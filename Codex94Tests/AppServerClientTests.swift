@@ -3,6 +3,29 @@ import XCTest
 @testable import Codex94
 
 final class AppServerClientTests: XCTestCase {
+    func testInitializeUsesInjectedClientVersion() async throws {
+        let fixture = try makeFixture(
+            script: #"""
+            IFS= read -r initialize
+            case "$initialize" in
+              *'"version":"9.8.7"'*) ;;
+              *) exit 71 ;;
+            esac
+            printf '%s\n' '{"id":1,"result":{"serverInfo":{"name":"fake"}}}'
+            IFS= read -r initialized
+            IFS= read -r limits
+            printf '%s\n' '{"id":2,"result":{"rateLimits":{"planType":"pro","primary":null,"secondary":{"usedPercent":27,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
+            """#,
+            clientVersion: "9.8.7"
+        )
+
+        let snapshot = try await fixture.client.fetch(
+            executable: fixture.executable,
+            identityMode: .quotaOnly
+        )
+        XCTAssertEqual(snapshot.window(.weekly)?.remainingPercent, 73)
+    }
+
     func testFetchIgnoresNotificationsAndMismatchedIDs() async throws {
         let fixture = try makeFixture(script: #"""
         IFS= read -r initialize
@@ -122,7 +145,8 @@ final class AppServerClientTests: XCTestCase {
         script: String,
         maximumLineBytes: Int = 1_048_576,
         initializeTimeout: TimeInterval = 1,
-        totalTimeout: TimeInterval = 3
+        totalTimeout: TimeInterval = 3,
+        clientVersion: String = "test"
     ) throws -> Fixture {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("Codex94ServerTests-\(UUID().uuidString)", isDirectory: true)
@@ -156,7 +180,8 @@ final class AppServerClientTests: XCTestCase {
                 "HOME": directory.path,
                 "PATH": "/usr/bin:/bin",
                 "TMPDIR": directory.path
-            ]
+            ],
+            clientVersion: clientVersion
         )
         let executable = LocatedCodex(
             executableURL: executableURL,

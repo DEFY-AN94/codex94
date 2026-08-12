@@ -1,6 +1,48 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "about.bundleIdentifier" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Bundle identifier" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Bundle 标识符" } }
+      }
+    },
+    "about.creator" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Created by" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "制作人" } }
+      }
+    },
+    "about.license" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "License" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开源许可" } }
+      }
+    },
+    "about.requirements" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "System requirement" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系统要求" } }
+      }
+    },
+    "about.subtitle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "An open-source Codex quota monitor for macOS" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开源的 macOS Codex 额度监控工具" } }
+      }
+    },
+    "about.unofficial" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Codex94 is an unofficial community tool and is not affiliated with OpenAI." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Codex94 是非官方社区工具，与 OpenAI 没有关联。" } }
+      }
+    },
+    "about.version" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Version" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "版本" } }
+      }
+    },
     "command.dashboard" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Dashboard" } },
@@ -53,6 +95,12 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Use automatic" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "使用自动检测" } }
+      }
+    },
+    "dashboard.about" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "About Codex94" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关于 Codex94" } }
       }
     },
     "dashboard.connection" : {
@@ -109,6 +157,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动" } }
       }
     },
+    "display.dashboardWindowSize" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dashboard window size" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仪表盘窗口尺寸" } }
+      }
+    },
     "display.fiveHour" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "5h" } },
@@ -125,6 +179,36 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Weekly" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每周" } }
+      }
+    },
+    "display.windowSize.compact" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Compact" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "紧凑" } }
+      }
+    },
+    "display.windowSize.custom" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Custom" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自定义" } }
+      }
+    },
+    "display.windowSize.fullHD" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Full HD" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全高清" } }
+      }
+    },
+    "display.windowSize.large" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Large" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "大" } }
+      }
+    },
+    "display.windowSize.standard" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Standard" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "标准" } }
       }
     },
     "error.codexNotExecutable" : {

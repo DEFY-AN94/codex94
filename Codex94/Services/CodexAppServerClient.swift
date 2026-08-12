@@ -18,19 +18,22 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
     private let runtimeDirectory: URL
     private let timeouts: AppServerTimeouts
     private let environment: [String: String]
+    private let clientVersion: String
     private let workerQueue = DispatchQueue(label: "com.defyan94.codex94.app-server")
     private let logger = Logger(subsystem: "com.defyan94.codex94", category: "rpc")
 
     init(
         runtimeDirectory: URL? = nil,
         timeouts: AppServerTimeouts = AppServerTimeouts(),
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        clientVersion: String = AppMetadata.current.version
     ) {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         self.runtimeDirectory = runtimeDirectory
             ?? base.appendingPathComponent("Codex94/Runtime", isDirectory: true)
         self.timeouts = timeouts
         self.environment = environment
+        self.clientVersion = clientVersion
     }
 
     func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot {
@@ -102,7 +105,7 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
                 "clientInfo": [
                     "name": "codex94",
                     "title": "Codex94",
-                    "version": "0.1.0"
+                    "version": clientVersion
                 ],
                 "capabilities": [
                     "experimentalApi": true

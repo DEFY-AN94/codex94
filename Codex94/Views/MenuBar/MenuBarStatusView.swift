@@ -13,7 +13,7 @@ struct MenuBarStatusView: View {
             stale: isStale
         )
 
-        HStack(spacing: 5) {
+        HStack(spacing: 4) {
             ZStack(alignment: .topTrailing) {
                 RingGaugeView(
                     remainingPercent: window?.remainingPercent,
@@ -34,9 +34,9 @@ struct MenuBarStatusView: View {
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .monospacedDigit()
                 .lineLimit(1)
-                .frame(width: 42, alignment: .leading)
+                .frame(width: 30, alignment: .leading)
         }
-        .frame(width: 64, height: 22)
+        .frame(width: 52, height: 22)
         .contentShape(Rectangle())
         .allowsHitTesting(false)
         .accessibilityLabel("Codex94 \(QuotaFormatting.percent(window?.remainingPercent))")
@@ -49,4 +49,3 @@ private extension ConnectionState {
         return false
     }
 }
-

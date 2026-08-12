@@ -6,7 +6,8 @@ a fixed-width ring and opens a compact, CLI-style quota popover.
 
 The app is menu-bar-first and has no Dock icon. Its Dashboard contains connection
 state, detected Codex path and version, account permission, menu display mode,
-refresh frequency, theme, language, launch-at-login, and redacted diagnostics.
+refresh frequency, window-size presets, theme, language, launch-at-login,
+redacted diagnostics, and app/creator information.
 
 > Codex94 is not affiliated with or endorsed by OpenAI. `app-server` is an
 > experimental Codex interface and may change in future Codex releases.
@@ -81,10 +82,14 @@ v1.
 ## Behavior
 
 - Refreshes at launch, whenever the popover opens, and every 1/5/15/30 minutes.
+- Closes the transient popover when the user clicks elsewhere without consuming
+  the original click or requesting Accessibility permission.
 - Coalesces overlapping refreshes into one app-server process.
 - Keeps the last successful quota visible when a refresh fails and marks it stale.
 - Hides the 5-hour row and selector whenever Codex does not return that window.
 - `Auto` displays the available window with the lowest remaining percentage.
+- Resizes Dashboard to 900x600, 1280x720, 1440x810, or 1920x1080 logical
+  points, proportionally fitting oversized presets to the current display.
 - Offers `Quota + account` and `Quota only` permission modes. Email is shown only
   in Dashboard and is never written to disk.
 - Uses only the current Codex login; v1 does not manage multiple accounts or
@@ -112,4 +117,3 @@ defaults delete com.defyan94.codex94
 ## License
 
 MIT. See [LICENSE](LICENSE) and [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
-

@@ -7,8 +7,16 @@ struct DashboardView: View {
         case display
         case startup
         case diagnostics
+        case about
 
         var id: String { rawValue }
+
+        static let primarySections: [Section] = [
+            .connection,
+            .display,
+            .startup,
+            .diagnostics
+        ]
 
         var titleKey: LocalizedStringKey {
             switch self {
@@ -16,6 +24,7 @@ struct DashboardView: View {
             case .display: "dashboard.display"
             case .startup: "dashboard.startup"
             case .diagnostics: "dashboard.diagnostics"
+            case .about: "dashboard.about"
             }
         }
 
@@ -25,11 +34,13 @@ struct DashboardView: View {
             case .display: "rectangle.on.rectangle"
             case .startup: "power.circle"
             case .diagnostics: "stethoscope"
+            case .about: "info.circle"
             }
         }
     }
 
     @ObservedObject var store: AppStore
+    @ObservedObject var windowState: DashboardWindowState
     let chooseCodex: () -> Void
     let clearManualCodex: () -> Void
     let quit: () -> Void
@@ -39,11 +50,35 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(Section.allCases, selection: $selection) { section in
-                Label(section.titleKey, systemImage: section.systemImage)
-                    .tag(section)
+            VStack(spacing: 0) {
+                List(Section.primarySections, selection: $selection) { section in
+                    Label(section.titleKey, systemImage: section.systemImage)
+                        .tag(section)
+                }
+                .listStyle(.sidebar)
+
+                Divider()
+
+                Button {
+                    selection = .about
+                } label: {
+                    Label(Section.about.titleKey, systemImage: Section.about.systemImage)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 8)
+                        .frame(height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(selection == .about ? Color.white : Color.primary)
+                .background {
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(selection == .about ? Color.accentColor : Color.clear)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
+                .accessibilityAddTraits(selection == .about ? .isSelected : [])
             }
-            .listStyle(.sidebar)
+            .frame(minWidth: 190, idealWidth: 230, maxWidth: 280)
             .navigationTitle("Codex94")
             .navigationSplitViewColumnWidth(min: 190, ideal: 230, max: 280)
             .toolbar(removing: .sidebarToggle)
@@ -57,11 +92,13 @@ struct DashboardView: View {
                         clearManualCodex: clearManualCodex
                     )
                 case .display:
-                    DisplaySettingsView(store: store)
+                    DisplaySettingsView(store: store, windowState: windowState)
                 case .startup:
                     StartupSettingsView(store: store)
                 case .diagnostics:
                     DiagnosticsView(store: store)
+                case .about:
+                    AboutView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -125,6 +162,22 @@ private struct ConnectionSettingsView: View {
 
             SettingsDivider()
 
+            SettingsRow("settings.refreshInterval") {
+                Picker("settings.refreshInterval", selection: Binding(
+                    get: { store.preferences.refreshInterval },
+                    set: { store.setRefreshInterval($0) }
+                )) {
+                    ForEach(RefreshInterval.allCases) { interval in
+                        (Text(verbatim: "\(interval.rawValue) ") + Text("settings.minutesShort"))
+                            .tag(interval)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 180)
+            }
+
+            SettingsDivider()
+
             SettingsRow("connection.codexPath") {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(store.locatedCodex?.executableURL.path ?? "—")
@@ -182,6 +235,7 @@ private struct ConnectionSettingsView: View {
 
 private struct DisplaySettingsView: View {
     @ObservedObject var store: AppStore
+    @ObservedObject var windowState: DashboardWindowState
 
     var body: some View {
         SettingsPage(title: "dashboard.display") {
@@ -201,18 +255,27 @@ private struct DisplaySettingsView: View {
 
             SettingsDivider()
 
-            SettingsRow("settings.refreshInterval") {
-                Picker("settings.refreshInterval", selection: Binding(
-                    get: { store.preferences.refreshInterval },
-                    set: { store.setRefreshInterval($0) }
+            SettingsRow("display.dashboardWindowSize") {
+                Picker("display.dashboardWindowSize", selection: Binding(
+                    get: { windowState.selectedPreset },
+                    set: { preset in
+                        if let preset {
+                            windowState.request(preset)
+                        }
+                    }
                 )) {
-                    ForEach(RefreshInterval.allCases) { interval in
-                        (Text(verbatim: "\(interval.rawValue) ") + Text("settings.minutesShort"))
-                            .tag(interval)
+                    ForEach(DashboardWindowSizePreset.allCases) { preset in
+                        (Text(preset.localizedKey) + Text(verbatim: " · \(preset.dimensions)"))
+                            .tag(Optional(preset))
+                    }
+                    if windowState.selectedPreset == nil {
+                        (Text("display.windowSize.custom")
+                            + Text(verbatim: " · \(windowState.currentDimensions)"))
+                            .tag(DashboardWindowSizePreset?.none)
                     }
                 }
                 .labelsHidden()
-                .frame(width: 180)
+                .frame(width: 260)
             }
 
             SettingsDivider()
@@ -312,6 +375,81 @@ private struct DiagnosticsView: View {
                     Label(copied ? "diagnostics.copied" : "diagnostics.copy", systemImage: "doc.on.doc")
                 }
             }
+        }
+    }
+}
+
+private struct AboutView: View {
+    private let metadata = AppMetadata.current
+    private let githubURL = URL(string: "https://github.com/DEFY-AN94")!
+
+    var body: some View {
+        SettingsPage(title: "dashboard.about") {
+            HStack(spacing: 24) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 88, height: 88)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(metadata.name)
+                        .font(.system(size: 24, weight: .semibold))
+                    Text("about.subtitle")
+                        .foregroundStyle(.secondary)
+                    Text(metadata.versionAndBuild)
+                        .font(.system(.body, design: .monospaced))
+                }
+            }
+            .padding(.bottom, 28)
+
+            Divider()
+
+            SettingsRow("about.version") {
+                Text(metadata.versionAndBuild)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+            }
+
+            SettingsDivider()
+
+            SettingsRow("about.bundleIdentifier") {
+                Text(metadata.bundleIdentifier)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+            }
+
+            SettingsDivider()
+
+            SettingsRow("about.requirements") {
+                Text(verbatim: "macOS \(metadata.minimumSystemVersion)+")
+            }
+
+            SettingsDivider()
+
+            SettingsRow("about.license") {
+                Text(verbatim: "MIT")
+            }
+
+            SettingsDivider()
+
+            SettingsRow("about.creator") {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(verbatim: "Crysis_TJQ")
+                    Link("@DEFY-AN94", destination: githubURL)
+                }
+            }
+
+            SettingsDivider()
+
+            Text("about.unofficial")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.top, 20)
+            Text(metadata.copyright)
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
+                .padding(.top, 6)
         }
     }
 }

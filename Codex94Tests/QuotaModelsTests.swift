@@ -14,6 +14,13 @@ final class QuotaModelsTests: XCTestCase {
         XCTAssertEqual(window(.weekly, used: 130).remainingPercent, 0)
     }
 
+    func testMenuBarPercentFormattingStates() {
+        XCTAssertEqual(QuotaFormatting.percent(nil), "--")
+        XCTAssertEqual(QuotaFormatting.percent(9), "9%")
+        XCTAssertEqual(QuotaFormatting.percent(71), "71%")
+        XCTAssertEqual(QuotaFormatting.percent(100), "100%")
+    }
+
     func testAutomaticModeChoosesLowestRemainingWindow() {
         let snapshot = QuotaSnapshot(
             windows: [window(.fiveHour, used: 20), window(.weekly, used: 75)],
@@ -154,6 +161,32 @@ final class QuotaModelsTests: XCTestCase {
         XCTAssertEqual(
             simplifiedChinese.localizedString(forKey: "quota.weeklyShort", value: nil, table: nil),
             "每周"
+        )
+    }
+
+    func testDashboardAdditionsAreLocalized() throws {
+        let english = try localizationBundle("en")
+        let simplifiedChinese = try localizationBundle("zh-Hans")
+
+        XCTAssertEqual(
+            english.localizedString(forKey: "dashboard.about", value: nil, table: nil),
+            "About Codex94"
+        )
+        XCTAssertEqual(
+            english.localizedString(forKey: "display.dashboardWindowSize", value: nil, table: nil),
+            "Dashboard window size"
+        )
+        XCTAssertEqual(
+            simplifiedChinese.localizedString(forKey: "dashboard.about", value: nil, table: nil),
+            "关于 Codex94"
+        )
+        XCTAssertEqual(
+            simplifiedChinese.localizedString(
+                forKey: "display.dashboardWindowSize",
+                value: nil,
+                table: nil
+            ),
+            "仪表盘窗口尺寸"
         )
     }
 

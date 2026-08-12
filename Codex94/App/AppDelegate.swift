@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private var dashboardController: DashboardWindowController?
+    private var localMouseMonitor: Any?
+    private var globalMouseMonitor: Any?
 
     override init() {
         let preferences = PreferencesStore()
@@ -43,8 +45,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         false
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        stopOutsideClickMonitoring()
+    }
+
     func popoverWillShow(_ notification: Notification) {
         store.popoverWillOpen()
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        stopOutsideClickMonitoring()
     }
 
     @objc private func togglePopover() {
@@ -56,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func configureStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: 72)
+        let item = NSStatusBar.system.statusItem(withLength: 58)
         guard let button = item.button else { return }
         button.target = self
         button.action = #selector(togglePopover)
@@ -69,8 +79,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         button.addSubview(hostingView)
         NSLayoutConstraint.activate([
-            hostingView.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 4),
-            hostingView.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -4),
+            hostingView.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 3),
+            hostingView.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -3),
             hostingView.topAnchor.constraint(equalTo: button.topAnchor),
             hostingView.bottomAnchor.constraint(equalTo: button.bottomAnchor)
         ])
@@ -95,6 +105,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func showPopover() {
         guard let button = statusItem?.button else { return }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        startOutsideClickMonitoring()
+    }
+
+    private func startOutsideClickMonitoring() {
+        stopOutsideClickMonitoring()
+        let mouseEvents: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: mouseEvents) { [weak self] event in
+            let location = NSEvent.mouseLocation
+            Task { @MainActor [weak self] in
+                self?.closePopoverIfOutside(at: location)
+            }
+            return event
+        }
+
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: mouseEvents) { [weak self] _ in
+            let location = NSEvent.mouseLocation
+            Task { @MainActor [weak self] in
+                self?.closePopoverIfOutside(at: location)
+            }
+        }
+    }
+
+    private func stopOutsideClickMonitoring() {
+        if let localMouseMonitor {
+            NSEvent.removeMonitor(localMouseMonitor)
+            self.localMouseMonitor = nil
+        }
+        if let globalMouseMonitor {
+            NSEvent.removeMonitor(globalMouseMonitor)
+            self.globalMouseMonitor = nil
+        }
+    }
+
+    private func closePopoverIfOutside(at screenPoint: NSPoint) {
+        guard popover.isShown else {
+            stopOutsideClickMonitoring()
+            return
+        }
+        if popover.contentViewController?.view.window?.frame.contains(screenPoint) == true {
+            return
+        }
+        if statusButtonFrameOnScreen()?.contains(screenPoint) == true {
+            return
+        }
+        popover.performClose(nil)
+    }
+
+    private func statusButtonFrameOnScreen() -> NSRect? {
+        guard let button = statusItem?.button, let window = button.window else { return nil }
+        let frameInWindow = button.convert(button.bounds, to: nil)
+        return window.convertToScreen(frameInWindow)
     }
 
     private func openDashboard() {

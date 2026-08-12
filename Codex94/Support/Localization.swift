@@ -10,6 +10,17 @@ extension DisplayMode {
     }
 }
 
+extension DashboardWindowSizePreset {
+    var localizedKey: LocalizedStringKey {
+        switch self {
+        case .compact: "display.windowSize.compact"
+        case .standard: "display.windowSize.standard"
+        case .large: "display.windowSize.large"
+        case .fullHD: "display.windowSize.fullHD"
+        }
+    }
+}
+
 extension QuotaWindowKind {
     var localizedKey: LocalizedStringKey {
         switch self {

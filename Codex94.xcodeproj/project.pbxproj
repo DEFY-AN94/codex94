@@ -27,11 +27,14 @@
 		B00000000000000000000012 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000012 /* DashboardView.swift */; };
 		B00000000000000000000013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000013 /* Assets.xcassets */; };
 		B00000000000000000000014 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000014 /* Localizable.xcstrings */; };
+		B00000000000000000000015 /* DashboardWindowSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000016 /* DashboardWindowSize.swift */; };
+		B00000000000000000000016 /* AppMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000017 /* AppMetadata.swift */; };
 		B00000000000000000000101 /* QuotaModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000101 /* QuotaModelsTests.swift */; };
 		B00000000000000000000102 /* ExecutableLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000102 /* ExecutableLocatorTests.swift */; };
 		B00000000000000000000103 /* DiagnosticsRedactorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000103 /* DiagnosticsRedactorTests.swift */; };
 		B00000000000000000000104 /* AppServerClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000104 /* AppServerClientTests.swift */; };
 		B00000000000000000000105 /* SnapshotCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000105 /* SnapshotCacheTests.swift */; };
+		B00000000000000000000106 /* DashboardWindowSizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000106 /* DashboardWindowSizeTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -66,11 +69,14 @@
 		F00000000000000000000013 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F00000000000000000000014 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F00000000000000000000015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F00000000000000000000016 /* DashboardWindowSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/DashboardWindowSize.swift; sourceTree = "<group>"; };
+		F00000000000000000000017 /* AppMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/AppMetadata.swift; sourceTree = "<group>"; };
 		F00000000000000000000101 /* QuotaModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaModelsTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000102 /* ExecutableLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutableLocatorTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000103 /* DiagnosticsRedactorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsRedactorTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000104 /* AppServerClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClientTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000105 /* SnapshotCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotCacheTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000106 /* DashboardWindowSizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWindowSizeTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000201 /* Codex94.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Codex94.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F00000000000000000000202 /* Codex94Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Codex94Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -106,6 +112,7 @@
 				F00000000000000000000002 /* AppDelegate.swift */,
 				F00000000000000000000003 /* DashboardWindowController.swift */,
 				F00000000000000000000004 /* QuotaModels.swift */,
+				F00000000000000000000016 /* DashboardWindowSize.swift */,
 				F00000000000000000000005 /* CodexExecutableLocator.swift */,
 				F00000000000000000000006 /* CodexAppServerClient.swift */,
 				F00000000000000000000007 /* SnapshotCache.swift */,
@@ -113,6 +120,7 @@
 				F00000000000000000000009 /* PreferencesStore.swift */,
 				F0000000000000000000000A /* AppStore.swift */,
 				F0000000000000000000000B /* Formatting.swift */,
+				F00000000000000000000017 /* AppMetadata.swift */,
 				F0000000000000000000000C /* DiagnosticsRedactor.swift */,
 				F0000000000000000000000D /* Localization.swift */,
 				F0000000000000000000000E /* Theme.swift */,
@@ -135,6 +143,7 @@
 				F00000000000000000000103 /* DiagnosticsRedactorTests.swift */,
 				F00000000000000000000104 /* AppServerClientTests.swift */,
 				F00000000000000000000105 /* SnapshotCacheTests.swift */,
+				F00000000000000000000106 /* DashboardWindowSizeTests.swift */,
 			);
 			path = Codex94Tests;
 			sourceTree = "<group>";
@@ -218,6 +227,7 @@
 				B00000000000000000000002 /* AppDelegate.swift in Sources */,
 				B00000000000000000000003 /* DashboardWindowController.swift in Sources */,
 				B00000000000000000000004 /* QuotaModels.swift in Sources */,
+				B00000000000000000000015 /* DashboardWindowSize.swift in Sources */,
 				B00000000000000000000005 /* CodexExecutableLocator.swift in Sources */,
 				B00000000000000000000006 /* CodexAppServerClient.swift in Sources */,
 				B00000000000000000000007 /* SnapshotCache.swift in Sources */,
@@ -225,6 +235,7 @@
 				B00000000000000000000009 /* PreferencesStore.swift in Sources */,
 				B0000000000000000000000A /* AppStore.swift in Sources */,
 				B0000000000000000000000B /* Formatting.swift in Sources */,
+				B00000000000000000000016 /* AppMetadata.swift in Sources */,
 				B0000000000000000000000C /* DiagnosticsRedactor.swift in Sources */,
 				B0000000000000000000000D /* Localization.swift in Sources */,
 				B0000000000000000000000E /* Theme.swift in Sources */,
@@ -244,6 +255,7 @@
 				B00000000000000000000103 /* DiagnosticsRedactorTests.swift in Sources */,
 				B00000000000000000000104 /* AppServerClientTests.swift in Sources */,
 				B00000000000000000000105 /* SnapshotCacheTests.swift in Sources */,
+				B00000000000000000000106 /* DashboardWindowSizeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -308,7 +320,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -316,7 +328,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -333,14 +345,14 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

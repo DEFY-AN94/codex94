@@ -2,8 +2,10 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class DashboardWindowController: NSWindowController {
+final class DashboardWindowController: NSWindowController, NSWindowDelegate {
     private static let autosaveName = NSWindow.FrameAutosaveName("Codex94Dashboard")
+    private let windowState: DashboardWindowState
+    private var isApplyingPreset = false
 
     init(
         store: AppStore,
@@ -11,6 +13,9 @@ final class DashboardWindowController: NSWindowController {
         clearManualCodex: @escaping () -> Void,
         quit: @escaping () -> Void
     ) {
+        let windowState = DashboardWindowState()
+        self.windowState = windowState
+
         let window = NSWindow(
             contentRect: .zero,
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -25,6 +30,7 @@ final class DashboardWindowController: NSWindowController {
 
         let rootView = DashboardView(
             store: store,
+            windowState: windowState,
             chooseCodex: chooseCodex,
             clearManualCodex: clearManualCodex,
             quit: quit
@@ -32,11 +38,16 @@ final class DashboardWindowController: NSWindowController {
         window.contentView = NSHostingView(rootView: rootView)
 
         super.init(window: window)
+        window.delegate = self
+        windowState.setResizeHandler { [weak self] preset in
+            self?.applyWindowSize(preset)
+        }
 
         if !window.setFrameUsingName(Self.autosaveName) {
             applyInitialFrame(to: window)
         }
         window.setFrameAutosaveName(Self.autosaveName)
+        updateWindowState()
     }
 
     @available(*, unavailable)
@@ -51,6 +62,37 @@ final class DashboardWindowController: NSWindowController {
         window.makeKeyAndOrderFront(nil)
     }
 
+    func windowDidResize(_ notification: Notification) {
+        guard !isApplyingPreset else { return }
+        updateWindowState()
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        guard !isApplyingPreset else { return }
+        updateWindowState()
+    }
+
+    private func applyWindowSize(_ preset: DashboardWindowSizePreset) {
+        guard let window, let visibleFrame = visibleFrame(for: window) else { return }
+        let targetFrame = DashboardWindowSizing.fittedFrame(
+            for: preset,
+            visibleFrame: visibleFrame
+        )
+        isApplyingPreset = true
+        window.setFrame(targetFrame, display: true, animate: true)
+        isApplyingPreset = false
+        updateWindowState()
+    }
+
+    private func updateWindowState() {
+        guard let window, let visibleFrame = visibleFrame(for: window) else { return }
+        windowState.update(frame: window.frame, visibleFrame: visibleFrame)
+    }
+
+    private func visibleFrame(for window: NSWindow) -> NSRect? {
+        window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
+    }
+
     private func applyInitialFrame(to window: NSWindow) {
         guard let screen = NSScreen.main else {
             window.setContentSize(NSSize(width: 1_440, height: 810))
@@ -58,13 +100,12 @@ final class DashboardWindowController: NSWindowController {
             return
         }
 
-        let visible = screen.visibleFrame
-        let width = min(1_920, visible.width * 0.9)
-        let height = min(1_080, visible.height * 0.9)
-        let origin = NSPoint(
-            x: visible.midX - width / 2,
-            y: visible.midY - height / 2
+        window.setFrame(
+            DashboardWindowSizing.fittedFrame(
+                for: .fullHD,
+                visibleFrame: screen.visibleFrame
+            ),
+            display: false
         )
-        window.setFrame(NSRect(x: origin.x, y: origin.y, width: width, height: height), display: false)
     }
 }
