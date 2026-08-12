@@ -1,0 +1,393 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B00000000000000000000001 /* Codex94App.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000001 /* Codex94App.swift */; };
+		B00000000000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000002 /* AppDelegate.swift */; };
+		B00000000000000000000003 /* DashboardWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000003 /* DashboardWindowController.swift */; };
+		B00000000000000000000004 /* QuotaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000004 /* QuotaModels.swift */; };
+		B00000000000000000000005 /* CodexExecutableLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000005 /* CodexExecutableLocator.swift */; };
+		B00000000000000000000006 /* CodexAppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000006 /* CodexAppServerClient.swift */; };
+		B00000000000000000000007 /* SnapshotCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000007 /* SnapshotCache.swift */; };
+		B00000000000000000000008 /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000008 /* LaunchAtLoginController.swift */; };
+		B00000000000000000000009 /* PreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000009 /* PreferencesStore.swift */; };
+		B0000000000000000000000A /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000A /* AppStore.swift */; };
+		B0000000000000000000000B /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000B /* Formatting.swift */; };
+		B0000000000000000000000C /* DiagnosticsRedactor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000C /* DiagnosticsRedactor.swift */; };
+		B0000000000000000000000D /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000D /* Localization.swift */; };
+		B0000000000000000000000E /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000E /* Theme.swift */; };
+		B0000000000000000000000F /* QuotaBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000F /* QuotaBarView.swift */; };
+		B00000000000000000000010 /* MenuBarStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000010 /* MenuBarStatusView.swift */; };
+		B00000000000000000000011 /* QuotaPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000011 /* QuotaPopoverView.swift */; };
+		B00000000000000000000012 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000012 /* DashboardView.swift */; };
+		B00000000000000000000013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000013 /* Assets.xcassets */; };
+		B00000000000000000000014 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000014 /* Localizable.xcstrings */; };
+		B00000000000000000000101 /* QuotaModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000101 /* QuotaModelsTests.swift */; };
+		B00000000000000000000102 /* ExecutableLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000102 /* ExecutableLocatorTests.swift */; };
+		B00000000000000000000103 /* DiagnosticsRedactorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000103 /* DiagnosticsRedactorTests.swift */; };
+		B00000000000000000000104 /* AppServerClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000104 /* AppServerClientTests.swift */; };
+		B00000000000000000000105 /* SnapshotCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000105 /* SnapshotCacheTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		P00000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = T00000000000000000000001;
+			remoteInfo = Codex94;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		F00000000000000000000001 /* Codex94App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Codex94App.swift; sourceTree = "<group>"; };
+		F00000000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppDelegate.swift; sourceTree = "<group>"; };
+		F00000000000000000000003 /* DashboardWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/DashboardWindowController.swift; sourceTree = "<group>"; };
+		F00000000000000000000004 /* QuotaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/QuotaModels.swift; sourceTree = "<group>"; };
+		F00000000000000000000005 /* CodexExecutableLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/CodexExecutableLocator.swift; sourceTree = "<group>"; };
+		F00000000000000000000006 /* CodexAppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/CodexAppServerClient.swift; sourceTree = "<group>"; };
+		F00000000000000000000007 /* SnapshotCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/SnapshotCache.swift; sourceTree = "<group>"; };
+		F00000000000000000000008 /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LaunchAtLoginController.swift; sourceTree = "<group>"; };
+		F00000000000000000000009 /* PreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/PreferencesStore.swift; sourceTree = "<group>"; };
+		F0000000000000000000000A /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/AppStore.swift; sourceTree = "<group>"; };
+		F0000000000000000000000B /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/Formatting.swift; sourceTree = "<group>"; };
+		F0000000000000000000000C /* DiagnosticsRedactor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/DiagnosticsRedactor.swift; sourceTree = "<group>"; };
+		F0000000000000000000000D /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/Localization.swift; sourceTree = "<group>"; };
+		F0000000000000000000000E /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/Theme.swift; sourceTree = "<group>"; };
+		F0000000000000000000000F /* QuotaBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/QuotaBarView.swift; sourceTree = "<group>"; };
+		F00000000000000000000010 /* MenuBarStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/MenuBar/MenuBarStatusView.swift; sourceTree = "<group>"; };
+		F00000000000000000000011 /* QuotaPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/MenuBar/QuotaPopoverView.swift; sourceTree = "<group>"; };
+		F00000000000000000000012 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Dashboard/DashboardView.swift; sourceTree = "<group>"; };
+		F00000000000000000000013 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F00000000000000000000014 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		F00000000000000000000015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F00000000000000000000101 /* QuotaModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaModelsTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000102 /* ExecutableLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutableLocatorTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000103 /* DiagnosticsRedactorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsRedactorTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000104 /* AppServerClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClientTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000105 /* SnapshotCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotCacheTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000201 /* Codex94.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Codex94.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F00000000000000000000202 /* Codex94Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Codex94Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		W00000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		W00000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A00000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000004 /* Codex94 */,
+				A00000000000000000000005 /* Codex94Tests */,
+				A00000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A00000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000201 /* Codex94.app */,
+				F00000000000000000000202 /* Codex94Tests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000004 /* Codex94 */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000001 /* Codex94App.swift */,
+				F00000000000000000000002 /* AppDelegate.swift */,
+				F00000000000000000000003 /* DashboardWindowController.swift */,
+				F00000000000000000000004 /* QuotaModels.swift */,
+				F00000000000000000000005 /* CodexExecutableLocator.swift */,
+				F00000000000000000000006 /* CodexAppServerClient.swift */,
+				F00000000000000000000007 /* SnapshotCache.swift */,
+				F00000000000000000000008 /* LaunchAtLoginController.swift */,
+				F00000000000000000000009 /* PreferencesStore.swift */,
+				F0000000000000000000000A /* AppStore.swift */,
+				F0000000000000000000000B /* Formatting.swift */,
+				F0000000000000000000000C /* DiagnosticsRedactor.swift */,
+				F0000000000000000000000D /* Localization.swift */,
+				F0000000000000000000000E /* Theme.swift */,
+				F0000000000000000000000F /* QuotaBarView.swift */,
+				F00000000000000000000010 /* MenuBarStatusView.swift */,
+				F00000000000000000000011 /* QuotaPopoverView.swift */,
+				F00000000000000000000012 /* DashboardView.swift */,
+				F00000000000000000000013 /* Assets.xcassets */,
+				F00000000000000000000014 /* Localizable.xcstrings */,
+				F00000000000000000000015 /* Info.plist */,
+			);
+			path = Codex94;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000005 /* Codex94Tests */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000101 /* QuotaModelsTests.swift */,
+				F00000000000000000000102 /* ExecutableLocatorTests.swift */,
+				F00000000000000000000103 /* DiagnosticsRedactorTests.swift */,
+				F00000000000000000000104 /* AppServerClientTests.swift */,
+				F00000000000000000000105 /* SnapshotCacheTests.swift */,
+			);
+			path = Codex94Tests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		T00000000000000000000001 /* Codex94 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L00000000000000000000002 /* Build configuration list for PBXNativeTarget "Codex94" */;
+			buildPhases = (
+				S00000000000000000000001 /* Sources */,
+				W00000000000000000000001 /* Frameworks */,
+				R00000000000000000000001 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = Codex94;
+			productName = Codex94;
+			productReference = F00000000000000000000201 /* Codex94.app */;
+			productType = "com.apple.product-type.application";
+		};
+		T00000000000000000000002 /* Codex94Tests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L00000000000000000000003 /* Build configuration list for PBXNativeTarget "Codex94Tests" */;
+			buildPhases = (
+				S00000000000000000000002 /* Sources */,
+				W00000000000000000000002 /* Frameworks */,
+				R00000000000000000000002 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = (D00000000000000000000001 /* PBXTargetDependency */);
+			name = Codex94Tests;
+			productName = Codex94Tests;
+			productReference = F00000000000000000000202 /* Codex94Tests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					T00000000000000000000001 = { CreatedOnToolsVersion = 26.6; };
+					T00000000000000000000002 = { CreatedOnToolsVersion = 26.6; TestTargetID = T00000000000000000000001; };
+				};
+			};
+			buildConfigurationList = L00000000000000000000001 /* Build configuration list for PBXProject "Codex94" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base, "zh-Hans");
+			mainGroup = A00000000000000000000002;
+			productRefGroup = A00000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (T00000000000000000000001 /* Codex94 */, T00000000000000000000002 /* Codex94Tests */);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		R00000000000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (B00000000000000000000013 /* Assets.xcassets in Resources */, B00000000000000000000014 /* Localizable.xcstrings in Resources */);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		R00000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		S00000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000001 /* Codex94App.swift in Sources */,
+				B00000000000000000000002 /* AppDelegate.swift in Sources */,
+				B00000000000000000000003 /* DashboardWindowController.swift in Sources */,
+				B00000000000000000000004 /* QuotaModels.swift in Sources */,
+				B00000000000000000000005 /* CodexExecutableLocator.swift in Sources */,
+				B00000000000000000000006 /* CodexAppServerClient.swift in Sources */,
+				B00000000000000000000007 /* SnapshotCache.swift in Sources */,
+				B00000000000000000000008 /* LaunchAtLoginController.swift in Sources */,
+				B00000000000000000000009 /* PreferencesStore.swift in Sources */,
+				B0000000000000000000000A /* AppStore.swift in Sources */,
+				B0000000000000000000000B /* Formatting.swift in Sources */,
+				B0000000000000000000000C /* DiagnosticsRedactor.swift in Sources */,
+				B0000000000000000000000D /* Localization.swift in Sources */,
+				B0000000000000000000000E /* Theme.swift in Sources */,
+				B0000000000000000000000F /* QuotaBarView.swift in Sources */,
+				B00000000000000000000010 /* MenuBarStatusView.swift in Sources */,
+				B00000000000000000000011 /* QuotaPopoverView.swift in Sources */,
+				B00000000000000000000012 /* DashboardView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		S00000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000101 /* QuotaModelsTests.swift in Sources */,
+				B00000000000000000000102 /* ExecutableLocatorTests.swift in Sources */,
+				B00000000000000000000103 /* DiagnosticsRedactorTests.swift in Sources */,
+				B00000000000000000000104 /* AppServerClientTests.swift in Sources */,
+				B00000000000000000000105 /* SnapshotCacheTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D00000000000000000000001 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = T00000000000000000000001 /* Codex94 */; targetProxy = P00000000000000000000001 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		C00000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		C00000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		C00000000000000000000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Codex94/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		C00000000000000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Codex94/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		C00000000000000000000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Codex94.app/Contents/MacOS/Codex94";
+			};
+			name = Debug;
+		};
+		C00000000000000000000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Codex94.app/Contents/MacOS/Codex94";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		L00000000000000000000001 /* Build configuration list for PBXProject "Codex94" */ = {isa = XCConfigurationList; buildConfigurations = (C00000000000000000000001 /* Debug */, C00000000000000000000002 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		L00000000000000000000002 /* Build configuration list for PBXNativeTarget "Codex94" */ = {isa = XCConfigurationList; buildConfigurations = (C00000000000000000000011 /* Debug */, C00000000000000000000012 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		L00000000000000000000003 /* Build configuration list for PBXNativeTarget "Codex94Tests" */ = {isa = XCConfigurationList; buildConfigurations = (C00000000000000000000021 /* Debug */, C00000000000000000000022 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = A00000000000000000000001 /* Project object */;
+}

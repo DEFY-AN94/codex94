@@ -1,0 +1,330 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "command.dashboard" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dashboard" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仪表盘" } }
+      }
+    },
+    "command.quit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quit Codex94" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "退出 Codex94" } }
+      }
+    },
+    "command.refresh" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新" } }
+      }
+    },
+    "connection.account" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Current account" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前账号" } }
+      }
+    },
+    "connection.choose" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择…" } }
+      }
+    },
+    "connection.codexPath" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Detected Codex" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "检测到的 Codex" } }
+      }
+    },
+    "connection.identity" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Account permission" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "账号权限" } }
+      }
+    },
+    "connection.status" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connection" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接状态" } }
+      }
+    },
+    "connection.useAutomatic" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Use automatic" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "使用自动检测" } }
+      }
+    },
+    "dashboard.connection" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connection" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接" } }
+      }
+    },
+    "dashboard.diagnostics" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Diagnostics" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "诊断" } }
+      }
+    },
+    "dashboard.display" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Display" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示" } }
+      }
+    },
+    "dashboard.startup" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Startup" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启动" } }
+      }
+    },
+    "diagnostics.copied" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copied" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已复制" } }
+      }
+    },
+    "diagnostics.copy" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy redacted diagnostics" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制脱敏诊断" } }
+      }
+    },
+    "display.auto" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动" } }
+      }
+    },
+    "display.fiveHour" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "5h" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "5 小时" } }
+      }
+    },
+    "display.label" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Menu bar window" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "菜单栏窗口" } }
+      }
+    },
+    "display.weekly" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Week" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每周" } }
+      }
+    },
+    "error.codexNotExecutable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Codex is not executable" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Codex 文件不可执行" } }
+      }
+    },
+    "error.codexNotFound" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Codex was not found" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未找到 Codex" } }
+      }
+    },
+    "error.connectionFailed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not read quota" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法读取额度" } }
+      }
+    },
+    "error.invalidCodexVersion" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Selected file is not Codex" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "所选文件不是 Codex" } }
+      }
+    },
+    "error.notLoggedIn" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sign in to Codex first" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请先登录 Codex" } }
+      }
+    },
+    "error.processLaunchFailed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Codex could not start" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法启动 Codex" } }
+      }
+    },
+    "error.quotaUnavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No Codex quota window returned" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Codex 未返回额度窗口" } }
+      }
+    },
+    "error.timeout" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Codex timed out" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Codex 响应超时" } }
+      }
+    },
+    "identity.account" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quota + account" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "额度 + 账号信息" } }
+      }
+    },
+    "identity.account.detail" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show the current account in Dashboard" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在仪表盘显示当前账号" } }
+      }
+    },
+    "identity.quotaOnly" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quota only" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅额度" } }
+      }
+    },
+    "identity.quotaOnly.detail" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Do not request account details" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "不请求账号详情" } }
+      }
+    },
+    "identity.subtitle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose what Codex94 asks app-server for" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择 Codex94 向 app-server 请求的内容" } }
+      }
+    },
+    "identity.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Account permission" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "账号权限" } }
+      }
+    },
+    "language.english" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "English" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "English" } }
+      }
+    },
+    "language.system" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Follow System" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "跟随系统" } }
+      }
+    },
+    "language.zhHans" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "简体中文" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "简体中文" } }
+      }
+    },
+    "quota.fiveHourShort" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "5h" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "5时" } }
+      }
+    },
+    "quota.resets" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "· resets" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "· 重置于" } }
+      }
+    },
+    "quota.weeklyShort" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "week" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每周" } }
+      }
+    },
+    "settings.language" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Language" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "语言" } }
+      }
+    },
+    "settings.minutesShort" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "min" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分钟" } }
+      }
+    },
+    "settings.refreshInterval" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh frequency" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新频率" } }
+      }
+    },
+    "settings.theme" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Theme" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主题" } }
+      }
+    },
+    "startup.approvalRequired" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Approval is required in Login Items" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "需要在登录项中批准" } }
+      }
+    },
+    "startup.installRequired" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Install Codex94 in ~/Applications first" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请先将 Codex94 安装到 ~/Applications" } }
+      }
+    },
+    "startup.login" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Launch at login" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "登录时启动" } }
+      }
+    },
+    "status.connected" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connected" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已连接" } }
+      }
+    },
+    "status.idle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ready" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "就绪" } }
+      }
+    },
+    "status.refreshing" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refreshing" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在刷新" } }
+      }
+    },
+    "status.staleShort" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stale" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "数据已过期" } }
+      }
+    },
+    "status.unavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unavailable" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "不可用" } }
+      }
+    },
+    "theme.dark" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Terminal Dark" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "终端深色" } }
+      }
+    },
+    "theme.light" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Terminal Light" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "终端浅色" } }
+      }
+    },
+    "theme.system" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Follow System" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "跟随系统" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}
