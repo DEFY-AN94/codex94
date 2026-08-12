@@ -9,7 +9,7 @@ enum QuotaWindowKind: String, Codable, CaseIterable, Identifiable, Sendable {
     var shortLabel: String {
         switch self {
         case .fiveHour: "5h"
-        case .weekly: "week"
+        case .weekly: "Weekly"
         }
     }
 }

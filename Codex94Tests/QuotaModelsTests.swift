@@ -101,6 +101,67 @@ final class QuotaModelsTests: XCTestCase {
         XCTAssertEqual(QuotaFormatting.staleAge(since: now, now: now.addingTimeInterval(3_660)), "1h")
     }
 
+    func testPopoverTitleIncludesRemainingPercentAndPlaceholder() {
+        XCTAssertEqual(
+            QuotaFormatting.popoverTitle(planType: "prolite", remainingPercent: 79),
+            "Codex · Prolite · 79% left"
+        )
+        XCTAssertEqual(
+            QuotaFormatting.popoverTitle(planType: "prolite", remainingPercent: nil),
+            "Codex · Prolite · -- left"
+        )
+    }
+
+    func testPopoverTitleTracksAutomaticFiveHourAndWeeklyWindows() {
+        let snapshot = QuotaSnapshot(
+            windows: [window(.fiveHour, used: 21), window(.weekly, used: 40)],
+            planType: "pro",
+            fetchedAt: Date(),
+            account: nil,
+            codex: codex
+        )
+
+        let expectations: [(DisplayMode, String)] = [
+            (.automatic, "Codex · Pro · 60% left"),
+            (.fiveHour, "Codex · Pro · 79% left"),
+            (.weekly, "Codex · Pro · 60% left")
+        ]
+
+        for (mode, expectedTitle) in expectations {
+            let displayedWindow = snapshot.window(for: mode)
+            XCTAssertEqual(
+                QuotaFormatting.popoverTitle(
+                    planType: snapshot.planType,
+                    remainingPercent: displayedWindow?.remainingPercent
+                ),
+                expectedTitle
+            )
+        }
+    }
+
+    func testWeeklyLabelsAreLocalized() throws {
+        let english = try localizationBundle("en")
+        let simplifiedChinese = try localizationBundle("zh-Hans")
+
+        XCTAssertEqual(
+            english.localizedString(forKey: "quota.weeklyShort", value: nil, table: nil),
+            "Weekly"
+        )
+        XCTAssertEqual(
+            english.localizedString(forKey: "display.weekly", value: nil, table: nil),
+            "Weekly"
+        )
+        XCTAssertEqual(
+            simplifiedChinese.localizedString(forKey: "quota.weeklyShort", value: nil, table: nil),
+            "每周"
+        )
+    }
+
+    private func localizationBundle(_ language: String) throws -> Bundle {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: language, withExtension: "lproj"))
+        return try XCTUnwrap(Bundle(url: url))
+    }
+
     private func window(_ kind: QuotaWindowKind, used: Int) -> QuotaWindowSnapshot {
         QuotaWindowSnapshot(
             kind: kind,
@@ -110,4 +171,3 @@ final class QuotaModelsTests: XCTestCase {
         )
     }
 }
-

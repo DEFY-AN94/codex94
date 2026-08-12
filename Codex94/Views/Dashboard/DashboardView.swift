@@ -35,9 +35,10 @@ struct DashboardView: View {
     let quit: () -> Void
 
     @State private var selection: Section? = .connection
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             List(Section.allCases, selection: $selection) { section in
                 Label(section.titleKey, systemImage: section.systemImage)
                     .tag(section)
@@ -45,6 +46,7 @@ struct DashboardView: View {
             .listStyle(.sidebar)
             .navigationTitle("Codex94")
             .navigationSplitViewColumnWidth(min: 190, ideal: 230, max: 280)
+            .toolbar(removing: .sidebarToggle)
         } detail: {
             Group {
                 switch selection ?? .connection {
@@ -65,6 +67,18 @@ struct DashboardView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .toolbar {
+            ToolbarItem(id: "sidebar-toggle", placement: .navigation) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        columnVisibility = sidebarIsVisible ? .detailOnly : .all
+                    }
+                } label: {
+                    Image(systemName: "sidebar.left")
+                }
+                .help(sidebarActionKey)
+                .accessibilityLabel(Text(sidebarActionKey))
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     store.refresh(trigger: .manual)
@@ -81,6 +95,14 @@ struct DashboardView: View {
             }
         }
         .codex94Environment(store.preferences)
+    }
+
+    private var sidebarIsVisible: Bool {
+        columnVisibility != .detailOnly
+    }
+
+    private var sidebarActionKey: LocalizedStringKey {
+        sidebarIsVisible ? "dashboard.sidebar.hide" : "dashboard.sidebar.show"
     }
 }
 
@@ -313,8 +335,9 @@ private struct SettingsPage<Content: View>: View {
             }
             .frame(maxWidth: 1_080, alignment: .leading)
             .padding(.horizontal, 48)
-            .padding(.vertical, 42)
+            .padding(.bottom, 42)
         }
+        .contentMargins(.top, 42, for: .scrollContent)
     }
 }
 

@@ -73,6 +73,18 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示" } }
       }
     },
+    "dashboard.sidebar.hide" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hide sidebar" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "隐藏侧边栏" } }
+      }
+    },
+    "dashboard.sidebar.show" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show sidebar" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示侧边栏" } }
+      }
+    },
     "dashboard.startup" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Startup" } },
@@ -111,7 +123,7 @@
     },
     "display.weekly" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Week" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Weekly" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每周" } }
       }
     },
@@ -231,7 +243,7 @@
     },
     "quota.weeklyShort" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "week" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Weekly" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每周" } }
       }
     },

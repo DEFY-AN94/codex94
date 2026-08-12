@@ -54,7 +54,10 @@ struct QuotaPopoverView: View {
             .frame(width: 30, height: 30)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("Codex · \(QuotaFormatting.plan(store.snapshot?.planType)) · % left")
+                Text(QuotaFormatting.popoverTitle(
+                    planType: store.snapshot?.planType,
+                    remainingPercent: store.displayedWindow?.remainingPercent
+                ))
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
                     .lineLimit(1)
                 Text(store.connectionState.localizedKey)
@@ -85,7 +88,7 @@ struct QuotaPopoverView: View {
             if store.snapshot?.windows.isEmpty != false {
                 HStack(spacing: 12) {
                     Text("--")
-                        .frame(width: 44, alignment: .leading)
+                        .frame(width: 58, alignment: .leading)
                     Text(String(repeating: "░", count: 20))
                         .foregroundStyle(.secondary.opacity(0.45))
                         .frame(width: 170, alignment: .leading)
@@ -193,7 +196,7 @@ private struct QuotaWindowRow: View {
                         remainingPercent: window.remainingPercent,
                         stale: false
                     ))
-                    .frame(width: 44, alignment: .leading)
+                    .frame(width: 58, alignment: .leading)
 
                 QuotaBarView(
                     remainingPercent: window.remainingPercent,

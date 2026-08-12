@@ -19,7 +19,7 @@ final class DashboardWindowController: NSWindowController {
         )
         window.title = "Codex94"
         window.titlebarAppearsTransparent = false
-        window.toolbarStyle = .unified
+        window.toolbarStyle = .unifiedCompact
         window.minSize = NSSize(width: 900, height: 600)
         window.isReleasedWhenClosed = false
 

@@ -6,6 +6,10 @@ enum QuotaFormatting {
         return value > 100 ? "100%+" : "\(max(0, value))%"
     }
 
+    static func popoverTitle(planType: String?, remainingPercent: Int?) -> String {
+        "Codex · \(plan(planType)) · \(percent(remainingPercent)) left"
+    }
+
     static func resetCountdown(to date: Date?, now: Date = Date()) -> String {
         guard let date else { return "--" }
         let remaining = max(0, Int(date.timeIntervalSince(now)))
@@ -35,4 +39,3 @@ enum QuotaFormatting {
             .joined(separator: " ")
     }
 }
-
