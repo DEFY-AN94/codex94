@@ -188,6 +188,60 @@ final class QuotaModelsTests: XCTestCase {
             ),
             "仪表盘窗口尺寸"
         )
+        XCTAssertEqual(
+            simplifiedChinese.localizedString(forKey: "theme.dark", value: nil, table: nil),
+            "深色"
+        )
+        XCTAssertEqual(
+            simplifiedChinese.localizedString(forKey: "theme.light", value: nil, table: nil),
+            "浅色"
+        )
+    }
+
+    func testThemePreferencesMapToAppKitAppearances() {
+        XCTAssertNil(ThemePreference.system.appAppearanceName)
+        XCTAssertEqual(ThemePreference.terminalDark.appAppearanceName, .darkAqua)
+        XCTAssertEqual(ThemePreference.terminalLight.appAppearanceName, .aqua)
+    }
+
+    @MainActor
+    func testSystemThemeClearsLightAppearanceFromExistingSurfaces() {
+        let application = NSApplication.shared
+        let originalApplicationAppearance = application.appearance
+        defer { application.appearance = originalApplicationAppearance }
+
+        let statusView = NSView(frame: .zero)
+        let popoverView = NSView(frame: .zero)
+        let dashboardWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+
+        AppAppearance.apply(
+            .terminalLight,
+            application: application,
+            statusView: statusView,
+            popoverView: popoverView,
+            dashboardWindow: dashboardWindow
+        )
+        XCTAssertEqual(application.appearance?.name, .aqua)
+        XCTAssertEqual(statusView.appearance?.name, .aqua)
+        XCTAssertEqual(popoverView.appearance?.name, .aqua)
+        XCTAssertEqual(dashboardWindow.appearance?.name, .aqua)
+
+        AppAppearance.apply(
+            .system,
+            application: application,
+            statusView: statusView,
+            popoverView: popoverView,
+            dashboardWindow: dashboardWindow
+        )
+        XCTAssertNil(application.appearance)
+        XCTAssertNil(statusView.appearance)
+        XCTAssertNil(popoverView.appearance)
+        XCTAssertNil(dashboardWindow.appearance)
     }
 
     private func localizationBundle(_ language: String) throws -> Bundle {

@@ -53,6 +53,10 @@ struct SnapshotCache: Sendable {
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: directory.path
+        )
 
         let cached = CachedSnapshot(
             windows: snapshot.windows.map {
@@ -86,4 +90,3 @@ private extension JSONDecoder {
         return decoder
     }
 }
-

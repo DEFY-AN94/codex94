@@ -18,6 +18,30 @@ final class ExecutableLocatorTests: XCTestCase {
         XCTAssertEqual(candidates.last?.url.path, "/custom/two/codex")
     }
 
+    func testRelativePathComponentsAreIgnored() {
+        let home = URL(fileURLWithPath: "/tmp/codex94-home")
+        let locator = CodexExecutableLocator(
+            environment: [
+                "PATH": ".:relative/bin:/safe/bin::/also/safe",
+                "HOME": home.path
+            ],
+            homeDirectory: home
+        )
+        let pathCandidates = locator.candidateURLs(manualPath: nil)
+            .filter { $0.source == .path }
+
+        XCTAssertEqual(pathCandidates.map(\.url.path), [
+            "/safe/bin/codex",
+            "/also/safe/codex"
+        ])
+        XCTAssertEqual(
+            CodexExecutableLocator.sanitizedEnvironment(from: [
+                "PATH": ".:/safe/bin:relative/bin:/also/safe"
+            ])["PATH"],
+            "/safe/bin:/also/safe"
+        )
+    }
+
     func testManualExecutableIsValidatedByVersion() throws {
         let directory = try makeTemporaryDirectory()
         let executable = directory.appendingPathComponent("codex")
@@ -48,6 +72,96 @@ final class ExecutableLocatorTests: XCTestCase {
         }
     }
 
+    func testRejectsMultilineVersionOutput() throws {
+        let directory = try makeTemporaryDirectory()
+        let executable = directory.appendingPathComponent("codex")
+        try "#!/bin/sh\nprintf 'codex-cli 9.4.0\\nuntrusted detail\\n'\n".write(
+            to: executable,
+            atomically: true,
+            encoding: .utf8
+        )
+        XCTAssertEqual(chmod(executable.path, 0o700), 0)
+
+        let locator = CodexExecutableLocator(
+            environment: ["PATH": "", "HOME": directory.path],
+            homeDirectory: directory
+        )
+        XCTAssertThrowsError(try locator.locate(manualPath: executable.path)) { error in
+            XCTAssertEqual(error as? ConnectionIssue, .invalidCodexVersion)
+        }
+    }
+
+    func testRejectsOversizedVersionOutput() throws {
+        let directory = try makeTemporaryDirectory()
+        let executable = directory.appendingPathComponent("codex")
+        let script = """
+        #!/bin/sh
+        printf 'codex-cli '
+        i=0
+        while [ "$i" -lt 1100 ]; do
+          printf x
+          i=$((i + 1))
+        done
+        printf '\n'
+        """
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        XCTAssertEqual(chmod(executable.path, 0o700), 0)
+
+        let locator = CodexExecutableLocator(
+            environment: ["PATH": "", "HOME": directory.path],
+            homeDirectory: directory
+        )
+        XCTAssertThrowsError(try locator.locate(manualPath: executable.path)) { error in
+            XCTAssertEqual(error as? ConnectionIssue, .invalidCodexVersion)
+        }
+    }
+
+    func testVersionProbeTimeoutStopsProcess() throws {
+        let directory = try makeTemporaryDirectory()
+        let executable = directory.appendingPathComponent("codex")
+        let pidFile = directory.appendingPathComponent("pid")
+        let descendantPIDFile = directory.appendingPathComponent("descendant-pid")
+        let script = """
+        #!/bin/sh
+        printf '%s\n' "$$" > "\(pidFile.path)"
+        sleep 30 &
+        printf '%s\n' "$!" > "\(descendantPIDFile.path)"
+        wait
+        """
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        XCTAssertEqual(chmod(executable.path, 0o700), 0)
+
+        let locator = CodexExecutableLocator(
+            environment: ["PATH": "", "HOME": directory.path],
+            homeDirectory: directory
+        )
+        let startedAt = Date()
+        XCTAssertThrowsError(try locator.locate(manualPath: executable.path)) { error in
+            XCTAssertEqual(error as? ConnectionIssue, .invalidCodexVersion)
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 4.5)
+
+        try assertProcessIsGone(at: pidFile)
+        try assertProcessIsGone(at: descendantPIDFile)
+    }
+
+    private func assertProcessIsGone(
+        at pidFile: URL,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let pidText = try String(contentsOf: pidFile, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let pid = try XCTUnwrap(Int32(pidText), file: file, line: line)
+        let deadline = Date().addingTimeInterval(1)
+        while kill(pid, 0) == 0, Date() < deadline {
+            usleep(20_000)
+        }
+        let result = kill(pid, 0)
+        if result == 0 { kill(pid, SIGKILL) }
+        XCTAssertEqual(result, -1, "spawned process must be terminated", file: file, line: line)
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("Codex94Tests-\(UUID().uuidString)", isDirectory: true)
@@ -56,4 +170,3 @@ final class ExecutableLocatorTests: XCTestCase {
         return url
     }
 }
-

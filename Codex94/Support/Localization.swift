@@ -47,14 +47,6 @@ extension ThemePreference {
         case .terminalLight: "theme.light"
         }
     }
-
-    var colorScheme: ColorScheme? {
-        switch self {
-        case .system: nil
-        case .terminalDark: .dark
-        case .terminalLight: .light
-        }
-    }
 }
 
 extension LanguagePreference {
@@ -87,6 +79,5 @@ extension ConnectionIssue {
 extension View {
     func codex94Environment(_ preferences: PreferencesStore) -> some View {
         environment(\.locale, preferences.language.locale)
-            .preferredColorScheme(preferences.theme.colorScheme)
     }
 }

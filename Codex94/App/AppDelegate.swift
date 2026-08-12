@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @MainActor
@@ -10,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var dashboardController: DashboardWindowController?
     private var localMouseMonitor: Any?
     private var globalMouseMonitor: Any?
+    private var themeObservation: AnyCancellable?
 
     override init() {
         let preferences = PreferencesStore()
@@ -23,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             return
         }
         NSApp.setActivationPolicy(.accessory)
+        configureThemeObservation()
         configureStatusItem()
         configurePopover()
         store.start()
@@ -46,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        themeObservation?.cancel()
         stopOutsideClickMonitoring()
     }
 
@@ -85,6 +89,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             hostingView.bottomAnchor.constraint(equalTo: button.bottomAnchor)
         ])
         statusItem = item
+    }
+
+    private func configureThemeObservation() {
+        applyAppearance(preferences.theme)
+        themeObservation = preferences.$theme
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] theme in
+                self?.applyAppearance(theme)
+            }
+    }
+
+    private func applyAppearance(_ theme: ThemePreference) {
+        AppAppearance.apply(
+            theme,
+            application: NSApp,
+            statusView: statusItem?.button,
+            popoverView: popover.contentViewController?.view,
+            dashboardWindow: dashboardController?.window
+        )
     }
 
     private func configurePopover() {
@@ -169,6 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 quit: { NSApp.terminate(nil) }
             )
         }
+        applyAppearance(preferences.theme)
         dashboardController?.show()
     }
 

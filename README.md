@@ -12,29 +12,47 @@ redacted diagnostics, and app/creator information.
 > Codex94 is not affiliated with or endorsed by OpenAI. `app-server` is an
 > experimental Codex interface and may change in future Codex releases.
 
+This repository currently publishes source code only. Local builds are ad-hoc
+signed and are not notarized for public binary distribution.
+
 ## Requirements
 
 - macOS 14 or later
 - Full Xcode 16 or later for local builds
+- `ripgrep` (`rg`) and `jq` for security and release checks
 - Codex available from the ChatGPT app, Homebrew, a standard CLI location, or a
   manually selected executable
 - A current Codex login for live quota data
+
+With Homebrew, install the command-line prerequisites using
+`brew install ripgrep jq`.
 
 ## Data flow
 
 ```mermaid
 flowchart LR
-    A["Codex94 UI"] --> B["Fixed local subprocess"]
-    B --> C["codex -s read-only -a untrusted app-server --stdio"]
-    C --> D["account/rateLimits/read"]
-    C -. "optional" .-> E["account/read refreshToken false"]
-    D --> A
-    E --> A
+    A["Codex94"] <-->|"local stdio JSON-RPC"| B["Codex app-server"]
+    B -->|"Codex-owned login"| C["OpenAI account service"]
+    A --> D["quota-only local cache"]
 ```
 
-Codex94 never receives an access token. It does not make a direct quota HTTP
-request and does not read credential files, browser cookies, Keychain entries,
-Codex session logs, or SQLite databases. See [SECURITY.md](SECURITY.md).
+Codex94 requests `account/rateLimits/read` and, when enabled,
+`account/read(refreshToken: false)`. The Codex child may contact OpenAI services,
+but Codex94 never receives an access token. It does not make a direct quota HTTP
+request or read credential files, browser cookies, Keychain entries, Codex
+session logs, or SQLite databases. See [PRIVACY.md](PRIVACY.md) and
+[SECURITY.md](SECURITY.md).
+
+## Architecture
+
+- `App` owns status-item, popover, appearance, and Dashboard window lifecycle.
+- `Stores` owns refresh coalescing, UI state, and preference persistence.
+- `Services` owns executable discovery, bounded JSON-RPC, cache, and login items.
+- `Models` and `Support` contain quota selection, formatting, localization, and
+  redaction logic.
+- `Views` are SwiftUI presentation and do not access credentials or the network.
+
+There are no third-party runtime dependencies.
 
 ## Build and run
 
@@ -63,7 +81,14 @@ Run unit and fake app-server integration tests:
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   xcodebuild -project Codex94.xcodeproj -scheme Codex94 \
-  -destination 'platform=macOS' -derivedDataPath .build/DerivedData test
+  -destination 'platform=macOS' -derivedDataPath .build/DerivedData \
+  CODE_SIGNING_ALLOWED=NO test
+```
+
+Before publishing a commit or tag, run the complete release gate:
+
+```bash
+./script/release_check.sh
 ```
 
 ## Install
@@ -84,7 +109,8 @@ v1.
 - Refreshes at launch, whenever the popover opens, and every 1/5/15/30 minutes.
 - Closes the transient popover when the user clicks elsewhere without consuming
   the original click or requesting Accessibility permission.
-- Coalesces overlapping refreshes into one app-server process.
+- Runs at most one app-server process, coalesces ordinary duplicate refreshes,
+  and queues one replacement refresh when a connection preference changes.
 - Keeps the last successful quota visible when a refresh fails and marks it stale.
 - Hides the 5-hour row and selector whenever Codex does not return that window.
 - `Auto` displays the available window with the lowest remaining percentage.
@@ -104,6 +130,11 @@ therefore uses Hardened Runtime without App Sandbox, starts only a validated
 limits each JSON line to 1 MiB, enforces request timeouts, and terminates the
 child after every refresh.
 
+Version validation confirms protocol compatibility, not publisher identity.
+Codex94 executes the detected or manually selected binary, so users must trust
+their ChatGPT/Codex installation and any executable they select. Relative `PATH`
+entries are ignored.
+
 ## Uninstall
 
 Disable **Launch at login** in Dashboard, quit Codex94, then remove:
@@ -117,3 +148,7 @@ defaults delete com.defyan94.codex94
 ## License
 
 MIT. See [LICENSE](LICENSE) and [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for changes and
+[docs/RELEASING.md](docs/RELEASING.md) for the source-first GitHub publishing
+checklist.

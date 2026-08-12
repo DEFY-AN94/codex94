@@ -1,4 +1,32 @@
+import AppKit
 import SwiftUI
+
+extension ThemePreference {
+    var appAppearanceName: NSAppearance.Name? {
+        switch self {
+        case .system: nil
+        case .terminalDark: .darkAqua
+        case .terminalLight: .aqua
+        }
+    }
+}
+
+@MainActor
+enum AppAppearance {
+    static func apply(
+        _ theme: ThemePreference,
+        application: NSApplication,
+        statusView: NSView?,
+        popoverView: NSView?,
+        dashboardWindow: NSWindow?
+    ) {
+        let appearance = theme.appAppearanceName.flatMap(NSAppearance.init(named:))
+        application.appearance = appearance
+        statusView?.appearance = appearance
+        popoverView?.appearance = appearance
+        dashboardWindow?.appearance = appearance
+    }
+}
 
 struct Codex94Palette {
     let background: Color
@@ -38,4 +66,3 @@ struct Codex94Palette {
         return terminalRed
     }
 }
-

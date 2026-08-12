@@ -406,13 +406,13 @@
     "theme.dark" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Terminal Dark" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "终端深色" } }
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "深色" } }
       }
     },
     "theme.light" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Terminal Light" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "终端浅色" } }
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "浅色" } }
       }
     },
     "theme.system" : {

@@ -36,9 +36,11 @@ final class AppServerClientTests: XCTestCase {
         IFS= read -r account
         printf '%s\n' '{"id":2,"result":{"account":{"type":"chatgpt","email":"test@example.com","planType":"pro"},"requiresOpenaiAuth":true}}'
         IFS= read -r limits
-        printf '%s\n' '{"id":3,"result":{"rateLimits":{"planType":"pro","primary":null,"secondary":{"usedPercent":27,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
         printf '%s\n' "$$" > "__CODEX94_PID_FILE__"
-        sleep 30
+        sleep 30 &
+        printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
+        printf '%s\n' '{"id":3,"result":{"rateLimits":{"planType":"pro","primary":null,"secondary":{"usedPercent":27,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
+        wait
         """#)
 
         let snapshot = try await fixture.client.fetch(
@@ -51,10 +53,8 @@ final class AppServerClientTests: XCTestCase {
         XCTAssertEqual(snapshot.account?.email, "test@example.com")
         XCTAssertEqual(snapshot.planType, "pro")
 
-        let pidText = try String(contentsOf: fixture.pidFile, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let pid = try XCTUnwrap(Int32(pidText))
-        XCTAssertEqual(kill(pid, 0), -1, "fake app-server must be terminated after fetch")
+        try assertProcessIsGone(at: fixture.pidFile)
+        try assertProcessIsGone(at: fixture.descendantPIDFile)
     }
 
     func testServerErrorIsClassified() async throws {
@@ -102,7 +102,9 @@ final class AppServerClientTests: XCTestCase {
         let fixture = try makeFixture(
             script: #"""
             printf '%s\n' "$$" > "__CODEX94_PID_FILE__"
-            sleep 30
+            sleep 30 &
+            printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
+            wait
             """#,
             initializeTimeout: 0.5,
             totalTimeout: 1
@@ -110,10 +112,8 @@ final class AppServerClientTests: XCTestCase {
         await assertIssue(.initializationTimedOut) {
             try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaOnly)
         }
-        let pidText = try String(contentsOf: fixture.pidFile, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let pid = try XCTUnwrap(Int32(pidText))
-        XCTAssertEqual(kill(pid, 0), -1)
+        try assertProcessIsGone(at: fixture.pidFile)
+        try assertProcessIsGone(at: fixture.descendantPIDFile)
     }
 
     func testEarlyExitIsClassified() async throws {
@@ -139,6 +139,24 @@ final class AppServerClientTests: XCTestCase {
         let client: CodexAppServerClient
         let executable: LocatedCodex
         let pidFile: URL
+        let descendantPIDFile: URL
+    }
+
+    private func assertProcessIsGone(
+        at pidFile: URL,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let pidText = try String(contentsOf: pidFile, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let pid = try XCTUnwrap(Int32(pidText), file: file, line: line)
+        let deadline = Date().addingTimeInterval(1)
+        while kill(pid, 0) == 0, Date() < deadline {
+            usleep(20_000)
+        }
+        let result = kill(pid, 0)
+        if result == 0 { kill(pid, SIGKILL) }
+        XCTAssertEqual(result, -1, "spawned process must be terminated", file: file, line: line)
     }
 
     private func makeFixture(
@@ -155,10 +173,13 @@ final class AppServerClientTests: XCTestCase {
 
         let executableURL = directory.appendingPathComponent("codex")
         let pidFile = directory.appendingPathComponent("pid")
-        let resolvedScript = script.replacingOccurrences(
-            of: "__CODEX94_PID_FILE__",
-            with: pidFile.path
-        )
+        let descendantPIDFile = directory.appendingPathComponent("descendant-pid")
+        let resolvedScript = script
+            .replacingOccurrences(of: "__CODEX94_PID_FILE__", with: pidFile.path)
+            .replacingOccurrences(
+                of: "__CODEX94_DESCENDANT_PID_FILE__",
+                with: descendantPIDFile.path
+            )
         try ("#!/bin/sh\n" + resolvedScript).write(
             to: executableURL,
             atomically: true,
@@ -188,6 +209,11 @@ final class AppServerClientTests: XCTestCase {
             version: "codex-cli test",
             source: .manual
         )
-        return Fixture(client: client, executable: executable, pidFile: pidFile)
+        return Fixture(
+            client: client,
+            executable: executable,
+            pidFile: pidFile,
+            descendantPIDFile: descendantPIDFile
+        )
     }
 }

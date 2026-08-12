@@ -60,24 +60,28 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: runtimeDirectory.path
+        )
 
-        let process = Process()
         let input = Pipe()
         let output = Pipe()
-        process.executableURL = executable.executableURL
-        process.arguments = ["-s", "read-only", "-a", "untrusted", "app-server", "--stdio"]
-        process.currentDirectoryURL = runtimeDirectory
-        process.environment = CodexExecutableLocator.sanitizedEnvironment(from: environment)
-        process.standardInput = input
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
 
         let startedAt = Date()
         let totalDeadline = startedAt.addingTimeInterval(timeouts.total)
         logger.info("stage=start source=\(executable.source.rawValue, privacy: .public)")
 
+        let process: ManagedSubprocess
         do {
-            try process.run()
+            process = try ManagedSubprocess.launch(
+                executableURL: executable.executableURL,
+                arguments: ["-s", "read-only", "-a", "untrusted", "app-server", "--stdio"],
+                currentDirectoryURL: runtimeDirectory,
+                environment: CodexExecutableLocator.sanitizedEnvironment(from: environment),
+                standardInput: input,
+                standardOutput: output
+            )
         } catch {
             logger.error("stage=launch result=failed")
             throw ConnectionIssue.processLaunchFailed
@@ -90,7 +94,7 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
 
         defer {
             try? input.fileHandleForWriting.close()
-            stop(process)
+            ProcessTerminator.stop(process, gracePeriod: timeouts.terminationGrace)
             let milliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
             logger.info(
                 "stage=finish duration_ms=\(milliseconds, privacy: .public) bytes=\(channel.bytesRead, privacy: .public)"
@@ -116,7 +120,6 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
         _ = try response(
             id: initializeID,
             channel: channel,
-            process: process,
             deadline: requestDeadline(seconds: timeouts.initialize, totalDeadline: totalDeadline),
             timeoutIssue: totalDeadline.timeIntervalSinceNow <= timeouts.initialize
                 ? .totalTimedOut
@@ -136,7 +139,6 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
             accountResult = try response(
                 id: nextID,
                 channel: channel,
-                process: process,
                 deadline: requestDeadline(seconds: timeouts.request, totalDeadline: totalDeadline),
                 timeoutIssue: .requestTimedOut
             )
@@ -154,7 +156,6 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
         let limitsResult = try response(
             id: nextID,
             channel: channel,
-            process: process,
             deadline: requestDeadline(seconds: timeouts.request, totalDeadline: totalDeadline),
             timeoutIssue: .requestTimedOut
         )
@@ -180,7 +181,6 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
     private func response(
         id: Int,
         channel: JSONLineChannel,
-        process: Process,
         deadline: Date,
         timeoutIssue: ConnectionIssue
     ) throws -> [String: Any] {
@@ -217,20 +217,6 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
 
     private func requestDeadline(seconds: TimeInterval, totalDeadline: Date) -> Date {
         min(Date().addingTimeInterval(seconds), totalDeadline)
-    }
-
-    private func stop(_ process: Process) {
-        guard process.isRunning else { return }
-        process.terminate()
-
-        let deadline = Date().addingTimeInterval(timeouts.terminationGrace)
-        while process.isRunning, Date() < deadline {
-            usleep(20_000)
-        }
-        if process.isRunning {
-            kill(process.processIdentifier, SIGKILL)
-        }
-        process.waitUntilExit()
     }
 
     private static func integer(_ value: Any?) -> Int? {

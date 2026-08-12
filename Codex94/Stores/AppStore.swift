@@ -18,6 +18,7 @@ final class AppStore: ObservableObject {
     private let cache: SnapshotCache
     private let logger = Logger(subsystem: "com.defyan94.codex94", category: "state")
     private var refreshTask: Task<Void, Never>?
+    private var pendingRefreshTrigger: RefreshTrigger?
     private var backgroundTask: Task<Void, Never>?
     private var preferencesObservation: AnyCancellable?
 
@@ -73,6 +74,9 @@ final class AppStore: ObservableObject {
     func refresh(trigger: RefreshTrigger) {
         guard preferences.hasChosenIdentityMode else { return }
         guard refreshTask == nil else {
+            if trigger == .preferenceChange {
+                pendingRefreshTrigger = trigger
+            }
             logger.info("refresh=coalesced trigger=\(trigger.rawValue, privacy: .public)")
             return
         }
@@ -97,8 +101,14 @@ final class AppStore: ObservableObject {
                 applyFailure(Self.issue(from: error))
             }
 
-            isRefreshing = false
+            let queuedTrigger = pendingRefreshTrigger
+            pendingRefreshTrigger = nil
             refreshTask = nil
+            if let queuedTrigger {
+                refresh(trigger: queuedTrigger)
+            } else {
+                isRefreshing = false
+            }
         }
     }
 
@@ -155,7 +165,7 @@ final class AppStore: ObservableObject {
             generatedAt: now,
             connection: Self.connectionLabel(connectionState),
             codexPath: DiagnosticsRedactor.redact(locatedCodex?.executableURL.path ?? "not-detected"),
-            codexVersion: locatedCodex?.version ?? "unknown",
+            codexVersion: DiagnosticsRedactor.redact(locatedCodex?.version ?? "unknown"),
             codexSource: locatedCodex?.source.rawValue ?? "unknown",
             identityMode: preferences.identityMode.rawValue,
             displayMode: preferences.displayMode.rawValue,
@@ -166,18 +176,31 @@ final class AppStore: ObservableObject {
     }
 
     private func applySuccess(_ freshSnapshot: QuotaSnapshot, located: LocatedCodex) {
-        snapshot = freshSnapshot
+        let visibleSnapshot: QuotaSnapshot
+        if preferences.identityMode == .quotaOnly, freshSnapshot.account != nil {
+            visibleSnapshot = QuotaSnapshot(
+                windows: freshSnapshot.windows,
+                planType: freshSnapshot.planType,
+                fetchedAt: freshSnapshot.fetchedAt,
+                account: nil,
+                codex: freshSnapshot.codex
+            )
+        } else {
+            visibleSnapshot = freshSnapshot
+        }
+
+        snapshot = visibleSnapshot
         locatedCodex = located
         lastIssue = nil
         connectionState = .connected
 
         if preferences.displayMode == .fiveHour,
-           freshSnapshot.window(.fiveHour) == nil {
+           visibleSnapshot.window(.fiveHour) == nil {
             preferences.displayMode = .weekly
         }
 
         do {
-            try cache.save(freshSnapshot)
+            try cache.save(visibleSnapshot)
         } catch {
             logger.error("cache=write_failed")
         }
