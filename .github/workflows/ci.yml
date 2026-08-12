@@ -25,6 +25,9 @@ jobs:
       - name: Select Xcode 16.4
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
+      - name: Install ripgrep
+        run: brew install ripgrep
+
       - name: Static security check
         run: ./script/security_check.sh
 
