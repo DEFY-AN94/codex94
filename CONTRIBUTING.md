@@ -11,8 +11,12 @@ and a zero third-party runtime dependency model.
    private filesystem paths.
 3. Add focused tests for behavior changes and both English and Simplified Chinese
    strings for visible UI.
-4. Run `./script/release_check.sh`.
-5. Explain user-visible behavior, security-boundary changes, and test evidence in
+4. Keep `README.md` and `README.zh-CN.md` synchronized when installation,
+   behavior, security, screenshots, or project status changes.
+5. Use sanitized fixture data for documentation screenshots. Never capture a
+   real email address, account ID, quota, token, or private filesystem path.
+6. Run `./script/release_check.sh`.
+7. Explain user-visible behavior, security-boundary changes, and test evidence in
    the pull request.
 
 Use small, scoped commits. Match the existing SwiftUI/AppKit ownership split:

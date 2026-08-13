@@ -2,6 +2,16 @@
 
 All notable changes to Codex94 are documented here.
 
+## Unreleased
+
+### Documentation
+
+- Add matching English and Simplified Chinese project guides with language
+  navigation.
+- Add sanitized Terminal Dark menu bar, popover, and Connection screenshots.
+- Correct private source-installation, security-reporting, and ongoing release
+  guidance.
+
 ## 0.1.3 - 2026-08-13
 
 ### Fixed
