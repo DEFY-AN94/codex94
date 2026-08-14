@@ -164,8 +164,8 @@ final class AppStore: ObservableObject {
         RedactedDiagnostics(
             generatedAt: now,
             connection: Self.connectionLabel(connectionState),
-            codexPath: DiagnosticsRedactor.redact(locatedCodex?.executableURL.path ?? "not-detected"),
-            codexVersion: DiagnosticsRedactor.redact(locatedCodex?.version ?? "unknown"),
+            codexPath: DiagnosticsRedactor.codexPath(for: locatedCodex),
+            codexVersion: DiagnosticsRedactor.codexVersion(locatedCodex?.version),
             codexSource: locatedCodex?.source.rawValue ?? "unknown",
             identityMode: preferences.identityMode.rawValue,
             displayMode: preferences.displayMode.rawValue,

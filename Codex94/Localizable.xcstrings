@@ -151,6 +151,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制脱敏诊断" } }
       }
     },
+    "diagnostics.reviewBeforeSharing" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Review the redacted diagnostics before sharing." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分享前请再次检查脱敏诊断内容。" } }
+      }
+    },
     "display.auto" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto" } },
