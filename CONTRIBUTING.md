@@ -19,6 +19,11 @@ and a zero third-party runtime dependency model.
 7. Explain user-visible behavior, security-boundary changes, and test evidence in
    the pull request.
 
+Use the repository Issue forms for bug reports and feature requests, and follow
+the pull request template when submitting a change. AI-assisted contributions
+are welcome, but contributors remain responsible for reviewing the complete
+diff, tests, security impact, and licensing of their submission.
+
 Use small, scoped commits. Match the existing SwiftUI/AppKit ownership split:
 SwiftUI owns views and state presentation; AppKit owns status items, popovers,
 application appearance, and window lifecycle.

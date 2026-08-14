@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest a focused improvement to Codex94.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow or limitation should this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Security boundary
+      options:
+        - label: This request does not require Codex94 to read tokens, cookies, Keychain data, authentication files, session logs, or SQLite databases.
+          required: true

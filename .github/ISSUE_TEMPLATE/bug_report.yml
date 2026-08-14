@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a reproducible Codex94 problem without private account data.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here. Use the Security policy instead.
+  - type: input
+    id: app-version
+    attributes:
+      label: Codex94 version
+      placeholder: 0.1.4 (5)
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: macOS 14.7
+    validations:
+      required: true
+  - type: input
+    id: codex-source
+    attributes:
+      label: Codex source and version
+      description: For example, ChatGPT bundle and codex-cli version. Do not include a private path.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: Optional. Review the copied diagnostics before posting them.
+      render: text
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed tokens, cookies, email addresses, account IDs, raw RPC payloads, and private filesystem paths.
+          required: true

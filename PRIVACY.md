@@ -35,6 +35,14 @@ Unified Logging receives only operation stage, duration, byte count, executable
 source category, and normalized error category. Raw RPC payloads, email,
 credentials, and full executable paths are not logged.
 
+## User-initiated clipboard access
+
+When the user selects **Copy redacted diagnostics**, Codex94 normalizes the
+detected executable path and version, then writes the structured diagnostic text
+to the macOS system clipboard. This happens only after a user action. Codex94
+does not upload the clipboard contents or diagnostics, and users should review
+the copied text before sharing it.
+
 ## Permissions
 
 Codex94 does not request browser, Documents, Keychain, Accessibility, contacts,

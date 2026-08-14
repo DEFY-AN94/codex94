@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/DEFY-AN94/codex94/security/policy
+    about: Do not disclose vulnerabilities or sensitive data in a public Issue.
