@@ -374,6 +374,10 @@ private struct DiagnosticsView: View {
                 } label: {
                     Label(copied ? "diagnostics.copied" : "diagnostics.copy", systemImage: "doc.on.doc")
                 }
+
+                Text("diagnostics.reviewBeforeSharing")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

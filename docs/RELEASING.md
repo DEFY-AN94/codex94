@@ -1,9 +1,9 @@
 # Source release workflow
 
-Codex94 currently distributes source only. Local installs are ad-hoc signed and
-are not notarized, so they must not be presented as frictionless public binary
-downloads. This checklist applies to each future source version after the
-repository has already been created.
+Codex94 distributes source only. Local installs are ad-hoc signed and are not
+notarized, so they must not be presented as frictionless public binary
+downloads. This checklist covers normal source releases and the one-time public
+repository transition.
 
 ## 1. Prepare the release
 
@@ -50,20 +50,24 @@ git diff --check PREVIOUS_TAG..HEAD
 
 Replace `PREVIOUS_TAG` with the latest published source tag.
 
-## 3. Push and wait for CI
+## 3. Open a release pull request and wait for CI
 
-Push the release commit to `main` using the repository's normal review policy:
+Create and push a release branch instead of committing directly to `main`:
 
 ```bash
-git push origin main
+VERSION=X.Y.Z
+git switch -c "release/v$VERSION-public"
+git push -u origin "release/v$VERSION-public"
 ```
 
-Wait for the GitHub Actions CI workflow on that exact commit to pass. Do not tag
-a different or unverified commit.
+Open a pull request to `main`. The `test` job must pass before the maintainer
+squash-merges the pull request. Confirm that `main` now points to the verified
+merge commit; do not tag the release branch commit.
 
 ## 4. Create a new immutable tag
 
-After CI succeeds, create and inspect a new annotated tag:
+After the pull request is merged and CI succeeds on `main`, create and inspect a
+new annotated tag on that merge commit:
 
 ```bash
 VERSION=X.Y.Z
@@ -92,7 +96,33 @@ A source tag does not require a GitHub Release. If a source-only GitHub Release
 is added later, describe it accurately and do not attach an ad-hoc-signed app as
 a public binary.
 
-## 6. Binary distribution comes later
+## 6. One-time public repository transition
+
+The maintainer changes repository visibility manually. Before doing so, review
+the current tree, every reachable commit and tag, unreachable local Git objects,
+documentation screenshots and metadata, and all retained GitHub Actions logs.
+Changing a private repository to public also exposes its Actions history.
+
+Immediately after switching visibility to Public:
+
+1. Enable Private Vulnerability Reporting, Secret Scanning, and Push Protection.
+2. Enable Swift CodeQL Default Setup with the Extended query suite.
+3. Add an active `main` ruleset requiring pull requests, the `test` status check,
+   and linear history; block force pushes and deletion, with an owner emergency
+   bypass and zero required approvals for the current solo-maintainer workflow.
+4. Add a `v*` tag ruleset that blocks tag updates and deletion while permitting
+   the owner to create new release tags.
+5. Allow squash and rebase merges, disable merge commits, enable auto-merge, and
+   delete merged branches automatically.
+6. Restrict Actions to GitHub-created actions and require full-length commit
+   SHAs.
+7. Set the About description to `Unofficial macOS quota monitor compatible with
+   OpenAI Codex. Vibe-built with Codex. / 与 OpenAI Codex 兼容的非官方 macOS
+   额度监控工具。` and retain the existing topics.
+8. Verify the README language links, Issue forms, Security policy, CI result,
+   visibility, rulesets, and immutable release tag from a signed-out browser.
+
+## 7. Binary distribution comes later
 
 A public `.app`, ZIP, or DMG requires a reproducible universal archive,
 Developer ID Application signing, Apple notarization, stapling, Gatekeeper

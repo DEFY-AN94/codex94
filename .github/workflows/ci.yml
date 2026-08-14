@@ -18,26 +18,16 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out source
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Select Xcode 16.4
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
-      - name: Install ripgrep
-        run: brew install ripgrep
+      - name: Install release tools
+        run: brew install ripgrep jq
 
-      - name: Static security check
-        run: ./script/security_check.sh
-
-      - name: Test
-        run: |
-          xcodebuild \
-            -project Codex94.xcodeproj \
-            -scheme Codex94 \
-            -configuration Debug \
-            -destination 'platform=macOS' \
-            -derivedDataPath .build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
-            test
+      - name: Release gate
+        run: ./script/release_check.sh

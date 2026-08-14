@@ -4,17 +4,20 @@
 
 ## Overview
 
-Codex94 is an unofficial macOS menu bar utility for monitoring the quota of the
-currently signed-in Codex account. A compact ring shows the selected percentage
-remaining; clicking it opens a CLI-style quota popover. The app has no Dock icon,
-and its Dashboard is focused on connection and display settings.
+Codex94 is an unofficial, independent macOS menu bar quota monitor compatible
+with OpenAI Codex. A compact ring shows the selected percentage remaining;
+clicking it opens a CLI-style quota popover. The app has no Dock icon, and its
+Dashboard is focused on connection and display settings.
 
-Codex94 is currently an MIT-licensed source preview in a private repository. It
-uses the Codex executable already installed on the Mac and has no third-party
-runtime dependencies.
+Codex94 is an MIT-licensed source project. It uses the Codex executable already
+installed on the Mac and has no third-party runtime dependencies.
 
-> Codex94 is not affiliated with or endorsed by OpenAI. Codex `app-server` is
-> an experimental interface and may change in future Codex releases.
+**Vibe-built with Codex.** Each source release is still maintainer-reviewed,
+tested, and security-scanned before it is tagged.
+
+> Codex94 is not affiliated with, endorsed by, or sponsored by OpenAI. Codex
+> `app-server` is an experimental interface and may change in future Codex
+> releases.
 
 ## Screenshots
 
@@ -38,9 +41,9 @@ illustrative and do not contain a real account, identity, or quota.
 
 ## Distribution status
 
-- The current stable source tag is `v0.1.3`.
-- The repository is currently private, so only invited collaborators can clone
-  it.
+- The current stable source tag is `v0.1.4`.
+- When this repository is visible as Public, its source can be cloned without
+  GitHub authentication.
 - There is no GitHub Release, DMG, notarized binary, or automatic updater.
 - `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
   Runtime signature, and installs it at `~/Applications/Codex94.app`.
@@ -63,15 +66,11 @@ executable selected manually.
 
 ## Install from source
 
-While the repository is private, authenticate with a GitHub account that has
-collaborator access. The commands below use GitHub CLI for authentication and
-install the stable `v0.1.3` source:
+After the repository is public, install the stable `v0.1.4` source with:
 
 ```bash
-brew install gh ripgrep
-gh auth login --web
-gh auth setup-git
-git clone --branch v0.1.3 --depth 1 https://github.com/DEFY-AN94/codex94.git
+brew install ripgrep
+git clone --branch v0.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
 cd codex94
 
 sudo xcodebuild -license accept
@@ -147,6 +146,10 @@ arguments are fixed, the environment is minimized, output is bounded, requests
 time out, and the process group is terminated after each refresh. Version
 validation checks protocol compatibility, not publisher identity, so users must
 trust the ChatGPT/Codex installation and any executable they select.
+
+Copied diagnostics normalize the executable path and version before writing the
+text to the system clipboard. Users should still review that text before sharing
+it. Codex94 never uploads diagnostics.
 
 See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md) for the complete
 boundaries.

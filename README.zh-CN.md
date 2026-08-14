@@ -4,14 +4,17 @@
 
 ## 产品简介
 
-Codex94 是一款非官方 macOS 菜单栏工具，用于查看当前已登录 Codex 账号的额度。
+Codex94 是一款与 OpenAI Codex 兼容的非官方、独立 macOS 菜单栏额度监控工具。
 菜单栏中的紧凑圆环会显示所选额度窗口的剩余百分比；点击后会展开 CLI 风格的
 额度面板。App 不显示 Dock 图标，Dashboard 主要用于连接与显示设置。
 
-Codex94 目前是私有仓库中的 MIT 许可源码预览，使用 Mac 上已有的 Codex
-可执行文件，并且没有第三方运行时依赖。
+Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可执行文件，
+并且没有第三方运行时依赖。
 
-> Codex94 与 OpenAI 没有关联，也未获得 OpenAI 认可或背书。Codex
+**本项目通过 Codex 辅助的 vibe coding 工作流构建。** 每个源码版本在创建标签前
+仍会由维护者检查，并通过测试与安全扫描。
+
+> Codex94 与 OpenAI 没有隶属关系，也未获得 OpenAI 的认可、背书或赞助。Codex
 > `app-server` 是实验性接口，未来 Codex 版本可能会改变它。
 
 ## 界面截图
@@ -35,8 +38,8 @@ Codex94 目前是私有仓库中的 MIT 许可源码预览，使用 Mac 上已�
 
 ## 当前分发状态
 
-- 当前稳定源码标签为 `v0.1.3`。
-- 仓库目前为 Private，只有受邀协作者能够 clone。
+- 当前稳定源码标签为 `v0.1.4`。
+- 当仓库可见性设为 Public 后，任何人都可以在无需 GitHub 认证的情况下 clone 源码。
 - 当前没有 GitHub Release、DMG、经过公证的二进制或自动更新功能。
 - `script/install.sh` 会构建本地 Release App，应用 ad-hoc Hardened
   Runtime 签名，并安装到 `~/Applications/Codex94.app`。
@@ -57,14 +60,11 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 
 ## 从源码安装
 
-仓库保持 Private 期间，请先使用拥有协作者权限的 GitHub 账号完成认证。
-以下命令使用 GitHub CLI 认证，并安装稳定的 `v0.1.3` 源码：
+仓库公开后，可使用以下命令安装稳定的 `v0.1.4` 源码：
 
 ```bash
-brew install gh ripgrep
-gh auth login --web
-gh auth setup-git
-git clone --branch v0.1.3 --depth 1 https://github.com/DEFY-AN94/codex94.git
+brew install ripgrep
+git clone --branch v0.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
 cd codex94
 
 sudo xcodebuild -license accept
@@ -130,6 +130,9 @@ Hardened Runtime 仍然启用；子进程参数固定、环境变量最小化、
 请求有超时，并且每次刷新后都会终止完整进程组。版本验证只检查协议兼容性，
 不验证发布者身份，因此用户必须信任自己的 ChatGPT/Codex 安装以及手动选择的
 可执行文件。
+
+复制诊断时，Codex94 会先规范化可执行文件路径与版本，再将文本写入系统剪贴板。
+分享前仍应由用户再次检查内容；Codex94 不会上传诊断信息。
 
 完整边界请参阅 [PRIVACY.md](PRIVACY.md) 和 [SECURITY.md](SECURITY.md)
 （英文）。

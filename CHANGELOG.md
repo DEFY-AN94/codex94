@@ -4,13 +4,24 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
-### Documentation
+## 0.1.4 - 2026-08-14
+
+### Security
+
+- Normalize executable paths and strictly validate version strings before
+  copying redacted diagnostics.
+- Expand current-tree and Git-history checks for credentials, private machine
+  paths, and email addresses while allowing only explicit test fixtures.
+
+### Documentation and project maintenance
 
 - Add matching English and Simplified Chinese project guides with language
   navigation.
 - Add sanitized Terminal Dark menu bar, popover, and Connection screenshots.
-- Correct private source-installation, security-reporting, and ongoing release
-  guidance.
+- Document public source installation, security reporting, clipboard behavior,
+  and the Codex-assisted vibe-coding workflow.
+- Add Issue and pull request templates, SHA-pinned CI, and Dependabot coverage
+  for GitHub Actions.
 
 ## 0.1.3 - 2026-08-13
 
