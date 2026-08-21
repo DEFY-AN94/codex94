@@ -177,8 +177,20 @@
     },
     "display.label" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Menu bar window" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "菜单栏窗口" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Menu bar quota" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "菜单栏额度" } }
+      }
+    },
+    "display.savedQuota" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved quota" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已保存额度" } }
+      }
+    },
+    "display.selectionUnavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved quota unavailable; showing Auto" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已保存额度暂不可用；当前显示自动" } }
       }
     },
     "display.weekly" : {
@@ -323,6 +335,12 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "5h" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "5时" } }
+      }
+    },
+    "quota.model" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quota model" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "额度模型" } }
       }
     },
     "quota.resets" : {

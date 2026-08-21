@@ -2,11 +2,12 @@
 
 ## Boundary
 
-Codex94 launches the user's existing Codex executable with fixed read-only and
-untrusted approval settings, then requests quota data over local stdio JSON-RPC.
-Codex itself owns authentication. Codex94 does not implement a usage HTTP client
-and does not directly inspect authentication stores, browser state, session
-logs, or local usage databases.
+Codex94 launches the user's existing Codex executable with the fixed command
+`codex -s read-only -a never app-server --stdio`, then requests quota data over
+local stdio JSON-RPC. The sandbox remains read-only and the noninteractive child
+cannot request an approval. Codex itself owns authentication. Codex94 does not
+implement OAuth or a usage HTTP client and does not directly inspect
+authentication stores, browser state, session logs, or local usage databases.
 
 The app is intentionally not App Sandboxed because the child Codex process must
 access its own existing login state. Hardened Runtime is enabled for installed
@@ -22,11 +23,16 @@ login, but Codex94 never receives that credential.
 
 ## Stored data
 
-The cache contains only window type, used percentage, reset timestamp, plan type,
-and fetch timestamp. It is stored under `~/Library/Application Support/Codex94`
-with owner-only permissions. Account email is memory-only. `UserDefaults` stores
-UI choices, refresh frequency, account-information mode, and an optional manually
-selected Codex path. See [PRIVACY.md](PRIVACY.md) for the complete inventory.
+Cache v2 contains only quota-bucket identifiers and optional names, plan type,
+window type and duration, used percentage, reset timestamp, and fetch timestamp.
+It is stored under `~/Library/Application Support/Codex94` with owner-only
+permissions. It excludes account identifiers, email, credentials, executable
+paths, and raw RPC data; legacy snapshots are migrated into the same minimized
+schema. Account email and the popover's currently browsed model are memory-only.
+`UserDefaults` stores UI choices, including the preferred menu-bar quota
+selection, refresh frequency, account-information mode, and an optional
+manually selected Codex path. See [PRIVACY.md](PRIVACY.md) for the complete
+inventory.
 
 ## Supported versions
 

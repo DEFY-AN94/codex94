@@ -240,16 +240,7 @@ private struct DisplaySettingsView: View {
     var body: some View {
         SettingsPage(title: "dashboard.display") {
             SettingsRow("display.label") {
-                Picker("display.label", selection: Binding(
-                    get: { store.preferences.displayMode },
-                    set: { store.setDisplayMode($0) }
-                )) {
-                    ForEach(store.availableDisplayModes) { mode in
-                        Text(mode.localizedKey).tag(mode)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
+                MenuBarQuotaPicker(store: store)
                 .frame(maxWidth: 360)
             }
 

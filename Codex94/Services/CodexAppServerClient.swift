@@ -76,7 +76,7 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
         do {
             process = try ManagedSubprocess.launch(
                 executableURL: executable.executableURL,
-                arguments: ["-s", "read-only", "-a", "untrusted", "app-server", "--stdio"],
+                arguments: ["-s", "read-only", "-a", "never", "app-server", "--stdio"],
                 currentDirectoryURL: runtimeDirectory,
                 environment: CodexExecutableLocator.sanitizedEnvironment(from: environment),
                 standardInput: input,
@@ -298,31 +298,77 @@ enum RateLimitsParser {
         executable: LocatedCodex,
         fetchedAt: Date
     ) throws -> QuotaSnapshot {
-        let defaultLimits = limitsResult["rateLimits"] as? [String: Any]
-        let limitsByID = limitsResult["rateLimitsByLimitId"] as? [String: Any]
-        let codexLimits = limitsByID?["codex"] as? [String: Any]
+        let account = parseAccount(accountResult)
+        let legacyLimits = limitsResult["rateLimits"] as? [String: Any]
+        let legacyLimitID = legacyLimits.map {
+            opaqueIdentifier($0["limitId"]) ?? "codex"
+        }
 
-        let selectedLimits: [String: Any]
-        if let defaultLimits, !classifiedWindows(in: defaultLimits).isEmpty {
-            selectedLimits = defaultLimits
-        } else if let codexLimits {
-            selectedLimits = codexLimits
+        var bucketsByID: [String: QuotaBucketSnapshot] = [:]
+        if let limitsByID = limitsResult["rateLimitsByLimitId"] as? [String: Any] {
+            for mapKey in limitsByID.keys.sorted() {
+                guard let rawLimits = limitsByID[mapKey] as? [String: Any] else { continue }
+                guard !mapKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    continue
+                }
+                bucketsByID[mapKey] = bucket(from: rawLimits, limitID: mapKey)
+            }
+        }
+
+        if let legacyLimits, let legacyLimitID {
+            let fallback = bucket(from: legacyLimits, limitID: legacyLimitID)
+            if let preferred = bucketsByID[legacyLimitID] {
+                bucketsByID[legacyLimitID] = merge(preferred: preferred, fallback: fallback)
+            } else {
+                bucketsByID[legacyLimitID] = fallback
+            }
+        }
+
+        let defaultLimitID: String
+        if let legacyLimitID {
+            defaultLimitID = legacyLimitID
+        } else if bucketsByID["codex"] != nil {
+            defaultLimitID = "codex"
+        } else if let firstID = bucketsByID.keys.sorted().first {
+            defaultLimitID = firstID
         } else {
             throw ConnectionIssue.quotaUnavailable
         }
 
-        let windows = classifiedWindows(in: selectedLimits)
-        guard !windows.isEmpty else { throw ConnectionIssue.quotaUnavailable }
+        bucketsByID = bucketsByID.filter {
+            $0.key == defaultLimitID || !$0.value.windows.isEmpty
+        }
+        guard bucketsByID.values.contains(where: { !$0.windows.isEmpty }) else {
+            throw ConnectionIssue.quotaUnavailable
+        }
 
-        let account = parseAccount(accountResult)
-        let planType = selectedLimits["planType"] as? String ?? account?.planType
-        return QuotaSnapshot(
-            windows: windows.sorted { $0.kind.rawValue < $1.kind.rawValue },
-            planType: planType,
+        let buckets = bucketsByID.values
+            .map { bucket in
+                QuotaBucketSnapshot(
+                    limitID: bucket.limitID,
+                    limitName: bucket.limitName,
+                    planType: bucket.planType ?? account?.planType,
+                    windows: bucket.windows
+                )
+            }
+            .sorted {
+                let lhsIsDefault = $0.limitID == defaultLimitID
+                let rhsIsDefault = $1.limitID == defaultLimitID
+                if lhsIsDefault != rhsIsDefault { return lhsIsDefault }
+                return $0.limitID < $1.limitID
+            }
+
+        let snapshot = QuotaSnapshot(
+            buckets: buckets,
+            defaultLimitID: defaultLimitID,
             fetchedAt: fetchedAt,
             account: account,
             codex: executable
         )
+        guard snapshot.displayableBuckets.contains(where: { !$0.windows.isEmpty }) else {
+            throw ConnectionIssue.quotaUnavailable
+        }
+        return snapshot
     }
 
     static func classifiedWindows(in limits: [String: Any]) -> [QuotaWindowSnapshot] {
@@ -339,14 +385,19 @@ enum RateLimitsParser {
             let resetsAt = integer(rawWindow["resetsAt"]).map {
                 Date(timeIntervalSince1970: TimeInterval($0))
             }
-            windowsByKind[kind] = QuotaWindowSnapshot(
+            let candidate = QuotaWindowSnapshot(
                 kind: kind,
                 usedPercent: usedPercent,
                 windowMinutes: windowMinutes,
                 resetsAt: resetsAt
             )
+            if let existing = windowsByKind[kind],
+               existing.usedPercent >= candidate.usedPercent {
+                continue
+            }
+            windowsByKind[kind] = candidate
         }
-        return Array(windowsByKind.values)
+        return windowsByKind.values.sorted { $0.kind.sortOrder < $1.kind.sortOrder }
     }
 
     static func kind(for windowMinutes: Int) -> QuotaWindowKind? {
@@ -368,6 +419,48 @@ enum RateLimitsParser {
             email: account["email"] as? String,
             planType: account["planType"] as? String
         )
+    }
+
+    private static func bucket(
+        from rawLimits: [String: Any],
+        limitID: String
+    ) -> QuotaBucketSnapshot {
+        QuotaBucketSnapshot(
+            limitID: limitID,
+            limitName: nonEmptyString(rawLimits["limitName"]),
+            planType: nonEmptyString(rawLimits["planType"]),
+            windows: classifiedWindows(in: rawLimits)
+        )
+    }
+
+    private static func merge(
+        preferred: QuotaBucketSnapshot,
+        fallback: QuotaBucketSnapshot
+    ) -> QuotaBucketSnapshot {
+        var windowsByKind = Dictionary(uniqueKeysWithValues: fallback.windows.map { ($0.kind, $0) })
+        for window in preferred.windows {
+            windowsByKind[window.kind] = window
+        }
+        return QuotaBucketSnapshot(
+            limitID: preferred.limitID,
+            limitName: preferred.normalizedLimitName ?? fallback.normalizedLimitName,
+            planType: preferred.planType ?? fallback.planType,
+            windows: windowsByKind.values.sorted { $0.kind.sortOrder < $1.kind.sortOrder }
+        )
+    }
+
+    private static func nonEmptyString(_ value: Any?) -> String? {
+        guard let string = value as? String else { return nil }
+        let normalized = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : normalized
+    }
+
+    private static func opaqueIdentifier(_ value: Any?) -> String? {
+        guard let string = value as? String,
+              !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return string
     }
 
     private static func integer(_ value: Any?) -> Int? {

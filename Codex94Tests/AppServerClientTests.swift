@@ -3,6 +3,35 @@ import XCTest
 @testable import Codex94
 
 final class AppServerClientTests: XCTestCase {
+    func testFetchUsesReadOnlyNeverApprovalArguments() async throws {
+        let fixture = try makeFixture(script: #"""
+        [ "$#" -eq 6 ] || exit 70
+        [ "$1" = "-s" ] || exit 71
+        [ "$2" = "read-only" ] || exit 72
+        [ "$3" = "-a" ] || exit 73
+        [ "$4" = "never" ] || exit 74
+        [ "$5" = "app-server" ] || exit 75
+        [ "$6" = "--stdio" ] || exit 76
+        case " $* " in
+          *" untrusted "*) exit 77 ;;
+        esac
+
+        IFS= read -r initialize
+        printf '%s\n' '{"id":1,"result":{"serverInfo":{"name":"fake"}}}'
+        IFS= read -r initialized
+        IFS= read -r limits
+        printf '%s\n' '{"id":2,"result":{"rateLimits":{"limitId":"default-v1","planType":"pro","primary":null,"secondary":{"usedPercent":27,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
+        """#)
+
+        let snapshot = try await fixture.client.fetch(
+            executable: fixture.executable,
+            identityMode: .quotaOnly
+        )
+
+        XCTAssertEqual(snapshot.defaultLimitID, "default-v1")
+        XCTAssertEqual(snapshot.defaultBucket?.window(.weekly)?.remainingPercent, 73)
+    }
+
     func testInitializeUsesInjectedClientVersion() async throws {
         let fixture = try makeFixture(
             script: #"""
@@ -23,7 +52,31 @@ final class AppServerClientTests: XCTestCase {
             executable: fixture.executable,
             identityMode: .quotaOnly
         )
-        XCTAssertEqual(snapshot.window(.weekly)?.remainingPercent, 73)
+        XCTAssertEqual(snapshot.defaultBucket?.window(.weekly)?.remainingPercent, 73)
+    }
+
+    func testFetchKeepsDefaultCodexAndNamedSparkBucketsSeparate() async throws {
+        let fixture = try makeFixture(script: #"""
+        IFS= read -r initialize
+        printf '%s\n' '{"id":1,"result":{"serverInfo":{"name":"fake"}}}'
+        IFS= read -r initialized
+        IFS= read -r limits
+        printf '%s\n' '{"id":2,"result":{"rateLimits":{"limitId":"default-v2","planType":"pro","primary":null,"secondary":{"usedPercent":63,"windowDurationMins":10080,"resetsAt":2000000000}},"rateLimitsByLimitId":{"default-v2":{"limitId":"ignored-embedded-id","planType":"pro","primary":null,"secondary":{"usedPercent":61,"windowDurationMins":10080,"resetsAt":2000000100}},"model-special":{"limitName":"Spark","planType":"pro","primary":{"usedPercent":28,"windowDurationMins":300,"resetsAt":1999990000},"secondary":{"usedPercent":16,"windowDurationMins":10080,"resetsAt":2000010000}}}}}'
+        """#)
+
+        let snapshot = try await fixture.client.fetch(
+            executable: fixture.executable,
+            identityMode: .quotaOnly
+        )
+
+        XCTAssertEqual(snapshot.defaultLimitID, "default-v2")
+        XCTAssertEqual(snapshot.buckets.map(\.limitID), ["default-v2", "model-special"])
+        XCTAssertNil(snapshot.defaultBucket?.window(.fiveHour))
+        XCTAssertEqual(snapshot.defaultBucket?.window(.weekly)?.usedPercent, 61)
+        let spark = try XCTUnwrap(snapshot.bucket(id: "model-special"))
+        XCTAssertEqual(spark.limitName, "Spark")
+        XCTAssertEqual(spark.window(.fiveHour)?.usedPercent, 28)
+        XCTAssertEqual(spark.window(.weekly)?.usedPercent, 16)
     }
 
     func testFetchIgnoresNotificationsAndMismatchedIDs() async throws {
@@ -48,8 +101,8 @@ final class AppServerClientTests: XCTestCase {
             identityMode: .quotaAndAccount
         )
 
-        XCTAssertEqual(snapshot.window(.weekly)?.remainingPercent, 73)
-        XCTAssertNil(snapshot.window(.fiveHour))
+        XCTAssertEqual(snapshot.defaultBucket?.window(.weekly)?.remainingPercent, 73)
+        XCTAssertNil(snapshot.defaultBucket?.window(.fiveHour))
         XCTAssertEqual(snapshot.account?.email, "test@example.com")
         XCTAssertEqual(snapshot.planType, "pro")
 

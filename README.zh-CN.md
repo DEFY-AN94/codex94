@@ -5,8 +5,8 @@
 ## 产品简介
 
 Codex94 是一款与 OpenAI Codex 兼容的非官方、独立 macOS 菜单栏额度监控工具。
-菜单栏中的紧凑圆环会显示所选额度窗口的剩余百分比；点击后会展开 CLI 风格的
-额度面板。App 不显示 Dock 图标，Dashboard 主要用于连接与显示设置。
+菜单栏中的紧凑圆环会显示所选模型额度桶与额度窗口的剩余百分比；点击后会展开
+CLI 风格的额度面板。App 不显示 Dock 图标，Dashboard 主要用于连接与显示设置。
 
 Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可执行文件，
 并且没有第三方运行时依赖。
@@ -88,9 +88,14 @@ sudo xcodebuild -runFirstLaunch
 - App 启动、每次展开菜单栏面板，以及按所选的 1、5、15 或 30 分钟间隔刷新。
 - 使用 `account/rateLimits/read` 读取实时额度；在 **额度 + 账号信息** 模式下，
   还会调用 `account/read`，并固定使用 `refreshToken: false`。
-- 显示剩余百分比；`自动` 会选择现有窗口中剩余比例最低的一项。
-- Codex 未返回 5 小时窗口时，会隐藏该额度行与选择项；如果返回 Weekly 窗口，
-  则继续显示每周额度。
+- 将 Codex 返回的标准/默认额度桶与额外命名的模型额度桶分开处理。默认额度桶显示
+  为 **Codex**；其他额度桶使用服务端提供的名称，例如 **Spark**。
+- Popover 中的模型选择器每次浏览一个额度桶，与菜单栏选择相互独立；浏览模型
+  不会改变菜单栏圆环。
+- 动态的菜单栏额度菜单提供 `自动` 以及每个可用额度桶与窗口；`自动` 会在所有
+  可显示额度桶和窗口中选择剩余比例最低的一项。
+- Codex 未返回某个 5 小时或 Weekly 窗口时，会隐藏对应额度行与选择项；App
+  不估算额度，也不会合并彼此独立的额度窗口。
 - 刷新失败时保留最后一次成功数值，并标记为 stale。
 - 点击面板以外区域会收起临时面板，不会吞掉原始点击，也不需要辅助功能权限。
 - Codex 检测顺序为：手动路径、ChatGPT App 内置文件、Homebrew、
@@ -112,18 +117,19 @@ flowchart LR
 Codex94 使用固定参数启动已验证的可执行文件：
 
 ```text
-codex -s read-only -a untrusted app-server --stdio
+codex -s read-only -a never app-server --stdio
 ```
 
-身份验证由 Codex 自己管理，Codex 可能会访问 OpenAI 服务。Codex94 不接收
-access token 或 refresh token，不直接发送额度 HTTP 请求，也不读取认证文件、
-浏览器 cookie、Keychain、Codex session 日志或 SQLite 数据库。
+身份验证由 Codex 自己管理，Codex 可能会访问 OpenAI 服务。Codex94 不实现
+OAuth，不接收 access token 或 refresh token，不直接发送额度 HTTP 请求，也不
+读取认证文件、浏览器 cookie、Keychain、Codex session 日志或 SQLite 数据库。
 
-本地缓存仅保存额度窗口类型、百分比、重置时间、套餐类型和获取时间，并使用仅限
-当前用户的文件权限。**额度 + 账号信息** 模式下的邮箱只存在于内存；切换为
-**仅额度** 后会从内存快照移除。UserDefaults 保存界面选项和用户手动选择的
-可执行文件路径。Codex94 没有分析、广告、遥测上传、崩溃上报 SDK、更新检查器
-或项目自营服务器。
+带版本的本地缓存仅保存额度桶标识与可选名称、套餐类型、窗口时长与类型、百分比、
+重置时间和获取时间，并使用仅限当前用户的文件权限。**额度 + 账号信息** 模式下
+的邮箱只存在于内存；切换为 **仅额度** 后会从内存快照移除。UserDefaults 保存
+界面选项（包括菜单栏额度偏好）和用户手动选择的可执行文件路径；Popover 中浏览
+的模型只在本次运行中保存。Codex94 没有分析、广告、遥测上传、崩溃上报 SDK、
+更新检查器或项目自营服务器。
 
 App Sandbox 被有意关闭，因为 Codex 子进程需要访问它自己的登录状态。
 Hardened Runtime 仍然启用；子进程参数固定、环境变量最小化、输出有大小限制、
@@ -173,7 +179,8 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ```
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
-Dashboard 窗口生命周期。贡献与发布流程见
+Dashboard 窗口生命周期。实现结构、贡献与发布流程见
+[项目架构](docs/PROJECT_ARCHITECTURE.md)、
 [CONTRIBUTING.md](CONTRIBUTING.md) 和
 [docs/RELEASING.md](docs/RELEASING.md)（英文）。
 

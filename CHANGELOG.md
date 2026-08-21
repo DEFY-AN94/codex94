@@ -4,6 +4,31 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Restore compatibility with Codex CLI 0.149 by replacing the removed
+  `-a untrusted` app-server argument with `-a never`, while retaining the
+  read-only sandbox.
+
+### Added
+
+- Parse the default Codex quota bucket and additional named model buckets from
+  `rateLimitsByLimitId` without merging independent quotas.
+- Add independent model-bucket browsing in the popover and dynamic menu-bar
+  selections. `Auto` now chooses the lowest remaining percentage across every
+  displayable bucket and window.
+- Add a versioned quota cache with backward migration for legacy snapshots and
+  display-mode preferences.
+
+### Security and privacy
+
+- Keep authentication inside the Codex app-server boundary: Codex94 does not
+  add OAuth handling, direct quota HTTP requests, or authentication-store
+  access.
+- Keep cache v2 limited to quota-bucket identifiers and names, plan and window
+  metadata, percentages, reset times, and fetch time with owner-only
+  permissions.
+
 ## 0.1.4 - 2026-08-14
 
 ### Security
