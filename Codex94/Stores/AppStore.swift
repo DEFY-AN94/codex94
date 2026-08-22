@@ -9,6 +9,7 @@ final class AppStore: ObservableObject {
     @Published private(set) var connectionState: ConnectionState = .idle
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastIssue: ConnectionIssue?
+    @Published private(set) var viewedBucketID: String?
 
     let preferences: PreferencesStore
     let launchAtLogin: LaunchAtLoginController
@@ -37,11 +38,8 @@ final class AppStore: ObservableObject {
 
         if let cached = cache.load() {
             snapshot = cached
+            viewedBucketID = cached.defaultLimitID
             connectionState = .stale(lastSuccess: cached.fetchedAt, issue: .unknown)
-            if preferences.displayMode == .fiveHour,
-               cached.window(.fiveHour) == nil {
-                preferences.displayMode = .weekly
-            }
         }
 
         preferencesObservation = preferences.objectWillChange.sink { [weak self] _ in
@@ -54,15 +52,74 @@ final class AppStore: ObservableObject {
         backgroundTask?.cancel()
     }
 
-    var displayedWindow: QuotaWindowSnapshot? {
-        snapshot?.window(for: preferences.displayMode)
+    var menuBarQuota: ResolvedQuotaWindow? {
+        preferredMenuBarQuota ?? snapshot?.automaticResolvedWindow
     }
 
-    var availableDisplayModes: [DisplayMode] {
-        var modes: [DisplayMode] = [.automatic]
-        if snapshot?.window(.fiveHour) != nil { modes.append(.fiveHour) }
-        if snapshot?.window(.weekly) != nil { modes.append(.weekly) }
-        return modes
+    var menuBarSelectionUsesFallback: Bool {
+        preferences.menuBarQuotaSelection != .automatic && preferredMenuBarQuota == nil
+    }
+
+    var viewedBucket: QuotaBucketSnapshot? {
+        guard let snapshot else { return nil }
+        if let bucket = snapshot.displayableBuckets.first(where: { $0.limitID == viewedBucketID }) {
+            return bucket
+        }
+        return snapshot.defaultBucket
+    }
+
+    var viewedWindow: QuotaWindowSnapshot? {
+        viewedBucket?.mostConstrainedWindow
+    }
+
+    var menuBarQuotaOptions: [MenuBarQuotaOption] {
+        var options = [
+            MenuBarQuotaOption(
+                selection: .automatic,
+                bucketName: nil,
+                kind: nil,
+                isAvailable: true
+            )
+        ]
+
+        guard let snapshot else {
+            let preferred = preferences.menuBarQuotaSelection
+            if preferred != .automatic, let kind = Self.kind(in: preferred) {
+                options.append(MenuBarQuotaOption(
+                    selection: preferred,
+                    bucketName: nil,
+                    kind: kind,
+                    isAvailable: false
+                ))
+            }
+            return options
+        }
+
+        for bucket in snapshot.displayableBuckets {
+            for window in bucket.windows.sorted(by: { $0.kind.sortOrder < $1.kind.sortOrder }) {
+                let selection: MenuBarQuotaSelection = bucket.limitID == snapshot.defaultLimitID
+                    ? .defaultBucket(window.kind)
+                    : .bucket(limitID: bucket.limitID, kind: window.kind)
+                options.append(MenuBarQuotaOption(
+                    selection: selection,
+                    bucketName: snapshot.displayName(for: bucket),
+                    kind: window.kind,
+                    isAvailable: true
+                ))
+            }
+        }
+
+        let preferred = preferences.menuBarQuotaSelection
+        if !options.contains(where: { $0.selection == preferred }),
+           let kind = Self.kind(in: preferred) {
+            options.append(MenuBarQuotaOption(
+                selection: preferred,
+                bucketName: unavailableBucketName(for: preferred, snapshot: snapshot),
+                kind: kind,
+                isAvailable: false
+            ))
+        }
+        return options
     }
 
     func start() {
@@ -120,20 +177,23 @@ final class AppStore: ObservableObject {
         preferences.identityMode = mode
         preferences.hasChosenIdentityMode = true
         if mode == .quotaOnly, let snapshot {
-            self.snapshot = QuotaSnapshot(
-                windows: snapshot.windows,
-                planType: snapshot.planType,
-                fetchedAt: snapshot.fetchedAt,
-                account: nil,
-                codex: snapshot.codex
-            )
+            self.snapshot = snapshot.removingAccount()
         }
         refresh(trigger: .preferenceChange)
     }
 
-    func setDisplayMode(_ mode: DisplayMode) {
-        guard availableDisplayModes.contains(mode) else { return }
-        preferences.displayMode = mode
+    func setMenuBarQuotaSelection(_ selection: MenuBarQuotaSelection) {
+        guard menuBarQuotaOptions.contains(where: {
+            $0.selection == selection && $0.isAvailable
+        }) else { return }
+        preferences.menuBarQuotaSelection = selection
+    }
+
+    func setViewedBucket(_ limitID: String) {
+        guard snapshot?.displayableBuckets.contains(where: { $0.limitID == limitID }) == true else {
+            return
+        }
+        viewedBucketID = limitID
     }
 
     func setRefreshInterval(_ interval: RefreshInterval) {
@@ -144,13 +204,7 @@ final class AppStore: ObservableObject {
     func setIdentityMode(_ mode: IdentityMode) {
         preferences.identityMode = mode
         if mode == .quotaOnly, let snapshot {
-            self.snapshot = QuotaSnapshot(
-                windows: snapshot.windows,
-                planType: snapshot.planType,
-                fetchedAt: snapshot.fetchedAt,
-                account: nil,
-                codex: snapshot.codex
-            )
+            self.snapshot = snapshot.removingAccount()
         }
         refresh(trigger: .preferenceChange)
     }
@@ -168,7 +222,7 @@ final class AppStore: ObservableObject {
             codexVersion: DiagnosticsRedactor.codexVersion(locatedCodex?.version),
             codexSource: locatedCodex?.source.rawValue ?? "unknown",
             identityMode: preferences.identityMode.rawValue,
-            displayMode: preferences.displayMode.rawValue,
+            displayMode: preferences.menuBarQuotaSelection.diagnosticValue,
             refreshMinutes: preferences.refreshInterval.rawValue,
             lastSuccess: snapshot?.fetchedAt,
             lastError: lastIssue?.rawValue
@@ -178,13 +232,7 @@ final class AppStore: ObservableObject {
     private func applySuccess(_ freshSnapshot: QuotaSnapshot, located: LocatedCodex) {
         let visibleSnapshot: QuotaSnapshot
         if preferences.identityMode == .quotaOnly, freshSnapshot.account != nil {
-            visibleSnapshot = QuotaSnapshot(
-                windows: freshSnapshot.windows,
-                planType: freshSnapshot.planType,
-                fetchedAt: freshSnapshot.fetchedAt,
-                account: nil,
-                codex: freshSnapshot.codex
-            )
+            visibleSnapshot = freshSnapshot.removingAccount()
         } else {
             visibleSnapshot = freshSnapshot
         }
@@ -194,9 +242,8 @@ final class AppStore: ObservableObject {
         lastIssue = nil
         connectionState = .connected
 
-        if preferences.displayMode == .fiveHour,
-           visibleSnapshot.window(.fiveHour) == nil {
-            preferences.displayMode = .weekly
+        if !visibleSnapshot.displayableBuckets.contains(where: { $0.limitID == viewedBucketID }) {
+            viewedBucketID = visibleSnapshot.defaultLimitID
         }
 
         do {
@@ -231,6 +278,44 @@ final class AppStore: ObservableObject {
     private static func issue(from error: Error) -> ConnectionIssue {
         if let issue = error as? ConnectionIssue { return issue }
         return .unknown
+    }
+
+    private var preferredMenuBarQuota: ResolvedQuotaWindow? {
+        guard let snapshot,
+              let resolved = snapshot.resolved(preferences.menuBarQuotaSelection),
+              snapshot.displayableBuckets.contains(where: {
+                  $0.limitID == resolved.bucket.limitID
+              }) else {
+            return nil
+        }
+        return resolved
+    }
+
+    private func unavailableBucketName(
+        for selection: MenuBarQuotaSelection,
+        snapshot: QuotaSnapshot
+    ) -> String? {
+        switch selection {
+        case .automatic:
+            return nil
+        case .defaultBucket:
+            return "Codex"
+        case let .bucket(limitID, _):
+            guard let bucket = snapshot.displayableBuckets.first(where: {
+                $0.limitID == limitID
+            }) else {
+                return nil
+            }
+            return snapshot.displayName(for: bucket)
+        }
+    }
+
+    private static func kind(in selection: MenuBarQuotaSelection) -> QuotaWindowKind? {
+        switch selection {
+        case .automatic: nil
+        case let .defaultBucket(kind): kind
+        case let .bucket(_, kind): kind
+        }
     }
 
     private static func connectionLabel(_ state: ConnectionState) -> String {

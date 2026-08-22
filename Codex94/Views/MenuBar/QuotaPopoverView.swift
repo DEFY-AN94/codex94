@@ -28,13 +28,17 @@ struct QuotaPopoverView: View {
     private var quotaContent: some View {
         VStack(spacing: 0) {
             header
+            if (store.snapshot?.displayableBuckets.count ?? 0) > 1 {
+                Divider()
+                modelPicker
+            }
             Divider()
             quotaRows
 
             stateBanner
 
             Divider()
-            displayModePicker
+            menuBarQuotaPicker
             Divider()
             commandRows
         }
@@ -44,19 +48,20 @@ struct QuotaPopoverView: View {
     private var header: some View {
         HStack(spacing: 12) {
             RingGaugeView(
-                remainingPercent: store.displayedWindow?.remainingPercent,
+                remainingPercent: store.viewedWindow?.remainingPercent,
                 color: palette.quotaColor(
-                    remainingPercent: store.displayedWindow?.remainingPercent,
+                    remainingPercent: store.viewedWindow?.remainingPercent,
                     stale: store.connectionState.isStale
                 ),
                 lineWidth: 3
             )
-            .frame(width: 30, height: 30)
+            .frame(width: 34, height: 34)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(QuotaFormatting.popoverTitle(
-                    planType: store.snapshot?.planType,
-                    remainingPercent: store.displayedWindow?.remainingPercent
+                    bucketName: viewedBucketName,
+                    planType: store.viewedBucket?.planType,
+                    remainingPercent: store.viewedWindow?.remainingPercent
                 ))
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
                     .lineLimit(1)
@@ -77,15 +82,47 @@ struct QuotaPopoverView: View {
         .padding(.vertical, 15)
     }
 
+    private var viewedBucketName: String {
+        guard let snapshot = store.snapshot, let bucket = store.viewedBucket else {
+            return "Codex"
+        }
+        return snapshot.displayName(for: bucket)
+    }
+
+    private var modelPicker: some View {
+        HStack(spacing: 12) {
+            Text("quota.model")
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(.secondary)
+            Picker("quota.model", selection: Binding(
+                get: { store.viewedBucket?.limitID ?? store.snapshot?.defaultLimitID ?? "" },
+                set: { store.setViewedBucket($0) }
+            )) {
+                ForEach(store.snapshot?.displayableBuckets ?? []) { bucket in
+                    Text(verbatim: QuotaFormatting.shortBucketName(
+                        store.snapshot?.displayName(for: bucket) ?? bucket.limitID
+                    ))
+                    .tag(bucket.limitID)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(maxWidth: 300)
+            Spacer()
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 11)
+    }
+
     private var quotaRows: some View {
         VStack(spacing: 14) {
-            if let fiveHour = store.snapshot?.window(.fiveHour) {
+            if let fiveHour = store.viewedBucket?.window(.fiveHour) {
                 QuotaWindowRow(window: fiveHour, palette: palette)
             }
-            if let weekly = store.snapshot?.window(.weekly) {
+            if let weekly = store.viewedBucket?.window(.weekly) {
                 QuotaWindowRow(window: weekly, palette: palette)
             }
-            if store.snapshot?.windows.isEmpty != false {
+            if store.viewedBucket?.windows.isEmpty != false {
                 HStack(spacing: 12) {
                     Text("--")
                         .frame(width: 58, alignment: .leading)
@@ -129,22 +166,13 @@ struct QuotaPopoverView: View {
         }
     }
 
-    private var displayModePicker: some View {
+    private var menuBarQuotaPicker: some View {
         HStack(spacing: 12) {
             Text("display.label")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
-            Picker("display.label", selection: Binding(
-                get: { store.preferences.displayMode },
-                set: { store.setDisplayMode($0) }
-            )) {
-                ForEach(store.availableDisplayModes) { mode in
-                    Text(mode.localizedKey).tag(mode)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 260)
+            MenuBarQuotaPicker(store: store)
+                .frame(maxWidth: 300)
             Spacer()
         }
         .padding(.horizontal, 18)
@@ -181,6 +209,53 @@ struct QuotaPopoverView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
+    }
+}
+
+struct MenuBarQuotaPicker: View {
+    @ObservedObject var store: AppStore
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Picker("display.label", selection: Binding(
+                get: { store.preferences.menuBarQuotaSelection },
+                set: { store.setMenuBarQuotaSelection($0) }
+            )) {
+                ForEach(store.menuBarQuotaOptions) { option in
+                    optionLabel(option)
+                        .tag(option.selection)
+                        .disabled(!option.isAvailable)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+
+            if store.menuBarSelectionUsesFallback {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .help("display.selectionUnavailable")
+                    .accessibilityLabel(Text("display.selectionUnavailable"))
+            }
+        }
+    }
+
+    private func optionLabel(_ option: MenuBarQuotaOption) -> Text {
+        guard option.selection != .automatic, let kind = option.kind else {
+            return Text("display.auto")
+        }
+
+        let bucket: Text
+        if let bucketName = option.bucketName {
+            bucket = Text(verbatim: QuotaFormatting.shortBucketName(bucketName))
+        } else {
+            bucket = Text("display.savedQuota")
+        }
+
+        let label = bucket + Text(verbatim: " · ") + Text(kind.localizedKey)
+        if option.isAvailable {
+            return label
+        }
+        return label + Text(verbatim: " · ") + Text("status.unavailable")
     }
 }
 

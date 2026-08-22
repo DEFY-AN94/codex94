@@ -6,7 +6,7 @@ struct MenuBarStatusView: View {
 
     var body: some View {
         let palette = Codex94Palette.resolve(store.preferences.theme, scheme: colorScheme)
-        let window = store.displayedWindow
+        let window = store.menuBarQuota?.window
         let isStale = store.connectionState.isStale
         let color = palette.quotaColor(
             remainingPercent: window?.remainingPercent,

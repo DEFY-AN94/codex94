@@ -77,7 +77,10 @@ final class DiagnosticsRedactorTests: XCTestCase {
             codexVersion: DiagnosticsRedactor.codexVersion("codex-cli user@example.com"),
             codexSource: "manual",
             identityMode: "quotaOnly",
-            displayMode: "weekly",
+            displayMode: MenuBarQuotaSelection.bucket(
+                limitID: "private-model-identifier",
+                kind: .weekly
+            ).diagnosticValue,
             refreshMinutes: 5,
             lastSuccess: Date(timeIntervalSince1970: 900),
             lastError: nil
@@ -86,9 +89,12 @@ final class DiagnosticsRedactorTests: XCTestCase {
         XCTAssertTrue(diagnostics.contains("connection: connected"))
         XCTAssertTrue(diagnostics.contains("codexPath: <redacted-path>/codex"))
         XCTAssertTrue(diagnostics.contains("codexVersion: codex-cli <redacted-version>"))
+        XCTAssertTrue(diagnostics.contains("displayMode: bucket.weekly"))
+        XCTAssertFalse(diagnostics.contains("private-model-identifier"))
         XCTAssertFalse(diagnostics.contains("/Users/private"))
         XCTAssertFalse(diagnostics.contains("@"))
         XCTAssertFalse(diagnostics.lowercased().contains("payload"))
+        XCTAssertFalse(diagnostics.lowercased().contains("token"))
     }
 
     private func located(

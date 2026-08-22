@@ -1,15 +1,5 @@
 import SwiftUI
 
-extension DisplayMode {
-    var localizedKey: LocalizedStringKey {
-        switch self {
-        case .automatic: "display.auto"
-        case .fiveHour: "display.fiveHour"
-        case .weekly: "display.weekly"
-        }
-    }
-}
-
 extension DashboardWindowSizePreset {
     var localizedKey: LocalizedStringKey {
         switch self {

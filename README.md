@@ -5,9 +5,10 @@
 ## Overview
 
 Codex94 is an unofficial, independent macOS menu bar quota monitor compatible
-with OpenAI Codex. A compact ring shows the selected percentage remaining;
-clicking it opens a CLI-style quota popover. The app has no Dock icon, and its
-Dashboard is focused on connection and display settings.
+with OpenAI Codex. A compact ring shows the selected model bucket and quota
+window's percentage remaining; clicking it opens a CLI-style quota popover. The
+app has no Dock icon, and its Dashboard is focused on connection and display
+settings.
 
 Codex94 is an MIT-licensed source project. It uses the Codex executable already
 installed on the Mac and has no third-party runtime dependencies.
@@ -97,10 +98,16 @@ at the stable path above.
   minutes according to the selected setting.
 - Uses `account/rateLimits/read` for live quota data. In **Quota + account**
   mode it also uses `account/read` with `refreshToken: false`.
-- Displays remaining percentage. `Auto` chooses the available window with the
-  lowest remaining percentage.
-- Hides the 5-hour row and selector whenever Codex does not return that window;
-  Weekly remains available when supplied.
+- Keeps the standard/default quota bucket separate from additional named model
+  buckets returned by Codex. The default bucket is shown as **Codex**; named
+  buckets use the service-provided name, such as **Spark**.
+- The popover model picker browses one bucket at a time and is independent from
+  the menu-bar selection. Browsing a model does not change the menu-bar ring.
+- The dynamic menu-bar quota menu offers `Auto` plus each available bucket and
+  window. `Auto` chooses the lowest remaining percentage across all displayable
+  buckets and windows.
+- Hides a 5-hour or Weekly row and its selection whenever Codex does not return
+  that window; it never estimates or combines independent quota windows.
 - Keeps the last successful value after a refresh failure and marks it stale.
 - Closes the transient popover when the user clicks elsewhere without consuming
   the original click or requesting Accessibility permission.
@@ -125,20 +132,23 @@ flowchart LR
 Codex94 starts the validated executable with fixed arguments:
 
 ```text
-codex -s read-only -a untrusted app-server --stdio
+codex -s read-only -a never app-server --stdio
 ```
 
 Codex itself owns authentication and may contact OpenAI services. Codex94 does
-not receive an access or refresh token, make a direct quota HTTP request, or
-read authentication files, browser cookies, Keychain entries, Codex session
-logs, or SQLite databases.
+not implement OAuth, receive an access or refresh token, make a direct quota
+HTTP request, or read authentication files, browser cookies, Keychain entries,
+Codex session logs, or SQLite databases.
 
-The local cache stores only quota window type, percentage, reset time, plan type,
-and fetch time with owner-only permissions. Email is memory-only in **Quota +
-account** mode and is removed from the in-memory snapshot after switching to
-**Quota only**. UserDefaults stores interface choices and an optional manually
-selected executable path. Codex94 has no analytics, advertising, telemetry
-upload, crash-reporting SDK, update checker, or project-operated server.
+The versioned local cache stores only quota-bucket identifiers and optional
+names, plan type, window duration and type, percentage, reset time, and fetch
+time with owner-only permissions. Email is memory-only in **Quota + account**
+mode and is removed from the in-memory snapshot after switching to **Quota
+only**. UserDefaults stores interface choices, including the preferred menu-bar
+quota selection, and an optional manually selected executable path. The
+popover's browsed model is session-only. Codex94 has no analytics, advertising,
+telemetry upload, crash-reporting SDK, update checker, or project-operated
+server.
 
 App Sandbox is intentionally disabled because the Codex child process must
 access its own login state. Hardened Runtime remains enabled; subprocess
@@ -191,7 +201,8 @@ Run the complete local release gate:
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See
-[CONTRIBUTING.md](CONTRIBUTING.md) and
+[the project architecture](docs/PROJECT_ARCHITECTURE.md),
+[CONTRIBUTING.md](CONTRIBUTING.md), and
 [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Uninstall

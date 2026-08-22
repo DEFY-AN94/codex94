@@ -108,9 +108,14 @@ if [[ -n "$unexpected_history_fixture_pii" ]]; then
   exit 1
 fi
 
-if ! rg -q '"-s", "read-only", "-a", "untrusted", "app-server", "--stdio"' \
+if ! rg -q '"-s", "read-only", "-a", "never", "app-server", "--stdio"' \
   "$SOURCE_DIR/Services/CodexAppServerClient.swift"; then
   echo "Security check failed: hardened app-server arguments changed." >&2
+  exit 1
+fi
+
+if rg -q '"-a", "untrusted"' "$SOURCE_DIR"; then
+  echo "Security check failed: removed Codex approval policy 'untrusted' is still used." >&2
   exit 1
 fi
 

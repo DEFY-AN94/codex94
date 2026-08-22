@@ -115,4 +115,73 @@ final class PreferencesStoreTests: XCTestCase {
             .fifteenMinutes
         )
     }
+
+    @MainActor
+    func testLegacyDisplayModesMigrateWithoutConcreteLimitID() throws {
+        let cases: [(String, MenuBarQuotaSelection)] = [
+            ("automatic", .automatic),
+            ("fiveHour", .defaultBucket(.fiveHour)),
+            ("weekly", .defaultBucket(.weekly))
+        ]
+
+        for (legacyValue, expected) in cases {
+            let suiteName = "Codex94PreferencesTests-\(UUID().uuidString)"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+            defer { defaults.removePersistentDomain(forName: suiteName) }
+            defaults.set(legacyValue, forKey: "displayMode")
+
+            let preferences = PreferencesStore(defaults: defaults)
+
+            XCTAssertEqual(preferences.menuBarQuotaSelection, expected)
+            let persisted = try XCTUnwrap(defaults.data(forKey: "menuBarQuotaSelection.v2"))
+            XCTAssertEqual(
+                try JSONDecoder().decode(MenuBarQuotaSelection.self, from: persisted),
+                expected
+            )
+            XCTAssertFalse(String(data: persisted, encoding: .utf8)?.contains("limitID") == true)
+        }
+    }
+
+    @MainActor
+    func testOpaqueBucketSelectionRoundTrips() throws {
+        let suiteName = "Codex94PreferencesTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let selection = MenuBarQuotaSelection.bucket(
+            limitID: "opaque.model/id-v2",
+            kind: .weekly
+        )
+
+        let preferences = PreferencesStore(defaults: defaults)
+        preferences.menuBarQuotaSelection = selection
+
+        XCTAssertEqual(
+            PreferencesStore(defaults: defaults).menuBarQuotaSelection,
+            selection
+        )
+    }
+
+    @MainActor
+    func testNewSelectionWinsLegacyAndMalformedSelectionFallsBackSafely() throws {
+        let suiteName = "Codex94PreferencesTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("weekly", forKey: "displayMode")
+        defaults.set(
+            try JSONEncoder().encode(MenuBarQuotaSelection.defaultBucket(.fiveHour)),
+            forKey: "menuBarQuotaSelection.v2"
+        )
+
+        XCTAssertEqual(
+            PreferencesStore(defaults: defaults).menuBarQuotaSelection,
+            .defaultBucket(.fiveHour)
+        )
+
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(Data("not-json".utf8), forKey: "menuBarQuotaSelection.v2")
+        XCTAssertEqual(
+            PreferencesStore(defaults: defaults).menuBarQuotaSelection,
+            .automatic
+        )
+    }
 }
