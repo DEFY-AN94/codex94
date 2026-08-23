@@ -42,7 +42,7 @@ illustrative and do not contain a real account, identity, or quota.
 
 ## Distribution status
 
-- The current stable source tag is `v0.1.4`.
+- The current stable source tag is `v0.1.5`.
 - When this repository is visible as Public, its source can be cloned without
   GitHub authentication.
 - There is no GitHub Release, DMG, notarized binary, or automatic updater.
@@ -67,11 +67,11 @@ executable selected manually.
 
 ## Install from source
 
-After the repository is public, install the stable `v0.1.4` source with:
+After the repository is public, install the stable `v0.1.5` source with:
 
 ```bash
 brew install ripgrep
-git clone --branch v0.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.1.5 --depth 1 https://github.com/DEFY-AN94/codex94.git
 cd codex94
 
 sudo xcodebuild -license accept
