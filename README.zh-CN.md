@@ -38,7 +38,7 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 ## 当前分发状态
 
-- 当前稳定源码标签为 `v0.1.4`。
+- 当前稳定源码标签为 `v0.1.5`。
 - 当仓库可见性设为 Public 后，任何人都可以在无需 GitHub 认证的情况下 clone 源码。
 - 当前没有 GitHub Release、DMG、经过公证的二进制或自动更新功能。
 - `script/install.sh` 会构建本地 Release App，应用 ad-hoc Hardened
@@ -60,11 +60,11 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 
 ## 从源码安装
 
-仓库公开后，可使用以下命令安装稳定的 `v0.1.4` 源码：
+仓库公开后，可使用以下命令安装稳定的 `v0.1.5` 源码：
 
 ```bash
 brew install ripgrep
-git clone --branch v0.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.1.5 --depth 1 https://github.com/DEFY-AN94/codex94.git
 cd codex94
 
 sudo xcodebuild -license accept

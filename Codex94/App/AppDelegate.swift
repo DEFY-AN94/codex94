@@ -115,8 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.behavior = .transient
         popover.animates = true
         popover.delegate = self
-        popover.contentSize = NSSize(width: 500, height: 420)
-        popover.contentViewController = NSHostingController(
+        let contentViewController = QuotaPopoverHostingController(
             rootView: QuotaPopoverView(
                 store: store,
                 openDashboard: { [weak self] in self?.openDashboard() },
@@ -124,6 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             )
             .codex94Environment(preferences)
         )
+        contentViewController.install(in: popover)
     }
 
     private func showPopover() {

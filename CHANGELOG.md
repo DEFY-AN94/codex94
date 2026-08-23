@@ -4,8 +4,13 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
+## 0.1.5 - 2026-08-23
+
 ### Fixed
 
+- Keep the popover at 500 pt wide while following the active quota content's
+  natural height, preserving the header's top spacing without leaving unused
+  space below shorter single-window or multi-window layouts.
 - Restore compatibility with Codex CLI 0.149 by replacing the removed
   `-a untrusted` app-server argument with `-a never`, while retaining the
   read-only sandbox.

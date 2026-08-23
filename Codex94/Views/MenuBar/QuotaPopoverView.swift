@@ -1,6 +1,65 @@
 import AppKit
 import SwiftUI
 
+enum QuotaPopoverLayout {
+    static let contentWidth: CGFloat = 500
+
+    @MainActor
+    static func install<Content: View>(
+        _ contentViewController: NSHostingController<Content>,
+        in popover: NSPopover
+    ) {
+        popover.contentViewController = contentViewController
+        contentViewController.view.layoutSubtreeIfNeeded()
+        resize(popover, toHeight: contentViewController.view.fittingSize.height)
+    }
+
+    @MainActor
+    static func resize(_ popover: NSPopover, toHeight measuredHeight: CGFloat) {
+        guard measuredHeight.isFinite, measuredHeight > 0 else { return }
+        let contentSize = NSSize(width: contentWidth, height: ceil(measuredHeight))
+        guard popover.contentSize != contentSize else { return }
+        popover.contentSize = contentSize
+    }
+}
+
+@MainActor
+final class QuotaPopoverHostingController<Content: View>: NSHostingController<Content> {
+    private weak var popover: NSPopover?
+    private var resizeScheduled = false
+
+    func install(in popover: NSPopover) {
+        self.popover = popover
+        popover.contentViewController = self
+        view.layoutSubtreeIfNeeded()
+        synchronizeSize()
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        scheduleSizeSynchronization()
+    }
+
+    func synchronizeSize() {
+        guard let popover else { return }
+        let idealSize = sizeThatFits(in: NSSize(
+            width: QuotaPopoverLayout.contentWidth,
+            height: .greatestFiniteMagnitude
+        ))
+        QuotaPopoverLayout.resize(popover, toHeight: idealSize.height)
+    }
+
+    private func scheduleSizeSynchronization() {
+        guard popover != nil, !resizeScheduled else { return }
+        resizeScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            resizeScheduled = false
+            synchronizeSize()
+        }
+    }
+}
+
 struct QuotaPopoverView: View {
     @ObservedObject var store: AppStore
     let openDashboard: () -> Void
@@ -16,7 +75,8 @@ struct QuotaPopoverView: View {
                 IdentityChoiceView(store: store)
             }
         }
-        .frame(width: 500)
+        .frame(width: QuotaPopoverLayout.contentWidth, alignment: .top)
+        .fixedSize(horizontal: true, vertical: true)
         .background(palette.background)
         .codex94Environment(store.preferences)
     }
@@ -42,7 +102,6 @@ struct QuotaPopoverView: View {
             Divider()
             commandRows
         }
-        .frame(minHeight: 352)
     }
 
     private var header: some View {
@@ -80,6 +139,7 @@ struct QuotaPopoverView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 15)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var viewedBucketName: String {
