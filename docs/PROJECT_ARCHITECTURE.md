@@ -2,7 +2,7 @@
 
 > 目的：供 GPT Pro 或其他规划模型快速理解项目现状，并据此制定下一阶段升级计划。
 >
-> 稳定源码基线为 `v0.1.4`；本文同时描述 `main` 上尚未发布的 Codex 0.149
+> 稳定源码基线为 `v0.1.5`；本文描述该版本已经发布的 Codex 0.149
 > 兼容与多额度桶实现，不代表未来接口承诺。
 
 ## 1. 项目概览
@@ -98,7 +98,7 @@ flowchart TD
 - 将 App 设置为 `.accessory`，因此没有 Dock 图标。
 - 创建固定宽度 `58pt` 的 `NSStatusItem`。
 - 将 `MenuBarStatusView` 嵌入状态栏按钮。
-- 创建 `500 x 420` 的 transient `NSPopover`。
+- 创建固定 `500pt` 宽度、按当前内容自然调整高度的 transient `NSPopover`。
 - 每次 popover 即将显示时调用 `store.popoverWillOpen()` 刷新。
 - 用本地和全局鼠标监听补齐点击外部关闭行为。
 - 创建并复用 `DashboardWindowController`。
@@ -515,7 +515,8 @@ CI 在 push 到 `main` 和 pull request 时运行同一个 release gate。Action
 - 没有 WidgetKit、通知、历史趋势、菜单栏仅图标模式或多账号。
 - 没有 UI automation、Accessibility audit 或稳定截图测试 target。
 - 部分动态格式字符串由 Swift 直接拼接，若继续扩展语言需要更完整的 String Catalog interpolation 策略。
-- popover 尺寸固定；对 Dynamic Type、超长本地化和未来更多窗口的适配空间有限。
+- popover 固定 `500pt` 宽度并按内容自然调整高度；Dynamic Type 和超长本地化
+  仍受到固定宽度约束。
 
 ### 发布与运维
 
