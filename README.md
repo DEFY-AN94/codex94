@@ -42,7 +42,7 @@ illustrative and do not contain a real account, identity, or quota.
 
 ## Distribution status
 
-- The current stable source tag is `v0.1.5`.
+- The current stable source tag is `v0.1.6`.
 - When this repository is visible as Public, its source can be cloned without
   GitHub authentication.
 - There is no GitHub Release, DMG, notarized binary, or automatic updater.
@@ -67,11 +67,11 @@ executable selected manually.
 
 ## Install from source
 
-After the repository is public, install the stable `v0.1.5` source with:
+After the repository is public, install the stable `v0.1.6` source with:
 
 ```bash
 brew install ripgrep
-git clone --branch v0.1.5 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.1.6 --depth 1 https://github.com/DEFY-AN94/codex94.git
 cd codex94
 
 sudo xcodebuild -license accept
@@ -108,7 +108,12 @@ at the stable path above.
   buckets and windows.
 - Hides a 5-hour or Weekly row and its selection whenever Codex does not return
   that window; it never estimates or combines independent quota windows.
-- Keeps the last successful value after a refresh failure and marks it stale.
+- Keeps quota severity separate from connection and data freshness: quota
+  rings, percentages, and bars remain green, amber, or red according to the
+  remaining percentage, while refreshing, cached, and unavailable states use
+  distinct blue/cyan icons and text.
+- Keeps the last successful quota value after a refresh failure and marks it as
+  cached; when no snapshot is available, it shows a gray `--` instead of `0%`.
 - Closes the transient popover when the user clicks elsewhere without consuming
   the original click or requesting Accessibility permission.
 - Locates Codex in this order: manually selected path, ChatGPT app bundle,

@@ -4,6 +4,23 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
+## 0.1.6 - 2026-08-24
+
+### Fixed
+
+- Keep quota severity independent from connection and data freshness. Cached
+  snapshots retain their last known green, amber, or red quota color, while
+  refreshing, cached, and unavailable states use distinct blue/cyan status
+  badges.
+- Show a gray `--` when no quota snapshot is available instead of presenting
+  missing data as `0%`.
+
+### Added
+
+- Add a pure, tested `StatusPresentation` mapping shared by the menu bar and
+  popover, with localized English and Simplified Chinese help and combined
+  accessibility labels for quota and connection state.
+
 ## 0.1.5 - 2026-08-23
 
 ### Fixed

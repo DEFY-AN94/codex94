@@ -2,8 +2,8 @@
 
 > 目的：供 GPT Pro 或其他规划模型快速理解项目现状，并据此制定下一阶段升级计划。
 >
-> 稳定源码基线为 `v0.1.5`；本文描述该版本已经发布的 Codex 0.149
-> 兼容与多额度桶实现，不代表未来接口承诺。
+> 稳定源码基线为 `v0.1.6`；本文描述已经发布的 Codex 0.149 兼容、
+> 多额度桶与状态语义分离实现，不代表未来接口承诺。
 
 ## 1. 项目概览
 
@@ -127,6 +127,8 @@ flowchart TD
 - 检测到的 `LocatedCodex`。
 - `ConnectionState`。
 - 刷新状态和最近错误。
+- 基于实际菜单栏窗口和当前 popover 浏览窗口的两个只读 `StatusPresentation`
+  投影；它们不改变刷新状态机。
 - `PreferencesStore`。
 - `LaunchAtLoginController`。
 - `CodexExecutableLocator`、`QuotaFetching`、`SnapshotCache`。
@@ -160,6 +162,10 @@ flowchart TD
 - `unavailable(issue)`
 
 错误被规范化为 `ConnectionIssue`，UI 只显示本地化分类，不展示原始 RPC payload 或 stderr。
+
+展示层把额度与连接/数据新鲜度作为两个独立维度：`QuotaLevel` 只由剩余百分比
+决定，`ConnectionBadge` 则区分 refreshing、cached 和 unavailable。已有缓存数据
+重试时，Badge 优先显示 refreshing，同时保留 cached 上下文与最后成功时间。
 
 ## 6. Codex 可执行文件发现与验证
 
@@ -302,7 +308,8 @@ null、未知或损坏的单个窗口只影响自身，不会丢弃同一响应�
 
 - `16pt` 圆环。
 - 固定宽度等宽百分比文本。
-- stale 状态右上角琥珀色提示点。
+- refreshing、cached、unavailable 使用形状不同的蓝色/青色 Badge；connected 和
+  idle 不增加额外图形。
 
 颜色按剩余额度计算：
 
@@ -310,7 +317,9 @@ null、未知或损坏的单个窗口只影响自身，不会丢弃同一响应�
 - `20%...49%`: 琥珀色。
 - `< 20%`: 红色。
 - 无数据: 灰色。
-- stale: 琥珀色。
+
+连接状态不会覆盖额度颜色；stale snapshot 继续显示最后已知的绿色、琥珀色或
+红色额度，无 snapshot 时显示灰色 `--`。
 
 ### Popover
 
@@ -321,7 +330,7 @@ null、未知或损坏的单个窗口只影响自身，不会丢弃同一响应�
 - 当前额度桶自己的 5h/Weekly 条形额度行。
 - 20 段 CLI 风进度条。
 - reset 倒计时。
-- stale/unavailable banner。
+- 使用独立 connection accent 的 cached/unavailable banner。
 - Refresh、Dashboard、Quit 命令行式操作。
 - 首次启动的身份模式选择页。
 
@@ -346,7 +355,7 @@ Dashboard 使用自定义固定位置 sidebar toggle，并移除系统默认 tog
 - 当前语言为 English 和简体中文。
 - 语言覆盖通过 SwiftUI `environment(\.locale, ...)` 实现。
 - 主题选择通过 AppKit `NSAppearance` 同步到各窗口表面。
-- 色彩集中在 `Codex94Palette`。
+- 色彩集中在 `Codex94Palette`；quota severity 与 connection accent 使用独立 token。
 
 ## 10. 持久化、隐私与诊断
 
@@ -442,6 +451,8 @@ XCTest 测试套件覆盖：
 - AppStore 身份模式切换与 in-flight refresh 竞态。
 - cache v1 -> v2、旧偏好迁移、缓存权限和身份数据排除。
 - popover 浏览与菜单栏选择相互独立，以及额度桶暂时消失后的运行时回退/恢复。
+- quota 阈值、连接 Badge 优先级、stale 重试缓存上下文和无 snapshot 的 unknown
+  状态。
 - 诊断路径、版本、home directory 和 email 脱敏。
 - Dashboard 窗口预设和 metadata fallback。
 

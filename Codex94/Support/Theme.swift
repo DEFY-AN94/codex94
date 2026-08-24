@@ -35,6 +35,7 @@ struct Codex94Palette {
     let terminalGreen: Color
     let terminalAmber: Color
     let terminalRed: Color
+    let connectionAccent: Color
 
     static func resolve(_ preference: ThemePreference, scheme: ColorScheme) -> Codex94Palette {
         let isDark = preference == .terminalDark || (preference == .system && scheme == .dark)
@@ -45,7 +46,8 @@ struct Codex94Palette {
                 border: Color.white.opacity(0.13),
                 terminalGreen: Color(red: 0.45, green: 0.88, blue: 0.58),
                 terminalAmber: Color(red: 0.96, green: 0.77, blue: 0.34),
-                terminalRed: Color(red: 0.96, green: 0.39, blue: 0.39)
+                terminalRed: Color(red: 0.96, green: 0.39, blue: 0.39),
+                connectionAccent: Color(red: 0.36, green: 0.78, blue: 0.98)
             )
         }
         return Codex94Palette(
@@ -54,15 +56,17 @@ struct Codex94Palette {
             border: Color.black.opacity(0.12),
             terminalGreen: Color(red: 0.12, green: 0.56, blue: 0.27),
             terminalAmber: Color(red: 0.76, green: 0.48, blue: 0.05),
-            terminalRed: Color(red: 0.78, green: 0.16, blue: 0.16)
+            terminalRed: Color(red: 0.78, green: 0.16, blue: 0.16),
+            connectionAccent: Color(red: 0.00, green: 0.42, blue: 0.74)
         )
     }
 
-    func quotaColor(remainingPercent: Int?, stale: Bool) -> Color {
-        if stale { return terminalAmber }
-        guard let remainingPercent else { return .secondary }
-        if remainingPercent >= 50 { return terminalGreen }
-        if remainingPercent >= 20 { return terminalAmber }
-        return terminalRed
+    func quotaColor(for level: QuotaLevel) -> Color {
+        switch level {
+        case .unknown: .secondary
+        case .healthy: terminalGreen
+        case .warning: terminalAmber
+        case .critical: terminalRed
+        }
     }
 }

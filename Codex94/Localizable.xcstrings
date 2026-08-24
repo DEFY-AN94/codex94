@@ -1,6 +1,30 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "accessibility.cachedAge %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "last updated %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最后更新于 %@" } }
+      }
+    },
+    "accessibility.quotaWindow %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ quota" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@额度" } }
+      }
+    },
+    "accessibility.remainingPercent %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ remaining" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "剩余 %@" } }
+      }
+    },
+    "accessibility.unavailableQuota" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quota unavailable" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "额度不可用" } }
+      }
+    },
     "about.bundleIdentifier" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Bundle identifier" } },
@@ -397,6 +421,18 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "登录时启动" } }
       }
     },
+    "status.cached" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cached data" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "缓存数据" } }
+      }
+    },
+    "status.cached.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Showing cached quota data" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在显示缓存额度数据" } }
+      }
+    },
     "status.connected" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Connected" } },
@@ -415,6 +451,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在刷新" } }
       }
     },
+    "status.refreshing.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refreshing quota data" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在刷新额度数据" } }
+      }
+    },
     "status.staleShort" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Stale" } },
@@ -425,6 +467,12 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Unavailable" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "不可用" } }
+      }
+    },
+    "status.unavailable.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quota connection unavailable" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "额度连接不可用" } }
       }
     },
     "theme.dark" : {
