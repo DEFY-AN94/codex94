@@ -206,9 +206,8 @@ Run the complete local release gate:
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See
-[the project architecture](docs/PROJECT_ARCHITECTURE.md),
-[CONTRIBUTING.md](CONTRIBUTING.md), and
-[docs/RELEASING.md](docs/RELEASING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md) and [docs/RELEASING.md](docs/RELEASING.md)
+for contribution and release workflows.
 
 ## Uninstall
 
