@@ -183,9 +183,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ```
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
-Dashboard 窗口生命周期。实现结构、贡献与发布流程见
-[项目架构](docs/PROJECT_ARCHITECTURE.md)、
-[CONTRIBUTING.md](CONTRIBUTING.md) 和
+Dashboard 窗口生命周期。贡献与发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 和
 [docs/RELEASING.md](docs/RELEASING.md)（英文）。
 
 ## 卸载
