@@ -36,7 +36,7 @@ inventory.
 
 ## Supported versions
 
-`v0.1.5` is the current stable source tag. The `main` branch may contain
+`v0.1.6` is the current stable source tag. The `main` branch may contain
 unreleased documentation or development work. Security fixes are applied to the
 latest maintained source version.
 

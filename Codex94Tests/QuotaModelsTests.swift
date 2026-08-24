@@ -516,6 +516,59 @@ final class QuotaModelsTests: XCTestCase {
         }
     }
 
+    func testStatusSemanticLabelsAreLocalized() throws {
+        let english = try localizationBundle("en")
+        let simplifiedChinese = try localizationBundle("zh-Hans")
+
+        let expectations: [(String, String, String)] = [
+            ("status.cached", "Cached data", "缓存数据"),
+            ("status.refreshing.help", "Refreshing quota data", "正在刷新额度数据"),
+            ("status.cached.help", "Showing cached quota data", "正在显示缓存额度数据"),
+            ("status.unavailable.help", "Quota connection unavailable", "额度连接不可用"),
+            ("accessibility.quotaWindow %@", "%@ quota", "%@额度"),
+            ("accessibility.remainingPercent %@", "%@ remaining", "剩余 %@"),
+            ("accessibility.unavailableQuota", "Quota unavailable", "额度不可用"),
+            ("accessibility.cachedAge %@", "last updated %@", "最后更新于 %@")
+        ]
+
+        for (key, englishValue, chineseValue) in expectations {
+            XCTAssertEqual(
+                english.localizedString(forKey: key, value: nil, table: nil),
+                englishValue
+            )
+            XCTAssertEqual(
+                simplifiedChinese.localizedString(forKey: key, value: nil, table: nil),
+                chineseValue
+            )
+        }
+
+        let englishQuotaWindow = english.localizedString(
+            forKey: "accessibility.quotaWindow %@",
+            value: nil,
+            table: nil
+        )
+        let chineseQuotaWindow = simplifiedChinese.localizedString(
+            forKey: "accessibility.quotaWindow %@",
+            value: nil,
+            table: nil
+        )
+        let englishRemaining = english.localizedString(
+            forKey: "accessibility.remainingPercent %@",
+            value: nil,
+            table: nil
+        )
+        let chineseRemaining = simplifiedChinese.localizedString(
+            forKey: "accessibility.remainingPercent %@",
+            value: nil,
+            table: nil
+        )
+
+        XCTAssertEqual(String(format: englishQuotaWindow, "Weekly"), "Weekly quota")
+        XCTAssertEqual(String(format: chineseQuotaWindow, "每周"), "每周额度")
+        XCTAssertEqual(String(format: englishRemaining, "18%"), "18% remaining")
+        XCTAssertEqual(String(format: chineseRemaining, "18%"), "剩余 18%")
+    }
+
     func testThemePreferencesMapToAppKitAppearances() {
         XCTAssertNil(ThemePreference.system.appAppearanceName)
         XCTAssertEqual(ThemePreference.terminalDark.appAppearanceName, .darkAqua)

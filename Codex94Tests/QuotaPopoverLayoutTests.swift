@@ -65,6 +65,23 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         XCTAssertEqual(popover.contentSize.height, codexHeight, accuracy: 0.5)
     }
 
+    func testMenuBarStatusKeepsFixedSizeWithCachedBadge() throws {
+        let fixture = try makeFixture(snapshot: snapshot(includeSpark: true))
+        defer { fixture.cleanUp() }
+        let controller = NSHostingController(
+            rootView: MenuBarStatusView(store: fixture.store)
+                .codex94Environment(fixture.preferences)
+        )
+
+        let size = controller.sizeThatFits(in: NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        ))
+
+        XCTAssertEqual(size.width, 52, accuracy: 0.5)
+        XCTAssertEqual(size.height, 22, accuracy: 0.5)
+    }
+
     private func hostingSize(for fixture: StoreFixture) -> NSSize {
         let popover = NSPopover()
         let controller = makeHostingController(for: fixture)

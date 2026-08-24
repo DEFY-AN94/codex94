@@ -66,6 +66,62 @@ extension ConnectionIssue {
     }
 }
 
+extension StatusPresentation {
+    var localizedConnectionKey: LocalizedStringKey {
+        switch connectionBadge {
+        case .none:
+            isIdle ? "status.idle" : "status.connected"
+        case .refreshing:
+            "status.refreshing"
+        case .stale:
+            "status.cached"
+        case .unavailable:
+            "status.unavailable"
+        }
+    }
+}
+
+extension ConnectionBadge {
+    var localizedHelpKey: LocalizedStringKey {
+        switch self {
+        case .none:
+            "status.connected"
+        case .refreshing:
+            "status.refreshing.help"
+        case .stale:
+            "status.cached.help"
+        case .unavailable:
+            "status.unavailable.help"
+        }
+    }
+}
+
+enum StatusAccessibilityText {
+    static func connectionContext(_ presentation: StatusPresentation) -> Text {
+        var text = Text(presentation.localizedConnectionKey)
+        if presentation.usesCachedData, presentation.connectionBadge != .stale {
+            text = text + Text(verbatim: ", ") + Text("status.cached")
+        }
+        return text
+    }
+
+    static func quotaWindow(_ kind: LocalizedStringKey) -> Text {
+        Text("accessibility.quotaWindow \(Text(kind))")
+    }
+
+    static func remainingPercent(_ percent: String) -> Text {
+        Text("accessibility.remainingPercent \(percent)")
+    }
+
+    static func cachedAge(_ age: String) -> Text {
+        Text("accessibility.cachedAge \(age)")
+    }
+
+    static var unavailableQuota: Text {
+        Text("accessibility.unavailableQuota")
+    }
+}
+
 extension View {
     func codex94Environment(_ preferences: PreferencesStore) -> some View {
         environment(\.locale, preferences.language.locale)

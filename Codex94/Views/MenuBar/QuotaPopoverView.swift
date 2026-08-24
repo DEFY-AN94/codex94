@@ -105,41 +105,50 @@ struct QuotaPopoverView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            RingGaugeView(
-                remainingPercent: store.viewedWindow?.remainingPercent,
-                color: palette.quotaColor(
-                    remainingPercent: store.viewedWindow?.remainingPercent,
-                    stale: store.connectionState.isStale
-                ),
-                lineWidth: 3
-            )
-            .frame(width: 34, height: 34)
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let presentation = store.viewedStatusPresentation
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(QuotaFormatting.popoverTitle(
-                    bucketName: viewedBucketName,
-                    planType: store.viewedBucket?.planType,
-                    remainingPercent: store.viewedWindow?.remainingPercent
-                ))
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .lineLimit(1)
-                Text(store.connectionState.localizedKey)
+            HStack(spacing: 12) {
+                RingGaugeView(
+                    remainingPercent: store.viewedWindow?.remainingPercent,
+                    color: palette.quotaColor(for: presentation.quotaLevel),
+                    lineWidth: 3
+                )
+                .frame(width: 34, height: 34)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(QuotaFormatting.popoverTitle(
+                        bucketName: viewedBucketName,
+                        planType: store.viewedBucket?.planType,
+                        remainingPercent: store.viewedWindow?.remainingPercent
+                    ))
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        ConnectionBadgeView(
+                            badge: presentation.connectionBadge,
+                            color: palette.connectionAccent,
+                            size: 9
+                        )
+                        .accessibilityHidden(true)
+
+                        Text(presentation.localizedConnectionKey)
+                    }
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
-            }
+                }
 
-            Spacer()
-
-            if store.isRefreshing {
-                ProgressView()
-                    .controlSize(.small)
-                    .accessibilityLabel(Text("status.refreshing"))
+                Spacer()
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(headerAccessibilityLabel(
+                presentation: presentation,
+                now: context.date
+            ))
+            .padding(.horizontal, 18)
+            .padding(.vertical, 15)
+            .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 15)
-        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var viewedBucketName: String {
@@ -147,6 +156,39 @@ struct QuotaPopoverView: View {
             return "Codex"
         }
         return snapshot.displayName(for: bucket)
+    }
+
+    private func headerAccessibilityLabel(
+        presentation: StatusPresentation,
+        now: Date
+    ) -> Text {
+        var label = Text(verbatim: viewedBucketName)
+        if let window = store.viewedWindow {
+            label = label
+                + Text(verbatim: ", ")
+                + StatusAccessibilityText.quotaWindow(window.kind.localizedKey)
+                + Text(verbatim: ", ")
+                + StatusAccessibilityText.remainingPercent(
+                    QuotaFormatting.percent(window.remainingPercent)
+                )
+        } else {
+            label = label
+                + Text(verbatim: ", ")
+                + StatusAccessibilityText.unavailableQuota
+        }
+
+        label = label
+            + Text(verbatim: ", ")
+            + StatusAccessibilityText.connectionContext(presentation)
+
+        if presentation.usesCachedData, let lastSuccess = presentation.lastSuccess {
+            label = label
+                + Text(verbatim: ", ")
+                + StatusAccessibilityText.cachedAge(
+                    QuotaFormatting.staleAge(since: lastSuccess, now: now)
+                )
+        }
+        return label
     }
 
     private var modelPicker: some View {
@@ -194,6 +236,8 @@ struct QuotaPopoverView: View {
                     Spacer()
                 }
                 .font(.system(size: 14, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             }
         }
         .padding(.horizontal, 18)
@@ -202,28 +246,46 @@ struct QuotaPopoverView: View {
 
     @ViewBuilder
     private var stateBanner: some View {
-        switch store.connectionState {
-        case let .stale(lastSuccess, issue):
+        let presentation = store.viewedStatusPresentation
+
+        if presentation.usesCachedData, let lastSuccess = presentation.lastSuccess {
             Divider()
             TimelineView(.periodic(from: .now, by: 30)) { context in
                 StatusBanner(
-                    icon: "exclamationmark.triangle.fill",
-                    color: palette.terminalAmber,
-                    text: Text("status.staleShort")
-                        + Text(" \(QuotaFormatting.staleAge(since: lastSuccess, now: context.date)) · ")
-                        + Text(issue.localizedKey)
+                    badge: .stale,
+                    color: palette.connectionAccent,
+                    text: cachedBannerText(
+                        presentation: presentation,
+                        lastSuccess: lastSuccess,
+                        now: context.date
+                    ),
+                    accessibilityText: issueText(for: presentation)
                 )
             }
-        case let .unavailable(issue):
+        } else if presentation.connectionBadge == .unavailable {
             Divider()
             StatusBanner(
-                icon: "xmark.circle.fill",
-                color: palette.terminalRed,
-                text: Text(issue.localizedKey)
+                badge: .unavailable,
+                color: palette.connectionAccent,
+                text: issueText(for: presentation),
+                accessibilityText: issueText(for: presentation)
             )
-        default:
-            EmptyView()
         }
+    }
+
+    private func issueText(for presentation: StatusPresentation) -> Text {
+        Text(presentation.issue?.localizedKey ?? "error.connectionFailed")
+    }
+
+    private func cachedBannerText(
+        presentation: StatusPresentation,
+        lastSuccess: Date,
+        now: Date
+    ) -> Text {
+        let issue = presentation.issue?.localizedKey ?? "error.connectionFailed"
+        return Text("status.cached")
+            + Text(" \(QuotaFormatting.staleAge(since: lastSuccess, now: now)) · ")
+            + Text(issue)
     }
 
     private var menuBarQuotaPicker: some View {
@@ -328,21 +390,22 @@ private struct QuotaWindowRow: View {
             HStack(spacing: 12) {
                 Text(window.kind.localizedKey)
                     .foregroundStyle(palette.quotaColor(
-                        remainingPercent: window.remainingPercent,
-                        stale: false
+                        for: QuotaLevel(remainingPercent: window.remainingPercent)
                     ))
                     .frame(width: 58, alignment: .leading)
 
                 QuotaBarView(
                     remainingPercent: window.remainingPercent,
                     color: palette.quotaColor(
-                        remainingPercent: window.remainingPercent,
-                        stale: false
+                        for: QuotaLevel(remainingPercent: window.remainingPercent)
                     )
                 )
 
                 Text(QuotaFormatting.percent(window.remainingPercent))
                     .monospacedDigit()
+                    .foregroundStyle(palette.quotaColor(
+                        for: QuotaLevel(remainingPercent: window.remainingPercent)
+                    ))
                     .frame(width: 54, alignment: .trailing)
 
                 (Text("quota.resets")
@@ -356,14 +419,15 @@ private struct QuotaWindowRow: View {
 }
 
 private struct StatusBanner: View {
-    let icon: String
+    let badge: ConnectionBadge
     let color: Color
     let text: Text
+    let accessibilityText: Text
 
     var body: some View {
         HStack(spacing: 9) {
-            Image(systemName: icon)
-                .foregroundStyle(color)
+            ConnectionBadgeView(badge: badge, color: color, size: 11)
+                .accessibilityHidden(true)
             text
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.secondary)
@@ -372,6 +436,8 @@ private struct StatusBanner: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
     }
 }
 
@@ -486,22 +552,5 @@ private struct IdentityOption: View {
         .onHover { hovering = $0 }
         .padding(.horizontal, 10)
         .padding(.top, 8)
-    }
-}
-
-private extension ConnectionState {
-    var localizedKey: LocalizedStringKey {
-        switch self {
-        case .idle: "status.idle"
-        case .refreshing: "status.refreshing"
-        case .connected: "status.connected"
-        case .stale: "status.staleShort"
-        case .unavailable: "status.unavailable"
-        }
-    }
-
-    var isStale: Bool {
-        if case .stale = self { return true }
-        return false
     }
 }

@@ -5,47 +5,91 @@ struct MenuBarStatusView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            content(now: context.date)
+        }
+    }
+
+    private func content(now: Date) -> some View {
         let palette = Codex94Palette.resolve(store.preferences.theme, scheme: colorScheme)
-        let window = store.menuBarQuota?.window
-        let isStale = store.connectionState.isStale
-        let color = palette.quotaColor(
-            remainingPercent: window?.remainingPercent,
-            stale: isStale
-        )
+        let resolvedQuota = store.menuBarQuota
+        let window = resolvedQuota?.window
+        let presentation = store.menuBarStatusPresentation
+        let color = palette.quotaColor(for: presentation.quotaLevel)
 
-        HStack(spacing: 4) {
-            ZStack(alignment: .topTrailing) {
-                RingGaugeView(
-                    remainingPercent: window?.remainingPercent,
-                    color: color,
-                    lineWidth: 2.2
+        return HStack(spacing: 4) {
+            RingGaugeView(
+                remainingPercent: window?.remainingPercent,
+                color: color,
+                lineWidth: 2.2
+            )
+            .frame(width: 16, height: 16)
+            .overlay(alignment: .topTrailing) {
+                ConnectionBadgeView(
+                    badge: presentation.connectionBadge,
+                    color: palette.connectionAccent,
+                    size: 7
                 )
-                .frame(width: 16, height: 16)
-
-                if isStale {
-                    Circle()
-                        .fill(palette.terminalAmber)
-                        .frame(width: 4, height: 4)
-                        .offset(x: 1, y: -1)
-                }
+                .offset(x: 3, y: -3)
+                .accessibilityHidden(true)
             }
 
             Text(QuotaFormatting.percent(window?.remainingPercent))
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .monospacedDigit()
+                .foregroundStyle(color)
                 .lineLimit(1)
                 .frame(width: 30, alignment: .leading)
         }
         .frame(width: 52, height: 22)
         .contentShape(Rectangle())
         .allowsHitTesting(false)
-        .accessibilityLabel("Codex94 \(QuotaFormatting.percent(window?.remainingPercent))")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel(
+            resolvedQuota: resolvedQuota,
+            presentation: presentation,
+            now: now
+        ))
     }
-}
 
-private extension ConnectionState {
-    var isStale: Bool {
-        if case .stale = self { return true }
-        return false
+    private func accessibilityLabel(
+        resolvedQuota: ResolvedQuotaWindow?,
+        presentation: StatusPresentation,
+        now: Date
+    ) -> Text {
+        let bucketName: String
+        if let snapshot = store.snapshot, let bucket = resolvedQuota?.bucket {
+            bucketName = snapshot.displayName(for: bucket)
+        } else {
+            bucketName = "Codex"
+        }
+
+        var label = Text(verbatim: bucketName)
+        if let window = resolvedQuota?.window {
+            label = label
+                + Text(verbatim: ", ")
+                + StatusAccessibilityText.quotaWindow(window.kind.localizedKey)
+                + Text(verbatim: ", ")
+                + StatusAccessibilityText.remainingPercent(
+                    QuotaFormatting.percent(window.remainingPercent)
+                )
+        } else {
+            label = label
+                + Text(verbatim: ", ")
+                + StatusAccessibilityText.unavailableQuota
+        }
+
+        label = label
+            + Text(verbatim: ", ")
+            + StatusAccessibilityText.connectionContext(presentation)
+
+        if presentation.usesCachedData, let lastSuccess = presentation.lastSuccess {
+            label = label
+                + Text(verbatim: ", ")
+                + StatusAccessibilityText.cachedAge(
+                    QuotaFormatting.staleAge(since: lastSuccess, now: now)
+                )
+        }
+        return label
     }
 }

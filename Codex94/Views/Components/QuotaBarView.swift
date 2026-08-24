@@ -15,7 +15,11 @@ struct QuotaBarView: View {
             .font(.system(size: 14, weight: .medium, design: .monospaced))
             .lineLimit(1)
             .frame(width: 170, alignment: .leading)
-            .accessibilityLabel("\(remainingPercent) percent remaining")
+            .accessibilityLabel(
+                StatusAccessibilityText.remainingPercent(
+                    QuotaFormatting.percent(remainingPercent)
+                )
+            )
     }
 }
 
@@ -38,4 +42,3 @@ struct RingGaugeView: View {
         .accessibilityHidden(true)
     }
 }
-

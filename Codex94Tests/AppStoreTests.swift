@@ -129,6 +129,8 @@ final class AppStoreTests: XCTestCase {
         XCTAssertTrue(fixture.store.menuBarSelectionUsesFallback)
         XCTAssertEqual(fixture.store.menuBarQuota?.bucket.limitID, "default-v2")
         XCTAssertEqual(fixture.store.menuBarQuota?.window.remainingPercent, 60)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.quotaLevel, .healthy)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.connectionBadge, .none)
         let unavailable = fixture.store.menuBarQuotaOptions.first {
             $0.selection == .bucket(limitID: "model-special", kind: .weekly)
         }
@@ -143,6 +145,8 @@ final class AppStoreTests: XCTestCase {
         XCTAssertFalse(fixture.store.menuBarSelectionUsesFallback)
         XCTAssertEqual(fixture.store.menuBarQuota?.bucket.limitID, "model-special")
         XCTAssertEqual(fixture.store.menuBarQuota?.window.remainingPercent, 15)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.quotaLevel, .critical)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.connectionBadge, .none)
     }
 
     func testDefaultSelectionFollowsChangedOpaqueDefaultLimitID() async throws {
@@ -189,6 +193,10 @@ final class AppStoreTests: XCTestCase {
         XCTAssertEqual(fixture.store.viewedWindow?.usedPercent, 80)
         XCTAssertEqual(fixture.preferences.menuBarQuotaSelection, .defaultBucket(.weekly))
         XCTAssertEqual(fixture.store.menuBarQuota?.bucket.limitID, "default-v2")
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.quotaLevel, .healthy)
+        XCTAssertEqual(fixture.store.viewedStatusPresentation.quotaLevel, .warning)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.connectionBadge, .none)
+        XCTAssertEqual(fixture.store.viewedStatusPresentation.connectionBadge, .none)
 
         try await refreshAndWait(fixture.store)
 
@@ -254,6 +262,85 @@ final class AppStoreTests: XCTestCase {
         )
         XCTAssertTrue(fixture.store.menuBarSelectionUsesFallback)
         XCTAssertEqual(fixture.store.menuBarQuota?.bucket.limitID, "default-v2")
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.quotaLevel, .healthy)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.connectionBadge, .stale)
+        XCTAssertTrue(fixture.store.menuBarStatusPresentation.usesCachedData)
+        XCTAssertEqual(fixture.store.viewedStatusPresentation.quotaLevel, .healthy)
+        XCTAssertEqual(fixture.store.viewedStatusPresentation.connectionBadge, .stale)
+    }
+
+    func testUnavailableWithoutSnapshotProjectsUnknownQuota() async throws {
+        let fixture = try makeStoreFixture(
+            fetcher: SnapshotSequenceFetcher([]),
+            selection: .automatic
+        )
+
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRefreshToFinish(fixture.store)
+
+        XCTAssertEqual(fixture.store.connectionState, .unavailable(.quotaUnavailable))
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.quotaLevel, .unknown)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.connectionBadge, .unavailable)
+        XCTAssertEqual(fixture.store.viewedStatusPresentation.quotaLevel, .unknown)
+        XCTAssertEqual(fixture.store.viewedStatusPresentation.connectionBadge, .unavailable)
+    }
+
+    func testCachedSnapshotRetryProjectsRefreshingAndCachedData() async throws {
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: Date(timeIntervalSince1970: 1_000)
+        )
+        let fixture = try makeStoreFixture(
+            fetcher: DelayedFailureFetcher(),
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.refresh(trigger: .manual)
+
+        XCTAssertTrue(fixture.store.isRefreshing)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.quotaLevel, .healthy)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.connectionBadge, .refreshing)
+        XCTAssertTrue(fixture.store.menuBarStatusPresentation.usesCachedData)
+        XCTAssertEqual(fixture.store.viewedStatusPresentation.connectionBadge, .refreshing)
+        XCTAssertTrue(fixture.store.viewedStatusPresentation.usesCachedData)
+
+        try await waitForRefreshToFinish(fixture.store)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.connectionBadge, .stale)
+        XCTAssertTrue(fixture.store.menuBarStatusPresentation.usesCachedData)
+    }
+
+    func testConnectedSnapshotRefreshProjectsRefreshingWithoutCachedData() async throws {
+        let first = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 30,
+            sparkUsed: nil,
+            fetchedAt: Date(timeIntervalSince1970: 1_000)
+        )
+        let second = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 35,
+            sparkUsed: nil,
+            fetchedAt: Date(timeIntervalSince1970: 2_000)
+        )
+        let fixture = try makeStoreFixture(
+            fetcher: DelayedSnapshotSequenceFetcher([first, second]),
+            selection: .automatic
+        )
+        try await refreshAndWait(fixture.store)
+
+        fixture.store.refresh(trigger: .background)
+
+        XCTAssertTrue(fixture.store.isRefreshing)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.quotaLevel, .healthy)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.connectionBadge, .refreshing)
+        XCTAssertFalse(fixture.store.menuBarStatusPresentation.usesCachedData)
+
+        try await waitForRefreshToFinish(fixture.store)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.connectionBadge, .none)
+        XCTAssertFalse(fixture.store.menuBarStatusPresentation.usesCachedData)
     }
 
     private struct StoreFixture {
@@ -304,12 +391,16 @@ final class AppStoreTests: XCTestCase {
 
     private func refreshAndWait(_ store: AppStore) async throws {
         store.refresh(trigger: .manual)
+        try await waitForRefreshToFinish(store)
+        XCTAssertEqual(store.connectionState, .connected)
+    }
+
+    private func waitForRefreshToFinish(_ store: AppStore) async throws {
         let deadline = Date().addingTimeInterval(3)
         while store.isRefreshing, Date() < deadline {
             try await Task.sleep(for: .milliseconds(20))
         }
         XCTAssertFalse(store.isRefreshing)
-        XCTAssertEqual(store.connectionState, .connected)
     }
 
     private func makeSnapshot(
@@ -372,6 +463,31 @@ private actor SnapshotSequenceFetcher: QuotaFetching {
     }
 
     func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot {
+        guard !snapshots.isEmpty else { throw ConnectionIssue.quotaUnavailable }
+        return snapshots.removeFirst()
+    }
+}
+
+private actor DelayedFailureFetcher: QuotaFetching {
+    func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot {
+        try await Task.sleep(for: .milliseconds(250))
+        throw ConnectionIssue.requestTimedOut
+    }
+}
+
+private actor DelayedSnapshotSequenceFetcher: QuotaFetching {
+    private var snapshots: [QuotaSnapshot]
+    private var requestCount = 0
+
+    init(_ snapshots: [QuotaSnapshot]) {
+        self.snapshots = snapshots
+    }
+
+    func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot {
+        requestCount += 1
+        if requestCount > 1 {
+            try await Task.sleep(for: .milliseconds(250))
+        }
         guard !snapshots.isEmpty else { throw ConnectionIssue.quotaUnavailable }
         return snapshots.removeFirst()
     }

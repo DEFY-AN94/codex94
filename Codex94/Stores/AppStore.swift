@@ -72,6 +72,22 @@ final class AppStore: ObservableObject {
         viewedBucket?.mostConstrainedWindow
     }
 
+    var menuBarStatusPresentation: StatusPresentation {
+        StatusPresentation(
+            remainingPercent: menuBarQuota?.window.remainingPercent,
+            connectionState: connectionState,
+            isRefreshing: isRefreshing
+        )
+    }
+
+    var viewedStatusPresentation: StatusPresentation {
+        StatusPresentation(
+            remainingPercent: viewedWindow?.remainingPercent,
+            connectionState: connectionState,
+            isRefreshing: isRefreshing
+        )
+    }
+
     var menuBarQuotaOptions: [MenuBarQuotaOption] {
         var options = [
             MenuBarQuotaOption(

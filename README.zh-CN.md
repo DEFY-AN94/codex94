@@ -38,7 +38,7 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 ## 当前分发状态
 
-- 当前稳定源码标签为 `v0.1.5`。
+- 当前稳定源码标签为 `v0.1.6`。
 - 当仓库可见性设为 Public 后，任何人都可以在无需 GitHub 认证的情况下 clone 源码。
 - 当前没有 GitHub Release、DMG、经过公证的二进制或自动更新功能。
 - `script/install.sh` 会构建本地 Release App，应用 ad-hoc Hardened
@@ -60,11 +60,11 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 
 ## 从源码安装
 
-仓库公开后，可使用以下命令安装稳定的 `v0.1.5` 源码：
+仓库公开后，可使用以下命令安装稳定的 `v0.1.6` 源码：
 
 ```bash
 brew install ripgrep
-git clone --branch v0.1.5 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.1.6 --depth 1 https://github.com/DEFY-AN94/codex94.git
 cd codex94
 
 sudo xcodebuild -license accept
@@ -96,7 +96,11 @@ sudo xcodebuild -runFirstLaunch
   可显示额度桶和窗口中选择剩余比例最低的一项。
 - Codex 未返回某个 5 小时或 Weekly 窗口时，会隐藏对应额度行与选择项；App
   不估算额度，也不会合并彼此独立的额度窗口。
-- 刷新失败时保留最后一次成功数值，并标记为 stale。
+- 将额度严重度与连接/数据新鲜度分开：额度圆环、百分比和进度条只按剩余比例
+  显示绿色、琥珀色或红色；刷新中、缓存数据和连接不可用则使用独立的蓝色/青色
+  图标与文字。
+- 刷新失败时保留最后一次成功的额度并标记为缓存数据；没有可用额度快照时显示
+  灰色 `--`，不会伪装成 `0%`。
 - 点击面板以外区域会收起临时面板，不会吞掉原始点击，也不需要辅助功能权限。
 - Codex 检测顺序为：手动路径、ChatGPT App 内置文件、Homebrew、
   `/usr/local/bin`、`~/.local/bin`，最后是 `PATH` 中的绝对路径。
