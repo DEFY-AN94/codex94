@@ -28,5 +28,11 @@ Use small, scoped commits. Match the existing SwiftUI/AppKit ownership split:
 SwiftUI owns views and state presentation; AppKit owns status items, popovers,
 application appearance, and window lifecycle.
 
+`AppDelegate` owns registration and removal of macOS workspace notification
+observers and only forwards those events to the main-actor `AppStore`.
+`AppStore` owns refresh coordination, while the pure `RefreshPolicy` owns the
+wake freshness decision. SwiftUI views must not observe workspace notifications
+or start requests from relative-time rendering.
+
 Do not open a public issue for a suspected vulnerability. Follow
 [SECURITY.md](SECURITY.md).

@@ -4,13 +4,20 @@ import Foundation
 struct CodexExecutableLocator: Sendable {
     private let environment: [String: String]
     private let homeDirectory: URL
+    private let processLifecycle: ManagedSubprocessLifecycle
 
     init(
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        processLifecycle: ManagedSubprocessLifecycle = ManagedSubprocessLifecycle()
     ) {
         self.environment = environment
         self.homeDirectory = homeDirectory
+        self.processLifecycle = processLifecycle
+    }
+
+    func shutdown() {
+        processLifecycle.shutdown(gracePeriod: 0.5)
     }
 
     func locate(manualPath: String?) throws -> LocatedCodex {
@@ -110,16 +117,18 @@ struct CodexExecutableLocator: Sendable {
 
         let process: ManagedSubprocess
         do {
-            process = try ManagedSubprocess.launch(
-                executableURL: executableURL,
-                arguments: ["--version"],
-                environment: Self.sanitizedEnvironment(from: environment),
-                standardOutput: output
-            )
+            process = try processLifecycle.launch {
+                try ManagedSubprocess.launch(
+                    executableURL: executableURL,
+                    arguments: ["--version"],
+                    environment: Self.sanitizedEnvironment(from: environment),
+                    standardOutput: output
+                )
+            }
         } catch {
             throw ConnectionIssue.processLaunchFailed
         }
-        defer { ProcessTerminator.stop(process, gracePeriod: 0.5) }
+        defer { processLifecycle.stopIfActive(process, gracePeriod: 0.5) }
 
         let data: Data
         do {

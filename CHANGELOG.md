@@ -4,6 +4,21 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
+### Added
+
+- Show the last successful quota age in the popover header and in the menu-bar
+  and popover accessibility descriptions, including distinct refreshing,
+  cached, unavailable, and no-success states in English and Simplified Chinese.
+- Refresh once after a system wake when no successful snapshot exists or the
+  last success is at least 60 seconds old. Fresh snapshots are left unchanged,
+  and wake requests reuse the existing single-flight refresh path.
+
+### Fixed
+
+- Cancel and reap in-flight Codex version probes and app-server process groups
+  during app termination with bounded cleanup, preventing refresh children from
+  remaining after Codex94 exits.
+
 ## 0.1.6 - 2026-08-24
 
 ### Fixed

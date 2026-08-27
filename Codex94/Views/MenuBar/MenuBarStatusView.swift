@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarStatusView: View {
     @ObservedObject var store: AppStore
+    var onAccessibilityLabelChange: (String) -> Void = { _ in }
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -16,6 +17,12 @@ struct MenuBarStatusView: View {
         let window = resolvedQuota?.window
         let presentation = store.menuBarStatusPresentation
         let color = palette.quotaColor(for: presentation.quotaLevel)
+        let accessibilityLabel = Self.accessibilityLabel(
+            store: store,
+            resolvedQuota: resolvedQuota,
+            presentation: presentation,
+            now: now
+        )
 
         return HStack(spacing: 4) {
             RingGaugeView(
@@ -44,52 +51,33 @@ struct MenuBarStatusView: View {
         .frame(width: 52, height: 22)
         .contentShape(Rectangle())
         .allowsHitTesting(false)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel(
-            resolvedQuota: resolvedQuota,
-            presentation: presentation,
-            now: now
-        ))
+        .accessibilityHidden(true)
+        .onAppear {
+            onAccessibilityLabelChange(accessibilityLabel)
+        }
+        .onChange(of: accessibilityLabel) { _, updatedLabel in
+            onAccessibilityLabelChange(updatedLabel)
+        }
     }
 
-    private func accessibilityLabel(
+    static func accessibilityLabel(
+        store: AppStore,
         resolvedQuota: ResolvedQuotaWindow?,
         presentation: StatusPresentation,
         now: Date
-    ) -> Text {
+    ) -> String {
         let bucketName: String
         if let snapshot = store.snapshot, let bucket = resolvedQuota?.bucket {
             bucketName = snapshot.displayName(for: bucket)
         } else {
             bucketName = "Codex"
         }
-
-        var label = Text(verbatim: bucketName)
-        if let window = resolvedQuota?.window {
-            label = label
-                + Text(verbatim: ", ")
-                + StatusAccessibilityText.quotaWindow(window.kind.localizedKey)
-                + Text(verbatim: ", ")
-                + StatusAccessibilityText.remainingPercent(
-                    QuotaFormatting.percent(window.remainingPercent)
-                )
-        } else {
-            label = label
-                + Text(verbatim: ", ")
-                + StatusAccessibilityText.unavailableQuota
-        }
-
-        label = label
-            + Text(verbatim: ", ")
-            + StatusAccessibilityText.connectionContext(presentation)
-
-        if presentation.usesCachedData, let lastSuccess = presentation.lastSuccess {
-            label = label
-                + Text(verbatim: ", ")
-                + StatusAccessibilityText.cachedAge(
-                    QuotaFormatting.staleAge(since: lastSuccess, now: now)
-                )
-        }
-        return label
+        return StatusAccessibilityString.quotaSummary(
+            bucketName: bucketName,
+            window: resolvedQuota?.window,
+            presentation: presentation,
+            now: now,
+            language: store.preferences.language
+        )
     }
 }

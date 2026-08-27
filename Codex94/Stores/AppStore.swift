@@ -22,6 +22,7 @@ final class AppStore: ObservableObject {
     private var pendingRefreshTrigger: RefreshTrigger?
     private var backgroundTask: Task<Void, Never>?
     private var preferencesObservation: AnyCancellable?
+    private var isShuttingDown = false
 
     init(
         preferences: PreferencesStore = PreferencesStore(),
@@ -50,6 +51,8 @@ final class AppStore: ObservableObject {
     deinit {
         refreshTask?.cancel()
         backgroundTask?.cancel()
+        fetcher.shutdown()
+        locator.shutdown()
     }
 
     var menuBarQuota: ResolvedQuotaWindow? {
@@ -76,7 +79,8 @@ final class AppStore: ObservableObject {
         StatusPresentation(
             remainingPercent: menuBarQuota?.window.remainingPercent,
             connectionState: connectionState,
-            isRefreshing: isRefreshing
+            isRefreshing: isRefreshing,
+            lastSuccessfulFetch: snapshot?.fetchedAt
         )
     }
 
@@ -84,7 +88,8 @@ final class AppStore: ObservableObject {
         StatusPresentation(
             remainingPercent: viewedWindow?.remainingPercent,
             connectionState: connectionState,
-            isRefreshing: isRefreshing
+            isRefreshing: isRefreshing,
+            lastSuccessfulFetch: snapshot?.fetchedAt
         )
     }
 
@@ -139,12 +144,14 @@ final class AppStore: ObservableObject {
     }
 
     func start() {
+        guard !isShuttingDown else { return }
         configureBackgroundRefresh()
         guard preferences.hasChosenIdentityMode else { return }
         refresh(trigger: .launch)
     }
 
     func refresh(trigger: RefreshTrigger) {
+        guard !isShuttingDown else { return }
         guard preferences.hasChosenIdentityMode else { return }
         guard refreshTask == nil else {
             if trigger == .preferenceChange {
@@ -160,20 +167,24 @@ final class AppStore: ObservableObject {
         let identityMode = preferences.identityMode
 
         refreshTask = Task { [weak self] in
-            guard let self else { return }
+            guard let self, !isShuttingDown else { return }
             do {
                 let located = try await Task.detached(priority: .utility) { [locator] in
                     try locator.locate(manualPath: manualPath)
                 }.value
+                guard !Task.isCancelled, !isShuttingDown else { return }
                 let freshSnapshot = try await fetcher.fetch(
                     executable: located,
                     identityMode: identityMode
                 )
+                guard !Task.isCancelled, !isShuttingDown else { return }
                 applySuccess(freshSnapshot, located: located)
             } catch {
+                guard !Task.isCancelled, !isShuttingDown else { return }
                 applyFailure(Self.issue(from: error))
             }
 
+            guard !isShuttingDown else { return }
             let queuedTrigger = pendingRefreshTrigger
             pendingRefreshTrigger = nil
             refreshTask = nil
@@ -187,6 +198,33 @@ final class AppStore: ObservableObject {
 
     func popoverWillOpen() {
         refresh(trigger: .popover)
+    }
+
+    func handleSystemWake(now: Date = Date()) {
+        guard !isShuttingDown else { return }
+        guard preferences.hasChosenIdentityMode else { return }
+        guard RefreshPolicy.shouldRefreshAfterWake(
+            lastSuccessfulFetch: snapshot?.fetchedAt,
+            now: now
+        ) else { return }
+
+        configureBackgroundRefresh()
+        refresh(trigger: .systemWake)
+    }
+
+    func shutdown() {
+        guard !isShuttingDown else { return }
+        isShuttingDown = true
+        pendingRefreshTrigger = nil
+
+        backgroundTask?.cancel()
+        backgroundTask = nil
+        refreshTask?.cancel()
+        refreshTask = nil
+        isRefreshing = false
+
+        fetcher.shutdown()
+        locator.shutdown()
     }
 
     func chooseIdentityMode(_ mode: IdentityMode) {
@@ -281,6 +319,8 @@ final class AppStore: ObservableObject {
 
     private func configureBackgroundRefresh() {
         backgroundTask?.cancel()
+        backgroundTask = nil
+        guard !isShuttingDown else { return }
         let nanoseconds = UInt64(preferences.refreshInterval.seconds * 1_000_000_000)
         backgroundTask = Task { [weak self] in
             while !Task.isCancelled {

@@ -1,5 +1,19 @@
 import Foundation
 
+enum RelativeAge: Equatable, Sendable {
+    case justNow
+    case minutes(Int)
+    case hours(Int)
+    case days(Int)
+}
+
+enum ResetCountdown: Equatable, Sendable {
+    case unavailable
+    case minutes(Int)
+    case hours(Int, Int)
+    case days(Int, Int)
+}
+
 enum QuotaFormatting {
     static func percent(_ value: Int?) -> String {
         guard let value else { return "--" }
@@ -9,34 +23,41 @@ enum QuotaFormatting {
     static func popoverTitle(
         bucketName: String,
         planType: String?,
-        remainingPercent: Int?
+        remainingPercent: Int?,
+        language: LanguagePreference = .english,
+        bundle: Bundle = .main
     ) -> String {
         var components = [shortBucketName(bucketName, limit: 20)]
         if let planType, !planType.isEmpty {
             components.append(plan(planType))
         }
-        components.append("\(percent(remainingPercent)) left")
+        components.append(StatusAccessibilityString.localized(
+            "quota.remaining %@",
+            arguments: [percent(remainingPercent)],
+            language: language,
+            bundle: bundle
+        ))
         return components.joined(separator: " · ")
     }
 
-    static func resetCountdown(to date: Date?, now: Date = Date()) -> String {
-        guard let date else { return "--" }
+    static func resetCountdown(to date: Date?, now: Date = Date()) -> ResetCountdown {
+        guard let date else { return .unavailable }
         let remaining = max(0, Int(date.timeIntervalSince(now)))
         let days = remaining / 86_400
         let hours = (remaining % 86_400) / 3_600
         let minutes = (remaining % 3_600) / 60
 
-        if days > 0 { return "\(days)d \(hours)h" }
-        if hours > 0 { return "\(hours)h \(minutes)m" }
-        return "\(minutes)m"
+        if days > 0 { return .days(days, hours) }
+        if hours > 0 { return .hours(hours, minutes) }
+        return .minutes(minutes)
     }
 
-    static func staleAge(since date: Date, now: Date = Date()) -> String {
+    static func relativeAge(since date: Date, now: Date = Date()) -> RelativeAge {
         let seconds = max(0, Int(now.timeIntervalSince(date)))
-        if seconds < 60 { return "<1m" }
-        if seconds < 3_600 { return "\(seconds / 60)m" }
-        if seconds < 86_400 { return "\(seconds / 3_600)h" }
-        return "\(seconds / 86_400)d"
+        if seconds < 60 { return .justNow }
+        if seconds < 3_600 { return .minutes(seconds / 60) }
+        if seconds < 86_400 { return .hours(seconds / 3_600) }
+        return .days(seconds / 86_400)
     }
 
     static func plan(_ rawValue: String?) -> String {

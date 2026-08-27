@@ -343,15 +343,424 @@ final class AppStoreTests: XCTestCase {
         XCTAssertFalse(fixture.store.menuBarStatusPresentation.usesCachedData)
     }
 
+    func testSystemWakeAppliesIdentityAndFreshnessPolicy() async throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let response = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 20,
+            sparkUsed: nil,
+            fetchedAt: now
+        )
+        let cases: [(String, Date?, Bool)] = [
+            ("missing", nil, true),
+            ("fresh", now.addingTimeInterval(-59), false),
+            ("threshold", now.addingTimeInterval(-60), true),
+            ("old", now.addingTimeInterval(-7_200), true),
+            ("future", now.addingTimeInterval(1), true)
+        ]
+
+        for (name, fetchedAt, shouldRefresh) in cases {
+            let fetcher = GatedRecordingFetcher(outcomes: [.success(response)])
+            let cachedSnapshot = fetchedAt.map {
+                makeSnapshot(
+                    defaultLimitID: "default-v2",
+                    defaultUsed: 40,
+                    sparkUsed: nil,
+                    fetchedAt: $0
+                )
+            }
+            let fixture = try makeStoreFixture(
+                fetcher: fetcher,
+                selection: .automatic,
+                cachedSnapshot: cachedSnapshot
+            )
+
+            fixture.store.handleSystemWake(now: now)
+
+            if shouldRefresh {
+                try await waitForRequestCount(1, fetcher: fetcher)
+                await fetcher.releaseOne()
+                try await waitForRefreshToFinish(fixture.store)
+                XCTAssertEqual(fixture.store.connectionState, .connected, name)
+                XCTAssertEqual(fixture.store.snapshot?.fetchedAt, now, name)
+            } else {
+                try await Task.sleep(for: .milliseconds(75))
+                let requestCount = await fetcher.requestCount()
+                XCTAssertEqual(requestCount, 0, name)
+                XCTAssertFalse(fixture.store.isRefreshing, name)
+                XCTAssertEqual(fixture.store.snapshot?.fetchedAt, fetchedAt, name)
+            }
+        }
+
+        let identityFetcher = GatedRecordingFetcher(outcomes: [.success(response)])
+        let onboarding = try makeStoreFixture(
+            fetcher: identityFetcher,
+            selection: .automatic,
+            hasChosenIdentityMode: false
+        )
+
+        onboarding.store.handleSystemWake(now: now)
+        try await Task.sleep(for: .milliseconds(75))
+
+        let onboardingRequestCount = await identityFetcher.requestCount()
+        XCTAssertEqual(onboardingRequestCount, 0)
+        XCTAssertFalse(onboarding.store.isRefreshing)
+        XCTAssertNil(onboarding.store.snapshot)
+    }
+
+    func testSystemWakeSuccessAdvancesSnapshotWithoutRestoringAccountInQuotaOnlyMode() async throws {
+        let oldDate = Date(timeIntervalSince1970: 1_000)
+        let newDate = Date(timeIntervalSince1970: 2_000)
+        let oldSnapshot = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: oldDate
+        )
+        let freshBase = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 35,
+            sparkUsed: 25,
+            fetchedAt: newDate
+        )
+        let response = QuotaSnapshot(
+            buckets: freshBase.buckets,
+            defaultLimitID: freshBase.defaultLimitID,
+            fetchedAt: freshBase.fetchedAt,
+            account: AccountSummary(
+                type: "chatgpt",
+                email: "account@example.com",
+                planType: "pro"
+            ),
+            codex: freshBase.codex
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [.success(response)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: oldSnapshot
+        )
+
+        fixture.store.handleSystemWake(now: newDate)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+
+        XCTAssertEqual(fixture.store.connectionState, .connected)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, newDate)
+        XCTAssertNil(fixture.store.snapshot?.account)
+        XCTAssertEqual(fixture.store.snapshot?.bucket(id: "model-special")?.limitName, "Spark")
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.freshness, .updated(newDate))
+    }
+
+    func testSystemWakeFailurePreservesCachedSnapshotOrBecomesUnavailable() async throws {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let oldDate = Date(timeIntervalSince1970: 1_000)
+        let oldSnapshot = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: oldDate
+        )
+        let cachedFetcher = GatedRecordingFetcher(outcomes: [.failure(.requestTimedOut)])
+        let cachedFixture = try makeStoreFixture(
+            fetcher: cachedFetcher,
+            selection: .automatic,
+            cachedSnapshot: oldSnapshot
+        )
+
+        cachedFixture.store.handleSystemWake(now: now)
+        try await waitForRequestCount(1, fetcher: cachedFetcher)
+        await cachedFetcher.releaseOne()
+        try await waitForRefreshToFinish(cachedFixture.store)
+
+        XCTAssertEqual(cachedFixture.store.snapshot, oldSnapshot)
+        XCTAssertEqual(
+            cachedFixture.store.connectionState,
+            .stale(lastSuccess: oldDate, issue: .requestTimedOut)
+        )
+        XCTAssertEqual(cachedFixture.store.viewedStatusPresentation.freshness, .updated(oldDate))
+
+        let emptyFetcher = GatedRecordingFetcher(outcomes: [.failure(.requestTimedOut)])
+        let emptyFixture = try makeStoreFixture(
+            fetcher: emptyFetcher,
+            selection: .automatic
+        )
+
+        emptyFixture.store.handleSystemWake(now: now)
+        try await waitForRequestCount(1, fetcher: emptyFetcher)
+        await emptyFetcher.releaseOne()
+        try await waitForRefreshToFinish(emptyFixture.store)
+
+        XCTAssertNil(emptyFixture.store.snapshot)
+        XCTAssertEqual(emptyFixture.store.connectionState, .unavailable(.requestTimedOut))
+        XCTAssertEqual(
+            emptyFixture.store.viewedStatusPresentation.freshness,
+            .noSuccessfulData
+        )
+    }
+
+    func testWakeManualBackgroundAndPopoverAdjacencyNeverRunsOrQueuesAnotherFetch() async throws {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let oldSnapshot = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: now.addingTimeInterval(-120)
+        )
+
+        for adjacentTrigger in [RefreshTrigger.manual, .background, .popover] {
+            let response = makeSnapshot(
+                defaultLimitID: "default-v2",
+                defaultUsed: 35,
+                sparkUsed: nil,
+                fetchedAt: now
+            )
+            let fetcher = GatedRecordingFetcher(outcomes: [.success(response)])
+            let fixture = try makeStoreFixture(
+                fetcher: fetcher,
+                selection: .automatic,
+                cachedSnapshot: oldSnapshot
+            )
+
+            fixture.store.handleSystemWake(now: now)
+            try await waitForRequestCount(1, fetcher: fetcher)
+            fixture.store.refresh(trigger: adjacentTrigger)
+            fixture.store.handleSystemWake(now: now)
+            fixture.store.handleSystemWake(now: now)
+            try await Task.sleep(for: .milliseconds(75))
+
+            let inFlightRequestCount = await fetcher.requestCount()
+            let inFlightMaximum = await fetcher.maximumConcurrentRequests()
+            XCTAssertEqual(inFlightRequestCount, 1, adjacentTrigger.rawValue)
+            XCTAssertEqual(inFlightMaximum, 1, adjacentTrigger.rawValue)
+
+            await fetcher.releaseOne()
+            try await waitForRefreshToFinish(fixture.store)
+            try await Task.sleep(for: .milliseconds(75))
+
+            let finalRequestCount = await fetcher.requestCount()
+            let finalMaximum = await fetcher.maximumConcurrentRequests()
+            XCTAssertEqual(finalRequestCount, 1, adjacentTrigger.rawValue)
+            XCTAssertEqual(finalMaximum, 1, adjacentTrigger.rawValue)
+        }
+    }
+
+    func testWakeArrivingDuringManualBackgroundOrPopoverNeverRunsOrQueuesAnotherFetch() async throws {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let oldSnapshot = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: now.addingTimeInterval(-120)
+        )
+
+        for initialTrigger in [RefreshTrigger.manual, .background, .popover] {
+            let response = makeSnapshot(
+                defaultLimitID: "default-v2",
+                defaultUsed: 35,
+                sparkUsed: nil,
+                fetchedAt: now
+            )
+            let fetcher = GatedRecordingFetcher(outcomes: [.success(response)])
+            let fixture = try makeStoreFixture(
+                fetcher: fetcher,
+                selection: .automatic,
+                cachedSnapshot: oldSnapshot
+            )
+
+            if initialTrigger == .popover {
+                fixture.store.popoverWillOpen()
+            } else {
+                fixture.store.refresh(trigger: initialTrigger)
+            }
+            try await waitForRequestCount(1, fetcher: fetcher)
+
+            fixture.store.handleSystemWake(now: now)
+            fixture.store.handleSystemWake(now: now)
+            fixture.store.handleSystemWake(now: now)
+            try await Task.sleep(for: .milliseconds(75))
+
+            let inFlightRequestCount = await fetcher.requestCount()
+            let inFlightMaximum = await fetcher.maximumConcurrentRequests()
+            XCTAssertEqual(inFlightRequestCount, 1, initialTrigger.rawValue)
+            XCTAssertEqual(inFlightMaximum, 1, initialTrigger.rawValue)
+
+            await fetcher.releaseOne()
+            try await waitForRefreshToFinish(fixture.store)
+            try await Task.sleep(for: .milliseconds(75))
+
+            let finalRequestCount = await fetcher.requestCount()
+            let finalMaximum = await fetcher.maximumConcurrentRequests()
+            XCTAssertEqual(finalRequestCount, 1, initialTrigger.rawValue)
+            XCTAssertEqual(finalMaximum, 1, initialTrigger.rawValue)
+        }
+    }
+
+    func testWakeStillAllowsOneQueuedPreferenceChangeWithoutConcurrency() async throws {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let oldSnapshot = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: now.addingTimeInterval(-120)
+        )
+        let first = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 35,
+            sparkUsed: nil,
+            fetchedAt: now
+        )
+        let second = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 30,
+            sparkUsed: 20,
+            fetchedAt: now.addingTimeInterval(1)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [.success(first), .success(second)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: oldSnapshot
+        )
+
+        fixture.store.handleSystemWake(now: now)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        fixture.store.setIdentityMode(.quotaAndAccount)
+        fixture.store.handleSystemWake(now: now)
+
+        let firstRequestCount = await fetcher.requestCount()
+        let firstMaximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(firstRequestCount, 1)
+        XCTAssertEqual(firstMaximum, 1)
+
+        await fetcher.releaseOne()
+        try await waitForRequestCount(2, fetcher: fetcher)
+
+        let queuedMaximum = await fetcher.maximumConcurrentRequests()
+        let requestedModes = await fetcher.requestedModes()
+        XCTAssertEqual(queuedMaximum, 1)
+        XCTAssertEqual(requestedModes, [.quotaOnly, .quotaAndAccount])
+
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+
+        let finalRequestCount = await fetcher.requestCount()
+        let finalMaximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(finalRequestCount, 2)
+        XCTAssertEqual(finalMaximum, 1)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, second.fetchedAt)
+    }
+
+    func testIndependentWakeCanRetryAfterCoalescedWakeFails() async throws {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let oldDate = now.addingTimeInterval(-120)
+        let oldSnapshot = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: oldDate
+        )
+        let recovered = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 35,
+            sparkUsed: nil,
+            fetchedAt: now.addingTimeInterval(10)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [
+            .failure(.requestTimedOut),
+            .success(recovered)
+        ])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: oldSnapshot
+        )
+
+        fixture.store.handleSystemWake(now: now)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        fixture.store.handleSystemWake(now: now)
+        fixture.store.handleSystemWake(now: now)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await Task.sleep(for: .milliseconds(75))
+
+        let failedRequestCount = await fetcher.requestCount()
+        XCTAssertEqual(failedRequestCount, 1)
+        XCTAssertEqual(
+            fixture.store.connectionState,
+            .stale(lastSuccess: oldDate, issue: .requestTimedOut)
+        )
+
+        fixture.store.handleSystemWake(now: now.addingTimeInterval(10))
+        try await waitForRequestCount(2, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+
+        let finalRequestCount = await fetcher.requestCount()
+        let finalMaximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(finalRequestCount, 2)
+        XCTAssertEqual(finalMaximum, 1)
+        XCTAssertEqual(fixture.store.connectionState, .connected)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, recovered.fetchedAt)
+    }
+
+    func testShutdownIsIdempotentStopsRefreshAndRejectsFutureTriggers() async throws {
+        let response = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 20,
+            sparkUsed: nil,
+            fetchedAt: Date(timeIntervalSince1970: 2_000)
+        )
+        let fetcher = ShutdownCompletingFetcher(snapshot: response)
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic
+        )
+
+        fixture.store.refresh(trigger: .manual)
+        let deadline = Date().addingTimeInterval(2)
+        while fetcher.requestCount == 0, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(fetcher.requestCount, 1)
+
+        fixture.store.shutdown()
+        fixture.store.shutdown()
+        XCTAssertEqual(fetcher.shutdownCount, 1)
+        XCTAssertFalse(fixture.store.isRefreshing)
+
+        let completionDeadline = Date().addingTimeInterval(2)
+        while fetcher.completionCount == 0, Date() < completionDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(fetcher.completionCount, 1)
+        XCTAssertNil(fixture.store.snapshot)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.cacheFileURL.path))
+
+        fixture.store.start()
+        fixture.store.refresh(trigger: .manual)
+        fixture.store.popoverWillOpen()
+        fixture.store.handleSystemWake(now: Date(timeIntervalSince1970: 3_000))
+        try await Task.sleep(for: .milliseconds(100))
+
+        XCTAssertEqual(fetcher.requestCount, 1)
+        XCTAssertEqual(fetcher.shutdownCount, 1)
+        XCTAssertNil(fixture.store.snapshot)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.cacheFileURL.path))
+    }
+
     private struct StoreFixture {
         let store: AppStore
         let preferences: PreferencesStore
+        let cacheFileURL: URL
     }
 
     private func makeStoreFixture(
         fetcher: any QuotaFetching,
         selection: MenuBarQuotaSelection,
-        cachedSnapshot: QuotaSnapshot? = nil
+        cachedSnapshot: QuotaSnapshot? = nil,
+        hasChosenIdentityMode: Bool = true
     ) throws -> StoreFixture {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("Codex94StoreTests-\(UUID().uuidString)", isDirectory: true)
@@ -372,10 +781,11 @@ final class AppStoreTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults)
         preferences.manualCodexPath = executable.path
         preferences.identityMode = .quotaOnly
-        preferences.hasChosenIdentityMode = true
+        preferences.hasChosenIdentityMode = hasChosenIdentityMode
         preferences.menuBarQuotaSelection = selection
 
-        let cache = SnapshotCache(fileURL: directory.appendingPathComponent("quota.json"))
+        let cacheFileURL = directory.appendingPathComponent("quota.json")
+        let cache = SnapshotCache(fileURL: cacheFileURL)
         if let cachedSnapshot { try cache.save(cachedSnapshot) }
         let store = AppStore(
             preferences: preferences,
@@ -386,7 +796,11 @@ final class AppStoreTests: XCTestCase {
             fetcher: fetcher,
             cache: cache
         )
-        return StoreFixture(store: store, preferences: preferences)
+        return StoreFixture(
+            store: store,
+            preferences: preferences,
+            cacheFileURL: cacheFileURL
+        )
     }
 
     private func refreshAndWait(_ store: AppStore) async throws {
@@ -401,6 +815,19 @@ final class AppStoreTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(20))
         }
         XCTAssertFalse(store.isRefreshing)
+    }
+
+    private func waitForRequestCount(
+        _ expected: Int,
+        fetcher: GatedRecordingFetcher
+    ) async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            if await fetcher.requestCount() >= expected { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let actual = await fetcher.requestCount()
+        XCTAssertEqual(actual, expected)
     }
 
     private func makeSnapshot(
@@ -546,5 +973,132 @@ private actor IdentityRecordingFetcher: QuotaFetching {
 
     func requestedModes() -> [IdentityMode] {
         modes
+    }
+}
+
+private enum FetchOutcome: Sendable {
+    case success(QuotaSnapshot)
+    case failure(ConnectionIssue)
+}
+
+private actor GatedRecordingFetcher: QuotaFetching {
+    private let outcomes: [FetchOutcome]
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+    private var totalRequests = 0
+    private var activeRequests = 0
+    private var maximumActiveRequests = 0
+    private var modes: [IdentityMode] = []
+
+    init(outcomes: [FetchOutcome]) {
+        self.outcomes = outcomes
+    }
+
+    func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot {
+        let requestIndex = totalRequests
+        totalRequests += 1
+        activeRequests += 1
+        maximumActiveRequests = max(maximumActiveRequests, activeRequests)
+        modes.append(identityMode)
+
+        await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+
+        activeRequests -= 1
+        guard outcomes.indices.contains(requestIndex) else {
+            throw ConnectionIssue.quotaUnavailable
+        }
+        switch outcomes[requestIndex] {
+        case let .success(snapshot):
+            return snapshot
+        case let .failure(issue):
+            throw issue
+        }
+    }
+
+    func releaseOne() {
+        guard !continuations.isEmpty else { return }
+        continuations.removeFirst().resume()
+    }
+
+    func requestCount() -> Int {
+        totalRequests
+    }
+
+    func maximumConcurrentRequests() -> Int {
+        maximumActiveRequests
+    }
+
+    func requestedModes() -> [IdentityMode] {
+        modes
+    }
+}
+
+private final class ShutdownCompletingFetcher: QuotaFetching, @unchecked Sendable {
+    private let lock = NSLock()
+    private let snapshot: QuotaSnapshot
+    private var continuation: CheckedContinuation<QuotaSnapshot, Error>?
+    private var requests = 0
+    private var completions = 0
+    private var shutdowns = 0
+    private var didShutDown = false
+
+    init(snapshot: QuotaSnapshot) {
+        self.snapshot = snapshot
+    }
+
+    func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot {
+        let result: QuotaSnapshot = try await withCheckedThrowingContinuation { continuation in
+            lock.lock()
+            requests += 1
+            if didShutDown {
+                lock.unlock()
+                continuation.resume(throwing: CancellationError())
+                return
+            }
+            self.continuation = continuation
+            lock.unlock()
+        }
+        recordCompletion()
+        return result
+    }
+
+    private func recordCompletion() {
+        lock.lock()
+        completions += 1
+        lock.unlock()
+    }
+
+    func shutdown() {
+        lock.lock()
+        guard !didShutDown else {
+            lock.unlock()
+            return
+        }
+        didShutDown = true
+        shutdowns += 1
+        let continuation = continuation
+        self.continuation = nil
+        lock.unlock()
+
+        continuation?.resume(returning: snapshot)
+    }
+
+    var requestCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return requests
+    }
+
+    var shutdownCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return shutdowns
+    }
+
+    var completionCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return completions
     }
 }

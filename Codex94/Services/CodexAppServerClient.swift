@@ -4,6 +4,11 @@ import OSLog
 
 protocol QuotaFetching: Sendable {
     func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot
+    func shutdown()
+}
+
+extension QuotaFetching {
+    func shutdown() {}
 }
 
 struct AppServerTimeouts: Sendable {
@@ -20,6 +25,7 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
     private let environment: [String: String]
     private let clientVersion: String
     private let workerQueue = DispatchQueue(label: "com.defyan94.codex94.app-server")
+    private let processLifecycle = ManagedSubprocessLifecycle()
     private let logger = Logger(subsystem: "com.defyan94.codex94", category: "rpc")
 
     init(
@@ -51,6 +57,10 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
         }
     }
 
+    func shutdown() {
+        processLifecycle.shutdown(gracePeriod: timeouts.terminationGrace)
+    }
+
     private func fetchSynchronously(
         executable: LocatedCodex,
         identityMode: IdentityMode
@@ -74,14 +84,18 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
 
         let process: ManagedSubprocess
         do {
-            process = try ManagedSubprocess.launch(
-                executableURL: executable.executableURL,
-                arguments: ["-s", "read-only", "-a", "never", "app-server", "--stdio"],
-                currentDirectoryURL: runtimeDirectory,
-                environment: CodexExecutableLocator.sanitizedEnvironment(from: environment),
-                standardInput: input,
-                standardOutput: output
-            )
+            process = try processLifecycle.launch {
+                try ManagedSubprocess.launch(
+                    executableURL: executable.executableURL,
+                    arguments: ["-s", "read-only", "-a", "never", "app-server", "--stdio"],
+                    currentDirectoryURL: runtimeDirectory,
+                    environment: CodexExecutableLocator.sanitizedEnvironment(from: environment),
+                    standardInput: input,
+                    standardOutput: output
+                )
+            }
+        } catch ManagedSubprocessLifecycleError.shutDown {
+            throw ConnectionIssue.serverExited
         } catch {
             logger.error("stage=launch result=failed")
             throw ConnectionIssue.processLaunchFailed
@@ -94,7 +108,10 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
 
         defer {
             try? input.fileHandleForWriting.close()
-            ProcessTerminator.stop(process, gracePeriod: timeouts.terminationGrace)
+            processLifecycle.stopIfActive(
+                process,
+                gracePeriod: timeouts.terminationGrace
+            )
             let milliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
             logger.info(
                 "stage=finish duration_ms=\(milliseconds, privacy: .public) bytes=\(channel.bytesRead, privacy: .public)"

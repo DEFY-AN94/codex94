@@ -159,14 +159,141 @@ final class AppServerClientTests: XCTestCase {
             printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
             wait
             """#,
-            initializeTimeout: 0.5,
-            totalTimeout: 1
+            initializeTimeout: 1,
+            totalTimeout: 2
         )
         await assertIssue(.initializationTimedOut) {
             try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaOnly)
         }
         try assertProcessIsGone(at: fixture.pidFile)
         try assertProcessIsGone(at: fixture.descendantPIDFile)
+    }
+
+    func testShutdownTerminatesActiveProcessGroupAndRejectsFutureFetch() async throws {
+        let fixture = try makeFixture(
+            script: #"""
+            printf 'launch\n' >> "__CODEX94_INVOCATION_FILE__"
+            trap '' TERM
+            printf '%s\n' "$$" > "__CODEX94_PID_FILE__"
+            (
+              trap '' TERM
+              heartbeat=0
+              while :; do
+                heartbeat=$((heartbeat + 1))
+                if [ "$heartbeat" -ge 5000 ]; then
+                  printf 'heartbeat\n' >> "__CODEX94_HEARTBEAT_FILE__"
+                  heartbeat=0
+                fi
+              done
+            ) &
+            printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
+            wait
+            """#,
+            initializeTimeout: 3,
+            totalTimeout: 3
+        )
+
+        let fetchTask = Task {
+            try await fixture.client.fetch(
+                executable: fixture.executable,
+                identityMode: .quotaOnly
+            )
+        }
+        let parentPID = try await waitForPID(at: fixture.pidFile)
+        let descendantPID = try await waitForPID(at: fixture.descendantPIDFile)
+        defer {
+            _ = kill(-parentPID, SIGKILL)
+            _ = kill(parentPID, SIGKILL)
+            _ = kill(descendantPID, SIGKILL)
+        }
+        try await waitForFile(at: fixture.heartbeatFile)
+
+        let startedAt = Date()
+        fixture.client.shutdown()
+        fixture.client.shutdown()
+        let shutdownDuration = Date().timeIntervalSince(startedAt)
+
+        switch await fetchTask.result {
+        case .success:
+            XCTFail("An interrupted fetch must not produce a snapshot")
+        case .failure:
+            break
+        }
+        let completionDuration = Date().timeIntervalSince(startedAt)
+        XCTAssertLessThan(shutdownDuration, 1.0)
+        XCTAssertLessThan(completionDuration, 1.5)
+        assertProcessIsGone(parentPID)
+        assertProcessIsGone(descendantPID)
+        assertProcessGroupIsGone(parentPID)
+
+        let heartbeatSize = try fileSize(at: fixture.heartbeatFile)
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(try fileSize(at: fixture.heartbeatFile), heartbeatSize)
+
+        await assertIssue(.serverExited) {
+            try await fixture.client.fetch(
+                executable: fixture.executable,
+                identityMode: .quotaOnly
+            )
+        }
+        let launches = try String(contentsOf: fixture.invocationFile, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
+        XCTAssertEqual(launches.count, 1)
+    }
+
+    func testShutdownWaitsForProcessGroupAfterParentExitsOnTerm() async throws {
+        let fixture = try makeFixture(
+            script: #"""
+            printf 'launch\n' >> "__CODEX94_INVOCATION_FILE__"
+            printf '%s\n' "$$" > "__CODEX94_PID_FILE__"
+            (
+              trap '' TERM
+              heartbeat=0
+              while :; do
+                heartbeat=$((heartbeat + 1))
+                if [ "$heartbeat" -ge 5000 ]; then
+                  printf 'heartbeat\n' >> "__CODEX94_HEARTBEAT_FILE__"
+                  heartbeat=0
+                fi
+              done
+            ) &
+            printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
+            exec /bin/sleep 30
+            """#,
+            initializeTimeout: 3,
+            totalTimeout: 3
+        )
+
+        let fetchTask = Task {
+            try await fixture.client.fetch(
+                executable: fixture.executable,
+                identityMode: .quotaOnly
+            )
+        }
+        let parentPID = try await waitForPID(at: fixture.pidFile)
+        let descendantPID = try await waitForPID(at: fixture.descendantPIDFile)
+        defer {
+            _ = kill(-parentPID, SIGKILL)
+            _ = kill(parentPID, SIGKILL)
+            _ = kill(descendantPID, SIGKILL)
+        }
+        try await waitForFile(at: fixture.heartbeatFile)
+
+        let clock = ContinuousClock()
+        let startedAt = clock.now
+        fixture.client.shutdown()
+        let shutdownDuration = clock.now - startedAt
+
+        switch await fetchTask.result {
+        case .success:
+            XCTFail("An interrupted fetch must not produce a snapshot")
+        case .failure:
+            break
+        }
+        XCTAssertLessThan(shutdownDuration, .seconds(1.5))
+        assertProcessIsGone(parentPID)
+        assertProcessIsGone(descendantPID)
+        assertProcessGroupIsGone(parentPID)
     }
 
     func testEarlyExitIsClassified() async throws {
@@ -193,6 +320,74 @@ final class AppServerClientTests: XCTestCase {
         let executable: LocatedCodex
         let pidFile: URL
         let descendantPIDFile: URL
+        let invocationFile: URL
+        let heartbeatFile: URL
+    }
+
+    private func waitForPID(at fileURL: URL) async throws -> pid_t {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(2))
+        while clock.now < deadline {
+            if let contents = try? String(contentsOf: fileURL, encoding: .utf8),
+               let processID = pid_t(
+                   contents.trimmingCharacters(in: .whitespacesAndNewlines)
+               ),
+               processID > 0 {
+                return processID
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let missingProcessID: pid_t? = nil
+        return try XCTUnwrap(missingProcessID, "Timed out waiting for a complete PID file")
+    }
+
+    private func waitForFile(at fileURL: URL) async throws {
+        let deadline = Date().addingTimeInterval(2)
+        while !FileManager.default.fileExists(atPath: fileURL.path), Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+
+    private func fileSize(at fileURL: URL) throws -> UInt64 {
+        let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        return try XCTUnwrap(attributes[.size] as? NSNumber).uint64Value
+    }
+
+    private func assertProcessIsGone(
+        _ pid: pid_t,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let deadline = Date().addingTimeInterval(1)
+        while kill(pid, 0) == 0, Date() < deadline {
+            usleep(20_000)
+        }
+        let result = kill(pid, 0)
+        let processError = errno
+        if result == 0 { kill(pid, SIGKILL) }
+        XCTAssertEqual(result, -1, "spawned process must be terminated", file: file, line: line)
+        if result == -1 {
+            XCTAssertEqual(processError, ESRCH, file: file, line: line)
+        }
+    }
+
+    private func assertProcessGroupIsGone(
+        _ processGroupID: pid_t,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let deadline = Date().addingTimeInterval(1)
+        while kill(-processGroupID, 0) == 0, Date() < deadline {
+            usleep(20_000)
+        }
+        let result = kill(-processGroupID, 0)
+        let processError = errno
+        if result == 0 { kill(-processGroupID, SIGKILL) }
+        XCTAssertEqual(result, -1, "spawned process group must be terminated", file: file, line: line)
+        if result == -1 {
+            XCTAssertEqual(processError, ESRCH, file: file, line: line)
+        }
     }
 
     private func assertProcessIsGone(
@@ -227,11 +422,21 @@ final class AppServerClientTests: XCTestCase {
         let executableURL = directory.appendingPathComponent("codex")
         let pidFile = directory.appendingPathComponent("pid")
         let descendantPIDFile = directory.appendingPathComponent("descendant-pid")
+        let invocationFile = directory.appendingPathComponent("invocations")
+        let heartbeatFile = directory.appendingPathComponent("heartbeats")
         let resolvedScript = script
             .replacingOccurrences(of: "__CODEX94_PID_FILE__", with: pidFile.path)
             .replacingOccurrences(
                 of: "__CODEX94_DESCENDANT_PID_FILE__",
                 with: descendantPIDFile.path
+            )
+            .replacingOccurrences(
+                of: "__CODEX94_INVOCATION_FILE__",
+                with: invocationFile.path
+            )
+            .replacingOccurrences(
+                of: "__CODEX94_HEARTBEAT_FILE__",
+                with: heartbeatFile.path
             )
         try ("#!/bin/sh\n" + resolvedScript).write(
             to: executableURL,
@@ -257,6 +462,7 @@ final class AppServerClientTests: XCTestCase {
             ],
             clientVersion: clientVersion
         )
+        addTeardownBlock { client.shutdown() }
         let executable = LocatedCodex(
             executableURL: executableURL,
             version: "codex-cli test",
@@ -266,7 +472,9 @@ final class AppServerClientTests: XCTestCase {
             client: client,
             executable: executable,
             pidFile: pidFile,
-            descendantPIDFile: descendantPIDFile
+            descendantPIDFile: descendantPIDFile,
+            invocationFile: invocationFile,
+            heartbeatFile: heartbeatFile
         )
     }
 }
