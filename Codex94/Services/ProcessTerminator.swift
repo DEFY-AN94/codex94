@@ -6,7 +6,7 @@ private enum ManagedSubprocessError: Error {
     case systemCallFailed(Int32)
 }
 
-final class ManagedSubprocess {
+final class ManagedSubprocess: @unchecked Sendable {
     let processIdentifier: pid_t
     let processGroupIdentifier: pid_t
 
@@ -156,7 +156,7 @@ final class ManagedSubprocess {
         return pollForExit()
     }
 
-    func waitUntilExit() {
+    func reapDirectChild() {
         stateLock.lock()
         defer { stateLock.unlock() }
         guard waitStatus == nil else { return }
@@ -210,11 +210,73 @@ final class ManagedSubprocess {
     }
 }
 
+enum ManagedSubprocessLifecycleError: Error {
+    case shutDown
+    case processAlreadyActive
+}
+
+final class ManagedSubprocessLifecycle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var activeProcess: ManagedSubprocess?
+    private var isShutDown = false
+
+    func launch(
+        _ operation: () throws -> ManagedSubprocess
+    ) throws -> ManagedSubprocess {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard !isShutDown else {
+            throw ManagedSubprocessLifecycleError.shutDown
+        }
+        guard activeProcess == nil else {
+            throw ManagedSubprocessLifecycleError.processAlreadyActive
+        }
+
+        let process = try operation()
+        activeProcess = process
+        return process
+    }
+
+    func stopIfActive(
+        _ process: ManagedSubprocess,
+        gracePeriod: TimeInterval
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard activeProcess === process else { return }
+
+        ProcessTerminator.stop(process, gracePeriod: gracePeriod)
+        activeProcess = nil
+    }
+
+    func shutdown(gracePeriod: TimeInterval) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !isShutDown else { return }
+
+        isShutDown = true
+        guard let activeProcess else { return }
+        ProcessTerminator.stop(activeProcess, gracePeriod: gracePeriod)
+        self.activeProcess = nil
+    }
+}
+
 enum ProcessTerminator {
+    private static let reaperQueue = DispatchQueue(
+        label: "com.defyan94.codex94.process-reaper",
+        qos: .utility,
+        attributes: .concurrent
+    )
+
     static func stop(_ process: ManagedSubprocess, gracePeriod: TimeInterval) {
         process.signalProcessGroup(SIGTERM)
-        let deadline = Date().addingTimeInterval(gracePeriod)
-        while process.isProcessGroupRunning, Date() < deadline {
+        let clock = ContinuousClock()
+        let boundedGrace = max(0, min(gracePeriod, 60))
+        let gracefulDeadline = clock.now.advanced(
+            by: .milliseconds(Int64((boundedGrace * 1_000).rounded(.up)))
+        )
+        while process.isProcessGroupRunning, clock.now < gracefulDeadline {
             process.pollForExit()
             usleep(20_000)
         }
@@ -222,6 +284,43 @@ enum ProcessTerminator {
         if process.isProcessGroupRunning {
             process.signalProcessGroup(SIGKILL)
         }
-        process.waitUntilExit()
+        let termination = waitForForcedTermination(of: process, duration: 1)
+        if !termination.didReapDirectChild {
+            reaperQueue.async {
+                process.reapDirectChild()
+            }
+        }
+    }
+
+    private static func waitForForcedTermination(
+        of process: ManagedSubprocess,
+        duration: TimeInterval
+    ) -> (didReapDirectChild: Bool, didExitProcessGroup: Bool) {
+        let clock = ContinuousClock()
+        let boundedDuration = max(0, min(duration, 60))
+        let deadline = clock.now.advanced(
+            by: .milliseconds(Int64((boundedDuration * 1_000).rounded(.up)))
+        )
+        var didReapDirectChild = process.pollForExit()
+        var didExitProcessGroup = !process.isProcessGroupRunning
+
+        while clock.now < deadline,
+              !(didReapDirectChild && didExitProcessGroup) {
+            usleep(20_000)
+            if !didReapDirectChild {
+                didReapDirectChild = process.pollForExit()
+            }
+            if !didExitProcessGroup {
+                didExitProcessGroup = !process.isProcessGroupRunning
+            }
+        }
+
+        if !didReapDirectChild {
+            didReapDirectChild = process.pollForExit()
+        }
+        if !didExitProcessGroup {
+            didExitProcessGroup = !process.isProcessGroupRunning
+        }
+        return (didReapDirectChild, didExitProcessGroup)
     }
 }

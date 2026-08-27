@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var dashboardController: DashboardWindowController?
     private var localMouseMonitor: Any?
     private var globalMouseMonitor: Any?
+    private var workspaceWakeObserver: NSObjectProtocol?
     private var themeObservation: AnyCancellable?
 
     override init() {
@@ -25,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             return
         }
         NSApp.setActivationPolicy(.accessory)
+        configureWorkspaceWakeObservation()
         configureThemeObservation()
         configureStatusItem()
         configurePopover()
@@ -49,6 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        removeWorkspaceWakeObservation()
+        store.shutdown()
         themeObservation?.cancel()
         stopOutsideClickMonitoring()
     }
@@ -76,8 +80,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         button.action = #selector(togglePopover)
         button.toolTip = "Codex94"
         button.title = ""
+        button.setAccessibilityLabel(MenuBarStatusView.accessibilityLabel(
+            store: store,
+            resolvedQuota: store.menuBarQuota,
+            presentation: store.menuBarStatusPresentation,
+            now: Date()
+        ))
 
-        let statusView = MenuBarStatusView(store: store)
+        let statusView = MenuBarStatusView(
+            store: store,
+            onAccessibilityLabelChange: { [weak button] label in
+                button?.setAccessibilityLabel(label)
+            }
+        )
             .codex94Environment(preferences)
         let hostingView = NSHostingView(rootView: statusView)
         hostingView.translatesAutoresizingMaskIntoConstraints = false
@@ -89,6 +104,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             hostingView.bottomAnchor.constraint(equalTo: button.bottomAnchor)
         ])
         statusItem = item
+    }
+
+    private func configureWorkspaceWakeObservation() {
+        workspaceWakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.store.handleSystemWake()
+            }
+        }
+    }
+
+    private func removeWorkspaceWakeObservation() {
+        guard let workspaceWakeObserver else { return }
+        NSWorkspace.shared.notificationCenter.removeObserver(workspaceWakeObserver)
+        self.workspaceWakeObserver = nil
     }
 
     private func configureThemeObservation() {

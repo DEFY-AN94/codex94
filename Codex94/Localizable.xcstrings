@@ -1,22 +1,148 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "accessibility.cachedAge %@" : {
+    "accessibility.freshness.age.day %@" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "last updated %@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最后更新于 %@" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ day" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 天" } }
       }
     },
-    "accessibility.quotaWindow %@" : {
+    "accessibility.freshness.age.days %@" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ quota" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@额度" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ days" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 天" } }
+      }
+    },
+    "accessibility.freshness.age.hour %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ hour" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 小时" } }
+      }
+    },
+    "accessibility.freshness.age.hours %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ hours" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 小时" } }
+      }
+    },
+    "accessibility.freshness.age.justNow" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "just now" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刚刚" } }
+      }
+    },
+    "accessibility.freshness.age.minute %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ minute" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 分钟" } }
+      }
+    },
+    "accessibility.freshness.age.minutes %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ minutes" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 分钟" } }
+      }
+    },
+    "accessibility.freshness.lastSuccess %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "last success %@ ago" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次成功于 %@前" } }
+      }
+    },
+    "accessibility.freshness.lastSuccess.justNow" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "last success just now" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次成功就在刚刚" } }
+      }
+    },
+    "accessibility.freshness.noSuccessfulData" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "no successful data" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无成功数据" } }
+      }
+    },
+    "accessibility.freshness.noSuccessfulDataYet" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "no successful data yet" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "尚无成功数据" } }
+      }
+    },
+    "accessibility.freshness.updated %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "updated %@ ago" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@前更新" } }
+      }
+    },
+    "accessibility.freshness.updated.justNow" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "updated just now" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刚刚更新" } }
+      }
+    },
+    "accessibility.duration.day %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ day" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 天" } }
+      }
+    },
+    "accessibility.duration.days %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ days" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 天" } }
+      }
+    },
+    "accessibility.duration.hour %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ hour" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 小时" } }
+      }
+    },
+    "accessibility.duration.hours %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ hours" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 小时" } }
+      }
+    },
+    "accessibility.duration.minute %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ minute" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 分钟" } }
+      }
+    },
+    "accessibility.duration.minutes %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ minutes" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 分钟" } }
+      }
+    },
+    "accessibility.duration.separator" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : ", " } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : " " } }
+      }
+    },
+    "accessibility.quotaWindow.fiveHour" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "5-hour quota" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "5 小时额度" } }
+      }
+    },
+    "accessibility.quotaWindow.weekly" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Weekly quota" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每周额度" } }
       }
     },
     "accessibility.remainingPercent %@" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ remaining" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "剩余 %@" } }
+      }
+    },
+    "accessibility.resets %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Resets in %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@后重置" } }
       }
     },
     "accessibility.unavailableQuota" : {
@@ -301,6 +427,66 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Codex 响应超时" } }
       }
     },
+    "freshness.age.days %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@d" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 天" } }
+      }
+    },
+    "freshness.age.hours %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@h" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 小时" } }
+      }
+    },
+    "freshness.age.justNow" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "just now" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刚刚" } }
+      }
+    },
+    "freshness.age.minutes %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@m" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 分钟" } }
+      }
+    },
+    "freshness.lastSuccess %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "last success %@ ago" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次成功于 %@前" } }
+      }
+    },
+    "freshness.lastSuccess.justNow" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "last success just now" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次成功就在刚刚" } }
+      }
+    },
+    "freshness.noSuccessfulData" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "no successful data" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无成功数据" } }
+      }
+    },
+    "freshness.noSuccessfulDataYet" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "no successful data yet" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "尚无成功数据" } }
+      }
+    },
+    "freshness.updated %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "updated %@ ago" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@前更新" } }
+      }
+    },
+    "freshness.updated.justNow" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "updated just now" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刚刚更新" } }
+      }
+    },
     "identity.account" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Quota + account" } },
@@ -365,6 +551,30 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Quota model" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "额度模型" } }
+      }
+    },
+    "quota.remaining %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ left" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "剩余 %@" } }
+      }
+    },
+    "quota.reset.days %@ %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@d %@h" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@天%@时" } }
+      }
+    },
+    "quota.reset.hours %@ %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@h %@m" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@时%@分" } }
+      }
+    },
+    "quota.reset.minutes %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@m" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@分" } }
       }
     },
     "quota.resets" : {

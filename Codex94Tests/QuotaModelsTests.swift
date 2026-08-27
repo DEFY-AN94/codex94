@@ -367,11 +367,64 @@ final class QuotaModelsTests: XCTestCase {
         XCTAssertNil(RateLimitsParser.kind(for: 1_440))
     }
 
-    func testResetAndStaleFormatting() {
+    func testResetAndRelativeAgeFormatting() {
         let now = Date(timeIntervalSince1970: 1_000)
-        XCTAssertEqual(QuotaFormatting.resetCountdown(to: now.addingTimeInterval(90), now: now), "1m")
-        XCTAssertEqual(QuotaFormatting.resetCountdown(to: now.addingTimeInterval(9_000), now: now), "2h 30m")
-        XCTAssertEqual(QuotaFormatting.staleAge(since: now, now: now.addingTimeInterval(3_660)), "1h")
+        XCTAssertEqual(
+            QuotaFormatting.resetCountdown(to: nil, now: now),
+            .unavailable
+        )
+        XCTAssertEqual(
+            QuotaFormatting.resetCountdown(to: now.addingTimeInterval(-1), now: now),
+            .minutes(0)
+        )
+        XCTAssertEqual(
+            QuotaFormatting.resetCountdown(to: now.addingTimeInterval(90), now: now),
+            .minutes(1)
+        )
+        XCTAssertEqual(
+            QuotaFormatting.resetCountdown(to: now.addingTimeInterval(3_600), now: now),
+            .hours(1, 0)
+        )
+        XCTAssertEqual(
+            QuotaFormatting.resetCountdown(to: now.addingTimeInterval(9_000), now: now),
+            .hours(2, 30)
+        )
+        XCTAssertEqual(
+            QuotaFormatting.resetCountdown(to: now.addingTimeInterval(86_400), now: now),
+            .days(1, 0)
+        )
+        XCTAssertEqual(
+            QuotaFormatting.resetCountdown(
+                to: now.addingTimeInterval(2 * 86_400 + 5 * 3_600),
+                now: now
+            ),
+            .days(2, 5)
+        )
+        XCTAssertEqual(QuotaFormatting.relativeAge(since: now, now: now), .justNow)
+        XCTAssertEqual(
+            QuotaFormatting.relativeAge(since: now, now: now.addingTimeInterval(59)),
+            .justNow
+        )
+        XCTAssertEqual(
+            QuotaFormatting.relativeAge(since: now, now: now.addingTimeInterval(60)),
+            .minutes(1)
+        )
+        XCTAssertEqual(
+            QuotaFormatting.relativeAge(since: now, now: now.addingTimeInterval(3_599)),
+            .minutes(59)
+        )
+        XCTAssertEqual(
+            QuotaFormatting.relativeAge(since: now, now: now.addingTimeInterval(3_600)),
+            .hours(1)
+        )
+        XCTAssertEqual(
+            QuotaFormatting.relativeAge(since: now, now: now.addingTimeInterval(86_400)),
+            .days(1)
+        )
+        XCTAssertEqual(
+            QuotaFormatting.relativeAge(since: now.addingTimeInterval(1), now: now),
+            .justNow
+        )
     }
 
     func testPopoverTitleIncludesRemainingPercentAndPlaceholder() {
@@ -435,6 +488,103 @@ final class QuotaModelsTests: XCTestCase {
                 expectedTitle
             )
         }
+    }
+
+    func testPopoverTitleAndResetCountdownRespectLanguage() throws {
+        let english = try localizationBundle("en")
+        let simplifiedChinese = try localizationBundle("zh-Hans")
+
+        XCTAssertEqual(
+            QuotaFormatting.popoverTitle(
+                bucketName: "Codex",
+                planType: "pro",
+                remainingPercent: 32,
+                language: .english,
+                bundle: english
+            ),
+            "Codex · Pro · 32% left"
+        )
+        XCTAssertEqual(
+            QuotaFormatting.popoverTitle(
+                bucketName: "Codex",
+                planType: "pro",
+                remainingPercent: 32,
+                language: .simplifiedChinese,
+                bundle: simplifiedChinese
+            ),
+            "Codex · Pro · 剩余 32%"
+        )
+        XCTAssertEqual(
+            QuotaLocalizedString.resetCountdown(
+                .hours(2, 30),
+                language: .english,
+                bundle: english
+            ),
+            "2h 30m"
+        )
+        XCTAssertEqual(
+            QuotaLocalizedString.resetCountdown(
+                .hours(2, 30),
+                language: .simplifiedChinese,
+                bundle: simplifiedChinese
+            ),
+            "2时30分"
+        )
+        XCTAssertEqual(
+            QuotaLocalizedString.resetCountdown(
+                .days(2, 5),
+                language: .simplifiedChinese,
+                bundle: simplifiedChinese
+            ),
+            "2天5时"
+        )
+        XCTAssertEqual(
+            QuotaLocalizedString.resetCountdown(
+                .minutes(9),
+                language: .simplifiedChinese,
+                bundle: simplifiedChinese
+            ),
+            "9分"
+        )
+        XCTAssertEqual(
+            QuotaLocalizedString.resetCountdown(
+                .days(2, 5),
+                language: .english,
+                bundle: english
+            ),
+            "2d 5h"
+        )
+        XCTAssertEqual(
+            QuotaLocalizedString.accessibilityResetCountdown(
+                .hours(1, 1),
+                language: .english,
+                bundle: english
+            ),
+            "1 hour, 1 minute"
+        )
+        XCTAssertEqual(
+            QuotaLocalizedString.accessibilityResetCountdown(
+                .days(2, 5),
+                language: .simplifiedChinese,
+                bundle: simplifiedChinese
+            ),
+            "2 天 5 小时"
+        )
+        XCTAssertEqual(
+            QuotaLocalizedString.accessibilityResetCountdown(
+                .hours(1, 1),
+                language: .system,
+                bundle: simplifiedChinese
+            ),
+            "1 小时 1 分钟"
+        )
+        XCTAssertNil(
+            QuotaLocalizedString.accessibilityResetCountdown(
+                .unavailable,
+                language: .english,
+                bundle: english
+            )
+        )
     }
 
     func testWeeklyLabelsAreLocalized() throws {
@@ -516,7 +666,7 @@ final class QuotaModelsTests: XCTestCase {
         }
     }
 
-    func testStatusSemanticLabelsAreLocalized() throws {
+    func testStatusAndFreshnessSemanticLabelsAreLocalized() throws {
         let english = try localizationBundle("en")
         let simplifiedChinese = try localizationBundle("zh-Hans")
 
@@ -525,10 +675,67 @@ final class QuotaModelsTests: XCTestCase {
             ("status.refreshing.help", "Refreshing quota data", "正在刷新额度数据"),
             ("status.cached.help", "Showing cached quota data", "正在显示缓存额度数据"),
             ("status.unavailable.help", "Quota connection unavailable", "额度连接不可用"),
-            ("accessibility.quotaWindow %@", "%@ quota", "%@额度"),
+            ("accessibility.quotaWindow.fiveHour", "5-hour quota", "5 小时额度"),
+            ("accessibility.quotaWindow.weekly", "Weekly quota", "每周额度"),
             ("accessibility.remainingPercent %@", "%@ remaining", "剩余 %@"),
+            ("accessibility.resets %@", "Resets in %@", "%@后重置"),
             ("accessibility.unavailableQuota", "Quota unavailable", "额度不可用"),
-            ("accessibility.cachedAge %@", "last updated %@", "最后更新于 %@")
+            ("quota.remaining %@", "%@ left", "剩余 %@"),
+            ("quota.reset.days %@ %@", "%@d %@h", "%@天%@时"),
+            ("quota.reset.hours %@ %@", "%@h %@m", "%@时%@分"),
+            ("quota.reset.minutes %@", "%@m", "%@分"),
+            ("accessibility.duration.minute %@", "%@ minute", "%@ 分钟"),
+            ("accessibility.duration.minutes %@", "%@ minutes", "%@ 分钟"),
+            ("accessibility.duration.hour %@", "%@ hour", "%@ 小时"),
+            ("accessibility.duration.hours %@", "%@ hours", "%@ 小时"),
+            ("accessibility.duration.day %@", "%@ day", "%@ 天"),
+            ("accessibility.duration.days %@", "%@ days", "%@ 天"),
+            ("accessibility.duration.separator", ", ", " "),
+            ("freshness.updated.justNow", "updated just now", "刚刚更新"),
+            ("freshness.updated %@", "updated %@ ago", "%@前更新"),
+            ("freshness.lastSuccess.justNow", "last success just now", "上次成功就在刚刚"),
+            ("freshness.lastSuccess %@", "last success %@ ago", "上次成功于 %@前"),
+            ("freshness.noSuccessfulData", "no successful data", "暂无成功数据"),
+            ("freshness.noSuccessfulDataYet", "no successful data yet", "尚无成功数据"),
+            ("freshness.age.minutes %@", "%@m", "%@ 分钟"),
+            ("freshness.age.hours %@", "%@h", "%@ 小时"),
+            ("freshness.age.days %@", "%@d", "%@ 天"),
+            (
+                "accessibility.freshness.updated.justNow",
+                "updated just now",
+                "刚刚更新"
+            ),
+            (
+                "accessibility.freshness.updated %@",
+                "updated %@ ago",
+                "%@前更新"
+            ),
+            (
+                "accessibility.freshness.lastSuccess.justNow",
+                "last success just now",
+                "上次成功就在刚刚"
+            ),
+            (
+                "accessibility.freshness.lastSuccess %@",
+                "last success %@ ago",
+                "上次成功于 %@前"
+            ),
+            (
+                "accessibility.freshness.noSuccessfulData",
+                "no successful data",
+                "暂无成功数据"
+            ),
+            (
+                "accessibility.freshness.noSuccessfulDataYet",
+                "no successful data yet",
+                "尚无成功数据"
+            ),
+            ("accessibility.freshness.age.minute %@", "%@ minute", "%@ 分钟"),
+            ("accessibility.freshness.age.minutes %@", "%@ minutes", "%@ 分钟"),
+            ("accessibility.freshness.age.hour %@", "%@ hour", "%@ 小时"),
+            ("accessibility.freshness.age.hours %@", "%@ hours", "%@ 小时"),
+            ("accessibility.freshness.age.day %@", "%@ day", "%@ 天"),
+            ("accessibility.freshness.age.days %@", "%@ days", "%@ 天")
         ]
 
         for (key, englishValue, chineseValue) in expectations {
@@ -542,16 +749,6 @@ final class QuotaModelsTests: XCTestCase {
             )
         }
 
-        let englishQuotaWindow = english.localizedString(
-            forKey: "accessibility.quotaWindow %@",
-            value: nil,
-            table: nil
-        )
-        let chineseQuotaWindow = simplifiedChinese.localizedString(
-            forKey: "accessibility.quotaWindow %@",
-            value: nil,
-            table: nil
-        )
         let englishRemaining = english.localizedString(
             forKey: "accessibility.remainingPercent %@",
             value: nil,
@@ -563,8 +760,6 @@ final class QuotaModelsTests: XCTestCase {
             table: nil
         )
 
-        XCTAssertEqual(String(format: englishQuotaWindow, "Weekly"), "Weekly quota")
-        XCTAssertEqual(String(format: chineseQuotaWindow, "每周"), "每周额度")
         XCTAssertEqual(String(format: englishRemaining, "18%"), "18% remaining")
         XCTAssertEqual(String(format: chineseRemaining, "18%"), "剩余 18%")
     }

@@ -312,6 +312,7 @@ enum RefreshTrigger: String, Sendable {
     case popover
     case background
     case manual
+    case systemWake
     case preferenceChange
 }
 

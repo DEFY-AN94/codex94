@@ -28,20 +28,43 @@ enum ConnectionBadge: Equatable, Sendable {
     case unavailable
 }
 
+enum FreshnessDetail: Equatable, Sendable {
+    case none
+    case updated(Date)
+    case lastSuccess(Date)
+    case noSuccessfulData
+    case noSuccessfulDataYet
+}
+
 struct StatusPresentation: Equatable, Sendable {
     let quotaLevel: QuotaLevel
     let connectionBadge: ConnectionBadge
     let usesCachedData: Bool
     let isIdle: Bool
-    let lastSuccess: Date?
+    let freshness: FreshnessDetail
     let issue: ConnectionIssue?
+
+    var lastSuccess: Date? {
+        switch freshness {
+        case let .updated(date), let .lastSuccess(date): date
+        case .none, .noSuccessfulData, .noSuccessfulDataYet: nil
+        }
+    }
 
     init(
         remainingPercent: Int?,
         connectionState: ConnectionState,
-        isRefreshing: Bool
+        isRefreshing: Bool,
+        lastSuccessfulFetch: Date?
     ) {
         quotaLevel = QuotaLevel(remainingPercent: remainingPercent)
+
+        if case let .stale(stateLastSuccess, _) = connectionState {
+            assert(
+                stateLastSuccess == lastSuccessfulFetch,
+                "Stale connection state must mirror the current snapshot timestamp"
+            )
+        }
 
         let stateRequestsRefresh: Bool
         switch connectionState {
@@ -55,22 +78,18 @@ struct StatusPresentation: Equatable, Sendable {
         case .idle:
             isIdle = true
             usesCachedData = false
-            lastSuccess = nil
             issue = nil
         case .refreshing, .connected:
             isIdle = false
             usesCachedData = false
-            lastSuccess = nil
             issue = nil
-        case let .stale(lastSuccess, issue):
+        case let .stale(_, issue):
             isIdle = false
             usesCachedData = true
-            self.lastSuccess = lastSuccess
             self.issue = issue
         case let .unavailable(issue):
             isIdle = false
             usesCachedData = false
-            lastSuccess = nil
             self.issue = issue
         }
 
@@ -82,6 +101,24 @@ struct StatusPresentation: Equatable, Sendable {
             connectionBadge = .unavailable
         } else {
             connectionBadge = .none
+        }
+
+        switch connectionBadge {
+        case .refreshing:
+            freshness = lastSuccessfulFetch.map(FreshnessDetail.lastSuccess)
+                ?? .noSuccessfulDataYet
+        case .stale:
+            freshness = lastSuccessfulFetch.map(FreshnessDetail.updated)
+                ?? .noSuccessfulData
+        case .unavailable:
+            freshness = .noSuccessfulData
+        case .none:
+            if isIdle {
+                freshness = .none
+            } else {
+                freshness = lastSuccessfulFetch.map(FreshnessDetail.updated)
+                    ?? .noSuccessfulData
+            }
         }
     }
 }

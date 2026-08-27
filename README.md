@@ -96,6 +96,10 @@ at the stable path above.
 
 - Refreshes at launch, whenever the popover opens, and every 1, 5, 15, or 30
   minutes according to the selected setting.
+- After the Mac wakes, refreshes once when there is no successful snapshot or
+  the last success is at least 60 seconds old. A fresher snapshot is kept, and
+  wake, background, manual, and popover requests share the same single-flight
+  refresh path.
 - Uses `account/rateLimits/read` for live quota data. In **Quota + account**
   mode it also uses `account/read` with `refreshToken: false`.
 - Keeps the standard/default quota bucket separate from additional named model
@@ -114,6 +118,11 @@ at the stable path above.
   distinct blue/cyan icons and text.
 - Keeps the last successful quota value after a refresh failure and marks it as
   cached; when no snapshot is available, it shows a gray `--` instead of `0%`.
+- Shows the relative age of the last successful quota data in the popover
+  header. Refreshing with an existing snapshot reports the last success, while
+  refreshing or unavailable states without a snapshot use explicit no-success
+  wording. The same freshness context is included in menu-bar and popover
+  accessibility descriptions.
 - Closes the transient popover when the user clicks elsewhere without consuming
   the original click or requesting Accessibility permission.
 - Locates Codex in this order: manually selected path, ChatGPT app bundle,
@@ -158,9 +167,10 @@ server.
 App Sandbox is intentionally disabled because the Codex child process must
 access its own login state. Hardened Runtime remains enabled; subprocess
 arguments are fixed, the environment is minimized, output is bounded, requests
-time out, and the process group is terminated after each refresh. Version
-validation checks protocol compatibility, not publisher identity, so users must
-trust the ChatGPT/Codex installation and any executable they select.
+time out, and the process group is terminated after each refresh or during app
+shutdown with bounded cleanup. Version validation checks protocol compatibility,
+not publisher identity, so users must trust the ChatGPT/Codex installation and
+any executable they select.
 
 Copied diagnostics normalize the executable path and version before writing the
 text to the system clipboard. Users should still review that text before sharing

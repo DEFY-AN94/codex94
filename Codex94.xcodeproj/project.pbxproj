@@ -32,6 +32,7 @@
 		B00000000000000000000017 /* ProcessTerminator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000018 /* ProcessTerminator.swift */; };
 		B00000000000000000000018 /* StatusPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000019 /* StatusPresentation.swift */; };
 		B00000000000000000000019 /* ConnectionBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001A /* ConnectionBadgeView.swift */; };
+		B0000000000000000000001A /* RefreshPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001B /* RefreshPolicy.swift */; };
 		B00000000000000000000101 /* QuotaModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000101 /* QuotaModelsTests.swift */; };
 		B00000000000000000000102 /* ExecutableLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000102 /* ExecutableLocatorTests.swift */; };
 		B00000000000000000000103 /* DiagnosticsRedactorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000103 /* DiagnosticsRedactorTests.swift */; };
@@ -41,6 +42,7 @@
 		B00000000000000000000107 /* AppStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000107 /* AppStoreTests.swift */; };
 		B00000000000000000000108 /* QuotaPopoverLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000108 /* QuotaPopoverLayoutTests.swift */; };
 		B00000000000000000000109 /* StatusPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000109 /* StatusPresentationTests.swift */; };
+		B0000000000000000000010A /* RefreshPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000010A /* RefreshPolicyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -80,6 +82,7 @@
 		F00000000000000000000018 /* ProcessTerminator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ProcessTerminator.swift; sourceTree = "<group>"; };
 		F00000000000000000000019 /* StatusPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/StatusPresentation.swift; sourceTree = "<group>"; };
 		F0000000000000000000001A /* ConnectionBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/ConnectionBadgeView.swift; sourceTree = "<group>"; };
+		F0000000000000000000001B /* RefreshPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/RefreshPolicy.swift; sourceTree = "<group>"; };
 		F00000000000000000000101 /* QuotaModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaModelsTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000102 /* ExecutableLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutableLocatorTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000103 /* DiagnosticsRedactorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsRedactorTests.swift; sourceTree = "<group>"; };
@@ -89,6 +92,7 @@
 		F00000000000000000000107 /* AppStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000108 /* QuotaPopoverLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaPopoverLayoutTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000109 /* StatusPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusPresentationTests.swift; sourceTree = "<group>"; };
+		F0000000000000000000010A /* RefreshPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshPolicyTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000201 /* Codex94.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Codex94.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F00000000000000000000202 /* Codex94Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Codex94Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -138,6 +142,7 @@
 				F0000000000000000000000D /* Localization.swift */,
 				F0000000000000000000000E /* Theme.swift */,
 				F00000000000000000000019 /* StatusPresentation.swift */,
+				F0000000000000000000001B /* RefreshPolicy.swift */,
 				F0000000000000000000000F /* QuotaBarView.swift */,
 				F0000000000000000000001A /* ConnectionBadgeView.swift */,
 				F00000000000000000000010 /* MenuBarStatusView.swift */,
@@ -162,6 +167,7 @@
 				F00000000000000000000107 /* AppStoreTests.swift */,
 				F00000000000000000000108 /* QuotaPopoverLayoutTests.swift */,
 				F00000000000000000000109 /* StatusPresentationTests.swift */,
+				F0000000000000000000010A /* RefreshPolicyTests.swift */,
 			);
 			path = Codex94Tests;
 			sourceTree = "<group>";
@@ -259,6 +265,7 @@
 				B0000000000000000000000D /* Localization.swift in Sources */,
 				B0000000000000000000000E /* Theme.swift in Sources */,
 				B00000000000000000000018 /* StatusPresentation.swift in Sources */,
+				B0000000000000000000001A /* RefreshPolicy.swift in Sources */,
 				B0000000000000000000000F /* QuotaBarView.swift in Sources */,
 				B00000000000000000000019 /* ConnectionBadgeView.swift in Sources */,
 				B00000000000000000000010 /* MenuBarStatusView.swift in Sources */,
@@ -280,6 +287,7 @@
 				B00000000000000000000107 /* AppStoreTests.swift in Sources */,
 				B00000000000000000000108 /* QuotaPopoverLayoutTests.swift in Sources */,
 				B00000000000000000000109 /* StatusPresentationTests.swift in Sources */,
+				B0000000000000000000010A /* RefreshPolicyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -344,7 +352,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -352,7 +360,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.1.6;
+				MARKETING_VERSION = 0.1.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -370,14 +378,14 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.1.6;
+				MARKETING_VERSION = 0.1.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

@@ -120,7 +120,8 @@ struct QuotaPopoverView: View {
                     Text(QuotaFormatting.popoverTitle(
                         bucketName: viewedBucketName,
                         planType: store.viewedBucket?.planType,
-                        remainingPercent: store.viewedWindow?.remainingPercent
+                        remainingPercent: store.viewedWindow?.remainingPercent,
+                        language: store.preferences.language
                     ))
                         .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .lineLimit(1)
@@ -132,7 +133,9 @@ struct QuotaPopoverView: View {
                         )
                         .accessibilityHidden(true)
 
-                        Text(presentation.localizedConnectionKey)
+                        StatusVisibleText.context(presentation, now: context.date)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                     }
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
@@ -166,7 +169,7 @@ struct QuotaPopoverView: View {
         if let window = store.viewedWindow {
             label = label
                 + Text(verbatim: ", ")
-                + StatusAccessibilityText.quotaWindow(window.kind.localizedKey)
+                + StatusAccessibilityText.quotaWindow(window.kind)
                 + Text(verbatim: ", ")
                 + StatusAccessibilityText.remainingPercent(
                     QuotaFormatting.percent(window.remainingPercent)
@@ -179,15 +182,7 @@ struct QuotaPopoverView: View {
 
         label = label
             + Text(verbatim: ", ")
-            + StatusAccessibilityText.connectionContext(presentation)
-
-        if presentation.usesCachedData, let lastSuccess = presentation.lastSuccess {
-            label = label
-                + Text(verbatim: ", ")
-                + StatusAccessibilityText.cachedAge(
-                    QuotaFormatting.staleAge(since: lastSuccess, now: now)
-                )
-        }
+            + StatusAccessibilityText.statusContext(presentation, now: now)
         return label
     }
 
@@ -196,6 +191,7 @@ struct QuotaPopoverView: View {
             Text("quota.model")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Picker("quota.model", selection: Binding(
                 get: { store.viewedBucket?.limitID ?? store.snapshot?.defaultLimitID ?? "" },
                 set: { store.setViewedBucket($0) }
@@ -219,10 +215,18 @@ struct QuotaPopoverView: View {
     private var quotaRows: some View {
         VStack(spacing: 14) {
             if let fiveHour = store.viewedBucket?.window(.fiveHour) {
-                QuotaWindowRow(window: fiveHour, palette: palette)
+                QuotaWindowRow(
+                    window: fiveHour,
+                    palette: palette,
+                    language: store.preferences.language
+                )
             }
             if let weekly = store.viewedBucket?.window(.weekly) {
-                QuotaWindowRow(window: weekly, palette: palette)
+                QuotaWindowRow(
+                    window: weekly,
+                    palette: palette,
+                    language: store.preferences.language
+                )
             }
             if store.viewedBucket?.windows.isEmpty != false {
                 HStack(spacing: 12) {
@@ -230,6 +234,7 @@ struct QuotaPopoverView: View {
                         .frame(width: 58, alignment: .leading)
                     Text(String(repeating: "░", count: 20))
                         .foregroundStyle(.secondary.opacity(0.45))
+                        .lineLimit(1)
                         .frame(width: 170, alignment: .leading)
                     Text("--")
                         .frame(width: 54, alignment: .trailing)
@@ -248,20 +253,14 @@ struct QuotaPopoverView: View {
     private var stateBanner: some View {
         let presentation = store.viewedStatusPresentation
 
-        if presentation.usesCachedData, let lastSuccess = presentation.lastSuccess {
+        if presentation.usesCachedData {
             Divider()
-            TimelineView(.periodic(from: .now, by: 30)) { context in
-                StatusBanner(
-                    badge: .stale,
-                    color: palette.connectionAccent,
-                    text: cachedBannerText(
-                        presentation: presentation,
-                        lastSuccess: lastSuccess,
-                        now: context.date
-                    ),
-                    accessibilityText: issueText(for: presentation)
-                )
-            }
+            StatusBanner(
+                badge: .stale,
+                color: palette.connectionAccent,
+                text: cachedBannerText(presentation: presentation),
+                accessibilityText: cachedBannerText(presentation: presentation)
+            )
         } else if presentation.connectionBadge == .unavailable {
             Divider()
             StatusBanner(
@@ -278,13 +277,11 @@ struct QuotaPopoverView: View {
     }
 
     private func cachedBannerText(
-        presentation: StatusPresentation,
-        lastSuccess: Date,
-        now: Date
+        presentation: StatusPresentation
     ) -> Text {
         let issue = presentation.issue?.localizedKey ?? "error.connectionFailed"
         return Text("status.cached")
-            + Text(" \(QuotaFormatting.staleAge(since: lastSuccess, now: now)) · ")
+            + Text(verbatim: " · ")
             + Text(issue)
     }
 
@@ -293,6 +290,7 @@ struct QuotaPopoverView: View {
             Text("display.label")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             MenuBarQuotaPicker(store: store)
                 .frame(maxWidth: 300)
             Spacer()
@@ -384,9 +382,18 @@ struct MenuBarQuotaPicker: View {
 private struct QuotaWindowRow: View {
     let window: QuotaWindowSnapshot
     let palette: Codex94Palette
+    let language: LanguagePreference
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
+            let countdown = QuotaLocalizedString.resetCountdown(
+                QuotaFormatting.resetCountdown(to: window.resetsAt, now: context.date),
+                language: language
+            )
+            let accessibilityCountdown = QuotaLocalizedString.accessibilityResetCountdown(
+                QuotaFormatting.resetCountdown(to: window.resetsAt, now: context.date),
+                language: language
+            )
             HStack(spacing: 12) {
                 Text(window.kind.localizedKey)
                     .foregroundStyle(palette.quotaColor(
@@ -409,12 +416,28 @@ private struct QuotaWindowRow: View {
                     .frame(width: 54, alignment: .trailing)
 
                 (Text("quota.resets")
-                 + Text(" \(QuotaFormatting.resetCountdown(to: window.resetsAt, now: context.date))"))
+                 + Text(verbatim: " \(countdown)"))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .font(.system(size: 14, weight: .medium, design: .monospaced))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityLabel(resetCountdown: accessibilityCountdown))
         }
+    }
+
+    private func accessibilityLabel(resetCountdown: String?) -> Text {
+        var label = StatusAccessibilityText.quotaWindow(window.kind)
+            + Text(verbatim: ", ")
+            + StatusAccessibilityText.remainingPercent(
+                QuotaFormatting.percent(window.remainingPercent)
+            )
+        if let resetCountdown {
+            label = label
+                + Text(verbatim: ", ")
+                + StatusAccessibilityText.resets(resetCountdown)
+        }
+        return label
     }
 }
 
