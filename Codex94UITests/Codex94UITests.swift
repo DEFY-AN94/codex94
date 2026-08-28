@@ -557,6 +557,8 @@ final class Codex94UITests: XCTestCase {
             var previousFrame: CGRect?
             var previousType: XCUIElement.ElementType?
             var previousSidebarFrame: CGRect?
+            var lastValidSidebarFrame: CGRect?
+            var lastValidWindowFrame: CGRect?
             var stableSamples = 0
             var matchingCount = 0
             var eligibleCount = 0
@@ -598,8 +600,12 @@ final class Codex94UITests: XCTestCase {
                         x: windowFrame.minX, y: divider.minY,
                         width: divider.minX - windowFrame.minX, height: divider.height
                     )
+                    lastValidSidebarFrame = sidebarFrame
+                    lastValidWindowFrame = windowFrame
                 } else {
                     sidebarFrame = nil
+                    lastValidSidebarFrame = nil
+                    lastValidWindowFrame = nil
                 }
                 let matches = labels.allElementsBoundByIndex
                 matchingCount = matches.count
@@ -649,7 +655,18 @@ final class Codex94UITests: XCTestCase {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.05))
             } while Date() < deadline
             guard let sidebarLabel else {
-                throw UITestFailure("A unique stable Dashboard sidebar item was not available; exact=\(matchingCount), eligible=\(eligibleCount), splitters=\(splitterCount), eligibleSplitters=\(eligibleSplitterCount); \(splitterDiagnostics.joined(separator: "; ")); \(diagnostics.joined(separator: "; "))")
+                var probeSaved = false
+                do {
+                    try captureDashboardSidebarProbe(
+                        in: dashboard, sidebarFrame: lastValidSidebarFrame,
+                        windowFrame: lastValidWindowFrame, page: page
+                    )
+                    probeSaved = true
+                } catch {
+                    // Preserve the navigation failure without exposing a raw
+                    // diagnostic-write error or turning missing evidence into a pass.
+                }
+                throw UITestFailure("A unique stable Dashboard sidebar item was not available; exact=\(matchingCount), eligible=\(eligibleCount), splitters=\(splitterCount), eligibleSplitters=\(eligibleSplitterCount); \(splitterDiagnostics.joined(separator: "; ")); \(diagnostics.joined(separator: "; ")); sidebarProbeSaved=\(probeSaved)")
             }
             sidebarLabel.click()
             let marker: XCUIElement
@@ -660,6 +677,175 @@ final class Codex94UITests: XCTestCase {
             }
             try require(marker.waitForExistence(timeout: 5), "Dashboard selected the wrong destination")
         }
+    }
+
+    private func captureDashboardSidebarProbe(
+        in dashboard: XCUIElement, sidebarFrame: CGRect?, windowFrame: CGRect?, page: UIPage
+    ) throws {
+        // Failure-only evidence. Geometry outside the last validated sidebar may
+        // be inspected, but text outside it is never read. No result selects a UI target.
+        let geometryLimit = 256
+        let textElementLimit = 32
+        var report: [String: Any] = [
+            "method": "bounded-sidebar-field-classification", "diagnosticOnly": true,
+            "navigationVerified": false, "completeDisplaySmoke": false,
+            "expectedLanguage": language.artifactName,
+            "geometryLimit": geometryLimit, "textElementLimit": textElementLimit,
+            "scannedGeometryCount": 0, "recordedElementCount": 0,
+            "rawTextIncluded": false, "rawTestResultsUploaded": false,
+        ]
+        switch page {
+        case .connection: report["expectedPage"] = "connection"
+        case .display: report["expectedPage"] = "display"
+        case .diagnostics: report["expectedPage"] = "diagnostics"
+        }
+        func save() throws {
+            try fixture.writeReport("dashboard-sidebar-probe.json", fields: report)
+        }
+        func isUsableFrame(_ frame: CGRect) -> Bool {
+            [frame.minX, frame.minY, frame.maxX, frame.maxY, frame.width, frame.height]
+                .allSatisfy(\.isFinite) && frame.width > 0 && frame.height > 0
+        }
+        guard let sidebarFrame, let windowFrame,
+              isUsableFrame(sidebarFrame), isUsableFrame(windowFrame),
+              windowFrame.contains(sidebarFrame), sidebarFrame.width <= 280,
+              dashboard.exists, dashboard.frame == windowFrame else {
+            report["validatedGeometryUnavailableOrChanged"] = true
+            try save()
+            return
+        }
+        func hasCurrentSidebarGeometry() -> Bool {
+            guard dashboard.exists, dashboard.frame == windowFrame else { return false }
+            let query = dashboard.splitters
+            guard query.count <= 8 else { return false }
+            let splitters = query.allElementsBoundByAccessibilityElement
+            guard splitters.count <= 8 else { return false }
+            var dividerFrames: [CGRect] = []
+            for splitter in splitters {
+                guard splitter.exists else { continue }
+                let frame = splitter.frame
+                if isUsableFrame(frame), windowFrame.contains(frame),
+                   frame.height > frame.width, frame.minX > windowFrame.minX,
+                   frame.minX - windowFrame.minX <= 280 {
+                    dividerFrames.append(frame)
+                }
+            }
+            guard dividerFrames.count == 1 else { return false }
+            let divider = dividerFrames[0]
+            let currentSidebarFrame = CGRect(
+                x: windowFrame.minX, y: divider.minY,
+                width: divider.minX - windowFrame.minX, height: divider.height
+            )
+            return currentSidebarFrame == sidebarFrame
+                && dashboard.exists && dashboard.frame == windowFrame
+        }
+        guard hasCurrentSidebarGeometry() else {
+            report["validatedGeometryUnavailableOrChanged"] = true
+            try save()
+            return
+        }
+        let query = dashboard.descendants(matching: .any)
+        let rootCount = query.count
+        report["rootElementCount"] = rootCount
+        guard rootCount <= geometryLimit else {
+            report["geometryLimitExceeded"] = true
+            try save()
+            return
+        }
+        // Keep each geometry sample bound to its AX element, not a changing index.
+        let elements = query.allElementsBoundByAccessibilityElement
+        report["snapshotElementCount"] = elements.count
+        guard elements.count <= geometryLimit else {
+            report["geometryLimitExceeded"] = true
+            try save()
+            return
+        }
+        var contained: [XCUIElement] = []
+        var geometryCount = 0
+        for element in elements {
+            guard element.exists else { continue }
+            let frame = element.frame
+            geometryCount += 1
+            if isUsableFrame(frame), sidebarFrame.contains(frame) { contained.append(element) }
+        }
+        report["scannedGeometryCount"] = geometryCount
+        report["sidebarElementCount"] = contained.count
+        guard contained.count <= textElementLimit else {
+            report["textElementLimitExceeded"] = true
+            try save()
+            return
+        }
+        guard hasCurrentSidebarGeometry() else {
+            report["validatedGeometryUnavailableOrChanged"] = true
+            try save()
+            return
+        }
+        report["sidebarRelativeFrame"] = [
+            "x": Double(sidebarFrame.minX - windowFrame.minX),
+            "y": Double(sidebarFrame.minY - windowFrame.minY),
+            "width": Double(sidebarFrame.width), "height": Double(sidebarFrame.height),
+        ]
+
+        // Only these source-owned labels/keys may be named in the report. Unknown
+        // field contents are neither serialized nor hashed, including non-string values.
+        let vocabulary: [String: String] = [
+            "connection.en": "Connection", "connection.zh-Hans": "连接",
+            "display.en": "Display", "display.zh-Hans": "显示",
+            "startup.en": "Startup", "startup.zh-Hans": "启动",
+            "diagnostics.en": "Diagnostics", "diagnostics.zh-Hans": "诊断",
+            "about.en": "About Codex94", "about.zh-Hans": "关于 Codex94",
+            "connection.key": "dashboard.connection", "display.key": "dashboard.display",
+            "startup.key": "dashboard.startup", "diagnostics.key": "dashboard.diagnostics",
+            "about.key": "dashboard.about", "sidebar.en": "Sidebar",
+        ]
+        let entries = vocabulary.sorted { $0.key < $1.key }
+        func classify(_ raw: Any?) -> [String: Any] {
+            guard let text = raw as? String else {
+                return ["isString": false, "isMissing": raw == nil]
+            }
+            guard text.utf8.prefix(4_097).count <= 4_096 else {
+                return ["isString": true, "stringLimitExceeded": true]
+            }
+            let normalized = normalizedWhitespace(text)
+            return [
+                "isString": true, "isEmpty": text.isEmpty,
+                "exactIDs": entries.filter { text == $0.value }.map { $0.key },
+                "normalizedExactIDs": entries.filter { normalized == $0.value }.map { $0.key },
+                "containsIDs": entries.filter { text.contains($0.value) }.map { $0.key },
+            ]
+        }
+        var records: [[String: Any]] = []
+        for element in contained {
+            guard element.exists else { continue }
+            let frame = element.frame
+            guard isUsableFrame(frame), sidebarFrame.contains(frame) else { continue }
+            var record: [String: Any] = [
+                "role": element.elementType.rawValue,
+                "relativeFrame": [
+                    "x": Double(frame.minX - windowFrame.minX),
+                    "y": Double(frame.minY - windowFrame.minY),
+                    "width": Double(frame.width), "height": Double(frame.height),
+                ],
+                "enabled": element.isEnabled, "hittable": element.isHittable,
+                "selected": element.isSelected,
+            ]
+            // Window bounds alone cannot detect a narrower sidebar. Revalidate
+            // the divider immediately before reading each element's text fields.
+            guard hasCurrentSidebarGeometry() else {
+                report["validatedGeometryUnavailableOrChanged"] = true
+                report.removeValue(forKey: "sidebarRelativeFrame")
+                try save()
+                return
+            }
+            guard element.exists, element.frame == frame else { continue }
+            record["label"] = classify(element.label)
+            record["title"] = classify(element.title)
+            record["value"] = classify(element.value)
+            records.append(record)
+        }
+        report["recordedElementCount"] = records.count
+        report["elements"] = records
+        try save()
     }
 
     private func picker(
@@ -1663,7 +1849,7 @@ private struct SyntheticFixture {
             "popover-en.png", "popover-zh-Hans.png", "dashboard-en.png", "dashboard-zh-Hans.png",
             "popover-startup.png", "popover-refreshing.png", "popover-stale.png", "popover-unavailable-en.png",
             "popover-unavailable-zh-Hans.png", "display-result.json", "recovery-result.json",
-            "status-item-reference.json"
+            "status-item-reference.json", "dashboard-sidebar-probe.json"
         ]
         let variants = Set(UILanguage.allCases.flatMap { language in
             UITheme.allCases.map { "popover-long-\(language.artifactName)-\($0.rawValue).png" }
