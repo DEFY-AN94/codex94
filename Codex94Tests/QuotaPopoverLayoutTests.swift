@@ -392,8 +392,12 @@ final class QuotaPopoverLayoutTests: XCTestCase {
     func testHostedSwiftUIAccessibilityFixtureIsAvailable() throws {
         let nativeTitle = "Synthetic native accessibility control"
         let nativeControl = NSButton(title: nativeTitle, target: nil, action: nil)
-        XCTAssertEqual(nativeControl.accessibilityRole(), .button)
-        XCTAssertEqual(nativeControl.accessibilityTitle(), nativeTitle)
+        // AppKit exposes the button's cell, not its ignored control container.
+        let nativeElement = try XCTUnwrap(
+            NSAccessibility.unignoredDescendant(of: nativeControl) as? any NSAccessibilityProtocol
+        )
+        XCTAssertEqual(nativeElement.accessibilityRole(), .button)
+        XCTAssertEqual(nativeElement.accessibilityTitle(), nativeTitle)
 
         let label = "Synthetic SwiftUI accessibility control"
         let content = Text(verbatim: label)
@@ -664,10 +668,15 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                     let quitTitle = StatusAccessibilityString.localized(
                         "command.quit", language: language, bundle: .main
                     )
+                    let bucket = try XCTUnwrap(fixture.store.viewedBucket)
+                    let quotaIdentifiers = bucket.windows.map { "quota-window-" + $0.kind.rawValue }
                     let elements = accessibilityElements(in: view) { elements in
                         elements.contains {
                             $0.accessibilityRole() == .button
                                 && ($0.accessibilityLabel() ?? $0.accessibilityTitle() ?? "").contains(quitTitle)
+                        }
+                        && quotaIdentifiers.allSatisfy { identifier in
+                            elements.contains { $0.accessibilityIdentifier() == identifier }
                         }
                     }
                     let quitButton = try XCTUnwrap(elements.first {
@@ -680,25 +689,24 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                         accuracy: 1,
                         "Only the command section's 8pt padding may remain below Quit"
                     )
-                    let bucket = try XCTUnwrap(fixture.store.viewedBucket)
                     for quotaWindow in bucket.windows {
                         let reset = QuotaResetPresentation(
                             resetsAt: quotaWindow.resetsAt, now: referenceDate,
                             language: language, timeZone: resetTimeZone
                         )
                         let matching = elements.filter {
-                            $0.accessibilityLabel()?.contains(reset.accessibilityLabel) == true
+                            $0.accessibilityIdentifier() == "quota-window-" + quotaWindow.kind.rawValue
                         }
-                        XCTAssertFalse(matching.isEmpty)
-                        for element in matching {
-                            let frame = element.accessibilityFrame()
-                            XCTAssertGreaterThan(frame.width, 0)
-                            XCTAssertGreaterThan(frame.height, 0)
-                            XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX)
-                            XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX)
-                            XCTAssertGreaterThanOrEqual(frame.minY, bounds.minY + 8)
-                            XCTAssertLessThanOrEqual(frame.maxY, bounds.maxY - 8)
-                        }
+                        XCTAssertEqual(matching.count, 1, "The header must not substitute for a quota row")
+                        let row = try XCTUnwrap(matching.first)
+                        XCTAssertTrue(row.accessibilityLabel()?.contains(reset.accessibilityLabel) == true)
+                        let frame = row.accessibilityFrame()
+                        XCTAssertGreaterThan(frame.width, 0)
+                        XCTAssertGreaterThan(frame.height, 0)
+                        XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX)
+                        XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX)
+                        XCTAssertGreaterThanOrEqual(frame.minY, bounds.minY + 8)
+                        XCTAssertLessThanOrEqual(frame.maxY, bounds.maxY - 8)
                     }
                 }
             }
@@ -874,7 +882,18 @@ final class QuotaPopoverLayoutTests: XCTestCase {
     private func waitForLayout(until condition: () -> Bool) -> Bool {
         let deadline = Date(timeIntervalSinceNow: 2)
         while !condition(), Date() < deadline {
-            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.01))
+            // Synchronous main-actor tests block NSApplication's outer event loop.
+            // Dispatch only this test host's AppKit window/activation events, never
+            // keyboard or mouse input. A RunLoop turn alone leaves these queued.
+            for _ in 0..<32 {
+                guard Date() < deadline,
+                      let event = NSApp.nextEvent(
+                        matching: .appKitDefined, until: .distantPast,
+                        inMode: .default, dequeue: true
+                      ) else { break }
+                NSApp.sendEvent(event)
+            }
+            RunLoop.main.run(until: min(deadline, Date(timeIntervalSinceNow: 0.01)))
         }
         return condition()
     }
