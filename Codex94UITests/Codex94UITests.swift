@@ -801,10 +801,8 @@ final class Codex94UITests: XCTestCase {
         guard let bundleURL = running.bundleURL, let executableURL = running.executableURL else {
             throw UITestFailure("The fixture application's public bundle metadata is unavailable")
         }
-        let path = bundleURL.standardizedFileURL.resolvingSymlinksInPath().path
-        try require(path == fixture.applicationURL.path
-                    && executableURL.standardizedFileURL.resolvingSymlinksInPath().path == fixture.applicationBinaryURL.path,
-                    "UI tests must target the exact fixture-root build product, never an installed or other application")
+        _ = try SyntheticFixture.registeredPath(bundleURL.path, expected: fixture.applicationURL.path)
+        _ = try SyntheticFixture.registeredPath(executableURL.path, expected: fixture.applicationBinaryURL.path)
         guard let bundle = Bundle(url: bundleURL) else { throw UITestFailure("The fixture product bundle is invalid") }
         XCTAssertEqual(bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, fixture.expectedVersion)
         XCTAssertEqual(bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String, fixture.expectedBuild)
@@ -1029,13 +1027,24 @@ private struct SyntheticFixture {
               let rootPath = environment["CODEX94_UI_FIXTURE_ROOT"] else {
             throw UITestFailure("UI smoke tests require a preseeded, fresh GitHub-hosted Mac; local execution is refused")
         }
-        let root = URL(fileURLWithPath: rootPath, isDirectory: true)
-        guard root.path == root.standardizedFileURL.resolvingSymlinksInPath().path,
-              root.deletingLastPathComponent().path == "/private/tmp",
-              root.lastPathComponent.hasPrefix("codex94-v018-ui-"),
-              root.lastPathComponent.count > "codex94-v018-ui-".count else {
+        // Foundation's resolvingSymlinksInPath also abbreviates /private/tmp
+        // to /tmp. That spelling change is not a symlink in our fixture. Use
+        // POSIX identity instead, keeping /private/tmp as the sole authority.
+        let components = rootPath.split(separator: "/", omittingEmptySubsequences: false)
+        let name: String
+        if components.count == 4, components[0].isEmpty,
+           components[1] == "private", components[2] == "tmp" {
+            name = String(components[3])
+        } else if components.count == 3, components[0].isEmpty, components[1] == "tmp" {
+            name = String(components[2])
+        } else {
+            throw UITestFailure("The synthetic fixture root is outside the exact private temporary directory")
+        }
+        guard name.hasPrefix("codex94-v018-ui-"), name.count > "codex94-v018-ui-".count else {
             throw UITestFailure("The synthetic fixture root is not an approved canonical temporary directory")
         }
+        let canonicalRoot = try registeredPath(rootPath, expected: "/private/tmp/" + name)
+        let root = URL(fileURLWithPath: canonicalRoot, isDirectory: true)
         try validate(root, type: .typeDirectory, mode: 0o700)
         let manifestURL = root.appendingPathComponent("manifest.json")
         let manifest = try readJSON(manifestURL, maximumBytes: 131_072)
@@ -1067,9 +1076,10 @@ private struct SyntheticFixture {
         let modeURL = try child("modePath", "mode.json")
         let requestLogURL = try child("requestLogPath", "request-log.jsonl")
         let artifacts = try child("artifactDirectory", "artifacts", directory: true)
-        guard environment["CODEX94_UI_ARTIFACT_ROOT"] == artifacts.path else {
+        guard let artifactPath = environment["CODEX94_UI_ARTIFACT_ROOT"] else {
             throw UITestFailure("The UI artifact environment must match the exact manifest directory")
         }
+        _ = try registeredPath(artifactPath, expected: artifacts.path)
         let applicationURL = root.appendingPathComponent("DerivedData/Build/Products/Debug/Codex94.app", isDirectory: true)
         guard manifest["applicationProduct"] as? String == applicationURL.path else {
             throw UITestFailure("The build product path must match the pre-launch manifest")
@@ -1304,17 +1314,58 @@ private struct SyntheticFixture {
         return try Data(contentsOf: url)
     }
 
-    private static func validate(_ url: URL, type: FileAttributeType, mode: Int? = nil) throws {
-        guard url.path == url.standardizedFileURL.resolvingSymlinksInPath().path else {
-            throw UITestFailure("Fixture files must not traverse symbolic links")
+    /// Accept only a registered canonical path or its one system /tmp spelling.
+    /// Arbitrary symlink entries into a valid directory are not alternate roots.
+    static func registeredPath(_ reported: String, expected: String) throws -> String {
+        guard try posixRealPath(expected) == expected else {
+            throw UITestFailure("A registered fixture path must be POSIX-canonical and contain no symlink components")
         }
-        let info = try FileManager.default.attributesOfItem(atPath: url.path)
-        guard info[.type] as? FileAttributeType == type,
-              (info[.ownerAccountID] as? NSNumber)?.uint32Value == getuid() else {
+        if reported != expected {
+            guard expected.hasPrefix("/private/tmp/"),
+                  reported == String(expected.dropFirst("/private".count)),
+                  try posixRealPath("/tmp") == "/private/tmp" else {
+                throw UITestFailure("A reported path is neither the registered fixture nor its exact system tmp alias")
+            }
+        }
+        guard try posixRealPath(reported) == expected else {
+            throw UITestFailure("The reported path does not resolve to the exact registered fixture")
+        }
+        return expected
+    }
+
+    private static func posixRealPath(_ path: String) throws -> String {
+        guard path.hasPrefix("/"), !path.utf8.contains(0) else {
+            throw UITestFailure("Fixture paths must be absolute POSIX paths without embedded nulls")
+        }
+        let resolved = path.withCString { source -> String? in
+            guard let result = Darwin.realpath(source, nil) else { return nil }
+            defer { Darwin.free(result) }
+            return String(cString: result)
+        }
+        guard let resolved else { throw UITestFailure("Could not resolve a registered fixture path") }
+        return resolved
+    }
+
+    private static func validate(_ url: URL, type: FileAttributeType, mode: Int? = nil) throws {
+        var info = stat()
+        let result = url.path.withCString { Darwin.lstat($0, &info) }
+        let expectedType: mode_t
+        switch type {
+        case .typeDirectory: expectedType = mode_t(S_IFDIR)
+        case .typeRegular: expectedType = mode_t(S_IFREG)
+        default: throw UITestFailure("Only regular fixture files and directories are permitted")
+        }
+        guard result == 0, info.st_mode & mode_t(S_IFMT) == expectedType,
+              info.st_uid == getuid() else {
             throw UITestFailure("Fixture file type or owner is not the current disposable runner")
         }
-        if let mode, (info[.posixPermissions] as? NSNumber)?.intValue != mode {
-            throw UITestFailure("The fixture directory must remain private")
+        // lstat rejects a symlink at the leaf; realpath equality rejects aliases
+        // in any parent component, including the known synthetic cache path.
+        guard try posixRealPath(url.path) == url.path else {
+            throw UITestFailure("Fixture files must not traverse symbolic links")
+        }
+        if let mode, Int(info.st_mode & 0o7777) != mode {
+            throw UITestFailure("The fixture file permissions must remain private")
         }
     }
 }

@@ -515,7 +515,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
             )
             .codex94Environment(fixture.preferences)
             let rowController = NSHostingController(rootView: row)
-            let rowSize = rowController.sizeThatFits(in: NSSize(width: 464, height: .greatestFiniteMagnitude))
+            let rowSize = rowController.sizeThatFits(in: NSSize(width: 464, height: CGFloat.greatestFiniteMagnitude))
             XCTAssertEqual(rowSize.width, 464, accuracy: 0.5)
             XCTAssertTrue(rowSize.height.isFinite)
             XCTAssertGreaterThan(rowSize.height, 0)
