@@ -541,8 +541,9 @@ final class Codex94UITests: XCTestCase {
     private func selectPage(_ page: UIPage, in dashboard: XCUIElement) throws {
         try withoutRequests("Selecting a Dashboard page") {
             let title = language.page(page)
+            // macOS CI exposes sidebar text through value while label/title are empty.
             let labels = dashboard.descendants(matching: .any).matching(NSPredicate(
-                format: "label == %@ OR title == %@", title, title
+                format: "label == %@ OR title == %@ OR value == %@", title, title, title
             ))
             func isUsableFrame(_ frame: CGRect) -> Bool {
                 [frame.minX, frame.minY, frame.maxX, frame.maxY, frame.width, frame.height]
