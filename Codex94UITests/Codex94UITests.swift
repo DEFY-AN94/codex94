@@ -593,7 +593,7 @@ final class Codex94UITests: XCTestCase {
             try require(item.elementType == .statusItem && item.label == referenceLabel,
                         "The XCUI reference must be the runner's exact labeled status-item surface")
             let size = item.frame.size
-            try require(size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0,
+            try require(size.width.isFinite && size.height.isFinite && size.width > 0 && size.height > 0,
                         "The XCUI reference must expose finite visible geometry")
             xcuiMeasurements.append([
                 "requestedLength": requested, "reportedLength": reference.length,
