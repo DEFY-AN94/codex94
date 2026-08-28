@@ -169,15 +169,21 @@ def main():
     require(result.returncode == 0, "Could not preseed the synthetic AUT preferences")
 
     # Run a fake-only protocol self-check before launching the real application.
-    version = subprocess.run([str(executable), "--version"], capture_output=True, timeout=3, check=True)
-    require(version.stdout == b"codex-cli 9.4.0-ui-fixture\n", "Unexpected fake version")
+    system_alias = Path("/tmp") / root.name / "codex"
+    require(
+        Path("/tmp").resolve() == Path("/private/tmp") and system_alias.resolve() == executable,
+        "The system temporary alias must resolve to the exact fake executable",
+    )
+    for version_executable in (executable, system_alias):
+        version = subprocess.run([str(version_executable), "--version"], capture_output=True, timeout=3, check=True)
+        require(version.stdout == b"codex-cli 9.4.0-ui-fixture\n", "Unexpected fake version")
     transaction = '\n'.join([
         '{"id":1,"method":"initialize","params":{}}',
         '{"method":"initialized"}',
         '{"id":2,"method":"account/rateLimits/read"}',
     ]) + '\n'
     probe = subprocess.run(
-        [str(executable), "-s", "read-only", "-a", "never", "app-server", "--stdio"],
+        [str(system_alias), "-s", "read-only", "-a", "never", "app-server", "--stdio"],
         input=transaction.encode("utf-8"), capture_output=True, timeout=3, check=True,
     )
     responses = [json.loads(line) for line in probe.stdout.splitlines()]
@@ -190,6 +196,7 @@ def main():
         "runner": "github-hosted-macos", "preseededBeforeLaunch": True,
         "existingAUTDataRefused": True, "identityMode": "quotaOnly",
         "fakeProtocolSelfCheck": "passed", "selfCheckRateLimits": 1,
+        "fakeSystemTmpAliasChecked": True,
         "sourceRevision": source_revision,
         "runnerWriteScope": ["synthetic-control", "synthetic-artifacts"],
         "runnerPreferenceAccess": "read-only-synthetic-app-domain",

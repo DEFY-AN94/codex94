@@ -36,8 +36,9 @@ final class Codex94UITests: XCTestCase {
     func testDisplaySmoke() throws {
         try prepare(scenario: "display")
         try launchPopover(expectedRequestRange: 1...2)
-        try assertStatusItemWidth(58)
         var popover = try currentPopover()
+        try capture(popover, named: "popover-startup.png")
+        try assertStatusItemWidth(58)
         try assertNoRecoveryAction(in: popover)
         try assertQuotaLayout(in: popover, spark: false)
         try assertColor("FF8C42", in: identified("quota-window-weekly", in: popover))
@@ -219,8 +220,8 @@ final class Codex94UITests: XCTestCase {
         var popover = try currentPopover()
         try require(elementWithText(language.notExecutable, in: popover).exists,
                     "The non-executable fixture must fail before any quota request")
-        try assertColor("FF3366", in: popover, minimumPixels: 4)
         try capture(popover, named: "popover-unavailable-en.png")
+        try assertColor("FF3366", in: popover, minimumPixels: 4)
         var dashboard = try exerciseRecovery(.connection, by: .keyboard)
         let firstDashboardFrame = dashboard.frame
         try selectPage(.display, in: dashboard)
@@ -307,7 +308,7 @@ final class Codex94UITests: XCTestCase {
         try waitForSettledRequests()
         let delta = try fixture.requestCount() - before
         try require(expectedRequestRange.contains(delta),
-                    "Only launch plus the normal popover request may run at startup")
+                    "Startup quota request delta=\(delta); expected \(expectedRequestRange.lowerBound)...\(expectedRequestRange.upperBound)")
         try fixture.assertSafePreferences()
         _ = try ownedApplicationPID()
     }
@@ -1301,7 +1302,7 @@ private struct SyntheticFixture {
     func writeArtifact(_ data: Data, named filename: String) throws {
         let fixed: Set<String> = [
             "popover-en.png", "popover-zh-Hans.png", "dashboard-en.png", "dashboard-zh-Hans.png",
-            "popover-refreshing.png", "popover-stale.png", "popover-unavailable-en.png",
+            "popover-startup.png", "popover-refreshing.png", "popover-stale.png", "popover-unavailable-en.png",
             "popover-unavailable-zh-Hans.png", "display-result.json", "recovery-result.json"
         ]
         let variants = Set(UILanguage.allCases.flatMap { language in

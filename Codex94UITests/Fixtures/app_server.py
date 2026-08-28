@@ -12,7 +12,8 @@ import sys
 import time
 
 
-ROOT = Path(__file__).absolute().parent
+REPORTED_EXECUTABLE = Path(__file__).absolute()
+ROOT = Path("/private/tmp") / REPORTED_EXECUTABLE.parent.name
 MODE_NAMES = {"normal", "notLoggedIn", "serverError", "longName", "slow"}
 mode_name = "normal"
 log_ready = False
@@ -68,11 +69,22 @@ def main():
     require(ROOT.parent == Path("/private/tmp") and ROOT.name.startswith("codex94-v018-ui-"))
     require(ROOT == ROOT.resolve() and ROOT.stat().st_uid == os.getuid())
     require(stat.S_IMODE(ROOT.stat().st_mode) == 0o700)
+    # The production locator uses Foundation's resolvingSymlinksInPath, which
+    # abbreviates /private/tmp to /tmp. Accept only that system spelling of our
+    # exact registered executable, never arbitrary symlinks or another root.
+    canonical_executable = ROOT / "codex"
+    system_alias = Path("/tmp") / ROOT.name / "codex"
+    require(
+        REPORTED_EXECUTABLE == canonical_executable
+        or (REPORTED_EXECUTABLE == system_alias and Path("/tmp").resolve() == Path("/private/tmp"))
+    )
+    require(REPORTED_EXECUTABLE.resolve() == canonical_executable)
+    regular_file(canonical_executable)
     manifest = json.loads(regular_file(ROOT / "manifest.json").read_text(encoding="utf-8"))
     require(manifest["schemaVersion"] == 1 and manifest["fixtureRoot"] == str(ROOT))
     require(manifest["bundleID"] == "com.defyan94.codex94")
     require(manifest["runner"] == {"environment": "github-hosted", "os": "macOS"})
-    require(manifest["executable"] == str(ROOT / "codex"))
+    require(manifest["executable"] == str(canonical_executable))
     control = ROOT / "control"
     control_info = control.lstat()
     require(stat.S_ISDIR(control_info.st_mode) and control_info.st_uid == os.getuid())
