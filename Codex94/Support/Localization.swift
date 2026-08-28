@@ -1,5 +1,54 @@
 import SwiftUI
 
+extension DashboardSection {
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .connection: "dashboard.connection"
+        case .display: "dashboard.display"
+        case .startup: "dashboard.startup"
+        case .diagnostics: "dashboard.diagnostics"
+        case .about: "dashboard.about"
+        }
+    }
+}
+
+extension MenuBarLayout {
+    var localizedKey: LocalizedStringKey {
+        switch self {
+        case .ringAndPercentage: "display.layout.ringAndPercentage"
+        case .percentageOnly: "display.layout.percentageOnly"
+        case .ringOnly: "display.layout.ringOnly"
+        }
+    }
+}
+
+extension StatusAccentRole {
+    var localizedKey: LocalizedStringKey {
+        switch self {
+        case .healthy: "display.colors.healthy"
+        case .warning: "display.colors.warning"
+        case .critical: "display.colors.critical"
+        case .error: "display.colors.error"
+        }
+    }
+}
+
+extension ConnectionRecoveryDestination {
+    var localizedKey: LocalizedStringKey {
+        switch self {
+        case .connection: "recovery.openConnection"
+        case .diagnostics: "recovery.openDiagnostics"
+        }
+    }
+
+    var helpKey: LocalizedStringKey {
+        switch self {
+        case .connection: "recovery.openConnection.help"
+        case .diagnostics: "recovery.openDiagnostics.help"
+        }
+    }
+}
+
 extension DashboardWindowSizePreset {
     var localizedKey: LocalizedStringKey {
         switch self {
@@ -232,6 +281,9 @@ enum StatusAccessibilityString {
         presentation: StatusPresentation,
         now: Date,
         language: LanguagePreference,
+        locale: Locale? = nil,
+        calendar: Calendar = Calendar(identifier: .gregorian),
+        timeZone: TimeZone = .autoupdatingCurrent,
         bundle: Bundle = .main
     ) -> String {
         var components = [bucketName]
@@ -247,6 +299,15 @@ enum StatusAccessibilityString {
                 language: language,
                 bundle: bundle
             ))
+            components.append(QuotaResetPresentation(
+                resetsAt: window.resetsAt,
+                now: now,
+                language: language,
+                locale: locale,
+                calendar: calendar,
+                timeZone: timeZone,
+                bundle: bundle
+            ).accessibilityLabel)
         } else {
             components.append(localized(
                 "accessibility.unavailableQuota",
@@ -558,6 +619,61 @@ enum QuotaLocalizedString {
             language: language,
             bundle: bundle
         )
+    }
+}
+
+/// One display projection shared by quota rows, Connection and quota accessibility labels.
+/// Formatting has no dependency on AppStore, preferences or the refresh lifecycle.
+struct QuotaResetPresentation: Equatable {
+    let countdown: String
+    let absolute: String
+    let accessibilityLabel: String
+
+    init(
+        resetsAt: Date?,
+        now: Date,
+        language: LanguagePreference,
+        locale: Locale? = nil,
+        calendar: Calendar = Calendar(identifier: .gregorian),
+        timeZone: TimeZone = .autoupdatingCurrent,
+        bundle: Bundle = .main
+    ) {
+        let remaining = QuotaFormatting.resetCountdown(to: resetsAt, now: now)
+        countdown = QuotaLocalizedString.resetCountdown(
+            remaining, language: language, bundle: bundle
+        )
+        let timestamp = QuotaFormatting.absoluteReset(
+            to: resetsAt,
+            locale: locale ?? language.locale,
+            calendar: calendar,
+            timeZone: timeZone
+        )
+        if let timestamp {
+            absolute = StatusAccessibilityString.localized(
+                "quota.resetAt %@",
+                arguments: [timestamp],
+                language: language,
+                bundle: bundle
+            )
+        } else {
+            absolute = StatusAccessibilityString.localized(
+                "quota.resetAt.unavailable", language: language, bundle: bundle
+            )
+        }
+
+        if let duration = QuotaLocalizedString.accessibilityResetCountdown(
+            remaining, language: language, bundle: bundle
+        ) {
+            let relative = StatusAccessibilityString.localized(
+                "accessibility.resets %@",
+                arguments: [duration],
+                language: language,
+                bundle: bundle
+            )
+            accessibilityLabel = relative + ", " + absolute
+        } else {
+            accessibilityLabel = absolute
+        }
     }
 }
 

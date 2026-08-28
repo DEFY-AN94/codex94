@@ -24,6 +24,9 @@ tested, and security-scanned before it is tagged.
 
 The values below come from an isolated documentation fixture. They are
 illustrative and do not contain a real account, identity, or quota.
+These images still show the previous stable UI, not the `0.1.8` candidate.
+Updated popover and Dashboard screenshots are pending a fixture render and
+review; the existing images are retained without claiming candidate validation.
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 menu bar ring showing 79 percent remaining" width="144">
@@ -42,7 +45,10 @@ illustrative and do not contain a real account, identity, or quota.
 
 ## Distribution status
 
-- This source version is `0.1.7 (8)`; its stable source tag is `v0.1.7`.
+- The current stable source is `0.1.7 (8)`, tagged `v0.1.7`.
+- This development tree prepares an **unreleased `0.1.8 (9)` candidate**.
+  Build/test CI and GUI verification are pending; source review and
+  static checks are not runtime validation or a stable release.
 - A source release is available only after its tag is published. `main` may
   contain release preparation.
 - This public repository can be cloned without GitHub authentication.
@@ -68,7 +74,8 @@ executable selected manually.
 
 ## Install from source
 
-After `v0.1.7` is published, install its stable source with:
+Install the published stable `v0.1.7` source with the following commands. This
+does not install the unreleased `0.1.8` candidate:
 
 ```bash
 brew install ripgrep
@@ -95,6 +102,36 @@ at the stable path above.
 
 ## Main behavior
 
+This section describes the working `0.1.8` candidate; features marked below as
+new are not included in the stable `v0.1.7` install above.
+
+- New in the candidate: choose **Ring + Percentage**, **Percentage Only**, or
+  **Ring Only** in Dashboard → Display. A saved layout takes effect the next
+  time Codex94 starts, not by resizing the running status item. A status badge
+  is centered in a visible ring or occupies a fixed trailing slot in
+  Percentage Only.
+- New in the candidate: customize four independent colors for healthy
+  (50–100%), warning (20–49%), critical (0–19%), and hard-unavailable error
+  states. Thresholds cannot be changed. Colors update immediately and are
+  stored as opaque sRGB, normalized six-digit uppercase `RRGGBB` values without alpha.
+  Critical and error remain independent even when both default to theme red.
+  **Restore Default Colors** removes only the four overrides, preserving
+  layout, theme, language, quota selection, executable path, and window size.
+- New in the candidate: quota rows show a separate absolute **Reset** line
+  with the full date, hour/minute, and UTC offset at the reset instant,
+  including daylight-saving changes. The existing countdown remains; a
+  missing reset is unavailable and a past date stays visible with a zero
+  countdown. Dates follow the app language's locale and the current time zone.
+  Dashboard → Connection shows the actual resolved menu-bar bucket/window,
+  including temporary Auto fallback, rather than the popover's browsed model.
+- New in the candidate: issue banners offer **Open Connection** or
+  **Open Diagnostics**, reusing the same Dashboard window. Ordinary Dashboard
+  opening preserves its current page. These buttons only navigate; use the
+  existing **Refresh** to retry. A signed-out state explains that you must
+  sign in in Codex, then return and refresh; Codex94 does not perform login.
+- Layout/color changes, Reset rendering, and recovery navigation do not trigger
+  quota requests, write quota cache, or change connection state. Opening the
+  popover still follows its existing refresh behavior below.
 - Refreshes at launch, whenever the popover opens, and every 1, 5, 15, or 30
   minutes according to the selected setting.
 - After the Mac wakes, refreshes once when there is no successful snapshot or
@@ -114,9 +151,11 @@ at the stable path above.
 - Hides a 5-hour or Weekly row and its selection whenever Codex does not return
   that window; it never estimates or combines independent quota windows.
 - Keeps quota severity separate from connection and data freshness: quota
-  rings, percentages, and bars remain green, amber, or red according to the
-  remaining percentage, while refreshing, cached, and unavailable states use
-  distinct blue/cyan icons and text.
+  rings, percentages, and bars share the same resolved healthy/warning/critical
+  colors, defaulting to green, amber, and red. Refreshing and cached indicators
+  retain the blue/cyan connection accent. In the candidate, a hard-unavailable
+  badge, banner, or Dashboard error dot uses its independent error color,
+  defaulting to the theme red before any critical override.
 - Keeps the last successful quota value after a refresh failure and marks it as
   cached; when no snapshot is available, it shows a gray `--` instead of `0%`.
 - Shows the relative age of the last successful quota data in the popover
@@ -161,7 +200,11 @@ time with owner-only permissions. Email is memory-only in **Quota + account**
 mode and is removed from the in-memory snapshot after switching to **Quota
 only**. UserDefaults stores interface choices, including the preferred menu-bar
 quota selection, and an optional manually selected executable path. The
-popover's browsed model is session-only. Codex94 has no analytics, advertising,
+candidate adds `menuBarLayout.v1` and `statusAccentOverrides.v1` for layout and
+four color overrides. Reset text is derived from the existing reset timestamp,
+not additional cached fields. The popover's browsed model and the Dashboard's
+selected section are session-only; Dashboard frame autosave is unchanged.
+Codex94 has no analytics, advertising,
 telemetry upload, crash-reporting SDK, update checker, or project-operated
 server.
 
@@ -194,11 +237,16 @@ Build and run a Debug app:
 ./script/build_and_run.sh
 ```
 
-Run the static security check, build, launch, and verify the process:
+`build_and_run.sh` stops existing named Codex94 processes before building and
+launches the Debug app. `install.sh` replaces the app at its installation path
+and may launch it. These scripts are not read-only checks; local app runs can
+use the same preferences and cache as the installed app.
 
-```bash
-./script/build_and_run.sh --verify
-```
+Use synthetic fixtures and injected fetchers or an explicit fake executable
+for automated tests and documentation screenshots. Do not include real account
+credentials, identity, quota, or private paths in shared fixtures or artifacts.
+Keep test preferences and cache separate from daily app data; see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 Run the unit and fake app-server integration tests:
 
@@ -209,11 +257,16 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   CODE_SIGNING_ALLOWED=NO test
 ```
 
-Run the complete local release gate:
+Run the complete release gate, including hosted tests, a Release build, and
+security/signature checks:
 
 ```bash
 ./script/release_check.sh
 ```
+
+The candidate's CI and GUI checks and replacement documentation screenshots are
+still pending. Build/test results, GUI validation, and screenshot review are
+reported separately.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See

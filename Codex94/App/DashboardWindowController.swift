@@ -55,8 +55,9 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func show() {
+    func show(section: DashboardSection? = nil) {
         guard let window else { return }
+        windowState.select(section: section)
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window.makeKeyAndOrderFront(nil)

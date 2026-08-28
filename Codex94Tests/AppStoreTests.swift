@@ -4,6 +4,299 @@ import XCTest
 
 @MainActor
 final class AppStoreTests: XCTestCase {
+    func testDisplayPreferencesAndResetFormattingDoNotFetchOrRewriteQuotaCache() async throws {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let snapshot = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: 85,
+            fetchedAt: now,
+            defaultResetsAt: now.addingTimeInterval(86_400),
+            sparkResetsAt: now.addingTimeInterval(3_600)
+        )
+        let selection = MenuBarQuotaSelection.bucket(limitID: "model-special", kind: .weekly)
+        let fetcher = SnapshotSequenceFetcher([snapshot])
+        let fixture = try makeStoreFixture(fetcher: fetcher, selection: selection)
+        fixture.preferences.theme = .terminalLight
+        fixture.preferences.language = .simplifiedChinese
+        fixture.preferences.refreshInterval = .fifteenMinutes
+        let manualPath = try XCTUnwrap(fixture.preferences.manualCodexPath)
+        XCTAssertEqual(
+            manualPath,
+            fixture.cacheFileURL.deletingLastPathComponent().appendingPathComponent("codex").path
+        )
+
+        // This one explicit refresh establishes the successful-data baseline.
+        try await refreshAndWait(fixture.store)
+        let baseline = try captureDisplayBaseline(fixture)
+        XCTAssertNotNil(baseline.cache)
+        let windowState = DashboardWindowState()
+        windowState.select(section: .display)
+        let dimensions = windowState.currentDimensions
+        let sizePreset = windowState.selectedPreset
+
+        for layout in MenuBarLayout.allCases {
+            fixture.preferences.menuBarLayout = layout
+            XCTAssertEqual(fixture.preferences.menuBarLayout, layout)
+            try assertDisplayBaselineUnchanged(fixture, baseline: baseline)
+        }
+
+        let colors: [(StatusAccentRole, String)] = [
+            (.healthy, "12A678"),
+            (.warning, "D49316"),
+            (.critical, "CF365B"),
+            (.error, "754ACD")
+        ]
+        for (role, hex) in colors {
+            let color = try XCTUnwrap(StatusAccentColor(hex: hex))
+            fixture.preferences.statusAccentOverrides[role] = color
+            XCTAssertEqual(fixture.preferences.statusAccentOverrides[role], color)
+            try assertDisplayBaselineUnchanged(fixture, baseline: baseline)
+        }
+
+        let timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let languages: [(LanguagePreference, String)] = [
+            (.english, "en_US"),
+            (.simplifiedChinese, "zh-Hans-CN")
+        ]
+        let elapsedValues: [TimeInterval] = [0, 30, 90]
+        for (language, localeID) in languages {
+            for elapsed in elapsedValues {
+                let reset = QuotaResetPresentation(
+                    resetsAt: fixture.store.menuBarQuota?.window.resetsAt,
+                    now: now.addingTimeInterval(elapsed),
+                    language: language,
+                    locale: Locale(identifier: localeID),
+                    calendar: Calendar(identifier: .gregorian),
+                    timeZone: timeZone
+                )
+                XCTAssertTrue(reset.accessibilityLabel.contains(reset.absolute))
+                try assertDisplayBaselineUnchanged(fixture, baseline: baseline)
+            }
+        }
+
+        fixture.preferences.restoreDefaultColors()
+
+        XCTAssertTrue(fixture.preferences.statusAccentOverrides.isEmpty)
+        for role in StatusAccentRole.allCases {
+            XCTAssertNil(fixture.preferences.statusAccentOverrides[role])
+        }
+        XCTAssertEqual(fixture.preferences.menuBarLayout, .ringOnly)
+        XCTAssertEqual(fixture.preferences.manualCodexPath, manualPath)
+        XCTAssertEqual(fixture.preferences.identityMode, .quotaOnly)
+        XCTAssertTrue(fixture.preferences.hasChosenIdentityMode)
+        XCTAssertEqual(fixture.preferences.theme, .terminalLight)
+        XCTAssertEqual(fixture.preferences.language, .simplifiedChinese)
+        XCTAssertEqual(fixture.preferences.refreshInterval, .fifteenMinutes)
+        XCTAssertEqual(fixture.preferences.menuBarQuotaSelection, selection)
+        XCTAssertEqual(windowState.selection, .display)
+        XCTAssertEqual(windowState.currentDimensions, dimensions)
+        XCTAssertEqual(windowState.selectedPreset, sizePreset)
+        try await Task.sleep(for: .milliseconds(75))
+        try assertDisplayBaselineUnchanged(fixture, baseline: baseline)
+
+        let requestCount = await fetcher.requestCount()
+        let executablePaths = await fetcher.requestedExecutablePaths()
+        XCTAssertEqual(requestCount, 1, "Only the explicit baseline manual refresh may fetch")
+        XCTAssertEqual(executablePaths, [manualPath])
+    }
+
+    func testRecoveryNavigationPreservesStaleAndUnavailableStateWithoutFetching() async throws {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: now,
+            defaultResetsAt: now.addingTimeInterval(86_400)
+        )
+
+        for useCache in [false, true] {
+            let fetcher = SnapshotSequenceFetcher([])
+            let fixture = try makeStoreFixture(
+                fetcher: fetcher,
+                selection: .automatic,
+                cachedSnapshot: useCache ? cached : nil
+            )
+            fixture.store.refresh(trigger: .manual)
+            try await waitForRefreshToFinish(fixture.store)
+            XCTAssertEqual(
+                fixture.store.connectionState,
+                useCache
+                    ? .stale(lastSuccess: now, issue: .quotaUnavailable)
+                    : .unavailable(.quotaUnavailable)
+            )
+            let baseline = try captureDisplayBaseline(fixture)
+            XCTAssertEqual(baseline.cache != nil, useCache)
+            let windowState = DashboardWindowState()
+            let issue = try XCTUnwrap(fixture.store.lastIssue)
+
+            windowState.select(section: issue.recoveryDestination.dashboardSection)
+            XCTAssertEqual(windowState.selection, .diagnostics)
+            windowState.select(section: nil)
+            XCTAssertEqual(windowState.selection, .diagnostics)
+            windowState.select(
+                section: ConnectionIssue.notLoggedIn.recoveryDestination.dashboardSection
+            )
+            XCTAssertEqual(windowState.selection, .connection)
+            windowState.select(section: nil)
+            XCTAssertEqual(windowState.selection, .connection)
+            fixture.preferences.statusAccentOverrides[.error] = try XCTUnwrap(
+                StatusAccentColor(hex: "754ACD")
+            )
+            fixture.preferences.restoreDefaultColors()
+
+            try await Task.sleep(for: .milliseconds(75))
+            try assertDisplayBaselineUnchanged(fixture, baseline: baseline)
+            let requestCount = await fetcher.requestCount()
+            let executablePaths = await fetcher.requestedExecutablePaths()
+            XCTAssertEqual(requestCount, 1, "Recovery navigation is not a retry")
+            XCTAssertEqual(executablePaths, [try XCTUnwrap(fixture.preferences.manualCodexPath)])
+        }
+    }
+
+    func testBrowsingAndResetProjectionKeepMenuBarFallbackAndRestoredSelectionIndependent() async throws {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let defaultReset = now.addingTimeInterval(3 * 86_400)
+        let sparkReset = now.addingTimeInterval(3_600)
+        let restoredReset = now.addingTimeInterval(5_400)
+        let snapshots = [
+            makeSnapshot(
+                defaultLimitID: "default-v2", defaultUsed: 30, sparkUsed: 80,
+                fetchedAt: now, defaultResetsAt: defaultReset, sparkResetsAt: sparkReset
+            ),
+            makeSnapshot(
+                defaultLimitID: "default-v2", defaultUsed: 35, sparkUsed: nil,
+                fetchedAt: now.addingTimeInterval(60), defaultResetsAt: defaultReset
+            ),
+            makeSnapshot(
+                defaultLimitID: "default-v2", defaultUsed: 35, sparkUsed: 85,
+                fetchedAt: now.addingTimeInterval(120),
+                defaultResetsAt: defaultReset, sparkResetsAt: restoredReset
+            )
+        ]
+        let expectedResets = [sparkReset, defaultReset, restoredReset]
+        let selection = MenuBarQuotaSelection.bucket(limitID: "model-special", kind: .weekly)
+        let fetcher = SnapshotSequenceFetcher(snapshots)
+        let fixture = try makeStoreFixture(fetcher: fetcher, selection: selection)
+        let timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+
+        for index in snapshots.indices {
+            // Each snapshot transition is an explicit manual refresh, not a UI side effect.
+            try await refreshAndWait(fixture.store)
+            let baseline = try captureDisplayBaseline(fixture)
+            XCTAssertNotNil(baseline.cache)
+            let usesFallback = index == 1
+            XCTAssertEqual(fixture.store.menuBarSelectionUsesFallback, usesFallback)
+            XCTAssertEqual(
+                fixture.store.menuBarQuota?.bucket.limitID,
+                usesFallback ? "default-v2" : "model-special"
+            )
+            XCTAssertEqual(fixture.preferences.menuBarQuotaSelection, selection)
+
+            fixture.store.setViewedBucket("default-v2")
+            XCTAssertEqual(fixture.store.viewedBucket?.limitID, "default-v2")
+            let menuBarReset = QuotaResetPresentation(
+                resetsAt: fixture.store.menuBarQuota?.window.resetsAt,
+                now: now,
+                language: .english,
+                locale: Locale(identifier: "en_GB"),
+                calendar: Calendar(identifier: .gregorian),
+                timeZone: timeZone
+            )
+            let expectedReset = QuotaResetPresentation(
+                resetsAt: expectedResets[index],
+                now: now,
+                language: .english,
+                locale: Locale(identifier: "en_GB"),
+                calendar: Calendar(identifier: .gregorian),
+                timeZone: timeZone
+            )
+            let viewedReset = QuotaResetPresentation(
+                resetsAt: fixture.store.viewedWindow?.resetsAt,
+                now: now,
+                language: .english,
+                locale: Locale(identifier: "en_GB"),
+                calendar: Calendar(identifier: .gregorian),
+                timeZone: timeZone
+            )
+            XCTAssertEqual(menuBarReset, expectedReset)
+            if usesFallback {
+                XCTAssertEqual(menuBarReset, viewedReset)
+            } else {
+                XCTAssertNotEqual(menuBarReset.absolute, viewedReset.absolute)
+            }
+
+            fixture.store.setViewedBucket("model-special")
+            XCTAssertEqual(
+                fixture.store.viewedBucket?.limitID,
+                usesFallback ? "default-v2" : "model-special"
+            )
+            fixture.store.setViewedBucket("default-v2")
+            XCTAssertEqual(fixture.preferences.menuBarQuotaSelection, selection)
+            try await Task.sleep(for: .milliseconds(75))
+            try assertDisplayBaselineUnchanged(fixture, baseline: baseline)
+
+            let requestCount = await fetcher.requestCount()
+            let executablePaths = await fetcher.requestedExecutablePaths()
+            let manualPath = try XCTUnwrap(fixture.preferences.manualCodexPath)
+            XCTAssertEqual(requestCount, index + 1)
+            XCTAssertEqual(executablePaths, Array(repeating: manualPath, count: index + 1))
+        }
+    }
+
+    func testDisplayChangesDuringRefreshDoNotChangeStateOrQueueAnotherRequest() async throws {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let first = makeSnapshot(
+            defaultLimitID: "default-v2", defaultUsed: 40, sparkUsed: 80,
+            fetchedAt: now, defaultResetsAt: now.addingTimeInterval(86_400)
+        )
+        let second = makeSnapshot(
+            defaultLimitID: "default-v2", defaultUsed: 35, sparkUsed: 75,
+            fetchedAt: now.addingTimeInterval(60),
+            defaultResetsAt: now.addingTimeInterval(86_400)
+        )
+        let fetcher = DelayedSnapshotSequenceFetcher([first, second])
+        let fixture = try makeStoreFixture(fetcher: fetcher, selection: .defaultBucket(.weekly))
+        try await refreshAndWait(fixture.store)
+
+        fixture.store.refresh(trigger: .manual)
+        XCTAssertTrue(fixture.store.isRefreshing)
+        let baseline = try captureDisplayBaseline(fixture)
+        XCTAssertNotNil(baseline.cache)
+
+        for layout in MenuBarLayout.allCases {
+            fixture.preferences.menuBarLayout = layout
+        }
+        fixture.preferences.statusAccentOverrides[.healthy] = try XCTUnwrap(
+            StatusAccentColor(hex: "12A678")
+        )
+        fixture.preferences.restoreDefaultColors()
+        let windowState = DashboardWindowState()
+        windowState.select(
+            section: ConnectionIssue.requestTimedOut.recoveryDestination.dashboardSection
+        )
+        windowState.select(section: nil)
+        let reset = QuotaResetPresentation(
+            resetsAt: fixture.store.menuBarQuota?.window.resetsAt,
+            now: now.addingTimeInterval(30),
+            language: .english,
+            locale: Locale(identifier: "en_US"),
+            calendar: Calendar(identifier: .gregorian),
+            timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        )
+        XCTAssertTrue(reset.accessibilityLabel.contains(reset.absolute))
+        try assertDisplayBaselineUnchanged(fixture, baseline: baseline)
+
+        // The already-running manual refresh may now finish and update its cache.
+        try await waitForRefreshToFinish(fixture.store)
+        let requestCount = await fetcher.totalRequestCount()
+        XCTAssertEqual(requestCount, 2, "Only the two explicit manual refreshes may fetch")
+        XCTAssertEqual(fixture.store.snapshot, second)
+        XCTAssertEqual(fixture.store.connectionState, .connected)
+        XCTAssertNil(fixture.store.lastIssue)
+    }
+
     func testIdentityUpgradeQueuesAccountRefreshWhenRefreshIsAlreadyRunning() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("Codex94StoreTests-\(UUID().uuidString)", isDirectory: true)
@@ -750,6 +1043,55 @@ final class AppStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.cacheFileURL.path))
     }
 
+    private struct CacheFingerprint: Equatable {
+        let bytes: Data
+        let modifiedAt: Date
+        let fileNumber: UInt64
+    }
+
+    private struct DisplaySideEffectBaseline {
+        let snapshot: QuotaSnapshot?
+        let connectionState: ConnectionState
+        let isRefreshing: Bool
+        let lastIssue: ConnectionIssue?
+        let cache: CacheFingerprint?
+    }
+
+    private func captureDisplayBaseline(_ fixture: StoreFixture) throws -> DisplaySideEffectBaseline {
+        DisplaySideEffectBaseline(
+            snapshot: fixture.store.snapshot,
+            connectionState: fixture.store.connectionState,
+            isRefreshing: fixture.store.isRefreshing,
+            lastIssue: fixture.store.lastIssue,
+            cache: try cacheFingerprint(at: fixture.cacheFileURL)
+        )
+    }
+
+    private func assertDisplayBaselineUnchanged(
+        _ fixture: StoreFixture,
+        baseline: DisplaySideEffectBaseline,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        XCTAssertEqual(fixture.store.snapshot, baseline.snapshot, file: file, line: line)
+        XCTAssertEqual(fixture.store.connectionState, baseline.connectionState, file: file, line: line)
+        XCTAssertEqual(fixture.store.isRefreshing, baseline.isRefreshing, file: file, line: line)
+        XCTAssertEqual(fixture.store.lastIssue, baseline.lastIssue, file: file, line: line)
+        XCTAssertEqual(
+            try cacheFingerprint(at: fixture.cacheFileURL), baseline.cache, file: file, line: line
+        )
+    }
+
+    private func cacheFingerprint(at fileURL: URL) throws -> CacheFingerprint? {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
+        let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        return CacheFingerprint(
+            bytes: try Data(contentsOf: fileURL),
+            modifiedAt: try XCTUnwrap(attributes[.modificationDate] as? Date),
+            fileNumber: try XCTUnwrap(attributes[.systemFileNumber] as? NSNumber).uint64Value
+        )
+    }
+
     private struct StoreFixture {
         let store: AppStore
         let preferences: PreferencesStore
@@ -834,20 +1176,22 @@ final class AppStoreTests: XCTestCase {
         defaultLimitID: String,
         defaultUsed: Int,
         sparkUsed: Int?,
-        fetchedAt: Date
+        fetchedAt: Date,
+        defaultResetsAt: Date? = nil,
+        sparkResetsAt: Date? = nil
     ) -> QuotaSnapshot {
         var buckets = [
             bucket(
                 id: defaultLimitID,
                 name: nil,
-                windows: [window(.weekly, used: defaultUsed)]
+                windows: [window(.weekly, used: defaultUsed, resetsAt: defaultResetsAt)]
             )
         ]
         if let sparkUsed {
             buckets.append(bucket(
                 id: "model-special",
                 name: "Spark",
-                windows: [window(.weekly, used: sparkUsed)]
+                windows: [window(.weekly, used: sparkUsed, resetsAt: sparkResetsAt)]
             ))
         }
         return QuotaSnapshot(
@@ -872,27 +1216,37 @@ final class AppStoreTests: XCTestCase {
         )
     }
 
-    private func window(_ kind: QuotaWindowKind, used: Int) -> QuotaWindowSnapshot {
+    private func window(
+        _ kind: QuotaWindowKind,
+        used: Int,
+        resetsAt: Date? = nil
+    ) -> QuotaWindowSnapshot {
         QuotaWindowSnapshot(
             kind: kind,
             usedPercent: used,
             windowMinutes: kind == .fiveHour ? 300 : 10_080,
-            resetsAt: nil
+            resetsAt: resetsAt
         )
     }
 }
 
 private actor SnapshotSequenceFetcher: QuotaFetching {
     private var snapshots: [QuotaSnapshot]
+    private var executablePaths: [String] = []
 
     init(_ snapshots: [QuotaSnapshot]) {
         self.snapshots = snapshots
     }
 
     func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot {
+        executablePaths.append(executable.executableURL.path)
         guard !snapshots.isEmpty else { throw ConnectionIssue.quotaUnavailable }
         return snapshots.removeFirst()
     }
+
+    func requestCount() -> Int { executablePaths.count }
+
+    func requestedExecutablePaths() -> [String] { executablePaths }
 }
 
 private actor DelayedFailureFetcher: QuotaFetching {
@@ -918,6 +1272,8 @@ private actor DelayedSnapshotSequenceFetcher: QuotaFetching {
         guard !snapshots.isEmpty else { throw ConnectionIssue.quotaUnavailable }
         return snapshots.removeFirst()
     }
+
+    func totalRequestCount() -> Int { requestCount }
 }
 
 private actor IdentityRecordingFetcher: QuotaFetching {

@@ -6,6 +6,8 @@ final class PreferencesStore: ObservableObject {
     private enum Key {
         static let displayMode = "displayMode"
         static let menuBarQuotaSelection = "menuBarQuotaSelection.v2"
+        static let menuBarLayout = "menuBarLayout.v1"
+        static let statusAccentOverrides = "statusAccentOverrides.v1"
         static let identityMode = "identityMode"
         static let refreshInterval = "refreshInterval"
         static let theme = "theme"
@@ -24,6 +26,12 @@ final class PreferencesStore: ObservableObject {
 
     @Published var menuBarQuotaSelection: MenuBarQuotaSelection {
         didSet { persistMenuBarQuotaSelection() }
+    }
+    @Published var menuBarLayout: MenuBarLayout {
+        didSet { defaults.set(menuBarLayout.rawValue, forKey: Key.menuBarLayout) }
+    }
+    @Published var statusAccentOverrides: StatusAccentOverrides {
+        didSet { persistStatusAccentOverrides() }
     }
     @Published var identityMode: IdentityMode {
         didSet { defaults.set(identityMode.rawValue, forKey: Key.identityMode) }
@@ -47,6 +55,10 @@ final class PreferencesStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         menuBarQuotaSelection = Self.loadMenuBarQuotaSelection(from: defaults)
+        menuBarLayout = MenuBarLayout(storedValue: defaults.object(forKey: Key.menuBarLayout))
+        statusAccentOverrides = StatusAccentOverrides(
+            storedValue: defaults.object(forKey: Key.statusAccentOverrides)
+        )
         identityMode = IdentityMode(
             rawValue: defaults.string(forKey: Key.identityMode) ?? ""
         ) ?? .quotaAndAccount
@@ -62,6 +74,18 @@ final class PreferencesStore: ObservableObject {
         manualCodexPath = defaults.string(forKey: Key.manualCodexPath)
         hasChosenIdentityMode = defaults.bool(forKey: Key.hasChosenIdentityMode)
         persistMenuBarQuotaSelection()
+    }
+
+    func restoreDefaultColors() {
+        statusAccentOverrides = StatusAccentOverrides()
+    }
+
+    private func persistStatusAccentOverrides() {
+        if statusAccentOverrides.isEmpty {
+            defaults.removeObject(forKey: Key.statusAccentOverrides)
+        } else {
+            defaults.set(statusAccentOverrides.storageDictionary, forKey: Key.statusAccentOverrides)
+        }
     }
 
     private func persistMenuBarQuotaSelection() {

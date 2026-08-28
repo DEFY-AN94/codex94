@@ -6,6 +6,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let preferences: PreferencesStore
     private let store: AppStore
+    private let menuBarLayout: MenuBarLayout
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private var dashboardController: DashboardWindowController?
@@ -17,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     override init() {
         let preferences = PreferencesStore()
         self.preferences = preferences
+        menuBarLayout = preferences.menuBarLayout
         store = AppStore(preferences: preferences)
         super.init()
     }
@@ -74,7 +76,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func configureStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: 58)
+        let metrics = menuBarLayout.metrics
+        let item = NSStatusBar.system.statusItem(withLength: metrics.statusItemWidth)
         guard let button = item.button else { return }
         button.target = self
         button.action = #selector(togglePopover)
@@ -89,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         let statusView = MenuBarStatusView(
             store: store,
+            layout: menuBarLayout,
             onAccessibilityLabelChange: { [weak button] label in
                 button?.setAccessibilityLabel(label)
             }
@@ -98,8 +102,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         button.addSubview(hostingView)
         NSLayoutConstraint.activate([
-            hostingView.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 3),
-            hostingView.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -3),
+            hostingView.leadingAnchor.constraint(
+                equalTo: button.leadingAnchor, constant: metrics.horizontalInset
+            ),
+            hostingView.trailingAnchor.constraint(
+                equalTo: button.trailingAnchor, constant: -metrics.horizontalInset
+            ),
             hostingView.topAnchor.constraint(equalTo: button.topAnchor),
             hostingView.bottomAnchor.constraint(equalTo: button.bottomAnchor)
         ])
@@ -151,7 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let contentViewController = QuotaPopoverHostingController(
             rootView: QuotaPopoverView(
                 store: store,
-                openDashboard: { [weak self] in self?.openDashboard() },
+                openDashboard: { [weak self] section in self?.openDashboard(section: section) },
                 quit: { NSApp.terminate(nil) }
             )
             .codex94Environment(preferences)
@@ -216,7 +224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         return window.convertToScreen(frameInWindow)
     }
 
-    private func openDashboard() {
+    private func openDashboard(section: DashboardSection? = nil) {
         popover.performClose(nil)
         if dashboardController == nil {
             dashboardController = DashboardWindowController(
@@ -227,7 +235,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             )
         }
         applyAppearance(preferences.theme)
-        dashboardController?.show()
+        dashboardController?.show(section: section)
     }
 
     private func chooseCodexExecutable() {

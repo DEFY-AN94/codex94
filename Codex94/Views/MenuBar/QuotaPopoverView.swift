@@ -62,8 +62,10 @@ final class QuotaPopoverHostingController<Content: View>: NSHostingController<Co
 
 struct QuotaPopoverView: View {
     @ObservedObject var store: AppStore
-    let openDashboard: () -> Void
+    let openDashboard: (DashboardSection?) -> Void
     let quit: () -> Void
+    var referenceDate: Date? = nil
+    var resetTimeZone: TimeZone = .autoupdatingCurrent
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -82,7 +84,11 @@ struct QuotaPopoverView: View {
     }
 
     private var palette: Codex94Palette {
-        Codex94Palette.resolve(store.preferences.theme, scheme: colorScheme)
+        Codex94Palette.resolve(
+            store.preferences.theme,
+            scheme: colorScheme,
+            overrides: store.preferences.statusAccentOverrides
+        )
     }
 
     private var quotaContent: some View {
@@ -107,6 +113,7 @@ struct QuotaPopoverView: View {
     private var header: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let presentation = store.viewedStatusPresentation
+            let now = referenceDate ?? context.date
 
             HStack(spacing: 12) {
                 RingGaugeView(
@@ -128,12 +135,12 @@ struct QuotaPopoverView: View {
                     HStack(spacing: 5) {
                         ConnectionBadgeView(
                             badge: presentation.connectionBadge,
-                            color: palette.connectionAccent,
+                            color: palette.connectionBadgeColor(for: presentation.connectionBadge),
                             size: 9
                         )
                         .accessibilityHidden(true)
 
-                        StatusVisibleText.context(presentation, now: context.date)
+                        StatusVisibleText.context(presentation, now: now)
                             .lineLimit(1)
                             .minimumScaleFactor(0.85)
                     }
@@ -146,8 +153,9 @@ struct QuotaPopoverView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(headerAccessibilityLabel(
                 presentation: presentation,
-                now: context.date
+                now: now
             ))
+            .accessibilityIdentifier("quota-popover-header")
             .padding(.horizontal, 18)
             .padding(.vertical, 15)
             .fixedSize(horizontal: false, vertical: true)
@@ -165,25 +173,14 @@ struct QuotaPopoverView: View {
         presentation: StatusPresentation,
         now: Date
     ) -> Text {
-        var label = Text(verbatim: viewedBucketName)
-        if let window = store.viewedWindow {
-            label = label
-                + Text(verbatim: ", ")
-                + StatusAccessibilityText.quotaWindow(window.kind)
-                + Text(verbatim: ", ")
-                + StatusAccessibilityText.remainingPercent(
-                    QuotaFormatting.percent(window.remainingPercent)
-                )
-        } else {
-            label = label
-                + Text(verbatim: ", ")
-                + StatusAccessibilityText.unavailableQuota
-        }
-
-        label = label
-            + Text(verbatim: ", ")
-            + StatusAccessibilityText.statusContext(presentation, now: now)
-        return label
+        Text(verbatim: StatusAccessibilityString.quotaSummary(
+            bucketName: viewedBucketName,
+            window: store.viewedWindow,
+            presentation: presentation,
+            now: now,
+            language: store.preferences.language,
+            timeZone: resetTimeZone
+        ))
     }
 
     private var modelPicker: some View {
@@ -218,14 +215,18 @@ struct QuotaPopoverView: View {
                 QuotaWindowRow(
                     window: fiveHour,
                     palette: palette,
-                    language: store.preferences.language
+                    language: store.preferences.language,
+                    referenceDate: referenceDate,
+                    timeZone: resetTimeZone
                 )
             }
             if let weekly = store.viewedBucket?.window(.weekly) {
                 QuotaWindowRow(
                     window: weekly,
                     palette: palette,
-                    language: store.preferences.language
+                    language: store.preferences.language,
+                    referenceDate: referenceDate,
+                    timeZone: resetTimeZone
                 )
             }
             if store.viewedBucket?.windows.isEmpty != false {
@@ -259,15 +260,19 @@ struct QuotaPopoverView: View {
                 badge: .stale,
                 color: palette.connectionAccent,
                 text: cachedBannerText(presentation: presentation),
-                accessibilityText: cachedBannerText(presentation: presentation)
+                accessibilityText: cachedBannerText(presentation: presentation),
+                recoveryDestination: presentation.issue?.recoveryDestination,
+                openDashboard: openDashboard
             )
         } else if presentation.connectionBadge == .unavailable {
             Divider()
             StatusBanner(
                 badge: .unavailable,
-                color: palette.connectionAccent,
+                color: palette.errorColor,
                 text: issueText(for: presentation),
-                accessibilityText: issueText(for: presentation)
+                accessibilityText: issueText(for: presentation),
+                recoveryDestination: presentation.issue?.recoveryDestination,
+                openDashboard: openDashboard
             )
         }
     }
@@ -313,7 +318,7 @@ struct QuotaPopoverView: View {
                 title: Text("command.dashboard"),
                 systemImage: "slider.horizontal.3",
                 shortcut: "⌘,",
-                action: openDashboard
+                action: { openDashboard(nil) }
             )
             .keyboardShortcut(",", modifiers: .command)
 
@@ -379,88 +384,135 @@ struct MenuBarQuotaPicker: View {
     }
 }
 
-private struct QuotaWindowRow: View {
+struct QuotaWindowRow: View {
     let window: QuotaWindowSnapshot
     let palette: Codex94Palette
     let language: LanguagePreference
+    var referenceDate: Date? = nil
+    var locale: Locale? = nil
+    var calendar = Calendar(identifier: .gregorian)
+    var timeZone: TimeZone = .autoupdatingCurrent
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            let countdown = QuotaLocalizedString.resetCountdown(
-                QuotaFormatting.resetCountdown(to: window.resetsAt, now: context.date),
-                language: language
+            let reset = QuotaResetPresentation(
+                resetsAt: window.resetsAt,
+                now: referenceDate ?? context.date,
+                language: language,
+                locale: locale,
+                calendar: calendar,
+                timeZone: timeZone
             )
-            let accessibilityCountdown = QuotaLocalizedString.accessibilityResetCountdown(
-                QuotaFormatting.resetCountdown(to: window.resetsAt, now: context.date),
-                language: language
-            )
-            HStack(spacing: 12) {
-                Text(window.kind.localizedKey)
-                    .foregroundStyle(palette.quotaColor(
-                        for: QuotaLevel(remainingPercent: window.remainingPercent)
-                    ))
-                    .frame(width: 58, alignment: .leading)
-
-                QuotaBarView(
-                    remainingPercent: window.remainingPercent,
-                    color: palette.quotaColor(
-                        for: QuotaLevel(remainingPercent: window.remainingPercent)
-                    )
-                )
-
-                Text(QuotaFormatting.percent(window.remainingPercent))
-                    .monospacedDigit()
-                    .foregroundStyle(palette.quotaColor(
-                        for: QuotaLevel(remainingPercent: window.remainingPercent)
-                    ))
-                    .frame(width: 54, alignment: .trailing)
-
-                (Text("quota.resets")
-                 + Text(verbatim: " \(countdown)"))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .font(.system(size: 14, weight: .medium, design: .monospaced))
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(accessibilityLabel(resetCountdown: accessibilityCountdown))
+            QuotaWindowRowContent(window: window, palette: palette, reset: reset)
         }
     }
+}
 
-    private func accessibilityLabel(resetCountdown: String?) -> Text {
-        var label = StatusAccessibilityText.quotaWindow(window.kind)
+struct QuotaWindowRowContent: View {
+    let window: QuotaWindowSnapshot
+    let palette: Codex94Palette
+    let reset: QuotaResetPresentation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            QuotaWindowMainRow(window: window, palette: palette, countdown: reset.countdown)
+            QuotaAbsoluteResetLine(text: reset.absolute)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityIdentifier("quota-window-" + window.kind.rawValue)
+    }
+
+    private var accessibilityLabel: Text {
+        StatusAccessibilityText.quotaWindow(window.kind)
             + Text(verbatim: ", ")
             + StatusAccessibilityText.remainingPercent(
                 QuotaFormatting.percent(window.remainingPercent)
             )
-        if let resetCountdown {
-            label = label
-                + Text(verbatim: ", ")
-                + StatusAccessibilityText.resets(resetCountdown)
-        }
-        return label
+            + Text(verbatim: ", " + reset.accessibilityLabel)
     }
 }
 
-private struct StatusBanner: View {
+struct QuotaWindowMainRow: View {
+    let window: QuotaWindowSnapshot
+    let palette: Codex94Palette
+    let countdown: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(window.kind.localizedKey)
+                .foregroundStyle(quotaColor)
+                .frame(width: 58, alignment: .leading)
+            QuotaBarView(remainingPercent: window.remainingPercent, color: quotaColor)
+            Text(QuotaFormatting.percent(window.remainingPercent))
+                .monospacedDigit()
+                .foregroundStyle(quotaColor)
+                .frame(width: 54, alignment: .trailing)
+            (Text("quota.resets") + Text(verbatim: " " + countdown))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .font(.system(size: 14, weight: .medium, design: .monospaced))
+    }
+
+    private var quotaColor: Color {
+        palette.quotaColor(for: QuotaLevel(remainingPercent: window.remainingPercent))
+    }
+}
+
+struct QuotaAbsoluteResetLine: View {
+    let text: String
+
+    var body: some View {
+        Text(verbatim: text)
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .lineLimit(nil)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+struct StatusBanner: View {
     let badge: ConnectionBadge
     let color: Color
     let text: Text
     let accessibilityText: Text
+    let recoveryDestination: ConnectionRecoveryDestination?
+    let openDashboard: (DashboardSection?) -> Void
 
     var body: some View {
-        HStack(spacing: 9) {
-            ConnectionBadgeView(badge: badge, color: color, size: 11)
-                .accessibilityHidden(true)
-            text
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-            Spacer()
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 9) {
+                ConnectionBadgeView(badge: badge, color: color, size: 11)
+                    .accessibilityHidden(true)
+                text
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityText)
+
+            if let recoveryDestination {
+                Button {
+                    openDashboard(recoveryDestination.dashboardSection)
+                } label: {
+                    Text(recoveryDestination.localizedKey)
+                }
+                .controlSize(.small)
+                .help(Text(recoveryDestination.helpKey))
+                .accessibilityLabel(Text(recoveryDestination.localizedKey))
+                .accessibilityHint(Text(recoveryDestination.helpKey))
+                .accessibilityIdentifier("quota-recovery-button")
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText)
+        .accessibilityElement(children: .contain)
     }
 }
 

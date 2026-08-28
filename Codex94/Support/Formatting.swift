@@ -52,6 +52,37 @@ enum QuotaFormatting {
         return .minutes(minutes)
     }
 
+    static func absoluteReset(
+        to date: Date?,
+        locale: Locale,
+        calendar: Calendar,
+        timeZone: TimeZone
+    ) -> String? {
+        guard let date else { return nil }
+
+        var calendar = calendar
+        calendar.locale = locale
+        calendar.timeZone = timeZone
+
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = timeZone
+        // Calendar year and locale-selected hour cycle, with minute precision.
+        formatter.setLocalizedDateFormatFromTemplate("yMMMdjm")
+
+        // The reset can be on the other side of a DST transition from now.
+        let offset = timeZone.secondsFromGMT(for: date)
+        let offsetMinutes = abs(offset) / 60
+        let zone = String(
+            format: "UTC%@%02ld:%02ld",
+            offset < 0 ? "-" : "+",
+            offsetMinutes / 60,
+            offsetMinutes % 60
+        )
+        return "\(formatter.string(from: date)) (\(zone))"
+    }
+
     static func relativeAge(since date: Date, now: Date = Date()) -> RelativeAge {
         let seconds = max(0, Int(now.timeIntervalSince(date)))
         if seconds < 60 { return .justNow }
