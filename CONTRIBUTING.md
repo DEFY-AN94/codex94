@@ -51,9 +51,24 @@ test preferences, caches, and output paths separate from daily app data.
   Codex94 processes and launches a Debug app; `install.sh` replaces the app at
   its installation path and may launch it. These scripts are not read-only
   source checks.
-- The existing GitHub CI runs the release gate on a macOS runner. Report source
+- GitHub CI runs the release gate on a macOS runner. Report source
   review, compiled tests, GUI smoke, and screenshot review separately; passing
   CI or producing a nonempty image is not evidence of GUI correctness.
+
+The `Codex94` scheme retains the unit/release gate. The separate `Codex94UI`
+scheme exercises the unmodified app through an external UI test runner, with
+display and recovery scenarios on separate fresh GitHub-hosted Macs. Its
+fixture preparer refuses existing app data and seeds quota-only preferences
+and an explicit synthetic executable before any app initialization. It must
+not be run on a daily-use desktop; local UI testing needs a separately reviewed
+isolation setup, not overridden CI guard variables.
+
+UI jobs do not enable VoiceOver, change system settings, use real Codex
+credentials, or install the app. They upload only explicitly captured app-window
+PNGs and curated synthetic summaries with a seven-day retention period. Raw
+test result bundles, preferences, caches, environment dumps, and full-screen
+captures are not uploaded. Review the images themselves before replacing
+documentation screenshots.
 
 Cover fixed layout metrics and startup capture, independent color roles and
 restoration, Reset locale/calendar/time-zone behavior, all recovery routes,

@@ -389,30 +389,9 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: cacheURL), cacheBytes)
     }
 
-    func testHostedSwiftUIAccessibilityFixtureIsAvailable() throws {
-        let nativeTitle = "Synthetic native accessibility control"
-        let nativeControl = NSButton(title: nativeTitle, target: nil, action: nil)
-        // AppKit exposes the button's cell, not its ignored control container.
-        let nativeElement = try XCTUnwrap(
-            NSAccessibility.unignoredDescendant(of: nativeControl) as? any NSAccessibilityProtocol
-        )
-        XCTAssertEqual(nativeElement.accessibilityRole(), .button)
-        XCTAssertEqual(nativeElement.accessibilityTitle(), nativeTitle)
-
-        let label = "Synthetic SwiftUI accessibility control"
-        let content = Text(verbatim: label)
-            .accessibilityLabel(Text(verbatim: label))
-            .frame(width: 320, height: 40)
-        let window = try hostedWindow(content, width: 320, height: 40)
-        defer { window.close() }
-        let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
-            elements.contains { $0.accessibilityLabel() == label }
-        }
-        XCTAssertTrue(elements.contains { $0.accessibilityLabel() == label },
-                      "The CI fixture must expose plain SwiftUI text before product AX assertions can be evaluated")
-    }
-
-    func testAbsoluteResetHasItsOwnFullWidthRowAndCompleteAccessibleText() throws {
+    // Real accessibility, focus, and screen-frame assertions live in CI-only Codex94UITests.
+    // These unit fixtures measure detached SwiftUI hosts and store/cache invariants.
+    func testAbsoluteResetHasItsOwnFullWidthWrappingRow() throws {
         let window = try XCTUnwrap(snapshot(includeSpark: false).defaultBucket?.window(.weekly))
         let rowWidth = QuotaPopoverLayout.contentWidth - 36
         let contexts: [(LanguagePreference, Locale, TimeZone)] = [
@@ -457,103 +436,20 @@ final class QuotaPopoverLayoutTests: XCTestCase {
             XCTAssertEqual(size.width, rowWidth, accuracy: 0.5)
             XCTAssertGreaterThanOrEqual(size.height, floor(mainLineHeight) + 7 + floor(absoluteSize.height))
 
-            let host = try hostedWindow(content, width: rowWidth)
-            defer { host.close() }
-            let elements = accessibilityElements(in: try XCTUnwrap(host.contentView)) { elements in
-                elements.contains { $0.accessibilityLabel()?.contains(reset.accessibilityLabel) == true }
-            }
-            let element = try XCTUnwrap(elements.first {
-                $0.accessibilityLabel()?.contains(reset.accessibilityLabel) == true
-            })
-            XCTAssertTrue(element.accessibilityLabel()?.contains(reset.absolute) == true)
             XCTAssertTrue(reset.absolute.contains("UTC"))
-            XCTAssertLessThanOrEqual(element.accessibilityFrame().width, rowWidth + 1)
         }
     }
 
-    func testRecoveryButtonRemainsASeparateFocusableAccessibleAction() throws {
-        for language in [LanguagePreference.english, .simplifiedChinese] {
-            for destination in [ConnectionRecoveryDestination.connection, .diagnostics] {
-                let windowState = DashboardWindowState()
-                windowState.select(section: .display)
-                var requests: [DashboardSection?] = []
-                let content = StatusBanner(
-                    badge: .unavailable,
-                    color: .red,
-                    text: Text("error.connectionFailed"),
-                    accessibilityText: Text("error.connectionFailed"),
-                    recoveryDestination: destination,
-                    openDashboard: { section in
-                        requests.append(section)
-                        windowState.select(section: section)
-                    }
-                )
-                .environment(\.locale, language.locale)
-                let window = try hostedWindow(content, width: QuotaPopoverLayout.contentWidth)
-                defer { window.close() }
-                let titleKey = destination == .connection
-                    ? "recovery.openConnection" : "recovery.openDiagnostics"
-                let expectedTitle = StatusAccessibilityString.localized(
-                    titleKey, language: language, bundle: .main
-                )
-                let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
-                    elements.contains {
-                        $0.accessibilityRole() == .button
-                            && ($0.accessibilityLabel() ?? $0.accessibilityTitle()) == expectedTitle
-                    }
-                }
-                let buttons = elements.filter {
-                    $0.accessibilityRole() == .button
-                        && ($0.accessibilityLabel() ?? $0.accessibilityTitle()) == expectedTitle
-                }
-                XCTAssertEqual(buttons.count, 1, "The ignored text subtree must not hide or duplicate the action")
-                let button = try XCTUnwrap(buttons.first)
-                XCTAssertTrue(button.isAccessibilityElement())
-                XCTAssertTrue(button.isAccessibilityEnabled())
-                XCTAssertFalse((button.accessibilityHelp() ?? "").isEmpty)
-                XCTAssertTrue(button.isAccessibilitySelectorAllowed(
-                    #selector(NSAccessibilityProtocol.setAccessibilityFocused(_:))
-                ))
-                button.setAccessibilityFocused(true)
-                XCTAssertTrue(waitForLayout { button.isAccessibilityFocused() })
-                XCTAssertTrue(button.accessibilityPerformPress())
-                XCTAssertTrue(waitForLayout { requests.count == 1 })
-                XCTAssertEqual(requests, [destination.dashboardSection])
-                XCTAssertEqual(windowState.selection, destination.dashboardSection)
-            }
-        }
-    }
-
-    func testBannerWithoutIssueHasNoRecoveryButton() throws {
-        let content = StatusBanner(
-            badge: .stale,
-            color: .blue,
-            text: Text("status.cached"),
-            accessibilityText: Text("status.cached"),
-            recoveryDestination: nil,
-            openDashboard: { _ in XCTFail("No issue must expose no navigation action") }
-        )
-        .environment(\.locale, LanguagePreference.english.locale)
-        let window = try hostedWindow(content, width: QuotaPopoverLayout.contentWidth)
-        defer { window.close() }
-        let expectedText = StatusAccessibilityString.localized("status.cached", language: .english, bundle: .main)
-        let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
-            elements.contains { $0.accessibilityLabel() == expectedText }
-        }
-        XCTAssertTrue(elements.contains { $0.accessibilityLabel() == expectedText },
-                      "The negative action assertion must inspect a populated fixture tree")
-        XCTAssertFalse(elements.contains {
-            $0.accessibilityRole() == .button
-        })
-    }
-
-    func testNotLoggedInGuidanceIsVisibleAndLocalizedWithoutStartingLogin() async throws {
+    func testNotLoggedInSettingsMeasureInBothLanguagesWithoutAdditionalRequests() async throws {
         let fetcher = LayoutOutcomeFetcher(outcome: .failure(.notLoggedIn), delay: .zero)
         let fixture = try makeFixture(snapshot: nil, fetcher: fetcher)
         defer { fixture.cleanUp() }
         fixture.store.refresh(trigger: .manual)
         try await waitForRefreshToFinish(fixture.store)
         let stateBefore = fixture.store.connectionState
+        let cacheURL = fixture.directory.appendingPathComponent("quota.json")
+        XCTAssertEqual(fixture.store.lastIssue, .notLoggedIn)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: cacheURL.path))
 
         for language in [LanguagePreference.english, .simplifiedChinese] {
             fixture.preferences.language = language
@@ -565,26 +461,23 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                 resetTimeZone: resetTimeZone
             )
             .environment(\.locale, language.locale)
-            let window = try hostedWindow(content, width: 900, height: 600)
-            defer { window.close() }
-            let guidance = StatusAccessibilityString.localized(
-                "connection.notLoggedIn.guidance", language: language, bundle: .main
-            )
-            let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
-                elements.contains { ($0.accessibilityLabel() ?? $0.accessibilityValue() as? String) == guidance }
-            }
-            XCTAssertTrue(elements.contains {
-                ($0.accessibilityLabel() ?? $0.accessibilityValue() as? String) == guidance
-            })
+            let controller = NSHostingController(rootView: content)
+            let size = controller.sizeThatFits(in: NSSize(width: 900, height: 600))
+            XCTAssertEqual(size.width, 900, accuracy: 0.5)
+            XCTAssertTrue(size.height.isFinite)
+            XCTAssertGreaterThan(size.height, 0)
+            XCTAssertLessThanOrEqual(size.height, 600.5)
+            XCTAssertNil(controller.view.window)
         }
         await Task.yield()
         let requestCount = await fetcher.requestCount()
         XCTAssertEqual(requestCount, 1, "Only the explicit manual failure is permitted")
         XCTAssertEqual(fixture.store.connectionState, stateBefore)
         XCTAssertNil(fixture.store.snapshot)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: cacheURL.path))
     }
 
-    func testPopoverAndDashboardExposeSameResolvedResetWithoutChangingMenuBarChoice() throws {
+    func testResolvedMenuBarResetAndBrowsingRemainIndependentDuringDetachedLayout() throws {
         let fixture = try makeFixture(snapshot: snapshot(includeSpark: true))
         defer { fixture.cleanUp() }
         fixture.preferences.language = .english
@@ -621,26 +514,27 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                 resetTimeZone: resetTimeZone
             )
             .codex94Environment(fixture.preferences)
-            let rowWindow = try hostedWindow(row, width: 464)
-            let connectionWindow = try hostedWindow(connection, width: 900, height: 600)
-            defer { rowWindow.close(); connectionWindow.close() }
-            for window in [rowWindow, connectionWindow] {
-                let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
-                    elements.contains { $0.accessibilityLabel()?.contains(reset.accessibilityLabel) == true }
-                }
-                XCTAssertTrue(elements.contains {
-                    $0.accessibilityLabel()?.contains(reset.accessibilityLabel) == true
-                })
-                XCTAssertFalse(elements.contains {
-                    $0.accessibilityLabel()?.contains(browsedReset.absolute) == true
-                })
-            }
+            let rowController = NSHostingController(rootView: row)
+            let rowSize = rowController.sizeThatFits(in: NSSize(width: 464, height: .greatestFiniteMagnitude))
+            XCTAssertEqual(rowSize.width, 464, accuracy: 0.5)
+            XCTAssertTrue(rowSize.height.isFinite)
+            XCTAssertGreaterThan(rowSize.height, 0)
+            XCTAssertNil(rowController.view.window)
+
+            let connectionController = NSHostingController(rootView: connection)
+            let connectionSize = connectionController.sizeThatFits(in: NSSize(width: 900, height: 600))
+            XCTAssertEqual(connectionSize.width, 900, accuracy: 0.5)
+            XCTAssertTrue(connectionSize.height.isFinite)
+            XCTAssertGreaterThan(connectionSize.height, 0)
+            XCTAssertLessThanOrEqual(connectionSize.height, 600.5)
+            XCTAssertNil(connectionController.view.window)
             XCTAssertEqual(fixture.preferences.menuBarQuotaSelection, selection)
+            XCTAssertEqual(fixture.store.menuBarQuota, resolved)
         }
         XCTAssertEqual(fixture.store.viewedBucket?.limitID, "model-special")
     }
 
-    func testLongBucketResetLayoutKeepsHeaderAndQuotaRowsInsideNaturalBounds() throws {
+    func testLongBucketResetLayoutKeepsFiveHundredPointNaturalSize() throws {
         let fixture = try makeFixture(snapshot: snapshot(
             includeSpark: true,
             sparkName: String(repeating: "Synthetic Future Model ", count: 6)
@@ -661,59 +555,20 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                         resetTimeZone: resetTimeZone
                     )
                     .codex94Environment(fixture.preferences)
-                    let window = try hostedWindow(content, width: QuotaPopoverLayout.contentWidth)
-                    defer { window.close() }
-                    let view = try XCTUnwrap(window.contentView)
-                    let bounds = window.convertToScreen(view.convert(view.bounds, to: nil))
-                    let quitTitle = StatusAccessibilityString.localized(
-                        "command.quit", language: language, bundle: .main
-                    )
-                    let bucket = try XCTUnwrap(fixture.store.viewedBucket)
-                    let quotaIdentifiers = bucket.windows.map { "quota-window-" + $0.kind.rawValue }
-                    let elements = accessibilityElements(in: view) { elements in
-                        elements.contains {
-                            $0.accessibilityRole() == .button
-                                && ($0.accessibilityLabel() ?? $0.accessibilityTitle() ?? "").contains(quitTitle)
-                        }
-                        && quotaIdentifiers.allSatisfy { identifier in
-                            elements.contains { $0.accessibilityIdentifier() == identifier }
-                        }
-                    }
-                    let quitButton = try XCTUnwrap(elements.first {
-                        $0.accessibilityRole() == .button
-                            && ($0.accessibilityLabel() ?? $0.accessibilityTitle() ?? "").contains(quitTitle)
-                    })
-                    XCTAssertEqual(
-                        quitButton.accessibilityFrame().minY - bounds.minY,
-                        8,
-                        accuracy: 1,
-                        "Only the command section's 8pt padding may remain below Quit"
-                    )
-                    for quotaWindow in bucket.windows {
-                        let reset = QuotaResetPresentation(
-                            resetsAt: quotaWindow.resetsAt, now: referenceDate,
-                            language: language, timeZone: resetTimeZone
-                        )
-                        let matching = elements.filter {
-                            $0.accessibilityIdentifier() == "quota-window-" + quotaWindow.kind.rawValue
-                        }
-                        XCTAssertEqual(matching.count, 1, "The header must not substitute for a quota row")
-                        let row = try XCTUnwrap(matching.first)
-                        XCTAssertTrue(row.accessibilityLabel()?.contains(reset.accessibilityLabel) == true)
-                        let frame = row.accessibilityFrame()
-                        XCTAssertGreaterThan(frame.width, 0)
-                        XCTAssertGreaterThan(frame.height, 0)
-                        XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX)
-                        XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX)
-                        XCTAssertGreaterThanOrEqual(frame.minY, bounds.minY + 8)
-                        XCTAssertLessThanOrEqual(frame.maxY, bounds.maxY - 8)
-                    }
+                    let controller = NSHostingController(rootView: content)
+                    let size = controller.sizeThatFits(in: NSSize(
+                        width: QuotaPopoverLayout.contentWidth,
+                        height: .greatestFiniteMagnitude
+                    ))
+                    assertNaturalPopoverSize(size)
+                    XCTAssertNil(controller.view.window)
+                    XCTAssertEqual(fixture.store.viewedBucket?.limitID, bucketID)
                 }
             }
         }
     }
 
-    func testDisplayColorPickersHaveIndependentLocalizedAccessibleNamesWithoutFetch() async throws {
+    func testDisplaySettingsMeasureInBothLanguagesWithoutFetchingOrChangingCache() async throws {
         let fetcher = LayoutOutcomeFetcher(
             outcome: .success(snapshot(includeSpark: true)), delay: .zero
         )
@@ -722,128 +577,25 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         let cacheURL = fixture.directory.appendingPathComponent("quota.json")
         let cacheBytes = try Data(contentsOf: cacheURL)
         let stateBefore = fixture.store.connectionState
+        let snapshotBefore = fixture.store.snapshot
         for language in [LanguagePreference.english, .simplifiedChinese] {
             fixture.preferences.language = language
             let content = DisplaySettingsView(store: fixture.store, windowState: DashboardWindowState())
                 .environment(\.locale, language.locale)
-            let window = try hostedWindow(content, width: 900, height: 720)
-            defer { window.close() }
-            let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
-                StatusAccentRole.allCases.allSatisfy { role in
-                    let label = StatusAccessibilityString.localized(
-                        "display.colors." + role.rawValue, language: language, bundle: .main
-                    )
-                    return elements.contains {
-                        ($0.accessibilityRole() == .colorWell || $0.accessibilityRole() == .button)
-                            && ($0.accessibilityLabel() ?? $0.accessibilityTitle()) == label
-                    }
-                }
-            }
-            for role in StatusAccentRole.allCases {
-                let label = StatusAccessibilityString.localized(
-                    "display.colors." + role.rawValue, language: language, bundle: .main
-                )
-                XCTAssertTrue(elements.contains {
-                    ($0.accessibilityRole() == .colorWell || $0.accessibilityRole() == .button)
-                        && ($0.accessibilityLabel() ?? $0.accessibilityTitle()) == label
-                }, "Missing independently labelled color control: \(role.rawValue)")
-            }
+            let controller = NSHostingController(rootView: content)
+            let size = controller.sizeThatFits(in: NSSize(width: 900, height: 720))
+            XCTAssertEqual(size.width, 900, accuracy: 0.5)
+            XCTAssertTrue(size.height.isFinite)
+            XCTAssertGreaterThan(size.height, 0)
+            XCTAssertLessThanOrEqual(size.height, 720.5)
+            XCTAssertNil(controller.view.window)
         }
         await Task.yield()
         let requestCount = await fetcher.requestCount()
         XCTAssertEqual(requestCount, 0)
         XCTAssertEqual(fixture.store.connectionState, stateBefore)
+        XCTAssertEqual(fixture.store.snapshot, snapshotBefore)
         XCTAssertEqual(try Data(contentsOf: cacheURL), cacheBytes)
-    }
-
-    /// These windows are fixture-owned and have no frame autosave or restoration.
-    /// Like the hosted test target itself, they may run only inside an isolated runner.
-    private func hostedWindow<Content: View>(
-        _ content: Content, width: CGFloat, height: CGFloat? = nil
-    ) throws -> NSWindow {
-        let controller = NSHostingController(rootView: content)
-        let natural = height.map { NSSize(width: width, height: $0) }
-            ?? controller.sizeThatFits(in: NSSize(width: width, height: .greatestFiniteMagnitude))
-        guard natural.width.isFinite, natural.height.isFinite,
-              natural.width > 0, natural.height > 0,
-              natural.width <= 2_000, natural.height <= 2_000 else {
-            XCTFail("Fixture windows need a finite viewport; ScrollViews require an explicit height")
-            throw FixtureWindowError.invalidSize
-        }
-        let size = NSSize(width: width, height: ceil(natural.height))
-        let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: size),
-            styleMask: [.titled], backing: .buffered, defer: false
-        )
-        window.isReleasedWhenClosed = false
-        window.isRestorable = false
-        window.contentViewController = controller
-        controller.view.frame = NSRect(origin: .zero, size: size)
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
-        controller.view.layoutSubtreeIfNeeded()
-        controller.view.displayIfNeeded()
-        XCTAssertTrue(waitForLayout { NSApp.isActive && window.isKeyWindow && window.isVisible },
-                      "The fixture window must be presented before testing accessible focus or controls")
-        return window
-    }
-
-    /// Query only this fixture's view tree in-process: no TCC request or speech service.
-    /// SwiftUI can publish its accessibility children after the first layout pass.
-    private func accessibilityElements(
-        in root: Any,
-        matching isReady: ([any NSAccessibilityProtocol]) -> Bool
-    ) -> [any NSAccessibilityProtocol] {
-        func collect() -> [any NSAccessibilityProtocol] {
-            var visited: Set<ObjectIdentifier> = []
-            var result: [any NSAccessibilityProtocol] = []
-            func visit(_ value: Any) {
-                guard let element = value as? any NSAccessibilityProtocol else { return }
-                guard visited.insert(ObjectIdentifier(element)).inserted else { return }
-                if element.isAccessibilityElement() { result.append(element) }
-                for child in accessibilityChildren(of: element) { visit(child) }
-            }
-            visit(root)
-            return result
-        }
-
-        var result = collect()
-        let ready = waitForLayout {
-            result = collect()
-            return isReady(result)
-        }
-        if !ready { reportFixtureAccessibilityShape(root) }
-        return result
-    }
-
-    private func accessibilityChildren(of element: any NSAccessibilityProtocol) -> [Any] {
-        let children = element.accessibilityChildren() ?? []
-        if !children.isEmpty { return children }
-        return element.accessibilityChildrenInNavigationOrder()?.map { $0 as Any } ?? []
-    }
-
-    /// Failure diagnostics contain only classes, roles, and counts from synthetic fixtures.
-    /// Do not dump labels, values, paths, or any other application/window tree.
-    private func reportFixtureAccessibilityShape(_ root: Any) {
-        var visited: Set<ObjectIdentifier> = []
-        func visit(_ value: Any, depth: Int) {
-            guard depth < 5, visited.count < 24, let object = value as? NSObject,
-                  visited.insert(ObjectIdentifier(object)).inserted else { return }
-            guard let element = value as? any NSAccessibilityProtocol else {
-                print("Fixture AX depth=\(depth) class=\(type(of: object)) fullProtocol=false")
-                return
-            }
-            let children = accessibilityChildren(of: element)
-            print("Fixture AX depth=\(depth) class=\(type(of: object))"
-                  + " role=\(element.accessibilityRole()?.rawValue ?? "none")"
-                  + " exposed=\(element.isAccessibilityElement()) children=\(children.count)")
-            if let view = object as? NSView {
-                print("Fixture view attached=\(view.window != nil) visible=\(view.window?.isVisible == true)"
-                      + " key=\(view.window?.isKeyWindow == true) appActive=\(NSApp.isActive)")
-            }
-            for child in children { visit(child, depth: depth + 1) }
-        }
-        visit(root, depth: 0)
     }
 
     private func hostingSize(for fixture: StoreFixture) -> NSSize {
@@ -882,17 +634,6 @@ final class QuotaPopoverLayoutTests: XCTestCase {
     private func waitForLayout(until condition: () -> Bool) -> Bool {
         let deadline = Date(timeIntervalSinceNow: 2)
         while !condition(), Date() < deadline {
-            // Synchronous main-actor tests block NSApplication's outer event loop.
-            // Dispatch only this test host's AppKit window/activation events, never
-            // keyboard or mouse input. A RunLoop turn alone leaves these queued.
-            for _ in 0..<32 {
-                guard Date() < deadline,
-                      let event = NSApp.nextEvent(
-                        matching: .appKitDefined, until: .distantPast,
-                        inMode: .default, dequeue: true
-                      ) else { break }
-                NSApp.sendEvent(event)
-            }
             RunLoop.main.run(until: min(deadline, Date(timeIntervalSinceNow: 0.01)))
         }
         return condition()
@@ -1101,9 +842,6 @@ private struct StoreFixture {
     }
 }
 
-private enum FixtureWindowError: Error {
-    case invalidSize
-}
 
 private enum LayoutFetchOutcome: Sendable {
     case success(QuotaSnapshot)

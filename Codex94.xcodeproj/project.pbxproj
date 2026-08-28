@@ -45,10 +45,18 @@
 		B00000000000000000000108 /* QuotaPopoverLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000108 /* QuotaPopoverLayoutTests.swift */; };
 		B00000000000000000000109 /* StatusPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000109 /* StatusPresentationTests.swift */; };
 		B0000000000000000000010A /* RefreshPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000010A /* RefreshPolicyTests.swift */; };
+		B00000000000000000000301 /* Codex94UITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000301 /* Codex94UITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		P00000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = T00000000000000000000001;
+			remoteInfo = Codex94;
+		};
+		P00000000000000000000002 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A00000000000000000000001 /* Project object */;
 			proxyType = 1;
@@ -99,11 +107,14 @@
 		F0000000000000000000010A /* RefreshPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshPolicyTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000201 /* Codex94.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Codex94.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F00000000000000000000202 /* Codex94Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Codex94Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F00000000000000000000203 /* Codex94UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Codex94UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F00000000000000000000301 /* Codex94UITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Codex94UITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		W00000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		W00000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		W00000000000000000000003 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -112,6 +123,7 @@
 			children = (
 				A00000000000000000000004 /* Codex94 */,
 				A00000000000000000000005 /* Codex94Tests */,
+				A00000000000000000000006 /* Codex94UITests */,
 				A00000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -121,6 +133,7 @@
 			children = (
 				F00000000000000000000201 /* Codex94.app */,
 				F00000000000000000000202 /* Codex94Tests.xctest */,
+				F00000000000000000000203 /* Codex94UITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -178,6 +191,14 @@
 			path = Codex94Tests;
 			sourceTree = "<group>";
 		};
+		A00000000000000000000006 /* Codex94UITests */ = {
+			isa = PBXGroup;
+			children = (
+				F00000000000000000000301 /* Codex94UITests.swift */,
+			);
+			path = Codex94UITests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -211,6 +232,21 @@
 			productReference = F00000000000000000000202 /* Codex94Tests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		T00000000000000000000003 /* Codex94UITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L00000000000000000000004 /* Build configuration list for PBXNativeTarget "Codex94UITests" */;
+			buildPhases = (
+				S00000000000000000000003 /* Sources */,
+				W00000000000000000000003 /* Frameworks */,
+				R00000000000000000000003 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = (D00000000000000000000002 /* PBXTargetDependency */);
+			name = Codex94UITests;
+			productName = Codex94UITests;
+			productReference = F00000000000000000000203 /* Codex94UITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -223,6 +259,7 @@
 				TargetAttributes = {
 					T00000000000000000000001 = { CreatedOnToolsVersion = 26.6; };
 					T00000000000000000000002 = { CreatedOnToolsVersion = 26.6; TestTargetID = T00000000000000000000001; };
+					T00000000000000000000003 = { CreatedOnToolsVersion = 16.4; TestTargetID = T00000000000000000000001; };
 				};
 			};
 			buildConfigurationList = L00000000000000000000001 /* Build configuration list for PBXProject "Codex94" */;
@@ -234,7 +271,7 @@
 			productRefGroup = A00000000000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (T00000000000000000000001 /* Codex94 */, T00000000000000000000002 /* Codex94Tests */);
+			targets = (T00000000000000000000001 /* Codex94 */, T00000000000000000000002 /* Codex94Tests */, T00000000000000000000003 /* Codex94UITests */);
 		};
 /* End PBXProject section */
 
@@ -246,6 +283,7 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		R00000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		R00000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -299,10 +337,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		S00000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (B00000000000000000000301 /* Codex94UITests.swift in Sources */);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
 		D00000000000000000000001 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = T00000000000000000000001 /* Codex94 */; targetProxy = P00000000000000000000001 /* PBXContainerItemProxy */; };
+		D00000000000000000000002 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = T00000000000000000000001 /* Codex94 */; targetProxy = P00000000000000000000002 /* PBXContainerItemProxy */; };
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -434,12 +479,43 @@
 			};
 			name = Release;
 		};
+		C00000000000000000000031 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = Codex94;
+			};
+			name = Debug;
+		};
+		C00000000000000000000032 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = Codex94;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
 		L00000000000000000000001 /* Build configuration list for PBXProject "Codex94" */ = {isa = XCConfigurationList; buildConfigurations = (C00000000000000000000001 /* Debug */, C00000000000000000000002 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		L00000000000000000000002 /* Build configuration list for PBXNativeTarget "Codex94" */ = {isa = XCConfigurationList; buildConfigurations = (C00000000000000000000011 /* Debug */, C00000000000000000000012 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		L00000000000000000000003 /* Build configuration list for PBXNativeTarget "Codex94Tests" */ = {isa = XCConfigurationList; buildConfigurations = (C00000000000000000000021 /* Debug */, C00000000000000000000022 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		L00000000000000000000004 /* Build configuration list for PBXNativeTarget "Codex94UITests" */ = {isa = XCConfigurationList; buildConfigurations = (C00000000000000000000031 /* Debug */, C00000000000000000000032 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCConfigurationList section */
 	};
 	rootObject = A00000000000000000000001 /* Project object */;

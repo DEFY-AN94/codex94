@@ -31,3 +31,68 @@ jobs:
 
       - name: Release gate
         run: ./script/release_check.sh
+
+  ui-test:
+    name: UI smoke (${{ matrix.scenario }})
+    runs-on: macos-15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: display
+            method: testDisplaySmoke
+          - scenario: recovery
+            method: testRecoverySmoke
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+
+      - name: Prepare synthetic UI fixtures
+        id: fixtures
+        env:
+          CODEX94_UI_SCENARIO: ${{ matrix.scenario }}
+        run: /usr/bin/python3 -I Codex94UITests/Fixtures/prepare.py
+
+      - name: Run UI smoke
+        env:
+          CODEX94_UI_FIXTURE_ROOT: ${{ steps.fixtures.outputs.fixture-root }}
+          CODEX94_UI_ARTIFACT_ROOT: ${{ steps.fixtures.outputs.artifact-root }}
+          CODEX94_UI_TEST_METHOD: ${{ matrix.method }}
+        run: |
+          test -d "$CODEX94_UI_FIXTURE_ROOT"
+          test -d "$CODEX94_UI_ARTIFACT_ROOT"
+          xcodebuild \
+            -project Codex94.xcodeproj \
+            -scheme Codex94UI \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$CODEX94_UI_FIXTURE_ROOT/DerivedData" \
+            -resultBundlePath "$CODEX94_UI_FIXTURE_ROOT/results/Codex94UI.xcresult" \
+            -parallel-testing-enabled NO \
+            "-only-testing:Codex94UITests/Codex94UITests/$CODEX94_UI_TEST_METHOD" \
+            CODEX94_UI_FIXTURE_ROOT="$CODEX94_UI_FIXTURE_ROOT" \
+            CODEX94_UI_ARTIFACT_ROOT="$CODEX94_UI_ARTIFACT_ROOT" \
+            CODEX94_UI_GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+            CODEX94_UI_RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+            CODEX94_UI_RUNNER_OS="$RUNNER_OS" \
+            CODE_SIGNING_ALLOWED=YES \
+            test
+
+      - name: Upload synthetic UI evidence
+        if: ${{ always() && steps.fixtures.outputs.artifact-root != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codex94-ui-${{ matrix.scenario }}
+          path: |
+            ${{ steps.fixtures.outputs.artifact-root }}/*.png
+            ${{ steps.fixtures.outputs.artifact-root }}/*.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 7
