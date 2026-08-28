@@ -1,9 +1,11 @@
 import AppKit
 import ApplicationServices
 import CoreFoundation
+import CoreGraphics
 import CryptoKit
 import Darwin
 import Foundation
+import ImageIO
 import Security
 import XCTest
 
@@ -16,6 +18,8 @@ final class Codex94UITests: XCTestCase {
     private var application: XCUIApplication!
     private var language = UILanguage.english
     private var didLaunchApplication = false
+    private var nativeStatusWidths: [Int: CGFloat] = [:]
+    private var observedStatusWidths: [String: CGFloat] = [:]
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -210,7 +214,8 @@ final class Codex94UITests: XCTestCase {
         try fixture.writeReport("display-result.json", fields: [
             "scenario": "display", "completed": true,
             "languages": ["en", "zh-Hans"], "themes": UITheme.allCases.map(\.rawValue),
-            "statusItemWidths": [58, 50, 28], "rawTestResultsUploaded": false
+            "requestedStatusItemWidths": [58, 50, 28], "observedStatusItemAXWidths": observedStatusWidths,
+            "rawTestResultsUploaded": false
         ])
     }
 
@@ -289,6 +294,9 @@ final class Codex94UITests: XCTestCase {
         application = XCUIApplication(url: fixture.applicationURL)
         try require(application.state == .notRunning,
                     "Refuse to replace an already-running application")
+        if scenario == "display" {
+            nativeStatusWidths = try measureNativeStatusItemWidths()
+        }
         application.launchArguments = ["--show-popover"]
         // Do not copy the runner environment: the AUT must not receive XCTest's
         // hosted-test guard or any credential/path-discovery overrides.
@@ -443,8 +451,87 @@ final class Codex94UITests: XCTestCase {
 
     private func assertStatusItemWidth(_ width: CGFloat) throws {
         let item = try statusItem()
-        XCTAssertEqual(item.frame.width, width, accuracy: 1, "Check the real NSStatusItem, not a SwiftUI preview")
+        guard let nativeWidth = nativeStatusWidths[Int(width)] else {
+            throw UITestFailure("A pre-launch native status-item geometry reference is required")
+        }
+        try require(item.elementType == .statusItem,
+                    "Compare the native status-item AX surface, not an unrelated menu item")
+        let observed = item.frame.width
+        XCTAssertEqual(observed, nativeWidth, accuracy: 1,
+                       "The real status item must match the same-length native AX reference; no padding compensation")
+        if let previous = observedStatusWidths[String(Int(width))] {
+            XCTAssertEqual(observed, previous, accuracy: 0.1,
+                           "Saving a new layout must not change the current status-item width")
+        }
+        observedStatusWidths[String(Int(width))] = observed
         try require(item.frame.height > 0, "The actual status item must have visible geometry")
+    }
+
+    private func measureNativeStatusItemWidths() throws -> [Int: CGFloat] {
+        // Runs only after the CI/root/signature/preferences guards, before AUT
+        // launch. Own exactly one temporary native item; do not activate an app,
+        // set autosaveName, inspect other menu items or change system settings.
+        let reference = NSStatusBar.system.statusItem(withLength: 58)
+        defer { NSStatusBar.system.removeStatusItem(reference) }
+        guard let button = reference.button else { throw UITestFailure("Native status-item reference is unavailable") }
+        button.title = ""
+        button.setAccessibilityLabel("Codex94 synthetic width reference")
+        var widths: [Int: CGFloat] = [:]
+        var measurements: [[String: Any]] = []
+        var referenceFailures: [String] = []
+        for requested in [58, 50, 28] {
+            reference.length = CGFloat(requested)
+            var previous: NSSize?
+            var stableSamples = 0
+            var accessible: (any NSAccessibilityProtocol)?
+            try waitUntil("Native status-item geometry did not become stable") {
+                button.window?.contentView?.layoutSubtreeIfNeeded()
+                guard let element = NSAccessibility.unignoredDescendant(of: button) as? any NSAccessibilityProtocol else {
+                    return false
+                }
+                let size = element.accessibilityFrame().size
+                guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else { return false }
+                stableSamples = previous == size ? stableSamples + 1 : 0
+                previous = size
+                accessible = element
+                return stableSamples >= 3
+            }
+            guard let accessible else {
+                throw UITestFailure("The native reference must expose one unignored accessibility surface")
+            }
+            let role = accessible.accessibilityRole()
+            let axFrame = accessible.accessibilityFrame()
+            let rawFrame = button.accessibilityFrame()
+            let alignment = button.alignmentRect(forFrame: button.frame)
+            measurements.append([
+                "requestedLength": requested, "reportedLength": reference.length,
+                "buttonFrameWidth": button.frame.width, "buttonFrameHeight": button.frame.height,
+                "alignmentWidth": alignment.width, "alignmentHeight": alignment.height,
+                "rawButtonAXWidth": rawFrame.width, "rawButtonAXHeight": rawFrame.height,
+                "unignoredAXWidth": axFrame.width, "unignoredAXHeight": axFrame.height,
+                "unignoredRole": role?.rawValue ?? "missing",
+            ])
+            if abs(reference.length - CGFloat(requested)) > 0.01 {
+                referenceFailures.append("Native length \(requested) changed to \(reference.length)")
+            }
+            if role != .menuBarItem {
+                referenceFailures.append("Native status-item role is \(role?.rawValue ?? "missing"), not AXMenuBarItem")
+            }
+            widths[requested] = axFrame.width
+        }
+        try fixture.writeReport("status-item-reference.json", fields: [
+            "method": "native-unignored-status-item", "measurements": measurements,
+            "applicationNotLaunched": true, "rawTestResultsUploaded": false,
+        ])
+        if let combined = widths[58], let percentage = widths[50], let ring = widths[28],
+           combined - percentage > 2, percentage - ring > 2 {
+            // Adjacent +/-1pt acceptance ranges must be disjoint. A stale
+            // reference that never changed width must not bless a stuck AUT.
+        } else {
+            referenceFailures.append("Native reference widths must decrease with distinct nonoverlapping ranges")
+        }
+        try require(referenceFailures.isEmpty, referenceFailures.joined(separator: "; "))
+        return widths
     }
 
     private func selectPage(_ page: UIPage, in dashboard: XCUIElement) throws {
@@ -721,23 +808,40 @@ final class Codex94UITests: XCTestCase {
 
     private func assertColor(_ hex: String, in element: XCUIElement, minimumPixels: Int = 12) throws {
         let screenshot = element.screenshot()
-        guard let bitmap = NSBitmapImageRep(data: screenshot.pngRepresentation),
+        guard let source = CGImageSourceCreateWithData(screenshot.pngRepresentation as CFData, nil),
+              let original = CGImageSourceCreateImageAtIndex(source, 0, nil),
+              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
               let value = UInt32(hex, radix: 16) else { throw UITestFailure("Could not inspect the synthetic app screenshot") }
-        try require(bitmap.pixelsWide > 0 && bitmap.pixelsHigh > 0
-                    && bitmap.pixelsWide * bitmap.pixelsHigh <= 8_000_000,
+        let width = original.width
+        let height = original.height
+        try require(width > 0 && height > 0 && height <= 8_000_000 / width,
                     "Only bounded app-owned screenshots may be inspected")
         let target = [CGFloat((value >> 16) & 255), CGFloat((value >> 8) & 255), CGFloat(value & 255)]
-        var matches = 0
-        for y in stride(from: 0, to: bitmap.pixelsHigh, by: 2) {
-            for x in stride(from: 0, to: bitmap.pixelsWide, by: 2) {
-                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
-                let rgb = [color.redComponent * 255, color.greenComponent * 255, color.blueComponent * 255]
-                if zip(rgb, target).allSatisfy({ pair in abs(pair.0 - pair.1) <= 18 }) {
-                    matches += 1
-                    if matches >= minimumPixels { return }
+        // Normalize decoded pixels to explicit sRGB RGBA; sampling and acceptance thresholds are unchanged.
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        let matches = try bytes.withUnsafeMutableBytes { raw -> Int in
+            guard let context = CGContext(
+                data: raw.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: width * 4, space: colorSpace,
+                bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { throw UITestFailure("Could not normalize the synthetic app screenshot") }
+            context.translateBy(x: 0, y: CGFloat(height))
+            context.scaleBy(x: 1, y: -1)
+            context.draw(original, in: CGRect(x: 0, y: 0, width: width, height: height))
+            let buffer = raw.bindMemory(to: UInt8.self)
+            var count = 0
+            for y in stride(from: 0, to: height, by: 2) {
+                for x in stride(from: 0, to: width, by: 2) {
+                    let offset = (y * width + x) * 4
+                    if (0..<3).allSatisfy({ abs(CGFloat(buffer[offset + $0]) - target[$0]) <= 18 }) {
+                        count += 1
+                        if count >= minimumPixels { return count }
+                    }
                 }
             }
+            return count
         }
+        if matches >= minimumPixels { return }
         throw UITestFailure("The requested status color was not rendered in the owned app element")
     }
 
@@ -1303,7 +1407,8 @@ private struct SyntheticFixture {
         let fixed: Set<String> = [
             "popover-en.png", "popover-zh-Hans.png", "dashboard-en.png", "dashboard-zh-Hans.png",
             "popover-startup.png", "popover-refreshing.png", "popover-stale.png", "popover-unavailable-en.png",
-            "popover-unavailable-zh-Hans.png", "display-result.json", "recovery-result.json"
+            "popover-unavailable-zh-Hans.png", "display-result.json", "recovery-result.json",
+            "status-item-reference.json"
         ]
         let variants = Set(UILanguage.allCases.flatMap { language in
             UITheme.allCases.map { "popover-long-\(language.artifactName)-\($0.rawValue).png" }

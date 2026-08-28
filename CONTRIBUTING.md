@@ -70,6 +70,11 @@ permissions are generated before the build and applied only to the UI test
 target. The tests verify the signed runner and app permissions before launching
 the app; the production app receives no test-only permissions.
 
+Status-item GUI checks distinguish the requested AppKit length from its public
+accessibility bounds. A temporary native reference owned by the test process is
+measured and removed before app launch; it must distinguish all three lengths.
+No constant padding adjustment or widened tolerance is used to pass a failure.
+
 UI jobs do not enable VoiceOver, change system settings, use real Codex
 credentials, or install the app. They upload only explicitly captured app-window
 PNGs and curated synthetic summaries with a seven-day retention period. Raw
