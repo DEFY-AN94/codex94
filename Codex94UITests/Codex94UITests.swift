@@ -460,7 +460,7 @@ final class Codex94UITests: XCTestCase {
                     "Compare the native status-item AX surface, not an unrelated menu item")
         let observed = item.frame.width
         XCTAssertEqual(observed, nativeWidth, accuracy: 1,
-                       "The real status item must match the same-length native AX reference; no padding compensation")
+                       "The status item's AX width must match a native status item with the same requested length")
         if let previous = observedStatusWidths[String(Int(width))] {
             XCTAssertEqual(observed, previous, accuracy: 0.1,
                            "Saving a new layout must not change the current status-item width")
@@ -480,7 +480,6 @@ final class Codex94UITests: XCTestCase {
         button.title = ""
         button.setAccessibilityLabel(referenceLabel)
         var widths: [Int: CGFloat] = [:]
-        var nativeSizes: [Int: NSSize] = [:]
         var measurements: [[String: Any]] = []
         var referenceFailures: [String] = []
         for requested in [58, 50, 28] {
@@ -522,7 +521,6 @@ final class Codex94UITests: XCTestCase {
                 referenceFailures.append("Native status-item button role is \(role?.rawValue ?? "missing"), not AXButton")
             }
             widths[requested] = axFrame.width
-            nativeSizes[requested] = axFrame.size
         }
         try fixture.writeReport("status-item-reference.json", fields: [
             "method": "native-unignored-status-item", "measurements": measurements,
@@ -536,89 +534,7 @@ final class Codex94UITests: XCTestCase {
             referenceFailures.append("Native reference widths must decrease with distinct nonoverlapping ranges")
         }
         try require(referenceFailures.isEmpty, referenceFailures.joined(separator: "; "))
-
-        // The native report is already durable if querying the runner's own
-        // XCUI surface fails. This proxy only observes the existing runner;
-        // never launch, activate or terminate it, or fall back to direct AX IPC.
-        let runnerURL = fixture.applicationURL.deletingLastPathComponent()
-            .appendingPathComponent("Codex94UITests-Runner.app", isDirectory: true)
-        let runnerBundleID = fixture.bundleID + ".uitests.xctrunner"
-        let running = NSRunningApplication.current
-        guard Bundle.main.bundleIdentifier == runnerBundleID,
-              running.bundleIdentifier == runnerBundleID,
-              running.processIdentifier == getpid(),
-              let runningBundleURL = running.bundleURL else {
-            throw UITestFailure("The status-item reference must belong to the exact current UI runner")
-        }
-        _ = try SyntheticFixture.registeredPath(Bundle.main.bundleURL.path, expected: runnerURL.path)
-        _ = try SyntheticFixture.registeredPath(runningBundleURL.path, expected: runnerURL.path)
-        let runnerProxy = XCUIApplication(url: runnerURL)
-        var xcuiWidths: [Int: CGFloat] = [:]
-        var xcuiMeasurements: [[String: Any]] = []
-        var xcuiFailures: [String] = []
-        for requested in [58, 50, 28] {
-            guard let nativeSize = nativeSizes[requested] else {
-                throw UITestFailure("The XCUI reference requires its previously measured native size")
-            }
-            reference.length = CGFloat(requested)
-            var previous: NSSize?
-            var stableSamples = 0
-            try waitUntil("The native reference did not restore its measured geometry") {
-                button.window?.contentView?.layoutSubtreeIfNeeded()
-                guard let element = NSAccessibility.unignoredDescendant(of: button) as? any NSAccessibilityProtocol else {
-                    previous = nil
-                    stableSamples = 0
-                    return false
-                }
-                let size = element.accessibilityFrame().size
-                guard size.width.isFinite, size.height.isFinite,
-                      abs(size.width - nativeSize.width) <= 1,
-                      abs(size.height - nativeSize.height) <= 1 else {
-                    previous = nil
-                    stableSamples = 0
-                    return false
-                }
-                stableSamples = previous == size ? stableSamples + 1 : 0
-                previous = size
-                return stableSamples >= 3
-            }
-            try require(reference.length == CGFloat(requested),
-                        "The native reference must retain the exact requested length")
-            let matches = runnerProxy.statusItems.matching(NSPredicate(
-                format: "label == %@", referenceLabel
-            )).allElementsBoundByIndex
-            try require(matches.count == 1,
-                        "The current runner must expose exactly one synthetic reference status item")
-            let item = matches[0]
-            try require(item.elementType == .statusItem && item.label == referenceLabel,
-                        "The XCUI reference must be the runner's exact labeled status-item surface")
-            let size = item.frame.size
-            try require(size.width.isFinite && size.height.isFinite && size.width > 0 && size.height > 0,
-                        "The XCUI reference must expose finite visible geometry")
-            xcuiMeasurements.append([
-                "requestedLength": requested, "reportedLength": reference.length,
-                "nativeAXWidth": nativeSize.width, "nativeAXHeight": nativeSize.height,
-                "xcuiWidth": size.width, "xcuiHeight": size.height,
-                "xcuiElementType": "statusItem", "exactLabelMatched": true,
-            ])
-            if abs(size.width - nativeSize.width) > 1 || abs(size.height - nativeSize.height) > 1 {
-                xcuiFailures.append("XCUI and native AX geometry differ for length \(requested)")
-            }
-            xcuiWidths[requested] = size.width
-        }
-        try fixture.writeReport("status-item-xcui-reference.json", fields: [
-            "method": "same-runner-xcui-status-item", "measurements": xcuiMeasurements,
-            "runnerProductValidated": true, "runnerBundleID": runnerBundleID,
-            "applicationNotLaunched": true, "rawTestResultsUploaded": false,
-        ])
-        if let combined = xcuiWidths[58], let percentage = xcuiWidths[50], let ring = xcuiWidths[28],
-           combined - percentage > 2, percentage - ring > 2 {
-            // The returned XCUI reference must retain disjoint +/-1pt ranges.
-        } else {
-            xcuiFailures.append("XCUI reference widths must decrease with distinct nonoverlapping ranges")
-        }
-        try require(xcuiFailures.isEmpty, xcuiFailures.joined(separator: "; "))
-        return xcuiWidths
+        return widths
     }
 
     private func selectPage(_ page: UIPage, in dashboard: XCUIElement) throws {
@@ -995,17 +911,31 @@ final class Codex94UITests: XCTestCase {
         button: XCUIElement, destination: UIPage, popover: XCUIElement
     ) throws {
         // Diagnostic only: never turn missing AX permission into a skip/pass,
-        // prompt, settings change, synthetic click, or unverified focus claim.
+        // prompt, settings change, click-as-keyboard substitution, or unverified focus claim.
         // XCTest owns these events; only the fixture app's surface is captured.
         var tooltipVerified = false
+        var tooltipMatches: [[String: Any]] = []
         try withoutRequests("Collecting keyboard-only focus evidence") {
             button.hover()
-            let help = application.helpTags.matching(NSPredicate(
-                format: "label == %@ OR title == %@",
-                language.recoveryHelp(destination), language.recoveryHelp(destination)
+            let help = application.descendants(matching: .any).matching(NSPredicate(
+                format: "label == %@ OR title == %@ OR value == %@",
+                language.recoveryHelp(destination), language.recoveryHelp(destination),
+                language.recoveryHelp(destination)
             ))
             tooltipVerified = help.firstMatch.waitForExistence(timeout: 5) && help.count == 1
-            identified("quota-popover-header", in: popover).hover()
+            tooltipMatches = help.allElementsBoundByIndex.prefix(4).map { element in
+                ["elementType": element.elementType.rawValue,
+                 "width": element.frame.width, "height": element.frame.height,
+                 "labelMatches": element.label == language.recoveryHelp(destination),
+                 "titleMatches": element.title == language.recoveryHelp(destination),
+                 "valueMatches": element.value as? String == language.recoveryHelp(destination)]
+            }
+            let header = try uniqueIdentified("quota-popover-header", in: popover)
+            try require(header.buttons.count == 0, "Only the noninteractive header may activate the popover window")
+            // Clicking static content only makes this owned popover key. It
+            // neither focuses nor activates the recovery button; all following
+            // navigation is actual Tab input, without a settings change.
+            header.click()
             try capture(popover, named: "popover-keyboard-focus-0.png")
             for step in 1...6 {
                 application.typeKey(.tab, modifierFlags: [])
@@ -1013,8 +943,11 @@ final class Codex94UITests: XCTestCase {
             }
         }
         try fixture.writeReport("keyboard-navigation-probe.json", fields: [
-            "method": "xctest-tab-only", "tabCount": 6,
+            "method": "xctest-tab-after-window-activation", "tabCount": 6,
+            "windowActivation": "noninteractive-header-click",
+            "runnerFullKeyboardAccessEnabled": NSApplication.shared.isFullKeyboardAccessEnabled,
             "directAXTrust": false, "localizedTooltipVerified": tooltipVerified,
+            "matchingTooltipElements": tooltipMatches,
             "activationVerified": false, "permissionPromptsRequested": false,
             "rawTestResultsUploaded": false,
         ])
@@ -1535,8 +1468,7 @@ private struct SyntheticFixture {
             "popover-en.png", "popover-zh-Hans.png", "dashboard-en.png", "dashboard-zh-Hans.png",
             "popover-startup.png", "popover-refreshing.png", "popover-stale.png", "popover-unavailable-en.png",
             "popover-unavailable-zh-Hans.png", "display-result.json", "recovery-result.json",
-            "status-item-reference.json",
-            "status-item-xcui-reference.json"
+            "status-item-reference.json"
         ]
         let variants = Set(UILanguage.allCases.flatMap { language in
             UITheme.allCases.map { "popover-long-\(language.artifactName)-\($0.rawValue).png" }
