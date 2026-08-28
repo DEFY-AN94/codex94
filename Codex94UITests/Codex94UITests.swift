@@ -20,6 +20,7 @@ final class Codex94UITests: XCTestCase {
     private var didLaunchApplication = false
     private var nativeStatusWidths: [Int: CGFloat] = [:]
     private var observedStatusWidths: [String: CGFloat] = [:]
+    private var layoutMeasurementIndex = 0
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -697,7 +698,11 @@ final class Codex94UITests: XCTestCase {
         let bounds = content.frame
         let topToBottom = header.frame.midY < quit.frame.midY
         let bottomGap = topToBottom ? bounds.maxY - quit.frame.maxY : quit.frame.minY - bounds.minY
-        let topGap = topToBottom ? header.frame.minY - bounds.minY : bounds.maxY - header.frame.maxY
+        let paintTopGap = topToBottom ? header.frame.minY - bounds.minY : bounds.maxY - header.frame.maxY
+        let headerPadding: CGFloat = 15
+        let ringDiameter: CGFloat = 34
+        let ringStroke: CGFloat = 3
+        let geometryTolerance: CGFloat = 1
         XCTAssertEqual(bottomGap, 8, accuracy: 1, "Only the natural 8pt command padding may remain below Quit")
         // Also check the outer surface: choosing a naturally-sized inner stack
         // alone could hide the original fixed-height blank-space regression.
@@ -706,10 +711,29 @@ final class Codex94UITests: XCTestCase {
         let outer = popover.frame
         let horizontalChrome = max(max(bounds.minX - outer.minX, outer.maxX - bounds.maxX), 0)
         let outerBottomGap = topToBottom ? outer.maxY - quit.frame.maxY : quit.frame.minY - outer.minY
+        try fixture.writeReport("quota-layout-\(layoutMeasurementIndex).json", fields: [
+            "method": "stroke-aware-accessibility-bounds", "language": language.rawValue,
+            "bucket": longName ? "long-name" : (spark ? "spark" : "codex"),
+            "contentWidth": bounds.width, "contentHeight": bounds.height,
+            "headerWidth": header.frame.width, "headerHeight": header.frame.height,
+            "paintTopGap": paintTopGap, "commandBottomGap": bottomGap,
+            "outerBottomGap": outerBottomGap, "horizontalChrome": horizontalChrome,
+            "logicalHeaderPadding": headerPadding, "ringDiameter": ringDiameter,
+            "centeredRingStrokeWidth": ringStroke, "geometryTolerance": geometryTolerance,
+        ])
+        layoutMeasurementIndex += 1
         XCTAssertLessThanOrEqual(outerBottomGap, 8 + horizontalChrome + 2,
                                  "The real outer popover must not retain a blank fixed-height tail")
-        XCTAssertGreaterThanOrEqual(topGap, 14, "Header content must retain its 15pt top padding")
-        XCTAssertGreaterThanOrEqual(header.frame.height, 33, "The 34pt header ring must not be compressed")
+        // The accessibility bounds include the 3pt centered Circle.stroke:
+        // its paint can extend 1.5pt beyond the 34pt ring's layout frame. Taller
+        // text can instead define this union's top, so retain both strict bounds
+        // rather than assuming every language has a ring-dominated header.
+        XCTAssertGreaterThanOrEqual(paintTopGap, headerPadding - ringStroke / 2 - geometryTolerance,
+                                    "Header paint must retain the 15pt padding minus only its centered stroke")
+        XCTAssertLessThanOrEqual(paintTopGap, headerPadding + geometryTolerance,
+                                 "Header paint must not acquire additional blank top padding")
+        XCTAssertGreaterThanOrEqual(header.frame.height, ringDiameter + ringStroke - geometryTolerance,
+                                    "The complete stroke-inclusive 34pt header ring must not be compressed")
         if spark {
             XCTAssertTrue(header.label.contains(longName ? fixture.longName.trimmingCharacters(in: .whitespaces) : fixture.sparkName),
                           "A shortened visual title must keep the full accessible bucket name")
@@ -1475,7 +1499,10 @@ private struct SyntheticFixture {
         })
         let keyboardProbe = Set((0...6).map { "popover-keyboard-focus-\($0).png" })
             .union(["keyboard-navigation-probe.json"])
-        guard fixed.union(variants).union(keyboardProbe).contains(filename) else { throw UITestFailure("Artifact filename is outside the explicit allowlist") }
+        let layoutMeasurements = Set((0..<32).map { "quota-layout-\($0).json" })
+        guard fixed.union(variants).union(keyboardProbe).union(layoutMeasurements).contains(filename) else {
+            throw UITestFailure("Artifact filename is outside the explicit allowlist")
+        }
         try Self.validate(artifacts, type: .typeDirectory, mode: 0o700)
         let url = artifacts.appendingPathComponent(filename)
         guard !FileManager.default.fileExists(atPath: url.path) else {
