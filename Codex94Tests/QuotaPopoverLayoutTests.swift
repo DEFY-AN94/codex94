@@ -389,6 +389,25 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: cacheURL), cacheBytes)
     }
 
+    func testHostedSwiftUIAccessibilityFixtureIsAvailable() throws {
+        let nativeTitle = "Synthetic native accessibility control"
+        let nativeControl = NSButton(title: nativeTitle, target: nil, action: nil)
+        XCTAssertEqual(nativeControl.accessibilityRole(), .button)
+        XCTAssertEqual(nativeControl.accessibilityTitle(), nativeTitle)
+
+        let label = "Synthetic SwiftUI accessibility control"
+        let content = Text(verbatim: label)
+            .accessibilityLabel(Text(verbatim: label))
+            .frame(width: 320, height: 40)
+        let window = try hostedWindow(content, width: 320, height: 40)
+        defer { window.close() }
+        let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
+            elements.contains { $0.accessibilityLabel() == label }
+        }
+        XCTAssertTrue(elements.contains { $0.accessibilityLabel() == label },
+                      "The CI fixture must expose plain SwiftUI text before product AX assertions can be evaluated")
+    }
+
     func testAbsoluteResetHasItsOwnFullWidthRowAndCompleteAccessibleText() throws {
         let window = try XCTUnwrap(snapshot(includeSpark: false).defaultBucket?.window(.weekly))
         let rowWidth = QuotaPopoverLayout.contentWidth - 36
@@ -752,9 +771,12 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         window.isRestorable = false
         window.contentViewController = controller
         controller.view.frame = NSRect(origin: .zero, size: size)
+        NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         controller.view.layoutSubtreeIfNeeded()
         controller.view.displayIfNeeded()
+        XCTAssertTrue(waitForLayout { NSApp.isActive && window.isKeyWindow && window.isVisible },
+                      "The fixture window must be presented before testing accessible focus or controls")
         return window
     }
 
@@ -771,7 +793,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                 guard let element = value as? any NSAccessibilityProtocol else { return }
                 guard visited.insert(ObjectIdentifier(element)).inserted else { return }
                 if element.isAccessibilityElement() { result.append(element) }
-                for child in element.accessibilityChildren() ?? [] { visit(child) }
+                for child in accessibilityChildren(of: element) { visit(child) }
             }
             visit(root)
             return result
@@ -786,6 +808,12 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         return result
     }
 
+    private func accessibilityChildren(of element: any NSAccessibilityProtocol) -> [Any] {
+        let children = element.accessibilityChildren() ?? []
+        if !children.isEmpty { return children }
+        return element.accessibilityChildrenInNavigationOrder()?.map { $0 as Any } ?? []
+    }
+
     /// Failure diagnostics contain only classes, roles, and counts from synthetic fixtures.
     /// Do not dump labels, values, paths, or any other application/window tree.
     private func reportFixtureAccessibilityShape(_ root: Any) {
@@ -797,10 +825,14 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                 print("Fixture AX depth=\(depth) class=\(type(of: object)) fullProtocol=false")
                 return
             }
-            let children = element.accessibilityChildren() ?? []
+            let children = accessibilityChildren(of: element)
             print("Fixture AX depth=\(depth) class=\(type(of: object))"
                   + " role=\(element.accessibilityRole()?.rawValue ?? "none")"
                   + " exposed=\(element.isAccessibilityElement()) children=\(children.count)")
+            if let view = object as? NSView {
+                print("Fixture view attached=\(view.window != nil) visible=\(view.window?.isVisible == true)"
+                      + " key=\(view.window?.isKeyWindow == true) appActive=\(NSApp.isActive)")
+            }
             for child in children { visit(child, depth: depth + 1) }
         }
         visit(root, depth: 0)
