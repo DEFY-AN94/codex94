@@ -207,15 +207,24 @@ final class PreferencesStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set("weekly", forKey: "displayMode")
         let preferences = PreferencesStore(defaults: defaults)
-        let selectionData = try XCTUnwrap(defaults.data(forKey: "menuBarQuotaSelection.v2"))
 
         for layout in MenuBarLayout.allCases {
+            let selectionData = try XCTUnwrap(defaults.data(forKey: "menuBarQuotaSelection.v2"))
             preferences.menuBarLayout = layout
+            XCTAssertEqual(preferences.menuBarQuotaSelection, .defaultBucket(.weekly))
+            XCTAssertEqual(defaults.data(forKey: "menuBarQuotaSelection.v2"), selectionData)
+
+            // Initialization re-encodes the migrated selection; JSON key order is not stable.
+            // Check the layout setter's no-write guarantee above and the reloaded value below.
             let reloaded = PreferencesStore(defaults: defaults)
             XCTAssertEqual(reloaded.menuBarLayout, layout)
             XCTAssertEqual(reloaded.menuBarQuotaSelection, .defaultBucket(.weekly))
             XCTAssertEqual(defaults.string(forKey: "displayMode"), "weekly")
-            XCTAssertEqual(defaults.data(forKey: "menuBarQuotaSelection.v2"), selectionData)
+            let reloadedSelectionData = try XCTUnwrap(defaults.data(forKey: "menuBarQuotaSelection.v2"))
+            XCTAssertEqual(
+                try JSONDecoder().decode(MenuBarQuotaSelection.self, from: reloadedSelectionData),
+                .defaultBucket(.weekly)
+            )
         }
     }
 

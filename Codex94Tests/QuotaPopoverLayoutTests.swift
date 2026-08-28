@@ -436,7 +436,10 @@ final class QuotaPopoverLayoutTests: XCTestCase {
 
             let host = try hostedWindow(content, width: rowWidth)
             defer { host.close() }
-            let element = try XCTUnwrap(accessibilityElements(in: try XCTUnwrap(host.contentView)).first {
+            let elements = accessibilityElements(in: try XCTUnwrap(host.contentView)) { elements in
+                elements.contains { $0.accessibilityLabel()?.contains(reset.accessibilityLabel) == true }
+            }
+            let element = try XCTUnwrap(elements.first {
                 $0.accessibilityLabel()?.contains(reset.accessibilityLabel) == true
             })
             XCTAssertTrue(element.accessibilityLabel()?.contains(reset.absolute) == true)
@@ -470,7 +473,13 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                 let expectedTitle = StatusAccessibilityString.localized(
                     titleKey, language: language, bundle: .main
                 )
-                let buttons = accessibilityElements(in: try XCTUnwrap(window.contentView)).filter {
+                let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
+                    elements.contains {
+                        $0.accessibilityRole() == .button
+                            && ($0.accessibilityLabel() ?? $0.accessibilityTitle()) == expectedTitle
+                    }
+                }
+                let buttons = elements.filter {
                     $0.accessibilityRole() == .button
                         && ($0.accessibilityLabel() ?? $0.accessibilityTitle()) == expectedTitle
                 }
@@ -501,9 +510,16 @@ final class QuotaPopoverLayoutTests: XCTestCase {
             recoveryDestination: nil,
             openDashboard: { _ in XCTFail("No issue must expose no navigation action") }
         )
+        .environment(\.locale, LanguagePreference.english.locale)
         let window = try hostedWindow(content, width: QuotaPopoverLayout.contentWidth)
         defer { window.close() }
-        XCTAssertFalse(accessibilityElements(in: try XCTUnwrap(window.contentView)).contains {
+        let expectedText = StatusAccessibilityString.localized("status.cached", language: .english, bundle: .main)
+        let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
+            elements.contains { $0.accessibilityLabel() == expectedText }
+        }
+        XCTAssertTrue(elements.contains { $0.accessibilityLabel() == expectedText },
+                      "The negative action assertion must inspect a populated fixture tree")
+        XCTAssertFalse(elements.contains {
             $0.accessibilityRole() == .button
         })
     }
@@ -531,7 +547,10 @@ final class QuotaPopoverLayoutTests: XCTestCase {
             let guidance = StatusAccessibilityString.localized(
                 "connection.notLoggedIn.guidance", language: language, bundle: .main
             )
-            XCTAssertTrue(accessibilityElements(in: try XCTUnwrap(window.contentView)).contains {
+            let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
+                elements.contains { ($0.accessibilityLabel() ?? $0.accessibilityValue() as? String) == guidance }
+            }
+            XCTAssertTrue(elements.contains {
                 ($0.accessibilityLabel() ?? $0.accessibilityValue() as? String) == guidance
             })
         }
@@ -583,7 +602,9 @@ final class QuotaPopoverLayoutTests: XCTestCase {
             let connectionWindow = try hostedWindow(connection, width: 900, height: 600)
             defer { rowWindow.close(); connectionWindow.close() }
             for window in [rowWindow, connectionWindow] {
-                let elements = accessibilityElements(in: try XCTUnwrap(window.contentView))
+                let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
+                    elements.contains { $0.accessibilityLabel()?.contains(reset.accessibilityLabel) == true }
+                }
                 XCTAssertTrue(elements.contains {
                     $0.accessibilityLabel()?.contains(reset.accessibilityLabel) == true
                 })
@@ -621,10 +642,15 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                     defer { window.close() }
                     let view = try XCTUnwrap(window.contentView)
                     let bounds = window.convertToScreen(view.convert(view.bounds, to: nil))
-                    let elements = accessibilityElements(in: view)
                     let quitTitle = StatusAccessibilityString.localized(
                         "command.quit", language: language, bundle: .main
                     )
+                    let elements = accessibilityElements(in: view) { elements in
+                        elements.contains {
+                            $0.accessibilityRole() == .button
+                                && ($0.accessibilityLabel() ?? $0.accessibilityTitle() ?? "").contains(quitTitle)
+                        }
+                    }
                     let quitButton = try XCTUnwrap(elements.first {
                         $0.accessibilityRole() == .button
                             && ($0.accessibilityLabel() ?? $0.accessibilityTitle() ?? "").contains(quitTitle)
@@ -675,7 +701,17 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                 .environment(\.locale, language.locale)
             let window = try hostedWindow(content, width: 900, height: 720)
             defer { window.close() }
-            let elements = accessibilityElements(in: try XCTUnwrap(window.contentView))
+            let elements = accessibilityElements(in: try XCTUnwrap(window.contentView)) { elements in
+                StatusAccentRole.allCases.allSatisfy { role in
+                    let label = StatusAccessibilityString.localized(
+                        "display.colors." + role.rawValue, language: language, bundle: .main
+                    )
+                    return elements.contains {
+                        ($0.accessibilityRole() == .colorWell || $0.accessibilityRole() == .button)
+                            && ($0.accessibilityLabel() ?? $0.accessibilityTitle()) == label
+                    }
+                }
+            }
             for role in StatusAccentRole.allCases {
                 let label = StatusAccessibilityString.localized(
                     "display.colors." + role.rawValue, language: language, bundle: .main
@@ -722,18 +758,52 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         return window
     }
 
-    /// Query this test's own view tree in-process: no TCC request or speech service.
-    private func accessibilityElements(in root: Any) -> [any NSAccessibilityProtocol] {
-        var visited: Set<ObjectIdentifier> = []
-        var result: [any NSAccessibilityProtocol] = []
-        func visit(_ value: Any) {
-            guard let element = value as? any NSAccessibilityProtocol else { return }
-            guard visited.insert(ObjectIdentifier(element)).inserted else { return }
-            if element.isAccessibilityElement() { result.append(element) }
-            for child in element.accessibilityChildren() ?? [] { visit(child) }
+    /// Query only this fixture's view tree in-process: no TCC request or speech service.
+    /// SwiftUI can publish its accessibility children after the first layout pass.
+    private func accessibilityElements(
+        in root: Any,
+        matching isReady: ([any NSAccessibilityProtocol]) -> Bool
+    ) -> [any NSAccessibilityProtocol] {
+        func collect() -> [any NSAccessibilityProtocol] {
+            var visited: Set<ObjectIdentifier> = []
+            var result: [any NSAccessibilityProtocol] = []
+            func visit(_ value: Any) {
+                guard let element = value as? any NSAccessibilityProtocol else { return }
+                guard visited.insert(ObjectIdentifier(element)).inserted else { return }
+                if element.isAccessibilityElement() { result.append(element) }
+                for child in element.accessibilityChildren() ?? [] { visit(child) }
+            }
+            visit(root)
+            return result
         }
-        visit(root)
+
+        var result = collect()
+        let ready = waitForLayout {
+            result = collect()
+            return isReady(result)
+        }
+        if !ready { reportFixtureAccessibilityShape(root) }
         return result
+    }
+
+    /// Failure diagnostics contain only classes, roles, and counts from synthetic fixtures.
+    /// Do not dump labels, values, paths, or any other application/window tree.
+    private func reportFixtureAccessibilityShape(_ root: Any) {
+        var visited: Set<ObjectIdentifier> = []
+        func visit(_ value: Any, depth: Int) {
+            guard depth < 5, visited.count < 24, let object = value as? NSObject,
+                  visited.insert(ObjectIdentifier(object)).inserted else { return }
+            guard let element = value as? any NSAccessibilityProtocol else {
+                print("Fixture AX depth=\(depth) class=\(type(of: object)) fullProtocol=false")
+                return
+            }
+            let children = element.accessibilityChildren() ?? []
+            print("Fixture AX depth=\(depth) class=\(type(of: object))"
+                  + " role=\(element.accessibilityRole()?.rawValue ?? "none")"
+                  + " exposed=\(element.isAccessibilityElement()) children=\(children.count)")
+            for child in children { visit(child, depth: depth + 1) }
+        }
+        visit(root, depth: 0)
     }
 
     private func hostingSize(for fixture: StoreFixture) -> NSSize {
