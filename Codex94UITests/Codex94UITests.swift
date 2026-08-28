@@ -747,7 +747,18 @@ final class Codex94UITests: XCTestCase {
             let absolute = try fixture.absoluteReset(resetKey, language: language)
             XCTAssertTrue(row.label.contains(absolute), "The actual quota row must contain the complete localized Reset")
             XCTAssertTrue(row.label.contains("UTC"), "The reset's date-specific UTC offset must be accessible")
-            XCTAssertEqual(row.frame.width, 464, accuracy: 1, "Reset uses the full row width, not the old countdown column")
+            // The merged AX element encloses visible content, not unused space
+            // in SwiftUI's invisible maxWidth frame. The unit test of the actual
+            // production row keeps the exact 464pt / separate Reset / wrapping
+            // assertions; here check its real paint bounds and aligned insets.
+            XCTAssertTrue(row.frame.width.isFinite && row.frame.width > 0,
+                          "The quota row must expose nonempty finite content bounds")
+            XCTAssertLessThanOrEqual(row.frame.width, bounds.width - 36 + geometryTolerance,
+                                     "Visible quota content must fit the full-width row")
+            XCTAssertEqual(row.frame.minX - bounds.minX, 18, accuracy: geometryTolerance,
+                           "Quota and Reset content must keep the row's 18pt leading inset")
+            XCTAssertGreaterThanOrEqual(bounds.maxX - row.frame.maxX, 18 - geometryTolerance,
+                                        "Quota and Reset content must preserve the trailing inset")
             XCTAssertGreaterThan(row.frame.height, 25, "Reset must have its own line below the unchanged quota row")
             XCTAssertTrue(bounds.insetBy(dx: -1, dy: -1).contains(row.frame), "Rows must remain inside the natural popover")
             XCTAssertFalse(row.frame.intersects(header.frame), "Header and quota rows must be independent frames")
@@ -939,6 +950,9 @@ final class Codex94UITests: XCTestCase {
         // XCTest owns these events; only the fixture app's surface is captured.
         var tooltipVerified = false
         var tooltipMatches: [[String: Any]] = []
+        var helpTagCount = 0
+        var helpTagTextCounts: [Int] = []
+        var helpTagCompleteMatches: [Bool] = []
         try withoutRequests("Collecting keyboard-only focus evidence") {
             button.hover()
             let help = application.descendants(matching: .any).matching(NSPredicate(
@@ -954,6 +968,33 @@ final class Codex94UITests: XCTestCase {
                  "titleMatches": element.title == language.recoveryHelp(destination),
                  "valueMatches": element.value as? String == language.recoveryHelp(destination)]
             }
+            // A native tooltip may split its text into accessible lines. Only
+            // inspect a bounded help-tag subtree belonging to this fixture AUT;
+            // whitespace normalization must still preserve the complete text.
+            let tags = application.helpTags
+            helpTagCount = tags.count
+            if helpTagCount <= 4 {
+                let expected = normalizedWhitespace(language.recoveryHelp(destination))
+                for tag in tags.allElementsBoundByIndex {
+                    let texts = tag.staticTexts
+                    helpTagTextCounts.append(texts.count)
+                    guard texts.count <= 8 else {
+                        helpTagCompleteMatches.append(false)
+                        continue
+                    }
+                    let fragments = texts.allElementsBoundByIndex.sorted {
+                        if $0.frame.minY != $1.frame.minY { return $0.frame.minY < $1.frame.minY }
+                        return $0.frame.minX < $1.frame.minX
+                    }.map { element in
+                        if !element.label.isEmpty { return element.label }
+                        if !element.title.isEmpty { return element.title }
+                        return element.value as? String ?? ""
+                    }
+                    let candidates = [tag.label, tag.title, tag.value as? String ?? "", fragments.joined(separator: " ")]
+                    helpTagCompleteMatches.append(candidates.contains { normalizedWhitespace($0) == expected })
+                }
+            }
+            tooltipVerified = tooltipVerified || (helpTagCount == 1 && helpTagCompleteMatches == [true])
             let header = try uniqueIdentified("quota-popover-header", in: popover)
             try require(header.buttons.count == 0, "Only the noninteractive header may activate the popover window")
             // Clicking static content only makes this owned popover key. It
@@ -972,11 +1013,40 @@ final class Codex94UITests: XCTestCase {
             "runnerFullKeyboardAccessEnabled": NSApplication.shared.isFullKeyboardAccessEnabled,
             "directAXTrust": false, "localizedTooltipVerified": tooltipVerified,
             "matchingTooltipElements": tooltipMatches,
+            "helpTagCount": helpTagCount, "helpTagTextCounts": helpTagTextCounts,
+            "helpTagCompleteMatches": helpTagCompleteMatches,
+            "nextProbe": "one-focus-checked-space-on-recovery-button",
             "activationVerified": false, "permissionPromptsRequested": false,
             "rawTestResultsUploaded": false,
         ])
+        // Unlike application.typeKey, this public API requires the target or a
+        // descendant to ALREADY have keyboard focus; otherwise XCTest raises an
+        // error. Do not catch that failure, add more Tabs, or fall back to click.
+        // Persist the diagnostic above first so a refused input remains evidence.
+        try withoutRequests("One focus-checked keyboard recovery probe") {
+            try require(button.exists && button.isEnabled && button.isHittable,
+                        "The single keyboard probe must still target the visible recovery button")
+            button.typeText(" ")
+            let dashboard = try dashboardWindow()
+            let marker = destination == .connection
+                ? identified("connection-menu-bar-reset", in: dashboard)
+                : elementWithText(language.copyDiagnostics, in: dashboard)
+            try require(marker.waitForExistence(timeout: 5), "Keyboard recovery opened the wrong destination")
+            try require(!identified("quota-popover-header", in: application).exists,
+                        "Keyboard recovery must close the owned popover")
+        }
+        try fixture.writeReport("keyboard-activation-probe.json", fields: [
+            "method": "single-element-typeText-space", "activationVerified": true,
+            "destinationVerified": true, "popoverClosed": true,
+            "requestsAndCacheUnchanged": true, "completeRecoverySmoke": false,
+            "localizedTooltipVerified": tooltipVerified, "permissionPromptsRequested": false,
+        ])
         try require(tooltipVerified,
                     "The independent recovery button must expose its exact localized tooltip")
+    }
+
+    private func normalizedWhitespace(_ value: String) -> String {
+        value.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
     private func ownedApplicationPID() throws -> pid_t {
@@ -1498,7 +1568,7 @@ private struct SyntheticFixture {
             UITheme.allCases.map { "popover-long-\(language.artifactName)-\($0.rawValue).png" }
         })
         let keyboardProbe = Set((0...6).map { "popover-keyboard-focus-\($0).png" })
-            .union(["keyboard-navigation-probe.json"])
+            .union(["keyboard-navigation-probe.json", "keyboard-activation-probe.json"])
         let layoutMeasurements = Set((0..<32).map { "quota-layout-\($0).json" })
         guard fixed.union(variants).union(keyboardProbe).union(layoutMeasurements).contains(filename) else {
             throw UITestFailure("Artifact filename is outside the explicit allowlist")
