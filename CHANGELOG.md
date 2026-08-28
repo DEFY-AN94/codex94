@@ -4,6 +4,8 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
+## 0.1.7 - 2026-08-28
+
 ### Added
 
 - Show the last successful quota age in the popover header and in the menu-bar

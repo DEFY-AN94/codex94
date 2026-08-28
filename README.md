@@ -42,9 +42,10 @@ illustrative and do not contain a real account, identity, or quota.
 
 ## Distribution status
 
-- The current stable source tag is `v0.1.6`.
-- When this repository is visible as Public, its source can be cloned without
-  GitHub authentication.
+- This source version is `0.1.7 (8)`; its stable source tag is `v0.1.7`.
+- A source release is available only after its tag is published. `main` may
+  contain release preparation.
+- This public repository can be cloned without GitHub authentication.
 - There is no GitHub Release, DMG, notarized binary, or automatic updater.
 - `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
   Runtime signature, and installs it at `~/Applications/Codex94.app`.
@@ -67,11 +68,11 @@ executable selected manually.
 
 ## Install from source
 
-After the repository is public, install the stable `v0.1.6` source with:
+After `v0.1.7` is published, install its stable source with:
 
 ```bash
 brew install ripgrep
-git clone --branch v0.1.6 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.1.7 --depth 1 https://github.com/DEFY-AN94/codex94.git
 cd codex94
 
 sudo xcodebuild -license accept
