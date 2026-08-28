@@ -73,6 +73,12 @@ def main():
     require(manifest["bundleID"] == "com.defyan94.codex94")
     require(manifest["runner"] == {"environment": "github-hosted", "os": "macOS"})
     require(manifest["executable"] == str(ROOT / "codex"))
+    control = ROOT / "control"
+    control_info = control.lstat()
+    require(stat.S_ISDIR(control_info.st_mode) and control_info.st_uid == os.getuid())
+    require(stat.S_IMODE(control_info.st_mode) == 0o700 and control.resolve() == control)
+    mode_path = control / "mode.json"
+    require(manifest["modePath"] == str(mode_path))
     log_ready = True
     if sys.argv[1:] == ["--version"]:
         event("version")
@@ -80,7 +86,7 @@ def main():
         return
     require(sys.argv[1:] == ["-s", "read-only", "-a", "never", "app-server", "--stdio"])
 
-    mode = json.loads(regular_file(ROOT / "mode.json").read_text(encoding="utf-8"))
+    mode = json.loads(regular_file(mode_path).read_text(encoding="utf-8"))
     require(isinstance(mode, dict))
     candidate_mode = mode.get("mode", "normal")
     require(isinstance(candidate_mode, str) and candidate_mode in MODE_NAMES)

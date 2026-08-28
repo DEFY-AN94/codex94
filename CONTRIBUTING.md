@@ -63,6 +63,13 @@ and an explicit synthetic executable before any app initialization. It must
 not be run on a daily-use desktop; local UI testing needs a separately reviewed
 isolation setup, not overridden CI guard variables.
 
+The external runner keeps Xcode's test sandbox. Its extra write access is
+limited to the current scenario's synthetic control and artifact directories;
+its shared-preference access is read-only for the preseeded app domain. These
+permissions are generated before the build and applied only to the UI test
+target. The tests verify the signed runner and app permissions before launching
+the app; the production app receives no test-only permissions.
+
 UI jobs do not enable VoiceOver, change system settings, use real Codex
 credentials, or install the app. They upload only explicitly captured app-window
 PNGs and curated synthetic summaries with a seven-day retention period. Raw

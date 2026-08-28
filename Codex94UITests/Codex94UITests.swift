@@ -1,8 +1,10 @@
 import AppKit
 import ApplicationServices
+import CoreFoundation
 import CryptoKit
 import Darwin
 import Foundation
+import Security
 import XCTest
 
 /// Black-box tests of the production application, never a hosted SwiftUI tree.
@@ -1071,11 +1073,17 @@ private struct SyntheticFixture {
             try validate(url, type: directory ? .typeDirectory : .typeRegular, mode: directory ? 0o700 : nil)
             return url
         }
+        let control = root.appendingPathComponent("control", isDirectory: true)
+        try validate(control, type: .typeDirectory, mode: 0o700)
         let executable = try child("executable", "codex")
         let invalidExecutable = try child("invalidExecutable", "invalid-codex")
-        let modeURL = try child("modePath", "mode.json")
+        let modeURL = try child("modePath", "control/mode.json")
         let requestLogURL = try child("requestLogPath", "request-log.jsonl")
         let artifacts = try child("artifactDirectory", "artifacts", directory: true)
+        let testEntitlements = try child("testEntitlements", "ui-test.entitlements")
+        try validateRunnerPermissions(
+            manifest: manifest, declaration: testEntitlements, control: control, artifacts: artifacts
+        )
         guard let artifactPath = environment["CODEX94_UI_ARTIFACT_ROOT"] else {
             throw UITestFailure("The UI artifact environment must match the exact manifest directory")
         }
@@ -1101,10 +1109,14 @@ private struct SyntheticFixture {
         }
         let candidateBytes = try read(applicationBinaryURL, maximumBytes: 268_435_456)
         let candidateBinarySHA256 = SHA256.hash(data: candidateBytes).map { String(format: "%02x", $0) }.joined()
+        try validateApplicationPermissionSeparation(applicationURL)
         // This exact cache belongs to the application domain that prepare.py
         // proved absent before launch. It is read only after the CI/root guard,
         // never scanned, exported, restored or deleted by the test runner.
-        let quotaCacheURL = FileManager.default.homeDirectoryForCurrentUser
+        // A sandboxed XCTest runner's Foundation home is its own container,
+        // not the nonsandboxed AUT's home. Resolve only this UID's account
+        // home metadata; never infer the AUT domain from a container path.
+        let quotaCacheURL = try accountHomeDirectory()
             .appendingPathComponent("Library/Application Support/Codex94/quota-snapshot.json")
         guard let appPaths = manifest["applicationPaths"] as? [String: String],
               appPaths["quotaCache"] == quotaCacheURL.path else {
@@ -1170,12 +1182,15 @@ private struct SyntheticFixture {
             "identityMode", "hasChosenIdentityMode", "manualCodexPath", "refreshInterval", "theme", "language"
         ]
         guard allowed.contains(key) else { throw UITestFailure("Refuse to read a non-allowlisted preference key") }
-        // Read individual keys only. Never export a preference domain, inspect
-        // another application or write preferences from the UI-test process.
-        guard let defaults = UserDefaults(suiteName: bundleID) else {
-            throw UITestFailure("The synthetic app preference domain is unavailable")
-        }
-        return defaults.object(forKey: key)
+        // Exact AUT/current-user/any-host domain only; no runner-container,
+        // global-default or ByHost fallback. The UI runner needs the matching
+        // read-only shared-preference entitlement. Missing access must fail the
+        // pre-launch seed assertions, never trigger permission or data writes.
+        // Do not synchronize, enumerate, export or mutate the preference domain.
+        return CFPreferencesCopyValue(
+            key as CFString, bundleID as CFString,
+            kCFPreferencesCurrentUser, kCFPreferencesAnyHost
+        )
     }
 
     func preferenceSnapshot(keys: [String]) throws -> NSDictionary {
@@ -1275,6 +1290,10 @@ private struct SyntheticFixture {
         report["sourceRevision"] = sourceRevision
         report["version"] = expectedVersion
         report["build"] = expectedBuild
+        report["runnerSandboxEnabled"] = true
+        report["runnerWritableDirectoryCount"] = 2
+        report["runnerPreferenceAccessReadOnly"] = true
+        report["uiPermissionsExcludedFromAUT"] = true
         let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
         try writeArtifact(data, named: name)
     }
@@ -1331,6 +1350,109 @@ private struct SyntheticFixture {
             throw UITestFailure("The reported path does not resolve to the exact registered fixture")
         }
         return expected
+    }
+
+    private static let sandboxEntitlement = "com.apple.security.app-sandbox"
+    private static let filesReadWriteEntitlement = "com.apple.security.temporary-exception.files.absolute-path.read-write"
+    private static let preferencesReadOnlyEntitlement = "com.apple.security.temporary-exception.shared-preference.read-only"
+    private static let preferencesReadWriteEntitlement = "com.apple.security.temporary-exception.shared-preference.read-write"
+
+    private static func validateRunnerPermissions(
+        manifest: [String: Any], declaration: URL, control: URL, artifacts: URL
+    ) throws {
+        let writableDirectories = [control.path + "/", artifacts.path + "/"]
+        let readOnlyDomains = ["com.defyan94.codex94"]
+        guard let permissions = manifest["testPermissions"] as? [String: Any],
+              Set(permissions.keys) == Set(["writableDirectories", "readOnlyPreferenceDomains"]),
+              let declaredDirectories = permissions["writableDirectories"] as? [String],
+              declaredDirectories.sorted() == writableDirectories.sorted(),
+              permissions["readOnlyPreferenceDomains"] as? [String] == readOnlyDomains,
+              let declared = try PropertyListSerialization.propertyList(
+                  from: read(declaration, maximumBytes: 65_536), options: [], format: nil
+              ) as? [String: Any],
+              Set(declared.keys) == Set([filesReadWriteEntitlement, preferencesReadOnlyEntitlement]),
+              let declaredReadWrite = declared[filesReadWriteEntitlement] as? [String],
+              declaredReadWrite.sorted() == writableDirectories.sorted(),
+              declared[preferencesReadOnlyEntitlement] as? [String] == readOnlyDomains,
+              declared[preferencesReadWriteEntitlement] == nil else {
+            throw UITestFailure("The declared UI permissions must match the exact fixture directories and read-only AUT domain")
+        }
+
+        // SecTask represents only this runner process. Query individual public
+        // entitlement keys; never enumerate tasks or inspect any keychain data.
+        guard let task = SecTaskCreateFromSelf(nil) else {
+            throw UITestFailure("The current UI runner's signed task is unavailable")
+        }
+        func entitlement(_ key: String) throws -> CFTypeRef? {
+            var error: Unmanaged<CFError>?
+            let value = SecTaskCopyValueForEntitlement(task, key as CFString, &error)
+            if let error {
+                _ = error.takeRetainedValue()
+                throw UITestFailure("Could not read a required entitlement from the current UI runner")
+            }
+            return value
+        }
+        guard let sandbox = try entitlement(sandboxEntitlement),
+              CFGetTypeID(sandbox) == CFBooleanGetTypeID(), sandbox as? Bool == true,
+              let actualDirectories = try entitlement(filesReadWriteEntitlement) as? [String],
+              actualDirectories.sorted() == writableDirectories.sorted(),
+              try entitlement(preferencesReadOnlyEntitlement) as? [String] == readOnlyDomains,
+              try entitlement(preferencesReadWriteEntitlement) == nil else {
+            throw UITestFailure("The running UI test host must be sandboxed with only the two registered writable directories and read-only AUT preferences")
+        }
+    }
+
+    private static func validateApplicationPermissionSeparation(_ applicationURL: URL) throws {
+        // The URL was already checked against the manifest and exact build
+        // product allowlist. Inspect its signed metadata without launching it,
+        // modifying trust, accessing the keychain, or exporting signing data.
+        var staticCode: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(applicationURL as CFURL, [], &staticCode) == errSecSuccess,
+              let staticCode else {
+            throw UITestFailure("The exact candidate application's code-signing metadata is unavailable")
+        }
+        var information: CFDictionary?
+        guard SecCodeCopySigningInformation(
+            staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &information
+        ) == errSecSuccess, let information = information as? [String: Any],
+              information[kSecCodeInfoIdentifier as String] as? String == "com.defyan94.codex94" else {
+            throw UITestFailure("The candidate must have the expected application signing identifier")
+        }
+        let entitlements: [String: Any]
+        if let value = information[kSecCodeInfoEntitlementsDict as String] {
+            guard let dictionary = value as? [String: Any] else {
+                throw UITestFailure("The candidate's embedded entitlement dictionary is invalid")
+            }
+            entitlements = dictionary
+        } else {
+            // An absent dictionary is safe only if there is no unparsed blob.
+            guard information[kSecCodeInfoEntitlements as String] == nil else {
+                throw UITestFailure("The candidate has entitlements that could not be interpreted")
+            }
+            entitlements = [:]
+        }
+        guard entitlements[filesReadWriteEntitlement] == nil,
+              entitlements[preferencesReadOnlyEntitlement] == nil,
+              entitlements[preferencesReadWriteEntitlement] == nil else {
+            throw UITestFailure("UI-test-only temporary permissions must never be embedded in the candidate application")
+        }
+    }
+
+    private static func accountHomeDirectory() throws -> URL {
+        let uid = getuid()
+        guard uid != 0, let account = Darwin.getpwuid(uid),
+              account.pointee.pw_uid == uid, let homePointer = account.pointee.pw_dir else {
+            throw UITestFailure("The current CI UID's system account home is unavailable")
+        }
+        // Copy immediately: getpwuid owns this buffer. Inspect no other account
+        // fields, enumerate no users, and never print the returned home path.
+        let path = String(cString: homePointer)
+        guard path.hasPrefix("/"), !path.utf8.contains(0) else {
+            throw UITestFailure("The current CI UID's account home must be an absolute path")
+        }
+        let directory = URL(fileURLWithPath: path, isDirectory: true)
+        try validate(directory, type: .typeDirectory)
+        return directory
     }
 
     private static func posixRealPath(_ path: String) throws -> String {

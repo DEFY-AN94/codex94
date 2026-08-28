@@ -82,12 +82,24 @@ def main():
 
     executable = root / "codex"
     invalid_executable = root / "invalid-codex"
-    mode_path = root / "mode.json"
+    control = root / "control"
+    mode_path = control / "mode.json"
     request_log = root / "request-log.jsonl"
     artifacts = root / "artifacts"
     results = root / "results"
+    entitlements_file = root / "ui-test.entitlements"
+    control.mkdir(mode=0o700)
     artifacts.mkdir(mode=0o700)
     results.mkdir(mode=0o700)
+    writable_directories = [str(control) + "/", str(artifacts) + "/"]
+    read_only_preference_domains = [BUNDLE_ID]
+    # Only the sandboxed external UI runner receives these temporary exceptions.
+    # Do not grant it writes to the manifest, fake, request log, AUT state or
+    # build products. Xcode retains its standard XCTest runner entitlements.
+    write_new(entitlements_file, plistlib.dumps({
+        "com.apple.security.temporary-exception.files.absolute-path.read-write": writable_directories,
+        "com.apple.security.temporary-exception.shared-preference.read-only": read_only_preference_domains,
+    }, fmt=plistlib.FMT_XML, sort_keys=True))
     fake_bytes = fixture_source.read_bytes()
     write_new(executable, fake_bytes, 0o700)
     write_new(invalid_executable, b"Synthetic non-executable Codex94 UI fixture.\n")
@@ -121,6 +133,11 @@ def main():
         "modePath": str(mode_path),
         "requestLogPath": str(request_log),
         "artifactDirectory": str(artifacts),
+        "testEntitlements": str(entitlements_file),
+        "testPermissions": {
+            "writableDirectories": writable_directories,
+            "readOnlyPreferenceDomains": read_only_preference_domains,
+        },
         "applicationProduct": str(root / "DerivedData" / "Build" / "Products" / "Debug" / "Codex94.app"),
         "applicationPaths": {
             "preferences": str(library / "Preferences" / (BUNDLE_ID + ".plist")),
@@ -174,6 +191,8 @@ def main():
         "existingAUTDataRefused": True, "identityMode": "quotaOnly",
         "fakeProtocolSelfCheck": "passed", "selfCheckRateLimits": 1,
         "sourceRevision": source_revision,
+        "runnerWriteScope": ["synthetic-control", "synthetic-artifacts"],
+        "runnerPreferenceAccess": "read-only-synthetic-app-domain",
         "rawTestResultsUploaded": False,
     }))
 
@@ -187,6 +206,7 @@ def main():
         )
         stream.write("fixture-root=" + str(root) + "\n")
         stream.write("artifact-root=" + str(artifacts) + "\n")
+        stream.write("entitlements-file=" + str(entitlements_file) + "\n")
     print("Prepared one fresh synthetic UI scenario; no existing AUT state was modified.")
 
 

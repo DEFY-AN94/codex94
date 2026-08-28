@@ -64,10 +64,12 @@ jobs:
         env:
           CODEX94_UI_FIXTURE_ROOT: ${{ steps.fixtures.outputs.fixture-root }}
           CODEX94_UI_ARTIFACT_ROOT: ${{ steps.fixtures.outputs.artifact-root }}
+          CODEX94_UI_TEST_ENTITLEMENTS: ${{ steps.fixtures.outputs.entitlements-file }}
           CODEX94_UI_TEST_METHOD: ${{ matrix.method }}
         run: |
           test -d "$CODEX94_UI_FIXTURE_ROOT"
           test -d "$CODEX94_UI_ARTIFACT_ROOT"
+          test -f "$CODEX94_UI_TEST_ENTITLEMENTS"
           xcodebuild \
             -project Codex94.xcodeproj \
             -scheme Codex94UI \
@@ -79,6 +81,7 @@ jobs:
             "-only-testing:Codex94UITests/Codex94UITests/$CODEX94_UI_TEST_METHOD" \
             CODEX94_UI_FIXTURE_ROOT="$CODEX94_UI_FIXTURE_ROOT" \
             CODEX94_UI_ARTIFACT_ROOT="$CODEX94_UI_ARTIFACT_ROOT" \
+            CODEX94_UI_TEST_ENTITLEMENTS="$CODEX94_UI_TEST_ENTITLEMENTS" \
             CODEX94_UI_GITHUB_ACTIONS="$GITHUB_ACTIONS" \
             CODEX94_UI_RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
             CODEX94_UI_RUNNER_OS="$RUNNER_OS" \
