@@ -541,15 +541,116 @@ final class Codex94UITests: XCTestCase {
     private func selectPage(_ page: UIPage, in dashboard: XCUIElement) throws {
         try withoutRequests("Selecting a Dashboard page") {
             let title = language.page(page)
-            let labels = dashboard.staticTexts.matching(NSPredicate(
+            let labels = dashboard.descendants(matching: .any).matching(NSPredicate(
                 format: "label == %@ OR title == %@", title, title
-            )).allElementsBoundByIndex
-            // The leftmost copy is the sidebar label, not the detail heading.
-            guard let sidebarLabel = labels.min(by: { $0.frame.minX < $1.frame.minX }) else {
-                throw UITestFailure("The requested Dashboard sidebar item is missing")
+            ))
+            func isUsableFrame(_ frame: CGRect) -> Bool {
+                [frame.minX, frame.minY, frame.maxX, frame.maxY, frame.width, frame.height]
+                    .allSatisfy(\.isFinite) && frame.width > 0 && frame.height > 0
             }
-            try require(sidebarLabel.frame.minX < dashboard.frame.midX,
-                        "Refuse to click a detail heading instead of the sidebar")
+
+            // A SwiftUI List label may be exposed as a row or group. Bound its
+            // hit target by the actual divider, not the configured maximum width.
+            // This is a soft deadline; individual XCTest queries may also wait.
+            let deadline = Date().addingTimeInterval(5)
+            var sidebarLabel: XCUIElement?
+            var previousFrame: CGRect?
+            var previousType: XCUIElement.ElementType?
+            var previousSidebarFrame: CGRect?
+            var stableSamples = 0
+            var matchingCount = 0
+            var eligibleCount = 0
+            var splitterCount = 0
+            var eligibleSplitterCount = 0
+            var diagnostics: [String] = []
+            var splitterDiagnostics: [String] = []
+            repeat {
+                try require(dashboard.exists, "Dashboard closed while locating its sidebar")
+                let windowFrame = dashboard.frame
+                try require(isUsableFrame(windowFrame) && windowFrame.width >= 280,
+                            "Dashboard must expose finite visible geometry")
+                let splitters = dashboard.splitters.allElementsBoundByIndex
+                splitterCount = splitters.count
+                try require(splitterCount <= 8, "Too many Dashboard splitters to establish a sidebar boundary")
+                var dividerFrames: [CGRect] = []
+                splitterDiagnostics = []
+                for splitter in splitters {
+                    guard splitter.exists else { continue }
+                    let frame = splitter.frame
+                    let validFrame = isUsableFrame(frame)
+                    let isSidebarDivider = validFrame && windowFrame.contains(frame)
+                        && frame.height > frame.width
+                        && frame.minX > windowFrame.minX
+                        && frame.minX - windowFrame.minX <= 280
+                    if splitterDiagnostics.count < 4 {
+                        let relative = validFrame
+                            ? String(describing: frame.offsetBy(dx: -windowFrame.minX, dy: -windowFrame.minY))
+                            : "nonfinite-or-empty"
+                        splitterDiagnostics.append("splitterFrame=\(relative), boundary=\(isSidebarDivider)")
+                    }
+                    if isSidebarDivider { dividerFrames.append(frame) }
+                }
+                eligibleSplitterCount = dividerFrames.count
+                let sidebarFrame: CGRect?
+                if dividerFrames.count == 1 {
+                    let divider = dividerFrames[0]
+                    sidebarFrame = CGRect(
+                        x: windowFrame.minX, y: divider.minY,
+                        width: divider.minX - windowFrame.minX, height: divider.height
+                    )
+                } else {
+                    sidebarFrame = nil
+                }
+                let matches = labels.allElementsBoundByIndex
+                matchingCount = matches.count
+                try require(matchingCount <= 16, "Too many exact Dashboard sidebar label matches")
+                var candidates: [(element: XCUIElement, frame: CGRect, type: XCUIElement.ElementType)] = []
+                diagnostics = []
+                for element in matches {
+                    guard element.exists else { continue }
+                    let frame = element.frame
+                    let type = element.elementType
+                    let enabled = element.isEnabled
+                    let hittable = element.isHittable
+                    let validFrame = isUsableFrame(frame)
+                    let insideSidebar = validFrame && (sidebarFrame?.contains(frame) == true)
+                    if diagnostics.count < 6 {
+                        let relative = validFrame
+                            ? String(describing: frame.offsetBy(dx: -windowFrame.minX, dy: -windowFrame.minY))
+                            : "nonfinite-or-empty"
+                        diagnostics.append("role=\(type.rawValue), relativeFrame=\(relative), enabled=\(enabled), hittable=\(hittable), sidebar=\(insideSidebar)")
+                    }
+                    if insideSidebar && enabled && hittable {
+                        candidates.append((element, frame, type))
+                    }
+                }
+                eligibleCount = candidates.count
+                if candidates.count == 1, let sidebarFrame {
+                    let candidate = candidates[0]
+                    if previousFrame == candidate.frame && previousType == candidate.type
+                        && previousSidebarFrame == sidebarFrame {
+                        stableSamples += 1
+                    } else {
+                        stableSamples = 1
+                    }
+                    previousFrame = candidate.frame
+                    previousType = candidate.type
+                    previousSidebarFrame = sidebarFrame
+                    if stableSamples >= 2 {
+                        sidebarLabel = candidate.element
+                        break
+                    }
+                } else {
+                    previousFrame = nil
+                    previousType = nil
+                    previousSidebarFrame = nil
+                    stableSamples = 0
+                }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            } while Date() < deadline
+            guard let sidebarLabel else {
+                throw UITestFailure("A unique stable Dashboard sidebar item was not available; exact=\(matchingCount), eligible=\(eligibleCount), splitters=\(splitterCount), eligibleSplitters=\(eligibleSplitterCount); \(splitterDiagnostics.joined(separator: "; ")); \(diagnostics.joined(separator: "; "))")
+            }
             sidebarLabel.click()
             let marker: XCUIElement
             switch page {
