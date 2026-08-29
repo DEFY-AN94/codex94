@@ -1562,7 +1562,7 @@ private enum UILanguage: String, CaseIterable {
         case .connection: chinese ? "连接" : "Connection"
         case .display: chinese ? "显示" : "Display"
         case .diagnostics: chinese ? "诊断" : "Diagnostics"
-        case .about: chinese ? "关于" : "About"
+        case .about: chinese ? "关于 Codex94" : "About Codex94"
         }
     }
     func theme(_ theme: UITheme) -> String {
