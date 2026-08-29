@@ -45,7 +45,7 @@ jobs:
             artifact: codex94-ui-display
           - scenario: recovery
             method: testRecoverySmoke
-            artifact: codex94-ui-recovery-focus-diagnostic
+            artifact: codex94-ui-recovery-click-functional-keyboard-pending
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

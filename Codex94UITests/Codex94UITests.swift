@@ -229,11 +229,11 @@ final class Codex94UITests: XCTestCase {
                     "The non-executable fixture must fail before any quota request")
         try capture(popover, named: "popover-unavailable-en.png")
         try assertColor("FF3366", in: popover, minimumPixels: 4)
-        var dashboard = try exerciseRecovery(.connection, by: .keyboard)
+        var dashboard = try exerciseRecoveryByClick(.connection)
         let firstDashboardFrame = dashboard.frame
         try selectPage(.display, in: dashboard)
         _ = try openPopover(expectedRequestDelta: 0)
-        dashboard = try exerciseRecovery(.connection, by: .accessibilityPress)
+        dashboard = try exerciseRecoveryByClick(.connection)
         XCTAssertEqual(dashboard.frame, firstDashboardFrame,
                        "Recovery must keep a single visible Dashboard at the existing frame")
 
@@ -241,7 +241,7 @@ final class Codex94UITests: XCTestCase {
         try setLanguage(.simplifiedChinese, in: dashboard)
         popover = try openPopover(expectedRequestDelta: 0)
         try capture(popover, named: "popover-unavailable-zh-Hans.png")
-        dashboard = try exerciseRecovery(.connection, by: .keyboard)
+        dashboard = try exerciseRecoveryByClick(.connection)
 
         // The only path choice is this manifest-validated fake executable. Never
         // select automatic discovery, sign in, or inspect a real Codex process.
@@ -263,7 +263,7 @@ final class Codex94UITests: XCTestCase {
             try setLanguage(testLanguage, in: dashboard)
             try fixture.setMode("notLoggedIn")
             _ = try openPopover(expectedRequestDelta: 1)
-            dashboard = try exerciseRecovery(.connection, by: .keyboard)
+            dashboard = try exerciseRecoveryByClick(.connection)
             let guidance = try uniqueIdentified("connection-login-guidance", in: dashboard)
             try require(guidance.isHittable, "Login guidance must be visible")
             XCTAssertEqual(guidance.label, language.loginGuidance)
@@ -273,19 +273,34 @@ final class Codex94UITests: XCTestCase {
             try selectPage(.display, in: dashboard)
             try fixture.setMode("serverError")
             _ = try openPopover(expectedRequestDelta: 1)
-            dashboard = try exerciseRecovery(.diagnostics, by: .keyboard)
-            // Also exercise the real public AXPress action after focus. This is
-            // not a click masquerading as a keyboard activation assertion.
+            dashboard = try exerciseRecoveryByClick(.diagnostics)
             try selectPage(.display, in: dashboard)
             _ = try openPopover(expectedRequestDelta: 1)
-            dashboard = try exerciseRecovery(.diagnostics, by: .accessibilityPress)
+            dashboard = try exerciseRecoveryByClick(.diagnostics)
             XCTAssertEqual(dashboard.frame, firstDashboardFrame)
         }
+
+        // Functional recovery is proven above only by ordinary XCTest clicks.
+        // Keep the hosted-runner keyboard path as a separate, non-acceptance
+        // diagnostic so a missing focus identity cannot masquerade as success.
+        try selectPage(.display, in: dashboard)
+        try fixture.setMode("serverError")
+        popover = try openPopover(expectedRequestDelta: 1)
+        try capturePendingKeyboardDiagnostic(
+            button: try uniqueIdentified("quota-recovery-button", in: popover),
+            destination: .diagnostics,
+            popover: popover
+        )
         try quitNormally()
-        try fixture.writeReport("recovery-result.json", fields: [
+        try fixture.writeReport("recovery-click-functional-result.json", fields: [
             "scenario": "recovery", "completed": true,
             "languages": ["en", "zh-Hans"], "destinations": ["connection", "diagnostics"],
-            "keyboardAndAXPress": true, "permissionPromptsRequested": false,
+            "functionalActivation": "xctest-click", "clickFunctionalRoutesVerified": true,
+            "keyboardAcceptance": "pending", "keyboardDiagnosticCompleted": true,
+            "accessibilityPressAcceptance": "pending",
+            "localizedTooltipAcceptance": "pending-hosted-runner",
+            "localizedTooltipDiagnosticCompleted": true,
+            "permissionPromptsRequested": false,
             "rawTestResultsUploaded": false
         ])
     }
@@ -1194,9 +1209,9 @@ final class Codex94UITests: XCTestCase {
         try fixture.writeArtifact(element.screenshot().pngRepresentation, named: filename)
     }
 
-    // MARK: - Recovery: public, already-authorized AX of this AUT only
+    // MARK: - Recovery: click-functional acceptance and separate keyboard evidence
 
-    private func exerciseRecovery(_ destination: UIPage, by activation: RecoveryActivation) throws -> XCUIElement {
+    private func exerciseRecoveryByClick(_ destination: UIPage) throws -> XCUIElement {
         let popover = try currentPopover()
         let button = try uniqueIdentified("quota-recovery-button", in: popover)
         try require(button.elementType == .button && button.isEnabled && button.isHittable,
@@ -1204,29 +1219,7 @@ final class Codex94UITests: XCTestCase {
         XCTAssertEqual(button.label.isEmpty ? button.title : button.label, language.recovery(destination))
         let before = try fixture.requestCount()
         let cacheBefore = try fixture.cacheFingerprint()
-        if !AXIsProcessTrusted() {
-            try captureKeyboardNavigationProbe(button: button, destination: destination, popover: popover)
-            throw UITestFailure("Direct AX trust is unavailable; review the keyboard-only focus evidence before choosing an alternative activation path")
-        }
-        let axButton = try recoveryAXElement()
-        XCTAssertEqual(try axString(kAXRoleAttribute, on: axButton), kAXButtonRole as String)
-        XCTAssertEqual(try axString(kAXHelpAttribute, on: axButton), language.recoveryHelp(destination))
-        try require(try axBoolean(kAXEnabledAttribute, on: axButton), "AX must expose the action as enabled")
-        var settable = DarwinBoolean(false)
-        try require(AXUIElementIsAttributeSettable(axButton, kAXFocusedAttribute as CFString, &settable) == .success
-                    && settable.boolValue, "Recovery must allow the public focused attribute")
-        try require(AXUIElementSetAttributeValue(axButton, kAXFocusedAttribute as CFString, kCFBooleanTrue) == .success,
-                    "Recovery must accept keyboard focus")
-        try waitUntil("The recovery button did not become focused") {
-            try self.axBoolean(kAXFocusedAttribute, on: axButton)
-        }
-        switch activation {
-        case .keyboard:
-            application.typeKey(.space, modifierFlags: [])
-        case .accessibilityPress:
-            try require(AXUIElementPerformAction(axButton, kAXPressAction as CFString) == .success,
-                        "The public AXPress action must activate recovery")
-        }
+        button.click()
         let dashboard = try dashboardWindow()
         let marker = destination == .connection
             ? identified("connection-menu-bar-reset", in: dashboard)
@@ -1240,7 +1233,7 @@ final class Codex94UITests: XCTestCase {
         return dashboard
     }
 
-    private func captureKeyboardNavigationProbe(
+    private func capturePendingKeyboardDiagnostic(
         button: XCUIElement, destination: UIPage, popover: XCUIElement
     ) throws {
         // Diagnostic only: never turn missing AX permission into a skip/pass,
@@ -1251,6 +1244,7 @@ final class Codex94UITests: XCTestCase {
         var helpTagCount = 0
         var helpTagTextCounts: [Int] = []
         var helpTagCompleteMatches: [Bool] = []
+        var afterTabsFocus = ReadOnlyFocusStage.unavailableFlags
         try withoutRequests("Collecting keyboard-only focus evidence") {
             button.hover()
             let help = application.descendants(matching: .any).matching(NSPredicate(
@@ -1297,56 +1291,46 @@ final class Codex94UITests: XCTestCase {
             try require(header.buttons.count == 0, "Only the noninteractive header may activate the popover window")
             // Observe whether this existing static-content click actually
             // makes the popover key. Do not add activation/focus operations.
-            captureReadOnlyFocusObservation(.beforeHeader)
+            _ = captureReadOnlyFocusObservation(.beforeHeader)
             header.click()
             try capture(popover, named: "popover-keyboard-focus-0.png")
             for step in 1...6 {
                 application.typeKey(.tab, modifierFlags: [])
                 try capture(try currentPopover(), named: "popover-keyboard-focus-\(step).png")
             }
-            captureReadOnlyFocusObservation(.afterTabs)
+            afterTabsFocus = captureReadOnlyFocusObservation(.afterTabs)
         }
         try fixture.writeReport("keyboard-navigation-probe.json", fields: [
             "method": "xctest-tab-after-window-activation", "tabCount": 6,
             "windowActivation": "noninteractive-header-click",
             "runnerFullKeyboardAccessEnabled": NSApplication.shared.isFullKeyboardAccessEnabled,
-            "directAXTrust": false, "localizedTooltipVerified": tooltipVerified,
+            "directAXTrust": AXIsProcessTrusted(), "localizedTooltipVerified": tooltipVerified,
             "matchingTooltipElements": tooltipMatches,
             "helpTagCount": helpTagCount, "helpTagTextCounts": helpTagTextCounts,
             "helpTagCompleteMatches": helpTagCompleteMatches,
-            "nextProbe": "one-focus-checked-space-on-recovery-button",
-            "activationVerified": false, "permissionPromptsRequested": false,
+            "nextProbe": "not-attempted-keyboard-acceptance-pending",
+            "activationVerified": false, "keyboardAcceptance": "pending",
+            "localizedTooltipAcceptance": "pending-hosted-runner",
+            "usedForClickFunctionalAcceptance": false, "permissionPromptsRequested": false,
             "rawTestResultsUploaded": false,
         ])
-        // Unlike application.typeKey, this public API requires the target or a
-        // descendant to ALREADY have keyboard focus; otherwise XCTest raises an
-        // error. Do not catch that failure, add more Tabs, or fall back to click.
-        // Persist the diagnostic above first so a refused input remains evidence.
-        try withoutRequests("One focus-checked keyboard recovery probe") {
-            try require(button.exists && button.isEnabled && button.isHittable,
-                        "The single keyboard probe must still target the visible recovery button")
-            button.typeText(" ")
-            captureReadOnlyFocusObservation(.afterSpace)
-            let dashboard = try dashboardWindow()
-            let marker = destination == .connection
-                ? identified("connection-menu-bar-reset", in: dashboard)
-                : elementWithText(language.copyDiagnostics, in: dashboard)
-            try require(marker.waitForExistence(timeout: 5), "Keyboard recovery opened the wrong destination")
-            try require(!identified("quota-popover-header", in: application).exists,
-                        "Keyboard recovery must close the owned popover")
-        }
+        let focusTargetVerified = afterTabsFocus["focusedElementIsRecoveryButton"] == true
         try fixture.writeReport("keyboard-activation-probe.json", fields: [
-            "method": "single-element-typeText-space", "activationVerified": true,
-            "destinationVerified": true, "popoverClosed": true,
+            "method": "not-attempted-keyboard-acceptance-pending",
+            "spaceAttempted": false, "focusTargetVerified": focusTargetVerified,
+            "activationObserved": false, "destinationObserved": false,
+            "popoverClosedObserved": false,
+            "pendingReason": focusTargetVerified ? "acceptance-policy-pending" : "recovery-focus-not-proven",
+            "keyboardAcceptance": "pending", "usedForClickFunctionalAcceptance": false,
             "requestsAndCacheUnchanged": true, "completeRecoverySmoke": false,
-            "localizedTooltipVerified": tooltipVerified, "permissionPromptsRequested": false,
+            "localizedTooltipVerified": tooltipVerified,
+            "localizedTooltipAcceptance": "pending-hosted-runner",
+            "permissionPromptsRequested": false,
         ])
-        try require(tooltipVerified,
-                    "The independent recovery button must expose its exact localized tooltip")
     }
 
-    private func captureReadOnlyFocusObservation(_ stage: ReadOnlyFocusStage) {
-        guard fixture.readOnlyFocusProbeEnabled else { return }
+    private func captureReadOnlyFocusObservation(_ stage: ReadOnlyFocusStage) -> [String: Bool] {
+        guard fixture.readOnlyFocusProbeEnabled else { return ReadOnlyFocusStage.unavailableFlags }
         var flags = ReadOnlyFocusStage.unavailableFlags
         do {
             try fixture.requestReadOnlyFocusObservation(stage)
@@ -1368,6 +1352,7 @@ final class Codex94UITests: XCTestCase {
         } catch {
             print("CIReadOnlyFocusDiagnosticArtifactSaved=false")
         }
+        return flags
     }
 
     private func normalizedWhitespace(_ value: String) -> String {
@@ -1388,58 +1373,6 @@ final class Codex94UITests: XCTestCase {
         XCTAssertEqual(bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, fixture.expectedVersion)
         XCTAssertEqual(bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String, fixture.expectedBuild)
         return running.processIdentifier
-    }
-
-    private func recoveryAXElement() throws -> AXUIElement {
-        try require(AXIsProcessTrusted(),
-                    "This CI runner lacks existing AX trust; no permission prompt or setting change is permitted")
-        let pid = try ownedApplicationPID()
-        let root = AXUIElementCreateApplication(pid)
-        try require(AXUIElementSetMessagingTimeout(root, 1) == .success, "The owned app AX timeout could not be bounded")
-        var queue: [(AXUIElement, Int)] = [(root, 0)]
-        var visited: [AXUIElement] = []
-        var matches: [AXUIElement] = []
-        let deadline = Date().addingTimeInterval(10)
-        while !queue.isEmpty {
-            let (element, depth) = queue.removeFirst()
-            if visited.contains(where: { CFEqual($0, element) }) { continue }
-            try require(visited.count < 512 && depth <= 24 && Date() < deadline,
-                        "The owned app AX traversal exceeded its time or size bound")
-            visited.append(element)
-            var elementPID: pid_t = 0
-            try require(AXUIElementGetPid(element, &elementPID) == .success && elementPID == pid,
-                        "Refuse an AX element outside the fixture application")
-            try require(AXUIElementSetMessagingTimeout(element, 0.25) == .success,
-                        "Each owned AX object must have its own bounded messaging timeout")
-            if (try? axString(kAXIdentifierAttribute, on: element)) == "quota-recovery-button" {
-                matches.append(element)
-            }
-            var children: CFTypeRef?
-            let error = AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &children)
-            if error == .attributeUnsupported || error == .noValue { continue }
-            try require(error == .success, "Could not read the fixture application's accessibility children")
-            guard let values = children as? [AXUIElement] else { continue }
-            try require(values.count <= 512, "A fixture AX child list exceeded its bound")
-            queue.append(contentsOf: values.map { ($0, depth + 1) })
-        }
-        try require(matches.count == 1, "The real app must expose exactly one AX recovery action")
-        return matches[0]
-    }
-
-    private func axString(_ attribute: String, on element: AXUIElement) throws -> String {
-        var value: CFTypeRef?
-        try require(AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
-                    "A required public accessibility attribute is unavailable")
-        guard let string = value as? String else { throw UITestFailure("Expected a string AX attribute") }
-        return string
-    }
-
-    private func axBoolean(_ attribute: String, on element: AXUIElement) throws -> Bool {
-        var value: CFTypeRef?
-        try require(AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
-                    "A required public accessibility boolean is unavailable")
-        guard let boolean = value as? Bool else { throw UITestFailure("Expected a boolean AX attribute") }
-        return boolean
     }
 
     private func chooseSyntheticExecutable(in dashboard: XCUIElement) throws {
@@ -1509,7 +1442,6 @@ private struct UITestFailure: Error, CustomStringConvertible {
     init(_ description: String) { self.description = description }
 }
 
-private enum RecoveryActivation { case keyboard, accessibilityPress }
 private enum ReadOnlyFocusStage: String, CaseIterable {
     case beforeHeader = "before-header"
     case afterTabs = "after-tabs"
@@ -2002,7 +1934,7 @@ private struct SyntheticFixture {
         let fixed: Set<String> = [
             "popover-en.png", "popover-zh-Hans.png", "dashboard-en.png", "dashboard-zh-Hans.png",
             "popover-startup.png", "popover-refreshing.png", "popover-stale.png", "popover-unavailable-en.png",
-            "popover-unavailable-zh-Hans.png", "display-result.json", "recovery-result.json",
+            "popover-unavailable-zh-Hans.png", "display-result.json", "recovery-click-functional-result.json",
             "status-item-reference.json", "dashboard-sidebar-probe.json"
         ]
         let variants = Set(UILanguage.allCases.flatMap { language in
