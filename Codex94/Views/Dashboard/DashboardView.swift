@@ -373,6 +373,7 @@ private struct AboutView: View {
                     Text(metadata.versionAndBuild)
                         .font(.system(.body, design: .monospaced))
                         .textSelection(.enabled)
+                        .accessibilityIdentifier("about-version")
                     CopyTextButton(
                         text: metadata.versionAndBuild,
                         label: "about.copyVersion",
@@ -381,7 +382,6 @@ private struct AboutView: View {
                     )
                     .controlSize(.small)
                 }
-                .accessibilityIdentifier("about-version")
             }
 
             SettingsDivider()
