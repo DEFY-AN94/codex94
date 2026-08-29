@@ -9,7 +9,8 @@ import ImageIO
 import Security
 import XCTest
 
-/// Black-box tests of the production application, never a hosted SwiftUI tree.
+/// External tests of the application, never a hosted SwiftUI tree. Only the
+/// recovery diagnostic uses a manifest-marked, temporary instrumented AUT copy.
 /// The scheme runs one scenario on each fresh GitHub-hosted Mac. Preparation is
 /// deliberately external to both the AUT and this runner, before either starts.
 @MainActor
@@ -304,6 +305,15 @@ final class Codex94UITests: XCTestCase {
         // Do not copy the runner environment: the AUT must not receive XCTest's
         // hosted-test guard or any credential/path-discovery overrides.
         application.launchEnvironment = [:]
+        if fixture.readOnlyFocusProbeEnabled {
+            // These five nonsecret values enable only the observer compiled
+            // into this exact CI source copy, never ordinary Debug/Release.
+            application.launchEnvironment = [
+                "CODEX94_CI_READ_ONLY_FOCUS_PROBE": "1",
+                "CODEX94_UI_FIXTURE_ROOT": fixture.root.path,
+                "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted", "RUNNER_OS": "macOS",
+            ]
+        }
         language = .english
         XCTAssertEqual(try fixture.requestCount(), fixture.selfCheckRateLimits)
     }
@@ -1285,15 +1295,16 @@ final class Codex94UITests: XCTestCase {
             tooltipVerified = tooltipVerified || (helpTagCount == 1 && helpTagCompleteMatches == [true])
             let header = try uniqueIdentified("quota-popover-header", in: popover)
             try require(header.buttons.count == 0, "Only the noninteractive header may activate the popover window")
-            // Clicking static content only makes this owned popover key. It
-            // neither focuses nor activates the recovery button; all following
-            // navigation is actual Tab input, without a settings change.
+            // Observe whether this existing static-content click actually
+            // makes the popover key. Do not add activation/focus operations.
+            captureReadOnlyFocusObservation(.beforeHeader)
             header.click()
             try capture(popover, named: "popover-keyboard-focus-0.png")
             for step in 1...6 {
                 application.typeKey(.tab, modifierFlags: [])
                 try capture(try currentPopover(), named: "popover-keyboard-focus-\(step).png")
             }
+            captureReadOnlyFocusObservation(.afterTabs)
         }
         try fixture.writeReport("keyboard-navigation-probe.json", fields: [
             "method": "xctest-tab-after-window-activation", "tabCount": 6,
@@ -1315,6 +1326,7 @@ final class Codex94UITests: XCTestCase {
             try require(button.exists && button.isEnabled && button.isHittable,
                         "The single keyboard probe must still target the visible recovery button")
             button.typeText(" ")
+            captureReadOnlyFocusObservation(.afterSpace)
             let dashboard = try dashboardWindow()
             let marker = destination == .connection
                 ? identified("connection-menu-bar-reset", in: dashboard)
@@ -1331,6 +1343,31 @@ final class Codex94UITests: XCTestCase {
         ])
         try require(tooltipVerified,
                     "The independent recovery button must expose its exact localized tooltip")
+    }
+
+    private func captureReadOnlyFocusObservation(_ stage: ReadOnlyFocusStage) {
+        guard fixture.readOnlyFocusProbeEnabled else { return }
+        var flags = ReadOnlyFocusStage.unavailableFlags
+        do {
+            try fixture.requestReadOnlyFocusObservation(stage)
+            let deadline = Date().addingTimeInterval(2)
+            repeat {
+                if let observed = try fixture.readReadOnlyFocusObservation(stage) {
+                    flags = observed
+                    break
+                }
+                RunLoop.current.run(until: min(deadline, Date().addingTimeInterval(0.025)))
+            } while Date() < deadline
+        } catch {
+            // No raw errors/paths, XCTFail, skip, additional input, or replacement
+            // error. Missing diagnostic data must not hide the original recovery
+            // failure; all state flags are unknown unless observationAvailable.
+        }
+        do {
+            try fixture.writeReadOnlyFocusArtifact(flags, stage: stage)
+        } catch {
+            print("CIReadOnlyFocusDiagnosticArtifactSaved=false")
+        }
     }
 
     private func normalizedWhitespace(_ value: String) -> String {
@@ -1473,6 +1510,25 @@ private struct UITestFailure: Error, CustomStringConvertible {
 }
 
 private enum RecoveryActivation { case keyboard, accessibilityPress }
+private enum ReadOnlyFocusStage: String, CaseIterable {
+    case beforeHeader = "before-header"
+    case afterTabs = "after-tabs"
+    case afterSpace = "after-space"
+
+    var requestName: String { "focus-\(rawValue).request" }
+    var responseName: String { "focus-\(rawValue).response.json" }
+    var artifactName: String { "focus-observation-\(rawValue).json" }
+
+    static let unavailableFlags: [String: Bool] = [
+        "observationAvailable": false, "instrumentedAUT": true,
+        "readOnlyDiagnostic": true, "productRecoveryVerified": false,
+        "applicationActive": false, "applicationHasKeyWindow": false,
+        "popoverShown": false, "popoverWindowAvailable": false,
+        "popoverIsKeyWindow": false, "applicationKeyWindowIsPopover": false,
+        "focusedElementAvailable": false, "focusedElementIdentityKnown": false,
+        "focusedElementIdentityUnknown": true, "focusedElementIsRecoveryButton": false,
+    ]
+}
 private enum UIPage { case connection, display, diagnostics }
 private enum UITheme: String, CaseIterable { case system, terminalDark, terminalLight }
 
@@ -1555,6 +1611,7 @@ private struct SyntheticFixture {
     let applicationURL: URL
     let applicationBinaryURL: URL
     let candidateBinarySHA256: String
+    let readOnlyFocusProbeEnabled: Bool
     let quotaCacheURL: URL
     let sparkName: String
     let longName: String
@@ -1626,6 +1683,9 @@ private struct SyntheticFixture {
         try validateRunnerPermissions(
             manifest: manifest, declaration: testEntitlements, control: control, artifacts: artifacts
         )
+        let readOnlyFocusProbeEnabled = try validateReadOnlyFocusProbe(
+            manifest: manifest, root: root, scenario: expectedScenario
+        )
         guard let artifactPath = environment["CODEX94_UI_ARTIFACT_ROOT"] else {
             throw UITestFailure("The UI artifact environment must match the exact manifest directory")
         }
@@ -1688,7 +1748,8 @@ private struct SyntheticFixture {
             executable: executable, invalidExecutable: invalidExecutable, modeURL: modeURL,
             requestLogURL: requestLogURL, artifacts: artifacts,
             applicationURL: applicationURL, applicationBinaryURL: applicationBinaryURL,
-            candidateBinarySHA256: candidateBinarySHA256, quotaCacheURL: quotaCacheURL,
+            candidateBinarySHA256: candidateBinarySHA256, readOnlyFocusProbeEnabled: readOnlyFocusProbeEnabled,
+            quotaCacheURL: quotaCacheURL,
             sparkName: sparkName, longName: longName,
             resetsAt: rawResets.mapValues(\.doubleValue), timeZone: .autoupdatingCurrent,
             initialPreferences: initial, selfCheckRateLimits: 1
@@ -1841,8 +1902,100 @@ private struct SyntheticFixture {
         report["runnerWritableDirectoryCount"] = 2
         report["runnerPreferenceAccessReadOnly"] = true
         report["uiPermissionsExcludedFromAUT"] = true
+        report["instrumentedAUT"] = readOnlyFocusProbeEnabled
+        report["readOnlyFocusDiagnostic"] = readOnlyFocusProbeEnabled
         let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
         try writeArtifact(data, named: name)
+    }
+
+    // A separate, fixed Boolean-only channel. Requests, responses and public
+    // reports are all exclusive 0600 creations, never updates or replacements.
+    func requestReadOnlyFocusObservation(_ stage: ReadOnlyFocusStage) throws {
+        guard readOnlyFocusProbeEnabled else { throw UITestFailure("The read-only CI observer is disabled") }
+        let directory = root.appendingPathComponent("control", isDirectory: true)
+        try Self.writeNewPrivateProbeFile(Data(), named: stage.requestName, in: directory)
+    }
+
+    func readReadOnlyFocusObservation(_ stage: ReadOnlyFocusStage) throws -> [String: Bool]? {
+        guard readOnlyFocusProbeEnabled else { throw UITestFailure("The read-only CI observer is disabled") }
+        let directory = root.appendingPathComponent("control", isDirectory: true)
+        try Self.validate(directory, type: .typeDirectory, mode: 0o700)
+        let url = directory.appendingPathComponent(stage.responseName)
+        var info = stat()
+        if Darwin.lstat(url.path, &info) != 0 {
+            guard errno == ENOENT else { throw UITestFailure("The fixed focus response is unavailable") }
+            return nil
+        }
+        try Self.validate(url, type: .typeRegular, mode: 0o600)
+        guard info.st_nlink == 1, info.st_size >= 0, info.st_size <= 4_096 else {
+            throw UITestFailure("The focus response is outside its private size/type contract")
+        }
+        let bytes = try Self.read(url, maximumBytes: 4_096)
+        // The AUT creates once, then writes; a bounded incomplete read may be
+        // retried, never interpreted as a focus result or printed verbatim.
+        guard let object = try? JSONSerialization.jsonObject(with: bytes),
+              let raw = object as? [String: Any] else { return nil }
+        guard Set(raw.keys) == Set(ReadOnlyFocusStage.unavailableFlags.keys),
+              raw.values.allSatisfy({ value in
+                  guard let number = value as? NSNumber else { return false }
+                  return CFGetTypeID(number) == CFBooleanGetTypeID()
+              }),
+              let flags = raw as? [String: Bool],
+              flags["observationAvailable"] == true, flags["instrumentedAUT"] == true,
+              flags["readOnlyDiagnostic"] == true, flags["productRecoveryVerified"] == false,
+              flags["focusedElementIdentityKnown"] != flags["focusedElementIdentityUnknown"],
+              flags["focusedElementIsRecoveryButton"] != true || flags["focusedElementIdentityKnown"] == true else {
+            throw UITestFailure("The read-only observer may report only its fixed Boolean schema")
+        }
+        return flags
+    }
+
+    func writeReadOnlyFocusArtifact(_ flags: [String: Bool], stage: ReadOnlyFocusStage) throws {
+        guard readOnlyFocusProbeEnabled,
+              Set(flags.keys) == Set(ReadOnlyFocusStage.unavailableFlags.keys) else {
+            throw UITestFailure("The focus artifact is outside its fixed Boolean schema")
+        }
+        let bytes = try JSONSerialization.data(withJSONObject: flags, options: [.prettyPrinted, .sortedKeys])
+        try Self.writeNewPrivateProbeFile(bytes, named: stage.artifactName, in: artifacts)
+    }
+
+    private static func writeNewPrivateProbeFile(_ data: Data, named name: String, in directory: URL) throws {
+        let requestNames = Set(ReadOnlyFocusStage.allCases.map(\.requestName))
+        let artifactNames = Set(ReadOnlyFocusStage.allCases.map(\.artifactName))
+        guard data.count <= 4_096,
+              (directory.lastPathComponent == "control" && data.isEmpty && requestNames.contains(name))
+                || (directory.lastPathComponent == "artifacts" && artifactNames.contains(name)) else {
+            throw UITestFailure("The focus file is outside its exact stage allowlist")
+        }
+        try validate(directory, type: .typeDirectory, mode: 0o700)
+        let directoryDescriptor = Darwin.open(directory.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+        guard directoryDescriptor >= 0 else { throw UITestFailure("The fixed focus directory is unavailable") }
+        defer { Darwin.close(directoryDescriptor) }
+        var directoryInfo = stat()
+        guard Darwin.fstat(directoryDescriptor, &directoryInfo) == 0,
+              directoryInfo.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+              directoryInfo.st_uid == getuid(), directoryInfo.st_mode & 0o7777 == 0o700 else {
+            throw UITestFailure("The fixed focus directory changed before creation")
+        }
+        let descriptor = Darwin.openat(directoryDescriptor, name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        guard descriptor >= 0 else { throw UITestFailure("Do not replace or follow an existing focus file") }
+        defer { Darwin.close(descriptor) }
+        var info = stat()
+        guard Darwin.fstat(descriptor, &info) == 0,
+              info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), info.st_uid == getuid(),
+              info.st_mode & 0o7777 == 0o600, info.st_nlink == 1 else {
+            throw UITestFailure("The new focus file must be private and singly owned")
+        }
+        try data.withUnsafeBytes { buffer in
+            guard let base = buffer.baseAddress else { return }
+            var offset = 0
+            while offset < buffer.count {
+                let count = Darwin.write(descriptor, base.advanced(by: offset), buffer.count - offset)
+                if count < 0 && errno == EINTR { continue }
+                guard count > 0 else { throw UITestFailure("Could not finish the bounded focus observation") }
+                offset += count
+            }
+        }
     }
 
     func writeArtifact(_ data: Data, named filename: String) throws {
@@ -1909,6 +2062,49 @@ private struct SyntheticFixture {
     private static let filesReadWriteEntitlement = "com.apple.security.temporary-exception.files.absolute-path.read-write"
     private static let preferencesReadOnlyEntitlement = "com.apple.security.temporary-exception.shared-preference.read-only"
     private static let preferencesReadWriteEntitlement = "com.apple.security.temporary-exception.shared-preference.read-write"
+
+    private static func validateReadOnlyFocusProbe(
+        manifest: [String: Any], root: URL, scenario: String
+    ) throws -> Bool {
+        guard let probe = manifest["readOnlyFocusProbe"] as? [String: Any],
+              let enabled = probe["enabled"] as? Bool,
+              enabled == (scenario == "recovery"), manifest["instrumentedAUT"] as? Bool == enabled else {
+            throw UITestFailure("The manifest must distinguish the instrumented recovery AUT from the normal product")
+        }
+        if !enabled {
+            guard Set(probe.keys) == Set(["enabled"]) else {
+                throw UITestFailure("The display scenario must use the unmodified production project")
+            }
+            return false
+        }
+        let hashKeys = ["originalAppDelegateSHA256", "instrumentedAppDelegateSHA256", "templateSHA256", "trackedBuildInputsSHA256"]
+        let sourceDirectory = root.appendingPathComponent("recovery-source", isDirectory: true)
+        guard Set(probe.keys) == Set(hashKeys + ["enabled", "temporarySourceDirectory"]),
+              probe["temporarySourceDirectory"] as? String == sourceDirectory.path,
+              hashKeys.allSatisfy({ key in
+                  (probe[key] as? String)?.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil
+              }), probe["originalAppDelegateSHA256"] as? String != probe["instrumentedAppDelegateSHA256"] as? String else {
+            throw UITestFailure("The temporary source copy must have exact path and distinct source provenance")
+        }
+        try validate(sourceDirectory, type: .typeDirectory, mode: 0o700)
+        let injectedSource = sourceDirectory.appendingPathComponent("Codex94/App/AppDelegate.swift")
+        try validate(injectedSource, type: .typeRegular, mode: 0o600)
+        let bytes = try read(injectedSource, maximumBytes: 262_144)
+        let actualHash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        guard actualHash == probe["instrumentedAppDelegateSHA256"] as? String else {
+            throw UITestFailure("The recovery observer source differs from its prepared copy")
+        }
+        for stage in ReadOnlyFocusStage.allCases {
+            for name in [stage.requestName, stage.responseName] {
+                let path = root.appendingPathComponent("control").appendingPathComponent(name).path
+                var info = stat()
+                guard Darwin.lstat(path, &info) == -1, errno == ENOENT else {
+                    throw UITestFailure("The read-only observer requires fresh, unreused stage files")
+                }
+            }
+        }
+        return true
+    }
 
     private static func validateRunnerPermissions(
         manifest: [String: Any], declaration: URL, control: URL, artifacts: URL

@@ -42,8 +42,10 @@ jobs:
         include:
           - scenario: display
             method: testDisplaySmoke
+            artifact: codex94-ui-display
           - scenario: recovery
             method: testRecoverySmoke
+            artifact: codex94-ui-recovery-focus-diagnostic
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -65,13 +67,20 @@ jobs:
           CODEX94_UI_FIXTURE_ROOT: ${{ steps.fixtures.outputs.fixture-root }}
           CODEX94_UI_ARTIFACT_ROOT: ${{ steps.fixtures.outputs.artifact-root }}
           CODEX94_UI_TEST_ENTITLEMENTS: ${{ steps.fixtures.outputs.entitlements-file }}
+          CODEX94_UI_PROJECT: ${{ steps.fixtures.outputs.project-file }}
           CODEX94_UI_TEST_METHOD: ${{ matrix.method }}
         run: |
           test -d "$CODEX94_UI_FIXTURE_ROOT"
           test -d "$CODEX94_UI_ARTIFACT_ROOT"
           test -f "$CODEX94_UI_TEST_ENTITLEMENTS"
+          test -f "$CODEX94_UI_PROJECT/project.pbxproj"
+          if [ "$CODEX94_UI_TEST_METHOD" = testRecoverySmoke ]; then
+            test "$CODEX94_UI_PROJECT" = "$CODEX94_UI_FIXTURE_ROOT/recovery-source/Codex94.xcodeproj"
+          else
+            test "$CODEX94_UI_PROJECT" = "$GITHUB_WORKSPACE/Codex94.xcodeproj"
+          fi
           xcodebuild \
-            -project Codex94.xcodeproj \
+            -project "$CODEX94_UI_PROJECT" \
             -scheme Codex94UI \
             -configuration Debug \
             -destination 'platform=macOS' \
@@ -92,7 +101,7 @@ jobs:
         if: ${{ always() && steps.fixtures.outputs.artifact-root != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: codex94-ui-${{ matrix.scenario }}
+          name: ${{ matrix.artifact }}
           path: |
             ${{ steps.fixtures.outputs.artifact-root }}/*.png
             ${{ steps.fixtures.outputs.artifact-root }}/*.json

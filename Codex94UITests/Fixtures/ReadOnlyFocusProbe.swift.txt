@@ -1,0 +1,172 @@
+// This template is not a product build input. prepare.py appends it only to
+// AppDelegate.swift in one fresh, tracked-input recovery CI source copy.
+// It observes this AUT through public AppKit getters; it never drives UI.
+import Darwin
+
+@MainActor
+private final class Codex94CIReadOnlyFocusProbe: NSObject {
+    private static let rootPath = __CODEX94_CI_FIXTURE_ROOT_LITERAL__
+    private static let stages = ["before-header", "after-tabs", "after-space"]
+    private weak var popover: NSPopover?
+    private var timer: Timer?
+    private var handledStages: Set<String> = []
+    private let expiresAt = Date().addingTimeInterval(120)
+
+    private init(popover: NSPopover) {
+        self.popover = popover
+        super.init()
+    }
+
+    static func start(popover: NSPopover) -> Codex94CIReadOnlyFocusProbe? {
+        let environment = ProcessInfo.processInfo.environment
+        let productPath = rootPath + "/DerivedData/Build/Products/Debug/Codex94.app"
+        guard environment["CODEX94_CI_READ_ONLY_FOCUS_PROBE"] == "1",
+              environment["CODEX94_UI_FIXTURE_ROOT"] == rootPath,
+              environment["GITHUB_ACTIONS"] == "true",
+              environment["RUNNER_ENVIRONMENT"] == "github-hosted",
+              environment["RUNNER_OS"] == "macOS", getuid() != 0,
+              rootPath.hasPrefix("/private/tmp/codex94-v018-ui-"),
+              rootPath.split(separator: "/").count == 3,
+              registered(Bundle.main.bundleURL.path, expected: productPath),
+              Bundle.main.bundleIdentifier == "com.defyan94.codex94",
+              Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == "0.1.8",
+              Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String == "9",
+              privateDirectory(rootPath), privateDirectory(rootPath + "/control") else {
+            return nil
+        }
+        // A relaunch must not replay observations or reuse another invocation's
+        // requests. Never clear these files, even on a diagnostic failure.
+        for stage in stages {
+            for suffix in [".request", ".response.json"] {
+                guard absent(rootPath + "/control/focus-" + stage + suffix) else { return nil }
+            }
+        }
+        let probe = Codex94CIReadOnlyFocusProbe(popover: popover)
+        let timer = Timer(timeInterval: 0.1, target: probe, selector: #selector(poll(_:)),
+                          userInfo: nil, repeats: true)
+        probe.timer = timer
+        RunLoop.main.add(timer, forMode: .common)
+        return probe
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    @objc private func poll(_ timer: Timer) {
+        guard Date() < expiresAt, handledStages.count < Self.stages.count,
+              Self.privateDirectory(Self.rootPath),
+              Self.privateDirectory(Self.rootPath + "/control") else {
+            stop()
+            return
+        }
+        for stage in Self.stages where !handledStages.contains(stage) {
+            let requestPath = Self.rootPath + "/control/focus-" + stage + ".request"
+            if Self.absent(requestPath) { continue }
+            // A request contains no commands or data: only one owned, empty,
+            // private regular file at this exact, compiled-in stage path.
+            guard Self.privateEmptyFile(requestPath) else {
+                stop()
+                return
+            }
+            handledStages.insert(stage)
+            writeObservation(stage: stage)
+        }
+        if handledStages.count == Self.stages.count { stop() }
+    }
+
+    private func writeObservation(stage: String) {
+        let popoverWindow = popover?.contentViewController?.viewIfLoaded?.window
+        // NSAccessibilityProtocols.h's Application section declares this
+        // public getter. It queries NSApp itself, not a global AX application.
+        let focusedElement = NSApp.accessibilityApplicationFocusedUIElement()
+        let identifier = (focusedElement as? any NSAccessibilityProtocol)?.accessibilityIdentifier()
+        let identityKnown = identifier.map { !$0.isEmpty } ?? false
+        let windowAvailable = popoverWindow != nil
+        let flags: [String: Bool] = [
+            "observationAvailable": true,
+            "instrumentedAUT": true,
+            "readOnlyDiagnostic": true,
+            "productRecoveryVerified": false,
+            "applicationActive": NSApp.isActive,
+            "applicationHasKeyWindow": NSApp.keyWindow != nil,
+            "popoverShown": popover?.isShown == true,
+            "popoverWindowAvailable": windowAvailable,
+            "popoverIsKeyWindow": windowAvailable && popoverWindow?.isKeyWindow == true,
+            "applicationKeyWindowIsPopover": windowAvailable && NSApp.keyWindow === popoverWindow,
+            "focusedElementAvailable": focusedElement != nil,
+            "focusedElementIdentityKnown": identityKnown,
+            "focusedElementIdentityUnknown": !identityKnown,
+            "focusedElementIsRecoveryButton": identityKnown && identifier == "quota-recovery-button",
+        ]
+        // Never serialize an identifier, responder, object, tree, path or raw
+        // accessibility field. A missing/informal AX identity remains unknown.
+        guard let bytes = try? JSONSerialization.data(withJSONObject: flags, options: [.sortedKeys]),
+              bytes.count <= 4_096 else { return }
+        let controlPath = Self.rootPath + "/control"
+        guard Self.privateDirectory(controlPath) else { return }
+        let directory = Darwin.open(controlPath, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+        guard directory >= 0 else { return }
+        defer { Darwin.close(directory) }
+        var directoryInfo = stat()
+        guard Darwin.fstat(directory, &directoryInfo) == 0,
+              directoryInfo.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+              directoryInfo.st_uid == getuid(), directoryInfo.st_mode & 0o7777 == 0o700 else { return }
+        let filename = "focus-" + stage + ".response.json"
+        let descriptor = Darwin.openat(directory, filename, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        guard descriptor >= 0 else { return }
+        defer { Darwin.close(descriptor) }
+        var info = stat()
+        guard Darwin.fstat(descriptor, &info) == 0,
+              info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+              info.st_uid == getuid(), info.st_mode & 0o7777 == 0o600,
+              info.st_nlink == 1 else { return }
+        bytes.withUnsafeBytes { buffer in
+            guard let base = buffer.baseAddress else { return }
+            var offset = 0
+            while offset < buffer.count {
+                let count = Darwin.write(descriptor, base.advanced(by: offset), buffer.count - offset)
+                if count < 0 && errno == EINTR { continue }
+                guard count > 0 else { return }
+                offset += count
+            }
+        }
+    }
+
+    private static func privateDirectory(_ path: String) -> Bool {
+        var info = stat()
+        return canonical(path) == path && Darwin.lstat(path, &info) == 0
+            && info.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR)
+            && info.st_uid == getuid() && info.st_mode & 0o7777 == 0o700
+    }
+
+    private static func privateEmptyFile(_ path: String) -> Bool {
+        var info = stat()
+        return canonical(path) == path && Darwin.lstat(path, &info) == 0
+            && info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG)
+            && info.st_uid == getuid() && info.st_mode & 0o7777 == 0o600
+            && info.st_size == 0 && info.st_nlink == 1
+    }
+
+    private static func absent(_ path: String) -> Bool {
+        var info = stat()
+        return Darwin.lstat(path, &info) == -1 && errno == ENOENT
+    }
+
+    private static func canonical(_ path: String) -> String? {
+        guard let resolved = Darwin.realpath(path, nil) else { return nil }
+        defer { Darwin.free(resolved) }
+        return String(cString: resolved)
+    }
+
+    private static func registered(_ reported: String, expected: String) -> Bool {
+        guard canonical(expected) == expected else { return false }
+        if reported != expected {
+            guard expected.hasPrefix("/private/tmp/"),
+                  reported == String(expected.dropFirst("/private".count)),
+                  canonical("/tmp") == "/private/tmp" else { return false }
+        }
+        return canonical(reported) == expected
+    }
+}

@@ -20,6 +20,67 @@ import tempfile
 BUNDLE_ID = "com.defyan94.codex94"
 PREFIX = "codex94-v018-ui-"
 
+# Only these tracked build inputs may enter the disposable recovery source copy.
+# No repository metadata, documentation, scripts, local state or directory copy.
+BUILD_INPUTS = (
+    "Codex94.xcodeproj/project.pbxproj",
+    "Codex94.xcodeproj/xcshareddata/xcschemes/Codex94.xcscheme",
+    "Codex94.xcodeproj/xcshareddata/xcschemes/Codex94UI.xcscheme",
+    "Codex94/App/AppDelegate.swift",
+    "Codex94/App/Codex94App.swift",
+    "Codex94/App/DashboardWindowController.swift",
+    "Codex94/Assets.xcassets/AccentColor.colorset/Contents.json",
+    "Codex94/Assets.xcassets/AppIcon.appiconset/Contents.json",
+    "Codex94/Assets.xcassets/AppIcon.appiconset/icon_128x128.png",
+    "Codex94/Assets.xcassets/AppIcon.appiconset/icon_128x128" + "@" + "2x.png",
+    "Codex94/Assets.xcassets/AppIcon.appiconset/icon_16x16.png",
+    "Codex94/Assets.xcassets/AppIcon.appiconset/icon_16x16" + "@" + "2x.png",
+    "Codex94/Assets.xcassets/AppIcon.appiconset/icon_256x256.png",
+    "Codex94/Assets.xcassets/AppIcon.appiconset/icon_256x256" + "@" + "2x.png",
+    "Codex94/Assets.xcassets/AppIcon.appiconset/icon_32x32.png",
+    "Codex94/Assets.xcassets/AppIcon.appiconset/icon_32x32" + "@" + "2x.png",
+    "Codex94/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
+    "Codex94/Assets.xcassets/AppIcon.appiconset/icon_512x512" + "@" + "2x.png",
+    "Codex94/Assets.xcassets/Contents.json",
+    "Codex94/Info.plist",
+    "Codex94/Localizable.xcstrings",
+    "Codex94/Models/DashboardWindowSize.swift",
+    "Codex94/Models/MenuBarAppearance.swift",
+    "Codex94/Models/QuotaModels.swift",
+    "Codex94/Services/CodexAppServerClient.swift",
+    "Codex94/Services/CodexExecutableLocator.swift",
+    "Codex94/Services/LaunchAtLoginController.swift",
+    "Codex94/Services/ProcessTerminator.swift",
+    "Codex94/Services/SnapshotCache.swift",
+    "Codex94/Stores/AppStore.swift",
+    "Codex94/Stores/PreferencesStore.swift",
+    "Codex94/Support/AppMetadata.swift",
+    "Codex94/Support/DiagnosticsRedactor.swift",
+    "Codex94/Support/Formatting.swift",
+    "Codex94/Support/Localization.swift",
+    "Codex94/Support/RefreshPolicy.swift",
+    "Codex94/Support/StatusPresentation.swift",
+    "Codex94/Support/Theme.swift",
+    "Codex94/Views/Components/ConnectionBadgeView.swift",
+    "Codex94/Views/Components/QuotaBarView.swift",
+    "Codex94/Views/Dashboard/DashboardView.swift",
+    "Codex94/Views/Dashboard/DisplaySettingsView.swift",
+    "Codex94/Views/MenuBar/MenuBarStatusView.swift",
+    "Codex94/Views/MenuBar/QuotaPopoverView.swift",
+    "Codex94Tests/AppServerClientTests.swift",
+    "Codex94Tests/AppStoreTests.swift",
+    "Codex94Tests/DashboardWindowSizeTests.swift",
+    "Codex94Tests/DiagnosticsRedactorTests.swift",
+    "Codex94Tests/ExecutableLocatorTests.swift",
+    "Codex94Tests/QuotaModelsTests.swift",
+    "Codex94Tests/QuotaPopoverLayoutTests.swift",
+    "Codex94Tests/RefreshPolicyTests.swift",
+    "Codex94Tests/SnapshotCacheTests.swift",
+    "Codex94Tests/StatusPresentationTests.swift",
+    "Codex94UITests/Codex94UITests.swift",
+)
+FOCUS_TEMPLATE = "Codex94UITests/Fixtures/ReadOnlyFocusProbe.swift.txt"
+
 
 def require(condition, message):
     if not condition:
@@ -34,6 +95,97 @@ def write_new(path, data, mode=0o600):
 
 def json_bytes(value):
     return (json.dumps(value, sort_keys=True, indent=2) + "\n").encode("utf-8")
+
+
+def recovery_project(repository, root, source_revision):
+    """Inject a read-only observer into one private copy, never the checkout."""
+    require(repository == repository.resolve(), "The build checkout must be canonical")
+    head = subprocess.run(
+        ["/usr/bin/git", "rev-parse", "HEAD"], cwd=repository,
+        capture_output=True, check=True,
+    ).stdout.decode("ascii").strip()
+    require(head == source_revision, "The recovery copy must use the tested commit")
+    requested = set(BUILD_INPUTS) | {FOCUS_TEMPLATE}
+    records = subprocess.run(
+        ["/usr/bin/git", "ls-tree", "-r", "-z", "HEAD", "--", *sorted(requested)],
+        cwd=repository, capture_output=True, check=True,
+    ).stdout.split(b"\0")
+    hashes = {}
+    for record in filter(None, records):
+        metadata, name = record.split(b"\t", 1)
+        mode, kind, digest = metadata.split(b" ")
+        relative = name.decode("utf-8")
+        require(mode == b"100644" and kind == b"blob" and relative in requested,
+                "Only regular tracked build inputs are permitted")
+        require(relative not in hashes, "Duplicate tracked build input")
+        hashes[relative] = digest.decode("ascii")
+    require(set(hashes) == requested, "The explicit recovery build-input allowlist is incomplete")
+    contents = {}
+    for relative in sorted(requested):
+        source = repository / relative
+        require(source == source.resolve(strict=True), "Build inputs must not traverse symbolic links")
+        descriptor = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(descriptor, "rb") as stream:
+            info = os.fstat(stream.fileno())
+            require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
+                    and 0 <= info.st_size <= 16_777_216, "Invalid bounded tracked build input")
+            data = stream.read(16_777_217)
+        require(len(data) <= 16_777_216, "Build input exceeded its size bound")
+        # The Git blob identity binds each copied byte to GITHUB_SHA, not merely
+        # to an index entry or a same-named untracked/modified local file.
+        blob = b"blob " + str(len(data)).encode("ascii") + b"\0" + data
+        require(hashlib.sha1(blob).hexdigest() == hashes[relative], "A tracked build input changed after checkout")
+        contents[relative] = data
+    require(sum(map(len, contents.values())) <= 67_108_864, "Recovery source copy exceeded its size bound")
+
+    original = contents["Codex94/App/AppDelegate.swift"]
+    source_text = original.decode("utf-8")
+    anchors = (
+        ("    private let popover = NSPopover()\n",
+         "    private let popover = NSPopover()\n"
+         "    private var ciReadOnlyFocusProbe: Codex94CIReadOnlyFocusProbe?\n"),
+        ("        configurePopover()\n        store.start()\n",
+         "        configurePopover()\n"
+         "        ciReadOnlyFocusProbe = Codex94CIReadOnlyFocusProbe.start(popover: popover)\n"
+         "        store.start()\n"),
+        ("    func applicationWillTerminate(_ notification: Notification) {\n",
+         "    func applicationWillTerminate(_ notification: Notification) {\n"
+         "        ciReadOnlyFocusProbe?.stop()\n"),
+    )
+    for before, after in anchors:
+        require(source_text.count(before) == 1, "The bounded AppDelegate injection anchor changed")
+        source_text = source_text.replace(before, after, 1)
+    template = contents[FOCUS_TEMPLATE].decode("utf-8")
+    require(template.count("__CODEX94_CI_FIXTURE_ROOT_LITERAL__") == 1,
+            "The read-only observer root placeholder must be unique")
+    template = template.replace("__CODEX94_CI_FIXTURE_ROOT_LITERAL__", json.dumps(str(root)), 1)
+    instrumented = (source_text + "\n" + template).encode("utf-8")
+
+    copy_root = root / "recovery-source"
+    copy_root.mkdir(mode=0o700)  # No reuse or overwrite of a previous copy.
+    for relative in BUILD_INPUTS:
+        directory = copy_root
+        for component in Path(relative).parts[:-1]:
+            directory = directory / component
+            if not directory.exists():
+                directory.mkdir(mode=0o700)
+            info = directory.lstat()
+            require(directory == directory.resolve() and stat.S_ISDIR(info.st_mode)
+                    and info.st_uid == os.getuid() and stat.S_IMODE(info.st_mode) == 0o700,
+                    "Recovery source directories must remain private and canonical")
+        payload = instrumented if relative == "Codex94/App/AppDelegate.swift" else contents[relative]
+        write_new(copy_root / relative, payload)
+    metadata = {
+        "enabled": True,
+        "temporarySourceDirectory": str(copy_root),
+        "originalAppDelegateSHA256": hashlib.sha256(original).hexdigest(),
+        "instrumentedAppDelegateSHA256": hashlib.sha256(instrumented).hexdigest(),
+        "templateSHA256": hashlib.sha256(contents[FOCUS_TEMPLATE]).hexdigest(),
+        "trackedBuildInputsSHA256": hashlib.sha256(json_bytes({
+            relative: hashlib.sha256(contents[relative]).hexdigest() for relative in BUILD_INPUTS
+        })).hexdigest(),
+    }
+    return copy_root / "Codex94.xcodeproj", metadata
 
 
 def main():
@@ -79,6 +231,7 @@ def main():
     require(root == root.resolve(), "Fixture root must not traverse a symlink")
     require(root.stat().st_uid == os.getuid(), "Fixture root owner mismatch")
     require(stat.S_IMODE(root.stat().st_mode) == 0o700, "Fixture root must be private")
+    require(not any(root.iterdir()), "A fresh fixture root must be empty")
 
     executable = root / "codex"
     invalid_executable = root / "invalid-codex"
@@ -107,6 +260,12 @@ def main():
     write_new(mode_path, json_bytes({
         "mode": "normal", "defaultUsedPercent": 68, "sparkUsedPercent": 12, "includeSpark": True,
     }))
+
+    repository = Path(__file__).absolute().parents[2]
+    project = repository / "Codex94.xcodeproj"
+    focus_probe = {"enabled": False}
+    if scenario == "recovery":
+        project, focus_probe = recovery_project(repository, root, source_revision)
 
     initial_preferences = {
         "identityMode": "quotaOnly",
@@ -148,6 +307,8 @@ def main():
             "windowAutosaveKey": "NSWindow Frame Codex94Dashboard",
         },
         "sourceRevision": source_revision,
+        "instrumentedAUT": scenario == "recovery",
+        "readOnlyFocusProbe": focus_probe,
         "executableSHA256": hashlib.sha256(fake_bytes).hexdigest(),
         "resetsAt": {"codexWeekly": 2_000_000_000, "sparkFiveHour": 2_000_003_600, "sparkWeekly": 2_000_007_200},
         "sparkName": "GPT-5.3-Codex-Spark",
@@ -198,6 +359,9 @@ def main():
         "fakeProtocolSelfCheck": "passed", "selfCheckRateLimits": 1,
         "fakeSystemTmpAliasChecked": True,
         "sourceRevision": source_revision,
+        "instrumentedAUT": scenario == "recovery",
+        "readOnlyFocusDiagnostic": scenario == "recovery",
+        "normalProductSourceModified": False,
         "runnerWriteScope": ["synthetic-control", "synthetic-artifacts"],
         "runnerPreferenceAccess": "read-only-synthetic-app-domain",
         "rawTestResultsUploaded": False,
@@ -214,6 +378,7 @@ def main():
         stream.write("fixture-root=" + str(root) + "\n")
         stream.write("artifact-root=" + str(artifacts) + "\n")
         stream.write("entitlements-file=" + str(entitlements_file) + "\n")
+        stream.write("project-file=" + str(project) + "\n")
     print("Prepared one fresh synthetic UI scenario; no existing AUT state was modified.")
 
 
