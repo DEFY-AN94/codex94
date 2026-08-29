@@ -4,9 +4,7 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
-The working candidate is `0.1.8 (9)`, not a stable source release. Candidate
-`164ae10` passed 155 compiled tests, the release gate, and CI display smoke.
-Recovery CI failed; remaining isolated GUI acceptance is pending.
+## 0.1.8 - 2026-08-29
 
 ### Added
 
@@ -23,9 +21,9 @@ Recovery CI failed; remaining isolated GUI acceptance is pending.
 - Add Open Connection or Open Diagnostics to issue banners. These actions only
   navigate within the existing Dashboard; ordinary opening preserves its
   current section. Connection includes sign-in guidance without executing login.
-- Share the Reset description across visible content and accessibility
-  labels, with English and Simplified Chinese strings and independently
-  accessible recovery buttons.
+- Share the Reset description across visible content and accessibility labels,
+  with English and Simplified Chinese strings and separate recovery buttons
+  with dedicated labels.
 
 ### Changed
 
@@ -45,7 +43,7 @@ Recovery CI failed; remaining isolated GUI acceptance is pending.
   schema, credentials, network interface, or permissions are introduced.
 - Document the local UI preferences, use synthetic test/screenshot fixtures,
   and report CI, GUI, and screenshot validation separately. Replace the four
-  popover/Dashboard images with reviewed synthetic candidate captures; retain
+  popover/Dashboard images with reviewed synthetic release captures; retain
   the unchanged default menu-bar example from the previous stable version.
 
 ## 0.1.7 - 2026-08-28

@@ -24,10 +24,10 @@ tested, and security-scanned before it is tagged.
 
 The values below come from an isolated documentation fixture. They are
 illustrative and do not contain a real account, identity, or quota.
-The popover and Dashboard images show the unreleased `0.1.8` candidate, captured
-in isolated CI and reviewed before inclusion. Their fixed future Reset dates
-are test values, not live reset schedules. The unchanged default menu-bar
-sample is retained from `v0.1.7`; screenshots alone do not establish acceptance.
+The popover and Dashboard images show `0.1.8`, captured in isolated CI and
+reviewed before inclusion. Their fixed future Reset dates are test values, not
+live reset schedules. The unchanged default menu-bar sample is retained from
+`v0.1.7`.
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 menu bar ring showing 79 percent remaining" width="144">
@@ -46,11 +46,7 @@ sample is retained from `v0.1.7`; screenshots alone do not establish acceptance.
 
 ## Distribution status
 
-- The current stable source is `0.1.7 (8)`, tagged `v0.1.7`.
-- This development tree prepares an **unreleased `0.1.8 (9)` candidate**.
-  Candidate `164ae10` passed compiled tests, the release gate, and CI display
-  smoke. Recovery CI failed and remaining isolated GUI verification is pending;
-  this is not full candidate acceptance or a stable release.
+- This source version is `0.1.8 (9)`; its stable source tag is `v0.1.8`.
 - A source release is available only after its tag is published. `main` may
   contain release preparation.
 - This public repository can be cloned without GitHub authentication.
@@ -76,12 +72,11 @@ executable selected manually.
 
 ## Install from source
 
-Install the published stable `v0.1.7` source with the following commands. This
-does not install the unreleased `0.1.8` candidate:
+After `v0.1.8` is published, install its stable source with:
 
 ```bash
 brew install ripgrep
-git clone --branch v0.1.7 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.1.8 --depth 1 https://github.com/DEFY-AN94/codex94.git
 cd codex94
 
 sudo xcodebuild -license accept
@@ -104,29 +99,26 @@ at the stable path above.
 
 ## Main behavior
 
-This section describes the working `0.1.8` candidate; features marked below as
-new are not included in the stable `v0.1.7` install above.
-
-- New in the candidate: choose **Ring + Percentage**, **Percentage Only**, or
+- Choose **Ring + Percentage**, **Percentage Only**, or
   **Ring Only** in Dashboard → Display. A saved layout takes effect the next
   time Codex94 starts, not by resizing the running status item. A status badge
   is centered in a visible ring or occupies a fixed trailing slot in
   Percentage Only.
-- New in the candidate: customize four independent colors for healthy
+- Customize four independent colors for healthy
   (50–100%), warning (20–49%), critical (0–19%), and hard-unavailable error
   states. Thresholds cannot be changed. Colors update immediately and are
   stored as opaque sRGB, normalized six-digit uppercase `RRGGBB` values without alpha.
   Critical and error remain independent even when both default to theme red.
   **Restore Default Colors** removes only the four overrides, preserving
   layout, theme, language, quota selection, executable path, and window size.
-- New in the candidate: quota rows show a separate absolute **Reset** line
+- Quota rows show a separate absolute **Reset** line
   with the full date, hour/minute, and UTC offset at the reset instant,
   including daylight-saving changes. The existing countdown remains; a
   missing reset is unavailable and a past date stays visible with a zero
   countdown. Dates follow the app language's locale and the current time zone.
   Dashboard → Connection shows the actual resolved menu-bar bucket/window,
   including temporary Auto fallback, rather than the popover's browsed model.
-- New in the candidate: issue banners offer **Open Connection** or
+- Issue banners offer **Open Connection** or
   **Open Diagnostics**, reusing the same Dashboard window. Ordinary Dashboard
   opening preserves its current page. These buttons only navigate; use the
   existing **Refresh** to retry. A signed-out state explains that you must
@@ -155,8 +147,8 @@ new are not included in the stable `v0.1.7` install above.
 - Keeps quota severity separate from connection and data freshness: quota
   rings, percentages, and bars share the same resolved healthy/warning/critical
   colors, defaulting to green, amber, and red. Refreshing and cached indicators
-  retain the blue/cyan connection accent. In the candidate, a hard-unavailable
-  badge, banner, or Dashboard error dot uses its independent error color,
+  retain the blue/cyan connection accent. A hard-unavailable badge, banner, or
+  Dashboard error dot uses its independent error color,
   defaulting to the theme red before any critical override.
 - Keeps the last successful quota value after a refresh failure and marks it as
   cached; when no snapshot is available, it shows a gray `--` instead of `0%`.
@@ -202,8 +194,8 @@ time with owner-only permissions. Email is memory-only in **Quota + account**
 mode and is removed from the in-memory snapshot after switching to **Quota
 only**. UserDefaults stores interface choices, including the preferred menu-bar
 quota selection, and an optional manually selected executable path. The
-candidate adds `menuBarLayout.v1` and `statusAccentOverrides.v1` for layout and
-four color overrides. Reset text is derived from the existing reset timestamp,
+Version 0.1.8 adds `menuBarLayout.v1` and `statusAccentOverrides.v1` for layout
+and four color overrides. Reset text is derived from the existing reset timestamp,
 not additional cached fields. The popover's browsed model and the Dashboard's
 selected section are session-only; Dashboard frame autosave is unchanged.
 Codex94 has no analytics, advertising,
@@ -266,12 +258,12 @@ security/signature checks:
 ./script/release_check.sh
 ```
 
-Validation snapshot for candidate `164ae10`: [155 compiled tests, the release
-gate, and CI display smoke](https://github.com/DEFY-AN94/codex94/actions/runs/33186827804)
-passed. The recovery CI job failed; keyboard recovery and fresh no-cache GUI
-Smoke B remain unverified. The four candidate popover/Dashboard screenshots have
-been visually and privacy reviewed. These results are reported separately and
-do not establish full candidate acceptance or validate later code changes.
+Version 0.1.8 passed the full GitHub test/release job, synthetic Display and
+click-functional Recovery UI jobs, and Actions/Swift CodeQL. Separate synthetic
+A/B GUI smokes covered all three next-launch layouts, color restoration,
+absolute Reset text, hard-unavailable recovery, and manual refresh. The four
+popover/Dashboard screenshots were visually and privacy reviewed. Keyboard
+activation, AXPress, and hosted tooltip exposure are not claimed as passed.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See

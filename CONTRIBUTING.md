@@ -91,12 +91,14 @@ screenshots must remain synthetic or redacted.
 
 Report source/static checks, compiled tests, GUI smoke, screenshots, and release
 status separately, tied to the actual candidate tree and artifacts. The four
-README popover/Dashboard images are reviewed synthetic `0.1.8` captures; the
-unchanged default menu-bar example remains from `v0.1.7`. Candidate `164ae10`
-passed compiled tests, the release gate, and CI display smoke. Recovery CI
-failed; remaining isolated GUI acceptance is pending. Keep new feature notes
-under Unreleased and stable installation instructions on `v0.1.7` until a
-separately reviewed source release is finalized.
+README popover/Dashboard images are reviewed synthetic `0.1.8` captures;
+the unchanged default menu-bar example remains from `v0.1.7`. Version 0.1.8
+passed the full test/release job, synthetic Display and click-functional
+Recovery UI jobs, CodeQL, and separate synthetic A/B GUI smokes. Keyboard
+activation, AXPress, and hosted tooltip exposure are not claimed as passed.
+Keep future feature notes under Unreleased and stable installation instructions
+on the latest published source tag until a separately reviewed source release
+is finalized.
 
 Do not open a public issue for a suspected vulnerability. Follow
 [SECURITY.md](SECURITY.md).

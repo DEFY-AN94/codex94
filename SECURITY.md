@@ -34,7 +34,7 @@ selection, refresh frequency, account-information mode, and an optional
 manually selected Codex path. See [PRIVACY.md](PRIVACY.md) for the complete
 inventory.
 
-The unreleased `0.1.8` candidate adds only local UI preferences for menu-bar
+Version `0.1.8` adds only local UI preferences for menu-bar
 layout (`menuBarLayout.v1`) and four independent opaque sRGB color overrides
 (`statusAccentOverrides.v1`, normalized uppercase `RRGGBB`). Restoring colors removes only
 those overrides. Absolute Reset text uses the existing timestamp without a new
@@ -45,15 +45,14 @@ quota requests, or quota-cache writes.
 
 ## Supported versions
 
-`0.1.7` is the current maintained source version, with stable source tag
-`v0.1.7`. A source release is available only after its tag is published. The
+This maintained source version is `0.1.8`; its stable source tag is `v0.1.8`.
+A source release is available only after its tag is published. The
 `main` branch may contain unreleased documentation or development work.
 Security fixes are applied to the latest maintained source version.
 
-The working `0.1.8 (9)` candidate is unreleased and does not replace that stable
-version. The `164ae10` validation snapshot passed compiled tests, the release
-gate, and CI display smoke; its synthetic documentation images were reviewed.
-Recovery CI failed and remaining isolated GUI verification is pending.
+Version `0.1.8 (9)` passed the full GitHub test/release job, synthetic Display
+and click-functional Recovery UI jobs, Actions/Swift CodeQL, and separate
+synthetic A/B GUI smokes. Its synthetic documentation images were reviewed.
 Contributor validation guidance is documented in [CONTRIBUTING.md](CONTRIBUTING.md);
 static source checks alone are not runtime security or release evidence.
 

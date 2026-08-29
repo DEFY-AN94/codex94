@@ -37,7 +37,7 @@ browsed in the popover is held only for the current app run and is not written
 to `UserDefaults`. macOS may also store the Dashboard window frame and
 launch-at-login state.
 
-The unreleased `0.1.8` candidate adds two UI preference keys:
+Version `0.1.8` adds two UI preference keys:
 
 - `menuBarLayout.v1` stores the layout used at the next app launch. It is
   separate from the existing menu-bar quota selection and its legacy migration.
@@ -46,7 +46,7 @@ The unreleased `0.1.8` candidate adds two UI preference keys:
   for the affected role. **Restore Default Colors** clears only these overrides,
   not quota selection, layout, theme, language, paths, or window settings.
 
-The candidate also keeps the selected Dashboard section only in memory; the
+Codex94 also keeps the selected Dashboard section only in memory; the
 existing macOS window-frame autosave behavior is unchanged. Absolute Reset text
 is derived from the existing quota reset timestamp and current display locale
 and time zone. It adds no cache fields or identity data. Local accessibility
