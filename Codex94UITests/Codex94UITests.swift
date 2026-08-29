@@ -1382,9 +1382,17 @@ final class Codex94UITests: XCTestCase {
         // Go to Folder targets a single manifest-validated file. No shell,
         // clipboard, Finder navigation, automatic lookup or login command.
         application.typeKey("g", modifierFlags: [.command, .shift])
-        let fields = application.textFields.allElementsBoundByIndex.filter(\.isHittable)
-        try require(fields.count == 1, "The native Go to Folder field must be unambiguous")
-        let pathField = fields[0]
+        let pathFields = application.textFields.matching(NSPredicate(
+            format: "identifier == %@", "PathTextField"
+        ))
+        try waitUntil("The native Go to Folder field did not become actionable") {
+            guard pathFields.count == 1 else { return false }
+            let candidate = pathFields.element(boundBy: 0)
+            return candidate.exists && candidate.isHittable && candidate.isEnabled
+        }
+        try require(pathFields.count == 1,
+                    "The identified native Go to Folder field must be unambiguous")
+        let pathField = pathFields.element(boundBy: 0)
         pathField.click()
         pathField.typeKey("a", modifierFlags: .command)
         pathField.typeText(fixture.executable.path)
