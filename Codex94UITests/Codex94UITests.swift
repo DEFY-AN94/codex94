@@ -266,7 +266,9 @@ final class Codex94UITests: XCTestCase {
             dashboard = try exerciseRecoveryByClick(.connection)
             let guidance = try uniqueIdentified("connection-login-guidance", in: dashboard)
             try require(guidance.isHittable, "Login guidance must be visible")
-            XCTAssertEqual(guidance.label, language.loginGuidance)
+            let guidanceText = [guidance.label, guidance.title, guidance.value as? String ?? ""]
+                .first { !$0.isEmpty } ?? ""
+            XCTAssertEqual(guidanceText, language.loginGuidance)
             try require(elementWithText(language.choose, in: dashboard).exists,
                         "Recovery must lead to Connection settings, not start login")
 
