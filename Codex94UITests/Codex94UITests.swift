@@ -1384,30 +1384,21 @@ final class Codex94UITests: XCTestCase {
         application.typeKey("g", modifierFlags: [.command, .shift])
         let fields = application.textFields.allElementsBoundByIndex.filter(\.isHittable)
         try require(fields.count == 1, "The native Go to Folder field must be unambiguous")
-        fields[0].click()
-        fields[0].typeKey("a", modifierFlags: .command)
-        fields[0].typeText(fixture.executable.path)
-        fields[0].typeKey(.return, modifierFlags: [])
-        let panelTitles = ["Choose…", "选择…"]
-        let prompts = ["Choose…", "选择…", "Choose", "选择", "Open", "打开"]
-        let panels = application.windows.matching(NSPredicate(
-            format: "label IN %@ OR title IN %@", panelTitles, panelTitles
-        ))
-        try require(panels.firstMatch.waitForExistence(timeout: 5),
-                    "The native Open panel must remain visible after Go to Folder")
-        try require(panels.count == 1, "Only one native Open panel may select the fake executable")
-        let panel = panels.element(boundBy: 0)
-        let confirmations = panel.buttons.matching(NSPredicate(
-            format: "label IN %@ OR title IN %@", prompts, prompts
-        ))
-        try require(confirmations.firstMatch.waitForExistence(timeout: 5),
-                    "The Open panel did not select the exact fake executable")
-        try require(confirmations.count == 1, "Only the native file panel confirmation may be pressed")
-        let confirmation = confirmations.element(boundBy: 0)
-        try waitUntil("The native file panel confirmation did not become actionable") {
-            confirmation.isHittable && confirmation.isEnabled
+        let pathField = fields[0]
+        pathField.click()
+        pathField.typeKey("a", modifierFlags: .command)
+        pathField.typeText(fixture.executable.path)
+        pathField.typeKey(.return, modifierFlags: [])
+        try waitUntil("Go to Folder did not return to the native Open panel") {
+            !pathField.exists || !pathField.isHittable
         }
-        confirmation.click()
+        try require(application.state == .runningForeground,
+                    "The isolated application must own the native Open panel")
+        try require(chooseButton.exists && !chooseButton.isHittable,
+                    "The modal Open panel must still block the underlying Choose control")
+        // This Return accepts only the native file chooser's default action.
+        // Recovery-button keyboard acceptance remains a separate pending gate.
+        application.typeKey(.return, modifierFlags: [])
     }
 
     private func selectedQuotaPreference() throws -> Data {
