@@ -1095,6 +1095,7 @@ final class Codex94UITests: XCTestCase {
             let page = try uniqueIdentified("overview-page", in: dashboard)
             let codex = try uniqueIdentified("overview-bucket-0", in: page)
             let spark = try uniqueIdentified("overview-bucket-1", in: page)
+            @MainActor
             func exposes(_ text: String, in element: XCUIElement) -> Bool {
                 ([element] + element.descendants(matching: .any).allElementsBoundByIndex).contains { candidate in
                     [candidate.label, candidate.title, candidate.value as? String ?? ""].contains {
