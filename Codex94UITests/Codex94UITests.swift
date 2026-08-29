@@ -1388,19 +1388,26 @@ final class Codex94UITests: XCTestCase {
         fields[0].typeKey("a", modifierFlags: .command)
         fields[0].typeText(fixture.executable.path)
         fields[0].typeKey(.return, modifierFlags: [])
+        let panelTitles = ["Choose…", "选择…"]
         let prompts = ["Choose…", "选择…", "Choose", "选择", "Open", "打开"]
-        try waitUntil("The Open panel did not select the exact fake executable") {
-            self.application.buttons.allElementsBoundByIndex.contains {
-                prompts.contains($0.label) && $0.isHittable && $0.isEnabled
-                    && !$0.frame.intersects(chooseButton.frame)
-            }
-        }
-        let confirmations = application.buttons.allElementsBoundByIndex.filter {
-            prompts.contains($0.label) && $0.isHittable && $0.isEnabled
-                && !$0.frame.intersects(chooseButton.frame)
-        }
+        let panels = application.windows.matching(NSPredicate(
+            format: "label IN %@ OR title IN %@", panelTitles, panelTitles
+        ))
+        try require(panels.firstMatch.waitForExistence(timeout: 5),
+                    "The native Open panel must remain visible after Go to Folder")
+        try require(panels.count == 1, "Only one native Open panel may select the fake executable")
+        let panel = panels.element(boundBy: 0)
+        let confirmations = panel.buttons.matching(NSPredicate(
+            format: "label IN %@ OR title IN %@", prompts, prompts
+        ))
+        try require(confirmations.firstMatch.waitForExistence(timeout: 5),
+                    "The Open panel did not select the exact fake executable")
         try require(confirmations.count == 1, "Only the native file panel confirmation may be pressed")
-        confirmations[0].click()
+        let confirmation = confirmations.element(boundBy: 0)
+        try waitUntil("The native file panel confirmation did not become actionable") {
+            confirmation.isHittable && confirmation.isEnabled
+        }
+        confirmation.click()
     }
 
     private func selectedQuotaPreference() throws -> Data {
