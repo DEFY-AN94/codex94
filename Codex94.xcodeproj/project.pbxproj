@@ -35,6 +35,8 @@
 		B0000000000000000000001A /* RefreshPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001B /* RefreshPolicy.swift */; };
 		B0000000000000000000001B /* MenuBarAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001C /* MenuBarAppearance.swift */; };
 		B0000000000000000000001C /* DisplaySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001D /* DisplaySettingsView.swift */; };
+		B0000000000000000000001D /* CopyTextButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001E /* CopyTextButton.swift */; };
+		B0000000000000000000001E /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001F /* OverviewView.swift */; };
 		B00000000000000000000101 /* QuotaModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000101 /* QuotaModelsTests.swift */; };
 		B00000000000000000000102 /* ExecutableLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000102 /* ExecutableLocatorTests.swift */; };
 		B00000000000000000000103 /* DiagnosticsRedactorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000103 /* DiagnosticsRedactorTests.swift */; };
@@ -95,6 +97,8 @@
 		F0000000000000000000001B /* RefreshPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/RefreshPolicy.swift; sourceTree = "<group>"; };
 		F0000000000000000000001C /* MenuBarAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/MenuBarAppearance.swift; sourceTree = "<group>"; };
 		F0000000000000000000001D /* DisplaySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Dashboard/DisplaySettingsView.swift; sourceTree = "<group>"; };
+		F0000000000000000000001E /* CopyTextButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/CopyTextButton.swift; sourceTree = "<group>"; };
+		F0000000000000000000001F /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Dashboard/OverviewView.swift; sourceTree = "<group>"; };
 		F00000000000000000000101 /* QuotaModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaModelsTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000102 /* ExecutableLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutableLocatorTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000103 /* DiagnosticsRedactorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsRedactorTests.swift; sourceTree = "<group>"; };
@@ -163,9 +167,11 @@
 				F0000000000000000000001B /* RefreshPolicy.swift */,
 				F0000000000000000000000F /* QuotaBarView.swift */,
 				F0000000000000000000001A /* ConnectionBadgeView.swift */,
+				F0000000000000000000001E /* CopyTextButton.swift */,
 				F00000000000000000000010 /* MenuBarStatusView.swift */,
 				F00000000000000000000011 /* QuotaPopoverView.swift */,
 				F00000000000000000000012 /* DashboardView.swift */,
+				F0000000000000000000001F /* OverviewView.swift */,
 				F0000000000000000000001D /* DisplaySettingsView.swift */,
 				F00000000000000000000013 /* Assets.xcassets */,
 				F00000000000000000000014 /* Localizable.xcstrings */,
@@ -313,9 +319,11 @@
 				B0000000000000000000001A /* RefreshPolicy.swift in Sources */,
 				B0000000000000000000000F /* QuotaBarView.swift in Sources */,
 				B00000000000000000000019 /* ConnectionBadgeView.swift in Sources */,
+				B0000000000000000000001D /* CopyTextButton.swift in Sources */,
 				B00000000000000000000010 /* MenuBarStatusView.swift in Sources */,
 				B00000000000000000000011 /* QuotaPopoverView.swift in Sources */,
 				B00000000000000000000012 /* DashboardView.swift in Sources */,
+				B0000000000000000000001E /* OverviewView.swift in Sources */,
 				B0000000000000000000001C /* DisplaySettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -405,7 +413,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -413,7 +421,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.1.8;
+				MARKETING_VERSION = 0.1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -431,14 +439,14 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.1.8;
+				MARKETING_VERSION = 0.1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

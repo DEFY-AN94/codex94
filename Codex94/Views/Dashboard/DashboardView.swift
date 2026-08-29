@@ -46,7 +46,9 @@ struct DashboardView: View {
             .toolbar(removing: .sidebarToggle)
         } detail: {
             Group {
-                switch windowState.selection ?? .connection {
+                switch windowState.resolvedSelection {
+                case .overview:
+                    OverviewView(store: store)
                 case .connection:
                     ConnectionSettingsView(
                         store: store,
@@ -305,13 +307,13 @@ private struct StartupSettingsView: View {
 
 private struct DiagnosticsView: View {
     @ObservedObject var store: AppStore
-    @State private var copied = false
 
     var body: some View {
+        let diagnostics = store.diagnostics().text
         SettingsPage(title: "dashboard.diagnostics") {
             VStack(alignment: .leading, spacing: 12) {
                 ScrollView {
-                    Text(store.diagnostics().text)
+                    Text(diagnostics)
                         .font(.system(size: 12, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -325,17 +327,12 @@ private struct DiagnosticsView: View {
                 }
                 .frame(minHeight: 320)
 
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(store.diagnostics().text, forType: .string)
-                    copied = true
-                    Task {
-                        try? await Task.sleep(nanoseconds: 1_500_000_000)
-                        copied = false
-                    }
-                } label: {
-                    Label(copied ? "diagnostics.copied" : "diagnostics.copy", systemImage: "doc.on.doc")
-                }
+                CopyTextButton(
+                    text: diagnostics,
+                    label: "diagnostics.copy",
+                    copiedLabel: "diagnostics.copied",
+                    accessibilityIdentifier: "copy-diagnostics"
+                )
 
                 Text("diagnostics.reviewBeforeSharing")
                     .font(.caption)
@@ -347,7 +344,7 @@ private struct DiagnosticsView: View {
 
 private struct AboutView: View {
     private let metadata = AppMetadata.current
-    private let githubURL = URL(string: "https://github.com/DEFY-AN94")!
+    private let creatorURL = URL(string: "https://github.com/DEFY-AN94")!
 
     var body: some View {
         SettingsPage(title: "dashboard.about") {
@@ -372,9 +369,19 @@ private struct AboutView: View {
             Divider()
 
             SettingsRow("about.version") {
-                Text(metadata.versionAndBuild)
-                    .font(.system(.body, design: .monospaced))
-                    .textSelection(.enabled)
+                HStack(spacing: 10) {
+                    Text(metadata.versionAndBuild)
+                        .font(.system(.body, design: .monospaced))
+                        .textSelection(.enabled)
+                    CopyTextButton(
+                        text: metadata.versionAndBuild,
+                        label: "about.copyVersion",
+                        copiedLabel: "about.versionCopied",
+                        accessibilityIdentifier: "copy-version"
+                    )
+                    .controlSize(.small)
+                }
+                .accessibilityIdentifier("about-version")
             }
 
             SettingsDivider()
@@ -399,10 +406,17 @@ private struct AboutView: View {
 
             SettingsDivider()
 
+            SettingsRow("about.project") {
+                Link("about.projectLink", destination: AppMetadata.projectURL)
+                    .accessibilityIdentifier("project-link")
+            }
+
+            SettingsDivider()
+
             SettingsRow("about.creator") {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(verbatim: "Crysis_TJQ")
-                    Link("@DEFY-AN94", destination: githubURL)
+                    Link("@DEFY-AN94", destination: creatorURL)
                 }
             }
 

@@ -34,27 +34,38 @@ selection, refresh frequency, account-information mode, and an optional
 manually selected Codex path. See [PRIVACY.md](PRIVACY.md) for the complete
 inventory.
 
-Version `0.1.8` adds only local UI preferences for menu-bar
-layout (`menuBarLayout.v1`) and four independent opaque sRGB color overrides
-(`statusAccentOverrides.v1`, normalized uppercase `RRGGBB`). Restoring colors removes only
-those overrides. Absolute Reset text uses the existing timestamp without a new
-cache schema, and the Dashboard section is session-only. Recovery actions only
-navigate to Connection or Diagnostics; login guidance does not execute login.
-These display/navigation changes do not add credential access, permissions,
-quota requests, or quota-cache writes.
+Version `0.1.8` introduced only local UI preferences for menu-bar layout
+(`menuBarLayout.v1`) and four independent opaque sRGB color overrides
+(`statusAccentOverrides.v1`, normalized uppercase `RRGGBB`). Version `0.1.9`
+reuses those keys and cache schema v2 unchanged. It applies layout changes to
+the existing status item immediately, and its default Overview reads the same
+snapshot without exposing email, executable paths, or raw bucket identifiers.
+
+The `0.1.9` post-reset task exists only in memory and reuses the existing
+Codex-subprocess request and single-flight coordinator. It chooses the earliest
+future displayable-window target at `resetsAt + 5` seconds or later, consumes a
+target after at most one attempt, and persists no ledger. Logs do not include
+Reset timestamps, bucket identifiers, account data, or paths. About version
+copying is user-triggered and shares the same bounded clipboard component as
+redacted Diagnostics. These changes add no credential access, identity field,
+cache field, preference key, direct network interface, background helper,
+telemetry, entitlement, or system permission.
 
 ## Supported versions
 
-This maintained source version is `0.1.8`; its stable source tag is `v0.1.8`.
-A source release is available only after its tag is published. The
-`main` branch may contain unreleased documentation or development work.
-Security fixes are applied to the latest maintained source version.
+This tree is the working `0.1.9 (10)` source candidate; the latest published
+stable source tag remains `v0.1.8`. The candidate is not a source release until
+an annotated `v0.1.9` tag is published from the separately verified final
+`main`. Feature branches and `main` may contain unreleased development work.
+Until that tag exists, `v0.1.8` remains the published stable source.
 
 Version `0.1.8 (9)` passed the full GitHub test/release job, synthetic Display
 and click-functional Recovery UI jobs, Actions/Swift CodeQL, and separate
 synthetic A/B GUI smokes. Its synthetic documentation images were reviewed.
 Contributor validation guidance is documented in [CONTRIBUTING.md](CONTRIBUTING.md);
 static source checks alone are not runtime security or release evidence.
+Draft PR CI, exact-head App review, and visual/privacy review of a synthetic
+`0.1.9` Overview artifact remain pending; none is claimed as release evidence.
 
 ## Reporting
 

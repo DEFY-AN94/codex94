@@ -6,19 +6,19 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let preferences: PreferencesStore
     private let store: AppStore
-    private let menuBarLayout: MenuBarLayout
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private var dashboardController: DashboardWindowController?
     private var localMouseMonitor: Any?
     private var globalMouseMonitor: Any?
     private var workspaceWakeObserver: NSObjectProtocol?
+    private var systemClockObserver: NSObjectProtocol?
     private var themeObservation: AnyCancellable?
+    private var menuBarLayoutObservation: AnyCancellable?
 
     override init() {
         let preferences = PreferencesStore()
         self.preferences = preferences
-        menuBarLayout = preferences.menuBarLayout
         store = AppStore(preferences: preferences)
         super.init()
     }
@@ -29,8 +29,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         NSApp.setActivationPolicy(.accessory)
         configureWorkspaceWakeObservation()
+        configureSystemClockObservation()
         configureThemeObservation()
         configureStatusItem()
+        configureMenuBarLayoutObservation()
         configurePopover()
         store.start()
 
@@ -54,8 +56,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         removeWorkspaceWakeObservation()
+        removeSystemClockObservation()
         store.shutdown()
         themeObservation?.cancel()
+        menuBarLayoutObservation?.cancel()
         stopOutsideClickMonitoring()
     }
 
@@ -76,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func configureStatusItem() {
-        let metrics = menuBarLayout.metrics
+        let metrics = preferences.menuBarLayout.metrics
         let item = NSStatusBar.system.statusItem(withLength: metrics.statusItemWidth)
         guard let button = item.button else { return }
         button.target = self
@@ -92,7 +96,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         let statusView = MenuBarStatusView(
             store: store,
-            layout: menuBarLayout,
             onAccessibilityLabelChange: { [weak button] label in
                 button?.setAccessibilityLabel(label)
             }
@@ -132,6 +135,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         self.workspaceWakeObserver = nil
     }
 
+    private func configureSystemClockObservation() {
+        systemClockObserver = NotificationCenter.default.addObserver(
+            forName: .NSSystemClockDidChange,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.store.handleSystemClockChange()
+            }
+        }
+    }
+
+    private func removeSystemClockObservation() {
+        guard let systemClockObserver else { return }
+        NotificationCenter.default.removeObserver(systemClockObserver)
+        self.systemClockObserver = nil
+    }
+
     private func configureThemeObservation() {
         applyAppearance(preferences.theme)
         themeObservation = preferences.$theme
@@ -139,6 +160,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             .receive(on: RunLoop.main)
             .sink { [weak self] theme in
                 self?.applyAppearance(theme)
+            }
+    }
+
+    private func configureMenuBarLayoutObservation() {
+        menuBarLayoutObservation = preferences.$menuBarLayout
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] layout in
+                self?.statusItem?.length = layout.metrics.statusItemWidth
             }
     }
 

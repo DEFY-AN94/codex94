@@ -29,11 +29,12 @@ Use small, scoped commits. Match the existing SwiftUI/AppKit ownership split:
 SwiftUI owns views and state presentation; AppKit owns status items, popovers,
 application appearance, and window lifecycle.
 
-`AppDelegate` owns registration and removal of macOS workspace notification
-observers and only forwards those events to the main-actor `AppStore`.
-`AppStore` owns refresh coordination, while the pure `RefreshPolicy` owns the
-wake freshness decision. SwiftUI views must not observe workspace notifications
-or start requests from relative-time rendering.
+`AppDelegate` owns registration and removal of macOS workspace and system-clock
+notification observers and only forwards those events to the main-actor
+`AppStore`. `AppStore` owns refresh and single-flight coordination, while the
+pure `RefreshPolicy` owns wake freshness and Reset-target decisions. SwiftUI
+views must not observe those notifications, schedule Reset requests, or start
+requests from relative-time rendering.
 
 ## Development and validation
 
@@ -44,6 +45,10 @@ test preferences, caches, and output paths separate from daily app data.
   repeatable tests. Do not import real account credentials into fixtures or
   CI, or publish account identity, real quota, tokens, raw RPC payloads, or
   private paths.
+- Test Reset scheduling through injected dates and internal wake/clock handlers;
+  do not wait for a real Reset or change system time. Cover the strict
+  `resetsAt + 5` boundary, deduplication, earliest target, single-flight
+  adjacency, failure consumption, wake/clock reconciliation, and shutdown.
 - Do not clear or rewrite daily preferences, cache, or authentication data as
   test setup. Fixture cleanup should target only exact test-created resources.
 - Understand script side effects before running them: `release_check.sh` runs
@@ -70,6 +75,12 @@ permissions are generated before the build and applied only to the UI test
 target. The tests verify the signed runner and app permissions before launching
 the app; the production app receives no test-only permissions.
 
+Fixture preparation must bind `HEAD` to `GITHUB_SHA`, read the committed app
+target's unique Debug/Release version and build from that same revision, and
+copy only the explicit build-input allowlist. Do not hard-code an app release
+version in runner metadata or temporary-path names; a fixture-schema version is
+separate from the app version.
+
 Status-item GUI checks distinguish the requested AppKit length from its public
 accessibility bounds. A temporary native reference owned by the test process is
 measured and removed before app launch; it must distinguish all three lengths.
@@ -82,23 +93,34 @@ test result bundles, preferences, caches, environment dumps, and full-screen
 captures are not uploaded. Review the images themselves before replacing
 documentation screenshots.
 
-Cover fixed layout metrics and startup capture, independent color roles and
-restoration, Reset locale/calendar/time-zone behavior, all recovery routes,
-button accessibility, and no-fetch/no-cache-write behavior. Preserve the
-existing multi-bucket, freshness, wake, and subprocess regressions. Shared
-Reset labels must include the countdown and absolute time; public test data and
-screenshots must remain synthetic or redacted.
+Cover fixed and live layout metrics, independent color roles and restoration,
+Reset locale/calendar/time-zone behavior and scheduling, all recovery routes,
+Overview routing/rendering, button accessibility, and no-fetch/no-cache-write
+behavior. About copy tests must use an isolated named pasteboard and must not
+read, clear, or overwrite the user's general pasteboard. Preserve the existing
+multi-bucket, freshness, wake, and subprocess regressions. Shared Reset labels
+must include the countdown and absolute time; public test data and screenshots
+must remain synthetic or redacted.
 
 Report source/static checks, compiled tests, GUI smoke, screenshots, and release
 status separately, tied to the actual candidate tree and artifacts. The four
 README popover/Dashboard images are reviewed synthetic `0.1.8` captures;
-the unchanged default menu-bar example remains from `v0.1.7`. Version 0.1.8
-passed the full test/release job, synthetic Display and click-functional
-Recovery UI jobs, CodeQL, and separate synthetic A/B GUI smokes. Keyboard
-activation, AXPress, and hosted tooltip exposure are not claimed as passed.
-Keep future feature notes under Unreleased and stable installation instructions
-on the latest published source tag until a separately reviewed source release
-is finalized.
+the unchanged default menu-bar example remains from `v0.1.7`. A `0.1.9`
+Overview artifact is not documentation evidence until exact-head Draft PR CI
+produces it and a person reviews the image itself for layout and privacy.
+Version 0.1.8 passed the full test/release job, synthetic Display and
+click-functional Recovery UI jobs, CodeQL, and separate synthetic A/B GUI
+smokes. Keyboard activation, AXPress, and hosted tooltip exposure are not
+claimed as passed. The working candidate is `0.1.9 (10)`, while stable install
+instructions remain on `v0.1.8`. Keep candidate notes under Unreleased without
+a guessed date or release claim until the source release is finalized.
+
+A release pull request begins as Draft. Required CI and exact-head synthetic UI
+artifacts must be complete and reviewed, and the maintainer must accept the
+exact-head App before separately authorizing Ready for review. Ready does not
+authorize merge; merge, the final `main` checks, and creation/push of an
+annotated source tag remain separate gates. Follow
+[docs/RELEASING.md](docs/RELEASING.md).
 
 Do not open a public issue for a suspected vulnerability. Follow
 [SECURITY.md](SECURITY.md).

@@ -157,6 +157,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Bundle 标识符" } }
       }
     },
+    "about.copyVersion" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy version" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制版本" } }
+      }
+    },
     "about.creator" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Created by" } },
@@ -167,6 +173,18 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "License" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开源许可" } }
+      }
+    },
+    "about.project" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Project" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "项目" } }
+      }
+    },
+    "about.projectLink" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "GitHub repository" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "GitHub 仓库" } }
       }
     },
     "about.requirements" : {
@@ -191,6 +209,12 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Version" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "版本" } }
+      }
+    },
+    "about.versionCopied" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copied" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已复制" } }
       }
     },
     "command.dashboard" : {
@@ -281,6 +305,12 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Display" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示" } }
+      }
+    },
+    "dashboard.overview" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Overview" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "总览" } }
       }
     },
     "dashboard.sidebar.hide" : {
@@ -401,12 +431,6 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Ring Only" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅圆环" } }
-      }
-    },
-    "display.layout.restartNotice" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The saved layout takes effect the next time Codex94 starts." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保存的布局将在下次启动 Codex94 时生效。" } }
       }
     },
     "display.label" : {
@@ -623,6 +647,24 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "简体中文" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "简体中文" } }
+      }
+    },
+    "overview.noQuotaData" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No quota data" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无额度数据" } }
+      }
+    },
+    "overview.noSnapshot" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No quota snapshot is available" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无可用的额度快照" } }
+      }
+    },
+    "overview.status" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Status" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "状态" } }
       }
     },
     "quota.fiveHourShort" : {

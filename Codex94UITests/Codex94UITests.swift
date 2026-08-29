@@ -42,6 +42,7 @@ final class Codex94UITests: XCTestCase {
     func testDisplaySmoke() throws {
         try prepare(scenario: "display")
         try launchPopover(expectedRequestRange: 1...2)
+        let initialApplicationPID = try ownedApplicationPID()
         var popover = try currentPopover()
         try capture(popover, named: "popover-startup.png")
         try assertStatusItemWidth(58)
@@ -62,23 +63,30 @@ final class Codex94UITests: XCTestCase {
         // The popover browses Spark, but the independently saved menu-bar quota
         // is still Codex Weekly. Compare actual accessible Reset strings.
         var dashboard = try openDashboard(from: popover)
+        try assertOverview(in: dashboard)
+        try capture(dashboard, named: "dashboard-en.png")
+        try assertOverview(in: dashboard, scrollToLastRow: true)
+        try selectPage(.about, in: dashboard)
+        try assertAbout(in: dashboard)
         try selectPage(.connection, in: dashboard)
         try assertDashboardReset(in: dashboard, spark: false)
         try selectPage(.display, in: dashboard)
         try assertColorControls(in: dashboard)
-        try scrollToTop(in: dashboard)
-        try capture(dashboard, named: "dashboard-en.png")
 
         try setLanguage(.simplifiedChinese, in: dashboard)
         dashboard = try dashboardWindow()
         try assertColorControls(in: dashboard)
-        try scrollToTop(in: dashboard)
+        try selectPage(.overview, in: dashboard)
+        try assertOverview(in: dashboard)
         try capture(dashboard, named: "dashboard-zh-Hans.png")
+        try selectPage(.about, in: dashboard)
+        try assertAbout(in: dashboard)
         popover = try openPopover(expectedRequestDelta: 1)
         try assertQuotaLayout(in: popover, spark: true)
         try assertNoRecoveryAction(in: popover)
         try capture(popover, named: "popover-zh-Hans.png")
         dashboard = try openDashboard(from: popover)
+        try selectPage(.display, in: dashboard)
 
         // A real server-provided long name, both languages, all three themes,
         // and both the one-window and two-window popover layouts.
@@ -195,28 +203,32 @@ final class Codex94UITests: XCTestCase {
         try manualRefresh(in: popover)
         try assertNoRecoveryAction(in: try currentPopover())
 
-        // Changing the preference is immediate, but the existing status item
-        // keeps the width captured at launch. No quit uses XCTest terminate().
-        for (layout, oldWidth, newWidth) in [
-            ("percentageOnly", CGFloat(58), CGFloat(50)),
-            ("ringOnly", CGFloat(50), CGFloat(28))
+        // Every layout change must resize the one existing status item in the
+        // same application process. Opening its popover after each transition
+        // proves the original target/action and anchor remain functional.
+        for (layout, newWidth) in [
+            ("percentageOnly", CGFloat(50)),
+            ("ringOnly", CGFloat(28)),
+            ("ringAndPercentage", CGFloat(58)),
         ] {
             dashboard = try openDashboard(from: try currentPopover())
             try selectPage(.display, in: dashboard)
-            try withoutRequests("Saving the next-launch menu-bar layout") {
+            try withoutRequests("Changing the live menu-bar layout") {
                 try chooseLayout(layout, in: dashboard)
             }
-            try assertStatusItemWidth(oldWidth)
-            try quitNormally()
-            try launchPopover(expectedRequestRange: 1...2)
             try assertStatusItemWidth(newWidth)
-            try assertNoRecoveryAction(in: try currentPopover())
+            XCTAssertEqual(try ownedApplicationPID(), initialApplicationPID,
+                           "Live layout changes must not restart the application")
+            popover = try openPopover(expectedRequestDelta: 1)
+            try assertNoRecoveryAction(in: popover)
         }
         try quitNormally()
         try fixture.writeReport("display-result.json", fields: [
             "scenario": "display", "completed": true,
             "languages": ["en", "zh-Hans"], "themes": UITheme.allCases.map(\.rawValue),
-            "requestedStatusItemWidths": [58, 50, 28], "observedStatusItemAXWidths": observedStatusWidths,
+            "requestedStatusItemWidths": [58, 50, 28, 58],
+            "sameProcessLayoutTransitions": true,
+            "observedStatusItemAXWidths": observedStatusWidths,
             "rawTestResultsUploaded": false
         ])
     }
@@ -491,7 +503,7 @@ final class Codex94UITests: XCTestCase {
                        "The status item's AX width must match a native status item with the same requested length")
         if let previous = observedStatusWidths[String(Int(width))] {
             XCTAssertEqual(observed, previous, accuracy: 0.1,
-                           "Saving a new layout must not change the current status-item width")
+                           "Returning to the same requested length must reproduce its status-item width")
         }
         observedStatusWidths[String(Int(width))] = observed
         try require(item.frame.height > 0, "The actual status item must have visible geometry")
@@ -699,9 +711,11 @@ final class Codex94UITests: XCTestCase {
             sidebarLabel.click()
             let marker: XCUIElement
             switch page {
+            case .overview: marker = identified("overview-page", in: dashboard)
             case .connection: marker = identified("connection-menu-bar-reset", in: dashboard)
             case .display: marker = identified("menu-bar-layout", in: dashboard)
             case .diagnostics: marker = elementWithText(language.copyDiagnostics, in: dashboard)
+            case .about: marker = identified("about-version", in: dashboard)
             }
             try require(marker.waitForExistence(timeout: 5), "Dashboard selected the wrong destination")
         }
@@ -723,9 +737,11 @@ final class Codex94UITests: XCTestCase {
             "rawTextIncluded": false, "rawTestResultsUploaded": false,
         ]
         switch page {
+        case .overview: report["expectedPage"] = "overview"
         case .connection: report["expectedPage"] = "connection"
         case .display: report["expectedPage"] = "display"
         case .diagnostics: report["expectedPage"] = "diagnostics"
+        case .about: report["expectedPage"] = "about"
         }
         func save() throws {
             try fixture.writeReport("dashboard-sidebar-probe.json", fields: report)
@@ -956,7 +972,7 @@ final class Codex94UITests: XCTestCase {
     private func chooseLayout(_ layout: String, in dashboard: XCUIElement) throws {
         let control = try picker(id: "menu-bar-layout", label: "", values: [], in: dashboard)
         try choose(language.layout(layout), in: control, container: dashboard)
-        try waitUntil("The next-launch layout preference did not change") {
+        try waitUntil("The live layout preference did not change") {
             try self.fixture.preference("menuBarLayout.v1") as? String == layout
         }
     }
@@ -976,16 +992,6 @@ final class Codex94UITests: XCTestCase {
             if element.isHittable { return }
         }
         throw UITestFailure("A required app control could not be made visible with bounded scrolling")
-    }
-
-    private func scrollToTop(in dashboard: XCUIElement) throws {
-        let scrolls = dashboard.scrollViews.allElementsBoundByIndex
-        guard let detail = scrolls.max(by: { $0.frame.width < $1.frame.width }) else {
-            throw UITestFailure("Dashboard must expose its own detail ScrollView")
-        }
-        for _ in 0..<5 { detail.scroll(byDeltaX: 0, deltaY: 320) }
-        try require(identified("menu-bar-layout", in: dashboard).isHittable,
-                    "Only the Display page may be saved as a Dashboard screenshot")
     }
 
     // MARK: - Real layout, complete Reset labels and color controls
@@ -1081,6 +1087,56 @@ final class Codex94UITests: XCTestCase {
             rowFrames.append(row.frame)
         }
         if rowFrames.count == 2 { XCTAssertFalse(rowFrames[0].intersects(rowFrames[1])) }
+    }
+
+    private func assertOverview(in dashboard: XCUIElement, scrollToLastRow: Bool = false) throws {
+        let action = scrollToLastRow ? "Scrolling Overview" : "Rendering Overview"
+        try withoutRequests(action) {
+            let page = try uniqueIdentified("overview-page", in: dashboard)
+            let codex = try uniqueIdentified("overview-bucket-0", in: page)
+            let spark = try uniqueIdentified("overview-bucket-1", in: page)
+            func exposes(_ text: String, in element: XCUIElement) -> Bool {
+                ([element] + element.descendants(matching: .any).allElementsBoundByIndex).contains { candidate in
+                    [candidate.label, candidate.title, candidate.value as? String ?? ""].contains {
+                        $0.contains(text)
+                    }
+                }
+            }
+            try require(exposes("Codex", in: codex),
+                        "The first Overview bucket must use the default display name")
+            try require(exposes(fixture.sparkName, in: spark),
+                        "The second Overview bucket must use its service-provided display name")
+
+            try require(!identified("overview-bucket-0-fiveHour", in: page).exists,
+                        "Overview must not invent a missing Codex 5-hour window")
+            _ = try uniqueIdentified("overview-bucket-0-weekly", in: page)
+            _ = try uniqueIdentified("overview-bucket-1-fiveHour", in: page)
+            let finalRow = try uniqueIdentified("overview-bucket-1-weekly", in: page)
+            if scrollToLastRow { try reveal(finalRow, in: dashboard) }
+
+            let accessibleElements = [page] + page.descendants(matching: .any).allElementsBoundByIndex
+            for element in accessibleElements {
+                let visibleStrings = [element.label, element.title, element.value as? String ?? ""]
+                try require(
+                    visibleStrings.allSatisfy { !$0.contains("default-v2") && !$0.contains("model-special") },
+                    "Overview must not expose an opaque quota bucket identifier"
+                )
+            }
+        }
+    }
+
+    private func assertAbout(in dashboard: XCUIElement) throws {
+        try withoutRequests("Inspecting About metadata") {
+            let version = try uniqueIdentified("about-version", in: dashboard)
+            let expected = "\(fixture.expectedVersion) (\(fixture.expectedBuild))"
+            let visibleStrings = [version.label, version.title, version.value as? String ?? ""]
+            try require(visibleStrings.contains(where: { normalizedWhitespace($0).contains(expected) }),
+                        "About must expose the manifest-validated version and build")
+            let copy = try uniqueIdentified("copy-version", in: dashboard)
+            try require(copy.isEnabled, "Copy Version must be available without touching the clipboard")
+            let project = try uniqueIdentified("project-link", in: dashboard)
+            try require(project.isEnabled, "The Project link must be available in About")
+        }
     }
 
     private func assertDashboardReset(in dashboard: XCUIElement, spark: Bool) throws {
@@ -1469,7 +1525,7 @@ private enum ReadOnlyFocusStage: String, CaseIterable {
         "focusedElementIdentityUnknown": true, "focusedElementIsRecoveryButton": false,
     ]
 }
-private enum UIPage { case connection, display, diagnostics }
+private enum UIPage { case overview, connection, display, diagnostics, about }
 private enum UITheme: String, CaseIterable { case system, terminalDark, terminalLight }
 
 private enum UILanguage: String, CaseIterable {
@@ -1498,9 +1554,11 @@ private enum UILanguage: String, CaseIterable {
     }
     func page(_ page: UIPage) -> String {
         switch page {
+        case .overview: chinese ? "总览" : "Overview"
         case .connection: chinese ? "连接" : "Connection"
         case .display: chinese ? "显示" : "Display"
         case .diagnostics: chinese ? "诊断" : "Diagnostics"
+        case .about: chinese ? "关于" : "About"
         }
     }
     func theme(_ theme: UITheme) -> String {
@@ -1581,7 +1639,7 @@ private struct SyntheticFixture {
         } else {
             throw UITestFailure("The synthetic fixture root is outside the exact private temporary directory")
         }
-        guard name.hasPrefix("codex94-v018-ui-"), name.count > "codex94-v018-ui-".count else {
+        guard name.hasPrefix("codex94-ui-v1-"), name.count > "codex94-ui-v1-".count else {
             throw UITestFailure("The synthetic fixture root is not an approved canonical temporary directory")
         }
         let canonicalRoot = try registeredPath(rootPath, expected: "/private/tmp/" + name)
@@ -1595,8 +1653,13 @@ private struct SyntheticFixture {
               manifest["bundleID"] as? String == "com.defyan94.codex94",
               let runner = manifest["runner"] as? [String: String],
               runner == ["environment": "github-hosted", "os": "macOS"],
-              manifest["expectedVersion"] as? String == "0.1.8",
-              manifest["expectedBuild"] as? String == "9",
+              let expectedVersion = manifest["expectedVersion"] as? String,
+              expectedVersion.range(
+                  of: #"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$"#,
+                  options: .regularExpression
+              ) != nil,
+              let expectedBuild = manifest["expectedBuild"] as? String,
+              expectedBuild.range(of: #"^[1-9][0-9]*$"#, options: .regularExpression) != nil,
               let sourceRevision = manifest["sourceRevision"] as? String,
               sourceRevision.range(of: "^[0-9a-f]{40}$", options: .regularExpression) != nil,
               let initial = manifest["initialPreferences"] as? [String: Any],
@@ -1640,10 +1703,12 @@ private struct SyntheticFixture {
             from: read(infoURL, maximumBytes: 131_072), options: [], format: nil
         ) as? [String: Any],
               info["CFBundleIdentifier"] as? String == "com.defyan94.codex94",
-              info["CFBundleShortVersionString"] as? String == "0.1.8",
-              info["CFBundleVersion"] as? String == "9",
+              info["CFBundleShortVersionString"] as? String == expectedVersion,
+              info["CFBundleVersion"] as? String == expectedBuild,
               info["CFBundleExecutable"] as? String == "Codex94" else {
-            throw UITestFailure("The exact fixture-root build product must be Codex94 0.1.8 (9)")
+            throw UITestFailure(
+                "The exact fixture-root build product must be Codex94 \(expectedVersion) (\(expectedBuild))"
+            )
         }
         let applicationBinaryURL = applicationURL.appendingPathComponent("Contents/MacOS/Codex94")
         guard FileManager.default.isExecutableFile(atPath: applicationBinaryURL.path) else {
@@ -1683,7 +1748,8 @@ private struct SyntheticFixture {
             throw UITestFailure("The fake protocol self-check or fixed synthetic quota data is missing")
         }
         return SyntheticFixture(
-            root: root, bundleID: "com.defyan94.codex94", expectedVersion: "0.1.8", expectedBuild: "9",
+            root: root, bundleID: "com.defyan94.codex94",
+            expectedVersion: expectedVersion, expectedBuild: expectedBuild,
             sourceRevision: sourceRevision,
             executable: executable, invalidExecutable: invalidExecutable, modeURL: modeURL,
             requestLogURL: requestLogURL, artifacts: artifacts,

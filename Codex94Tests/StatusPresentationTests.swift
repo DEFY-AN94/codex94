@@ -35,7 +35,7 @@ final class StatusPresentationTests: XCTestCase {
         XCTAssertEqual(ConnectionRecoveryDestination.diagnostics.dashboardSection, .diagnostics)
         XCTAssertEqual(
             DashboardSection.primarySections,
-            [.connection, .display, .startup, .diagnostics]
+            [.overview, .connection, .display, .startup, .diagnostics]
         )
     }
 
@@ -53,10 +53,10 @@ final class StatusPresentationTests: XCTestCase {
     @MainActor
     func testOrdinaryDashboardOpenPreservesDefaultAndSelectedSection() {
         let windowState = DashboardWindowState()
-        XCTAssertEqual(windowState.selection, .connection)
+        XCTAssertEqual(windowState.selection, .overview)
 
         windowState.select(section: nil)
-        XCTAssertEqual(windowState.selection, .connection)
+        XCTAssertEqual(windowState.selection, .overview)
 
         windowState.selection = .about
         windowState.select(section: nil)

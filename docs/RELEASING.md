@@ -5,18 +5,21 @@ notarized, so they must not be presented as frictionless public binary
 downloads. This checklist covers normal source releases and the one-time public
 repository transition.
 
-## 1. Prepare the release
+## 1. Prepare the release candidate
 
 1. Start from an up-to-date `main` branch and review all changes since the
    previous source tag.
 2. Choose a new semantic version. Update `MARKETING_VERSION` and
    `CURRENT_PROJECT_VERSION` when producing a new app version.
-3. Move the relevant entries from **Unreleased** in `CHANGELOG.md` into the new
-   dated version section.
+3. During implementation and the initial Draft PR, keep candidate notes under
+   **Unreleased** without a date or release claim. Keep stable installation and
+   clone instructions on the latest tag that actually exists.
 4. Keep `README.md` and `README.zh-CN.md` synchronized for any change to
    installation, behavior, security boundaries, screenshots, or distribution.
 5. Review documentation and fixture images for email addresses, account IDs,
    tokens, real quota values, private paths, and machine-specific details.
+6. Keep the release source-only. Do not create or attach an App, ZIP, DMG, or
+   other binary artifact to a GitHub Release.
 
 A documentation-only commit on `main` does not require moving an existing tag
 or changing the installed app version. It can be included naturally in the next
@@ -50,38 +53,95 @@ git diff --check PREVIOUS_TAG..HEAD
 
 Replace `PREVIOUS_TAG` with the latest published source tag.
 
-## 3. Open a release pull request and wait for CI
+## 3. Draft PR, exact-head review, Ready, and merge
 
 Create and push a release branch instead of committing directly to `main`:
 
 ```bash
-VERSION=X.Y.Z
-git switch -c "release/v$VERSION-public"
-git push -u origin "release/v$VERSION-public"
+RELEASE_BRANCH="codex/vX.Y.Z-focused-change"
+git switch -c "$RELEASE_BRANCH"
+git push -u origin "$RELEASE_BRANCH"
 ```
 
-Open a pull request to `main`. The `test` job must pass before the maintainer
-squash-merges the pull request. Confirm that `main` now points to the verified
-merge commit; do not tag the release branch commit.
+Open the pull request as **Draft**. Record its exact head SHA, version/build,
+scope, risk and rollback notes, automated checks, and synthetic UI evidence.
+Mark final App acceptance as **Pending**. Creating a Draft does not authorize
+Ready for review, merge, tagging, or installation.
 
-## 4. Create a new immutable tag
+For the exact Draft head:
 
-After the pull request is merged and CI succeeds on `main`, create and inspect a
-new annotated tag on that merge commit:
+1. Wait for every required test, UI display/recovery, and CodeQL check to finish
+   successfully. Pending, skipped, cancelled, or failed checks are not green.
+2. Download the synthetic UI artifacts and inspect the actual app-window images
+   for layout, clipping, localization, synthetic content, and privacy. A file's
+   existence or nonzero size is not visual evidence.
+3. Build the exact-head App for maintainer review. Record the reviewed SHA. Any
+   later App source, resource, project-setting, or Info.plist change invalidates
+   that acceptance and requires a new build and review. A documentation-only
+   change does not invalidate App acceptance, but still requires documentation
+   checks and CI.
+4. After image review and explicit acceptance of the exact-head App, obtain
+   separate authorization before marking the pull request **Ready for review**.
+5. Ready does not authorize merge. Obtain separate merge authorization, then
+   squash-merge and record the resulting `main` commit. Never tag the release
+   branch commit.
+
+Before Ready, finalize release-facing documentation on the same Draft. Replace
+candidate-only wording only when it remains true before and after tag creation;
+for example, say that the new tag is available only after publication. Move the
+changelog entry out of **Unreleased** only when the actual source-release date is
+known. If the expected date changes, correct it through the reviewed pull-request
+flow rather than guessing.
+
+## 4. Verify final main, then create the immutable tag
+
+After merge, fetch the exact remote `main` and wait for every required check on
+that commit to complete successfully. Re-audit version/build, bilingual README,
+changelog date, privacy, security, contribution guidance, Issue/PR templates,
+stable install instructions, and screenshot provenance. If anything is missing
+or the release date changed, stop and use a small docs-only Draft PR through the
+same Ready/merge/main-CI gates. Do not tag first and repair documentation later.
+
+Only after final `main` and its checks are verified, and after separate tag
+authorization, create and inspect one new annotated tag on that exact commit:
 
 ```bash
 VERSION=X.Y.Z
-git tag -a "v$VERSION" -m "Codex94 v$VERSION"
-git show --stat "v$VERSION"
-git push origin "v$VERSION"
+TAG="v$VERSION"
+MAIN_SHA="$(git rev-parse origin/main)"
+
+test -z "$(git tag --list "$TAG")"
+test -z "$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")"
+git tag -a "$TAG" "$MAIN_SHA" -m "Codex94 $TAG"
+test "$(git cat-file -t "$TAG")" = tag
+test "$(git rev-parse "${TAG}^{}")" = "$MAIN_SHA"
+git show --stat "$TAG"
+git push origin "refs/tags/$TAG:refs/tags/$TAG"
 ```
 
-Never move, reuse, delete, and recreate a tag that has already been pushed. If a
+Never move, reuse, delete, or recreate a tag that has already been pushed. If a
 published tag points to the wrong commit, preserve it and issue a new version
 with a clear changelog entry. In particular, the existing `v0.1.3` tag must
-remain unchanged.
+remain unchanged. Avoid `git push --tags`; push only the intended new tag.
 
-Avoid `git push --tags`; push only the intended new tag.
+Re-read the remote tag object and peeled commit, then validate a fresh shallow
+clone of the public source:
+
+```bash
+git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}"
+
+VERIFY_ROOT="$(mktemp -d)"
+git clone --branch "$TAG" --depth 1 \
+  https://github.com/DEFY-AN94/codex94.git "$VERIFY_ROOT/codex94"
+test "$(git -C "$VERIFY_ROOT/codex94" rev-parse HEAD)" = "$MAIN_SHA"
+rg -n 'MARKETING_VERSION|CURRENT_PROJECT_VERSION' \
+  "$VERIFY_ROOT/codex94/Codex94.xcodeproj/project.pbxproj"
+```
+
+The remote object must be an annotated tag, its peeled commit and the shallow
+clone's `HEAD` must equal the verified final `main`, and both Debug and Release
+must report the intended version/build. Also recheck the completed `main` CI and
+all release-facing documentation. A source tag does not require a GitHub Release.
 
 ## 5. Maintain the GitHub page
 

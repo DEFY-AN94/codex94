@@ -2,19 +2,8 @@ import SwiftUI
 
 struct MenuBarStatusView: View {
     @ObservedObject var store: AppStore
-    let layout: MenuBarLayout
-    var onAccessibilityLabelChange: (String) -> Void
+    var onAccessibilityLabelChange: (String) -> Void = { _ in }
     @Environment(\.colorScheme) private var colorScheme
-
-    init(
-        store: AppStore,
-        layout: MenuBarLayout = .ringAndPercentage,
-        onAccessibilityLabelChange: @escaping (String) -> Void = { _ in }
-    ) {
-        self.store = store
-        self.layout = layout
-        self.onAccessibilityLabelChange = onAccessibilityLabelChange
-    }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -31,6 +20,7 @@ struct MenuBarStatusView: View {
         let resolvedQuota = store.menuBarQuota
         let window = resolvedQuota?.window
         let presentation = store.menuBarStatusPresentation
+        let layout = store.preferences.menuBarLayout
         let accessibilityLabel = Self.accessibilityLabel(
             store: store,
             resolvedQuota: resolvedQuota,

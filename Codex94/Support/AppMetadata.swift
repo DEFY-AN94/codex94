@@ -8,6 +8,8 @@ struct AppMetadata: Equatable {
     let minimumSystemVersion: String
     let copyright: String
 
+    static let projectURL = URL(string: "https://github.com/DEFY-AN94/codex94")!
+
     static var current: AppMetadata {
         AppMetadata(bundle: .main)
     }
