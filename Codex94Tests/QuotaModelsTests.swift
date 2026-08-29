@@ -19,6 +19,9 @@ final class QuotaModelsTests: XCTestCase {
         XCTAssertEqual(QuotaFormatting.percent(9), "9%")
         XCTAssertEqual(QuotaFormatting.percent(71), "71%")
         XCTAssertEqual(QuotaFormatting.percent(100), "100%")
+        // Defensive display inputs, not values produced by the clamped quota model.
+        XCTAssertEqual(QuotaFormatting.percent(-1), "0%")
+        XCTAssertEqual(QuotaFormatting.percent(101), "100%+")
     }
 
     func testAutomaticSelectionChoosesLowestRemainingAcrossBuckets() {
@@ -427,6 +430,366 @@ final class QuotaModelsTests: XCTestCase {
         )
     }
 
+    func testAbsoluteResetIncludesLocalizedDateMinuteAndOffset() throws {
+        let reset = try resetUTCDate(2026, 8, 28, hour: 15, minute: 7, second: 49)
+        let timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let cases: [(locale: String, included: [String], excluded: [String])] = [
+            ("en_US", ["Aug", "28", "2026", "3:07", "PM"], ["15:07"]),
+            ("en_GB", ["28", "Aug", "2026", "15:07"], ["AM", "PM"]),
+            ("zh_Hans_CN", ["2026年", "8月", "28日", "15:07"], ["AM", "PM"])
+        ]
+
+        for item in cases {
+            let result = try XCTUnwrap(QuotaFormatting.absoluteReset(
+                to: reset,
+                locale: Locale(identifier: item.locale),
+                calendar: Calendar(identifier: .gregorian),
+                timeZone: timeZone
+            ))
+            for fragment in item.included {
+                XCTAssertTrue(result.contains(fragment), "\(item.locale): \(result)")
+            }
+            for fragment in item.excluded {
+                XCTAssertFalse(result.contains(fragment), "\(item.locale): \(result)")
+            }
+            XCTAssertTrue(result.hasSuffix("(UTC+00:00)"), result)
+            XCTAssertFalse(result.contains(":49"), "Seconds must not be displayed: \(result)")
+        }
+    }
+
+    func testAbsoluteResetRetainsPastDateAndLeavesCountdownClamped() throws {
+        let now = try resetUTCDate(2026, 8, 28, hour: 15, minute: 7, second: 49)
+        let past = now.addingTimeInterval(-90)
+        let future = now.addingTimeInterval(90)
+        let locale = Locale(identifier: "en_GB")
+        let calendar = Calendar(identifier: .gregorian)
+        let timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+
+        XCTAssertNil(QuotaFormatting.absoluteReset(
+            to: nil, locale: locale, calendar: calendar, timeZone: timeZone
+        ))
+        XCTAssertEqual(QuotaFormatting.resetCountdown(to: nil, now: now), .unavailable)
+        let pastText = try XCTUnwrap(QuotaFormatting.absoluteReset(
+            to: past, locale: locale, calendar: calendar, timeZone: timeZone
+        ))
+        let futureText = try XCTUnwrap(QuotaFormatting.absoluteReset(
+            to: future, locale: locale, calendar: calendar, timeZone: timeZone
+        ))
+
+        XCTAssertTrue(pastText.contains("28 Aug 2026"), pastText)
+        XCTAssertTrue(pastText.contains("15:06"), pastText)
+        XCTAssertTrue(futureText.contains("15:09"), futureText)
+        XCTAssertNotEqual(pastText, futureText)
+        XCTAssertEqual(QuotaFormatting.resetCountdown(to: past, now: now), .minutes(0))
+        XCTAssertEqual(QuotaFormatting.resetCountdown(to: future, now: now), .minutes(1))
+    }
+
+    func testAbsoluteResetNinetySecondsCrossesCalendarYear() throws {
+        let now = try resetUTCDate(2026, 12, 31, hour: 23, minute: 59, second: 30)
+        let reset = now.addingTimeInterval(90)
+        let timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let result = try XCTUnwrap(QuotaFormatting.absoluteReset(
+            to: reset,
+            locale: Locale(identifier: "en_GB"),
+            calendar: Calendar(identifier: .gregorian),
+            timeZone: timeZone
+        ))
+
+        XCTAssertTrue(result.contains("1 Jan 2027"), result)
+        XCTAssertTrue(result.contains("00:01"), result)
+        XCTAssertFalse(result.contains("2026"), "Use calendar year, not week-based year")
+        XCTAssertTrue(result.hasSuffix("(UTC+00:00)"), result)
+        XCTAssertEqual(QuotaFormatting.resetCountdown(to: reset, now: now), .minutes(1))
+    }
+
+    func testAbsoluteResetCrossesDayMonthAndYearInInjectedTimeZone() throws {
+        let timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 14 * 3_600))
+        let cases: [(month: Int, day: Int, expectedDay: String, monthName: String, year: String)] = [
+            (8, 28, "29", "Aug", "2026"),
+            (8, 31, "1", "Sep", "2026"),
+            (12, 31, "1", "Jan", "2027")
+        ]
+
+        for item in cases {
+            let reset = try resetUTCDate(2026, item.month, item.day, hour: 12, minute: 34)
+            let result = try XCTUnwrap(QuotaFormatting.absoluteReset(
+                to: reset,
+                locale: Locale(identifier: "en_GB"),
+                calendar: Calendar(identifier: .gregorian),
+                timeZone: timeZone
+            ))
+            XCTAssertEqual(String(result.prefix { $0.isNumber }), item.expectedDay, result)
+            // CLDR versions may abbreviate September as Sep or Sept.
+            XCTAssertTrue(result.contains(item.monthName), result)
+            XCTAssertTrue(result.contains(item.year), result)
+            XCTAssertTrue(result.contains("02:34"), result)
+            XCTAssertTrue(result.hasSuffix("(UTC+14:00)"), result)
+        }
+    }
+
+    func testAbsoluteResetNormalizesCalendarTimeZoneWithoutChangingCaller() throws {
+        let reset = try resetUTCDate(2026, 8, 28, hour: 23, minute: 40, second: 49)
+        let displayTimeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Kathmandu"))
+        let originalTimeZone = try XCTUnwrap(TimeZone(secondsFromGMT: -8 * 3_600))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "zh_Hans_CN")
+        calendar.timeZone = originalTimeZone
+        let originalCalendar = calendar
+        let locale = Locale(identifier: "en_GB")
+        let result = try XCTUnwrap(QuotaFormatting.absoluteReset(
+            to: reset, locale: locale, calendar: calendar, timeZone: displayTimeZone
+        ))
+
+        XCTAssertTrue(result.contains("29 Aug 2026"), result)
+        XCTAssertTrue(result.contains("05:25"), result)
+        XCTAssertTrue(result.hasSuffix("(UTC+05:45)"), result)
+        XCTAssertEqual(calendar, originalCalendar)
+        calendar.locale = locale
+        calendar.timeZone = displayTimeZone
+        XCTAssertEqual(result, QuotaFormatting.absoluteReset(
+            to: reset, locale: locale, calendar: calendar, timeZone: displayTimeZone
+        ))
+    }
+
+    func testAbsoluteResetDistinguishesBothDaylightSavingTransitions() throws {
+        let timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let cases: [(month: Int, day: Int, hour: Int, minute: Int, time: String, zone: String)] = [
+            (3, 8, 9, 59, "01:59", "UTC-08:00"),
+            (3, 8, 10, 0, "03:00", "UTC-07:00"),
+            (11, 1, 8, 30, "01:30", "UTC-07:00"),
+            (11, 1, 9, 30, "01:30", "UTC-08:00")
+        ]
+        var results: [String] = []
+
+        for item in cases {
+            let reset = try resetUTCDate(
+                2026, item.month, item.day, hour: item.hour, minute: item.minute, second: 49
+            )
+            let result = try XCTUnwrap(QuotaFormatting.absoluteReset(
+                to: reset,
+                locale: Locale(identifier: "en_GB"),
+                calendar: Calendar(identifier: .gregorian),
+                timeZone: timeZone
+            ))
+            XCTAssertTrue(result.contains("2026"), result)
+            XCTAssertTrue(result.contains(item.time), result)
+            XCTAssertTrue(result.hasSuffix("(\(item.zone))"), result)
+            XCTAssertFalse(result.contains(":49"), result)
+            results.append(result)
+        }
+
+        // Both fall-back instants read 01:30 locally; the offset keeps them unambiguous.
+        XCTAssertNotEqual(results[2], results[3])
+    }
+
+    func testAbsoluteResetUsesTargetOffsetRatherThanReferenceDateOffset() throws {
+        let now = try resetUTCDate(2026, 1, 15, hour: 12)
+        let reset = try resetUTCDate(2026, 7, 15, hour: 12)
+        let timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let result = try XCTUnwrap(QuotaFormatting.absoluteReset(
+            to: reset,
+            locale: Locale(identifier: "en_GB"),
+            calendar: Calendar(identifier: .gregorian),
+            timeZone: timeZone
+        ))
+
+        XCTAssertEqual(timeZone.secondsFromGMT(for: now), -8 * 3_600)
+        XCTAssertEqual(timeZone.secondsFromGMT(for: reset), -7 * 3_600)
+        XCTAssertTrue(result.contains("15 Jul 2026"), result)
+        XCTAssertTrue(result.contains("05:00"), result)
+        XCTAssertTrue(result.hasSuffix("(UTC-07:00)"), result)
+        XCTAssertFalse(result.contains("UTC-08:00"), result)
+    }
+
+    func testAbsoluteResetDoesNotReusePreviousLocaleOrTimeZone() throws {
+        let reset = try resetUTCDate(2026, 8, 28, hour: 15, minute: 7)
+        let utc = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let kathmandu = try XCTUnwrap(TimeZone(identifier: "Asia/Kathmandu"))
+        let calendar = Calendar(identifier: .gregorian)
+        let english = QuotaFormatting.absoluteReset(
+            to: reset, locale: Locale(identifier: "en_US"), calendar: calendar, timeZone: utc
+        )
+        let chinese = try XCTUnwrap(QuotaFormatting.absoluteReset(
+            to: reset,
+            locale: Locale(identifier: "zh_Hans_CN"),
+            calendar: calendar,
+            timeZone: kathmandu
+        ))
+
+        XCTAssertTrue(chinese.contains("2026年8月28日"), chinese)
+        XCTAssertTrue(chinese.contains("20:52"), chinese)
+        XCTAssertTrue(chinese.hasSuffix("(UTC+05:45)"), chinese)
+        XCTAssertEqual(english, QuotaFormatting.absoluteReset(
+            to: reset, locale: Locale(identifier: "en_US"), calendar: calendar, timeZone: utc
+        ))
+    }
+
+    func testResetPresentationUsesSharedFormatterAndLocalizedCountdown() throws {
+        let now = try resetUTCDate(2026, 8, 28, hour: 15, minute: 7, second: 49)
+        let reset = now.addingTimeInterval(2 * 3_600 + 30 * 60)
+        let timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Kathmandu"))
+        let calendar = Calendar(identifier: .gregorian)
+        let cases: [(LanguagePreference, String, String, String, String, String)] = [
+            (.english, "en", "en_US", "2h 30m", "Reset: ", "Resets in 2 hours, 30 minutes"),
+            (.simplifiedChinese, "zh-Hans", "zh_Hans_CN", "2时30分", "重置时间：", "2 小时 30 分钟后重置")
+        ]
+
+        for (language, resource, localeID, countdown, prefix, relativeLabel) in cases {
+            let bundle = try localizationBundle(resource)
+            let locale = Locale(identifier: localeID)
+            let timestamp = try XCTUnwrap(QuotaFormatting.absoluteReset(
+                to: reset, locale: locale, calendar: calendar, timeZone: timeZone
+            ))
+            let presentation = QuotaResetPresentation(
+                resetsAt: reset,
+                now: now,
+                language: language,
+                locale: locale,
+                calendar: calendar,
+                timeZone: timeZone,
+                bundle: bundle
+            )
+
+            XCTAssertEqual(presentation.countdown, countdown)
+            XCTAssertEqual(presentation.absolute, prefix + timestamp)
+            XCTAssertTrue(presentation.absolute.contains("2026"))
+            XCTAssertTrue(presentation.absolute.hasSuffix("(UTC+05:45)"))
+            XCTAssertEqual(presentation.accessibilityLabel, relativeLabel + ", " + presentation.absolute)
+            XCTAssertTrue(presentation.accessibilityLabel.contains(timestamp))
+            XCTAssertFalse(presentation.accessibilityLabel.contains(":49"))
+        }
+    }
+
+    func testResetPresentationWithNilDateDoesNotInventTime() throws {
+        let now = try resetUTCDate(2026, 8, 28, hour: 15, minute: 7)
+        let timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let cases: [(LanguagePreference, String, String, String)] = [
+            (.english, "en", "en_US", "Reset time unavailable"),
+            (.simplifiedChinese, "zh-Hans", "zh_Hans_CN", "重置时间不可用")
+        ]
+
+        for (language, resource, localeID, unavailable) in cases {
+            let presentation = QuotaResetPresentation(
+                resetsAt: nil,
+                now: now,
+                language: language,
+                locale: Locale(identifier: localeID),
+                calendar: Calendar(identifier: .gregorian),
+                timeZone: timeZone,
+                bundle: try localizationBundle(resource)
+            )
+
+            XCTAssertEqual(presentation.countdown, "--")
+            XCTAssertEqual(presentation.absolute, unavailable)
+            XCTAssertEqual(presentation.accessibilityLabel, unavailable)
+            XCTAssertFalse(presentation.accessibilityLabel.contains("2026"))
+            XCTAssertFalse(presentation.accessibilityLabel.contains("UTC"))
+        }
+    }
+
+    func testResetPresentationPastDateKeepsAbsoluteTimeAndZeroCountdown() throws {
+        let now = try resetUTCDate(2026, 8, 28, hour: 15, minute: 7)
+        let past = try resetUTCDate(2026, 8, 27, hour: 9, minute: 13)
+        let timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let calendar = Calendar(identifier: .gregorian)
+        let cases: [(LanguagePreference, String, String, String, String)] = [
+            (.english, "en", "en_GB", "0m", "Resets in 0 minutes"),
+            (.simplifiedChinese, "zh-Hans", "zh_Hans_CN", "0分", "0 分钟后重置")
+        ]
+
+        for (language, resource, localeID, countdown, relativeLabel) in cases {
+            let locale = Locale(identifier: localeID)
+            let timestamp = try XCTUnwrap(QuotaFormatting.absoluteReset(
+                to: past, locale: locale, calendar: calendar, timeZone: timeZone
+            ))
+            let presentation = QuotaResetPresentation(
+                resetsAt: past,
+                now: now,
+                language: language,
+                locale: locale,
+                calendar: calendar,
+                timeZone: timeZone,
+                bundle: try localizationBundle(resource)
+            )
+
+            XCTAssertEqual(presentation.countdown, countdown)
+            XCTAssertTrue(presentation.absolute.contains(timestamp))
+            XCTAssertTrue(presentation.absolute.contains("27"))
+            XCTAssertTrue(presentation.absolute.contains("09:13"))
+            XCTAssertTrue(presentation.absolute.hasSuffix("(UTC+00:00)"))
+            XCTAssertEqual(presentation.accessibilityLabel, relativeLabel + ", " + presentation.absolute)
+        }
+    }
+
+    func testQuotaSummaryIncludesSharedResetWithoutIdentityOrOpaqueIDs() throws {
+        let now = try resetUTCDate(2026, 8, 28, hour: 15, minute: 7)
+        let reset = now.addingTimeInterval(2 * 3_600 + 30 * 60)
+        let timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let calendar = Calendar(identifier: .gregorian)
+        let opaqueID = "synthetic-private-limit-id"
+        let email = "private@example.com"
+        let executablePath = "/synthetic-fixture/private-codex"
+        let quota = QuotaWindowSnapshot(
+            kind: .weekly, usedPercent: 68, windowMinutes: 10_080, resetsAt: reset
+        )
+        // Metadata is synthetic data only; this fixture never reads a path or launches a process.
+        let snapshot = QuotaSnapshot(
+            buckets: [bucket(opaqueID, windows: [quota])],
+            defaultLimitID: opaqueID,
+            fetchedAt: now,
+            account: AccountSummary(type: "SYNTHETIC_ACCOUNT_TYPE", email: email, planType: "pro"),
+            codex: LocatedCodex(
+                executableURL: URL(fileURLWithPath: executablePath),
+                version: "SYNTHETIC_CODEX_VERSION",
+                source: .manual
+            )
+        )
+        let resolved = try XCTUnwrap(snapshot.resolved(.defaultBucket(.weekly)))
+        let status = StatusPresentation(
+            remainingPercent: resolved.window.remainingPercent,
+            connectionState: .connected,
+            isRefreshing: false,
+            lastSuccessfulFetch: now
+        )
+        let cases: [(LanguagePreference, String, String, String, String)] = [
+            (.english, "en", "en_US", "Weekly quota", "32% remaining"),
+            (.simplifiedChinese, "zh-Hans", "zh_Hans_CN", "每周额度", "剩余 32%")
+        ]
+
+        for (language, resource, localeID, windowLabel, quotaLabel) in cases {
+            let bundle = try localizationBundle(resource)
+            let locale = Locale(identifier: localeID)
+            let sharedReset = QuotaResetPresentation(
+                resetsAt: resolved.window.resetsAt,
+                now: now,
+                language: language,
+                locale: locale,
+                calendar: calendar,
+                timeZone: timeZone,
+                bundle: bundle
+            )
+            let label = StatusAccessibilityString.quotaSummary(
+                bucketName: snapshot.displayName(for: resolved.bucket),
+                window: resolved.window,
+                presentation: status,
+                now: now,
+                language: language,
+                locale: locale,
+                calendar: calendar,
+                timeZone: timeZone,
+                bundle: bundle
+            )
+
+            XCTAssertTrue(label.hasPrefix("Codex, \(windowLabel), \(quotaLabel), "), label)
+            XCTAssertTrue(label.contains(sharedReset.accessibilityLabel), label)
+            for hiddenValue in [
+                opaqueID, email, executablePath, "SYNTHETIC_ACCOUNT_TYPE", "SYNTHETIC_CODEX_VERSION"
+            ] {
+                XCTAssertFalse(label.contains(hiddenValue), label)
+            }
+        }
+    }
+
     func testPopoverTitleIncludesRemainingPercentAndPlaceholder() {
         XCTAssertEqual(
             QuotaFormatting.popoverTitle(
@@ -808,6 +1171,22 @@ final class QuotaModelsTests: XCTestCase {
         XCTAssertNil(statusView.appearance)
         XCTAssertNil(popoverView.appearance)
         XCTAssertNil(dashboardWindow.appearance)
+    }
+
+    private func resetUTCDate(
+        _ year: Int,
+        _ month: Int,
+        _ day: Int,
+        hour: Int = 0,
+        minute: Int = 0,
+        second: Int = 0
+    ) throws -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        return try XCTUnwrap(calendar.date(from: DateComponents(
+            year: year, month: month, day: day, hour: hour, minute: minute, second: second
+        )))
     }
 
     private func localizationBundle(_ language: String) throws -> Bundle {

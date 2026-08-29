@@ -1,6 +1,42 @@
 import AppKit
 import Combine
 
+enum DashboardSection: String, CaseIterable, Identifiable, Sendable {
+    case connection
+    case display
+    case startup
+    case diagnostics
+    case about
+
+    var id: String { rawValue }
+
+    static let primarySections: [DashboardSection] = [
+        .connection,
+        .display,
+        .startup,
+        .diagnostics
+    ]
+
+    var systemImage: String {
+        switch self {
+        case .connection: "point.3.connected.trianglepath.dotted"
+        case .display: "rectangle.on.rectangle"
+        case .startup: "power.circle"
+        case .diagnostics: "stethoscope"
+        case .about: "info.circle"
+        }
+    }
+}
+
+extension ConnectionRecoveryDestination {
+    var dashboardSection: DashboardSection {
+        switch self {
+        case .connection: .connection
+        case .diagnostics: .diagnostics
+        }
+    }
+}
+
 enum DashboardWindowSizePreset: String, CaseIterable, Identifiable, Sendable {
     case compact
     case standard
@@ -72,6 +108,7 @@ enum DashboardWindowSizing {
 
 @MainActor
 final class DashboardWindowState: ObservableObject {
+    @Published var selection: DashboardSection? = .connection
     @Published private(set) var selectedPreset: DashboardWindowSizePreset?
     @Published private(set) var currentWidth = Int(DashboardWindowSizing.minimumSize.width)
     @Published private(set) var currentHeight = Int(DashboardWindowSizing.minimumSize.height)
@@ -80,6 +117,11 @@ final class DashboardWindowState: ObservableObject {
 
     var currentDimensions: String {
         "\(currentWidth)\u{00D7}\(currentHeight)"
+    }
+
+    func select(section: DashboardSection?) {
+        guard let section, selection != section else { return }
+        selection = section
     }
 
     func request(_ preset: DashboardWindowSizePreset) {

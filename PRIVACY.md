@@ -37,6 +37,27 @@ browsed in the popover is held only for the current app run and is not written
 to `UserDefaults`. macOS may also store the Dashboard window frame and
 launch-at-login state.
 
+Version `0.1.8` adds two UI preference keys:
+
+- `menuBarLayout.v1` stores the layout used at the next app launch. It is
+  separate from the existing menu-bar quota selection and its legacy migration.
+- `statusAccentOverrides.v1` stores up to four independent, opaque sRGB color
+  overrides as normalized six-digit uppercase `RRGGBB` values. Invalid values fall back
+  for the affected role. **Restore Default Colors** clears only these overrides,
+  not quota selection, layout, theme, language, paths, or window settings.
+
+Codex94 also keeps the selected Dashboard section only in memory; the
+existing macOS window-frame autosave behavior is unchanged. Absolute Reset text
+is derived from the existing quota reset timestamp and current display locale
+and time zone. It adds no cache fields or identity data. Local accessibility
+labels may include the visible quota and Reset information, but do not add
+account identity, opaque bucket identifiers, or executable paths.
+
+Changing layout/colors, rendering Reset text, or opening a recovery destination
+does not request quota, write quota cache, or change connection state. Recovery
+buttons only open an existing Dashboard section; they do not execute a login or
+introduce a separate retry request. Existing refresh triggers are unchanged.
+
 Unified Logging receives only operation stage, duration, byte count, executable
 source category, and normalized error category. Raw RPC payloads, email,
 credentials, and full executable paths are not logged.

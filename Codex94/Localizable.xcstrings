@@ -235,6 +235,18 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "账号权限" } }
       }
     },
+    "connection.notLoggedIn.guidance" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sign in in Codex, then return to Codex94 and choose Refresh. Codex94 does not sign in for you." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请先在 Codex 中登录，再回到 Codex94 点击刷新。Codex94 不会代你执行登录。" } }
+      }
+    },
+    "connection.reset" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Menu bar quota reset" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "菜单栏额度重置" } }
+      }
+    },
     "connection.status" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Connection" } },
@@ -323,6 +335,78 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "5h" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "5 小时" } }
+      }
+    },
+    "display.colors" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Status colors" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "状态颜色" } }
+      }
+    },
+    "display.colors.healthy" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "50–100% · Healthy" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "50–100% · 充足" } }
+      }
+    },
+    "display.colors.warning" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "20–49% · Warning" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "20–49% · 偏低" } }
+      }
+    },
+    "display.colors.critical" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "0–19% · Critical" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "0–19% · 紧张" } }
+      }
+    },
+    "display.colors.error" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unavailable · No successful data" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "不可用 · 无成功数据" } }
+      }
+    },
+    "display.colors.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Colors update immediately. Error applies only to unavailable data; cached and refreshing indicators keep their connection color." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "颜色立即生效。错误色仅用于无成功数据时的不可用状态；缓存和刷新中的提示保持原连接颜色。" } }
+      }
+    },
+    "display.colors.restoreDefaults" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Restore Default Colors" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "恢复默认颜色" } }
+      }
+    },
+    "display.layout" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Menu bar layout" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "菜单栏布局" } }
+      }
+    },
+    "display.layout.ringAndPercentage" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ring + Percentage" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "圆环 + 百分比" } }
+      }
+    },
+    "display.layout.percentageOnly" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Percentage Only" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅百分比" } }
+      }
+    },
+    "display.layout.ringOnly" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ring Only" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅圆环" } }
+      }
+    },
+    "display.layout.restartNotice" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The saved layout takes effect the next time Codex94 starts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保存的布局将在下次启动 Codex94 时生效。" } }
       }
     },
     "display.label" : {
@@ -577,6 +661,18 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@分" } }
       }
     },
+    "quota.resetAt %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reset: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重置时间：%@" } }
+      }
+    },
+    "quota.resetAt.unavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reset time unavailable" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重置时间不可用" } }
+      }
+    },
     "quota.resets" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "· resets" } },
@@ -587,6 +683,30 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Weekly" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每周" } }
+      }
+    },
+    "recovery.openConnection" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Connection" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开连接设置" } }
+      }
+    },
+    "recovery.openConnection.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Connection settings without requesting quota." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开连接设置，不会请求额度。" } }
+      }
+    },
+    "recovery.openDiagnostics" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Diagnostics" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开诊断" } }
+      }
+    },
+    "recovery.openDiagnostics.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open the local diagnostics page without requesting quota." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开本地诊断页面，不会请求额度。" } }
       }
     },
     "settings.language" : {

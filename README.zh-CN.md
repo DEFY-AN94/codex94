@@ -20,6 +20,9 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 ## 界面截图
 
 以下数值来自隔离的文档渲染夹具，仅用于展示，不包含真实账号、身份信息或额度。
+Popover 和 Dashboard 图片来自隔离 CI 中的 `0.1.8`，已在纳入前审查。图中固定的
+未来 Reset 日期是测试值，并非实时重置时间。未改变的默认菜单栏示例保留自
+`v0.1.7`。
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 菜单栏圆环显示剩余 79%" width="144">
@@ -32,13 +35,13 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 <p align="center"><strong>CLI 风格额度面板</strong></p>
 
 <p align="center">
-  <img src="docs/images/readme/dashboard-zh-Hans.png" alt="Codex94 Terminal Dark 简体中文连接设置页面" width="900">
+  <img src="docs/images/readme/dashboard-zh-Hans.png" alt="Codex94 Terminal Dark 简体中文显示设置页面" width="900">
 </p>
-<p align="center"><strong>连接设置页面</strong></p>
+<p align="center"><strong>显示设置页面</strong></p>
 
 ## 当前分发状态
 
-- 本文档对应源码版本 `0.1.7 (8)`，稳定源码标签为 `v0.1.7`。
+- 本文档对应源码版本 `0.1.8 (9)`，稳定源码标签为 `v0.1.8`。
 - 标签发布后才视为稳定源码发布；`main` 可能包含发布准备内容。
 - 仓库已公开，任何人都可以在无需 GitHub 认证的情况下 clone 源码。
 - 当前没有 GitHub Release、DMG、经过公证的二进制或自动更新功能。
@@ -61,11 +64,11 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 
 ## 从源码安装
 
-`v0.1.7` 标签发布后，可使用以下命令安装其稳定源码：
+`v0.1.8` 标签发布后，可使用以下命令安装其稳定源码：
 
 ```bash
 brew install ripgrep
-git clone --branch v0.1.7 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.1.8 --depth 1 https://github.com/DEFY-AN94/codex94.git
 cd codex94
 
 sudo xcodebuild -license accept
@@ -86,6 +89,24 @@ sudo xcodebuild -runFirstLaunch
 
 ## 主要行为
 
+- 在 Dashboard → 显示中选择**圆环 + 百分比**、**仅百分比**或
+  **仅圆环**。保存的布局在下次启动 Codex94 时生效，不会即时改变正在运行的
+  菜单栏宽度；状态标记位于圆环中央，或在“仅百分比”模式下占用固定尾部位置。
+- 分别自定义充足（50–100%）、偏低（20–49%）、紧张（0–19%）
+  和无可用数据时连接不可用的四种颜色；阈值不可调整。颜色即时生效，按不透明
+  sRGB 的规范化六位大写 `RRGGBB` 保存，不含透明度。紧张色和错误色彼此独立，
+  即使两者默认都是主题红色也不会联动。**恢复默认颜色**只移除这四项覆盖，
+  不改变布局、主题、语言、额度选择、可执行文件路径或窗口尺寸。
+- 额度行下方独立显示绝对**重置时间**，包含完整日期、小时/分钟及
+  重置时刻的 UTC 偏移，正确区分夏令时。原倒计时保留；没有日期则显示不可用，
+  过去日期仍显示原时间，倒计时不低于零。日期遵循 App 语言的 locale 和当前时区。
+  Dashboard → 连接显示菜单栏实际解析的额度桶与窗口（包括暂时回退到自动的结果），
+  而不是 Popover 中单独浏览的模型。
+- 错误横幅提供**打开连接设置**或**打开诊断**，复用同一个 Dashboard
+  窗口；普通打开 Dashboard 会保留当前页面。这些按钮只负责导航，重试仍使用
+  原有**刷新**。未登录时会提示先在 Codex 中登录、再回来刷新；Codex94 不代为登录。
+- 修改布局/颜色、渲染重置时间以及恢复导航本身不会请求额度、写入额度缓存或改变
+  连接状态；打开 Popover 仍按下述既有行为刷新。
 - App 启动、每次展开菜单栏面板，以及按所选的 1、5、15 或 30 分钟间隔刷新。
 - Mac 唤醒后，如果没有成功快照，或上次成功已过去至少 60 秒，则刷新一次；
   更鲜的快照保持不变。唤醒、后台、手动和展开面板触发的请求共用同一条单飞
@@ -100,9 +121,10 @@ sudo xcodebuild -runFirstLaunch
   可显示额度桶和窗口中选择剩余比例最低的一项。
 - Codex 未返回某个 5 小时或 Weekly 窗口时，会隐藏对应额度行与选择项；App
   不估算额度，也不会合并彼此独立的额度窗口。
-- 将额度严重度与连接/数据新鲜度分开：额度圆环、百分比和进度条只按剩余比例
-  显示绿色、琥珀色或红色；刷新中、缓存数据和连接不可用则使用独立的蓝色/青色
-  图标与文字。
+- 将额度严重度与连接/数据新鲜度分开：额度圆环、百分比和进度条使用同一套解析后
+  的充足/偏低/紧张颜色，默认依次为绿色、琥珀色和红色。刷新中与缓存标记保持
+  蓝色/青色连接强调色。在没有可用数据且连接不可用时，标记、横幅和
+  Dashboard 错误状态点使用独立错误色，默认取应用紧张色覆盖前的主题红色。
 - 刷新失败时保留最后一次成功的额度并标记为缓存数据；没有可用额度快照时显示
   灰色 `--`，不会伪装成 `0%`。
 - Popover 标题区域会显示最后一次成功额度数据的相对时间。已有快照时刷新会明确
@@ -138,8 +160,11 @@ OAuth，不接收 access token 或 refresh token，不直接发送额度 HTTP �
 带版本的本地缓存仅保存额度桶标识与可选名称、套餐类型、窗口时长与类型、百分比、
 重置时间和获取时间，并使用仅限当前用户的文件权限。**额度 + 账号信息** 模式下
 的邮箱只存在于内存；切换为 **仅额度** 后会从内存快照移除。UserDefaults 保存
-界面选项（包括菜单栏额度偏好）和用户手动选择的可执行文件路径；Popover 中浏览
-的模型只在本次运行中保存。Codex94 没有分析、广告、遥测上传、崩溃上报 SDK、
+界面选项（包括菜单栏额度偏好）和用户手动选择的可执行文件路径。版本 0.1.8 新增
+`menuBarLayout.v1` 与 `statusAccentOverrides.v1`，分别保存布局和四种颜色覆盖。
+重置时间文案只从现有重置时间戳派生，不新增缓存字段。Popover 中浏览的模型和
+Dashboard 当前页面只在本次运行中保存；窗口 frame autosave 行为保持不变。
+Codex94 没有分析、广告、遥测上传、崩溃上报 SDK、
 更新检查器或项目自营服务器。
 
 App Sandbox 被有意关闭，因为 Codex 子进程需要访问它自己的登录状态。
@@ -168,11 +193,13 @@ brew install ripgrep jq
 ./script/build_and_run.sh
 ```
 
-运行静态安全检查、构建、启动并确认进程：
+`build_and_run.sh` 会在构建前关闭现有的匹配名称 Codex94 进程，然后启动 Debug
+App。`install.sh` 会替换安装路径中的 App，并可能启动它。这些脚本并非只读检查；
+本机运行的 App 可能使用与已安装 App 相同的偏好和缓存。
 
-```bash
-./script/build_and_run.sh --verify
-```
+自动测试和文档截图应使用合成数据、注入 fetcher 或显式指定的 fake executable。
+不要在共享夹具或产物中包含真实账号凭证、身份、额度或私人路径。测试偏好与缓存
+应与日常 App 数据分开；详见 [CONTRIBUTING.md](CONTRIBUTING.md)（英文）。
 
 运行单元测试与 fake app-server 集成测试：
 
@@ -183,11 +210,17 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   CODE_SIGNING_ALLOWED=NO test
 ```
 
-运行完整本地发布检查：
+运行完整发布检查，包括 hosted tests、Release 构建和安全/签名检查：
 
 ```bash
 ./script/release_check.sh
 ```
+
+版本 0.1.8 已通过完整 GitHub 测试/发布任务、合成 Display 与点击功能 Recovery UI
+任务，以及 Actions/Swift CodeQL。独立的合成 A/B GUI smoke 覆盖三种下次启动布局、
+颜色恢复、绝对 Reset 文案、hard-unavailable 恢复和手动刷新。四张
+Popover/Dashboard 截图已完成视觉和隐私审查。键盘激活、AXPress 与托管运行器
+tooltip 暴露不声明为已通过。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。贡献与发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 和

@@ -2,56 +2,18 @@ import AppKit
 import SwiftUI
 
 struct DashboardView: View {
-    enum Section: String, CaseIterable, Identifiable {
-        case connection
-        case display
-        case startup
-        case diagnostics
-        case about
-
-        var id: String { rawValue }
-
-        static let primarySections: [Section] = [
-            .connection,
-            .display,
-            .startup,
-            .diagnostics
-        ]
-
-        var titleKey: LocalizedStringKey {
-            switch self {
-            case .connection: "dashboard.connection"
-            case .display: "dashboard.display"
-            case .startup: "dashboard.startup"
-            case .diagnostics: "dashboard.diagnostics"
-            case .about: "dashboard.about"
-            }
-        }
-
-        var systemImage: String {
-            switch self {
-            case .connection: "point.3.connected.trianglepath.dotted"
-            case .display: "rectangle.on.rectangle"
-            case .startup: "power.circle"
-            case .diagnostics: "stethoscope"
-            case .about: "info.circle"
-            }
-        }
-    }
-
     @ObservedObject var store: AppStore
     @ObservedObject var windowState: DashboardWindowState
     let chooseCodex: () -> Void
     let clearManualCodex: () -> Void
     let quit: () -> Void
 
-    @State private var selection: Section? = .connection
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             VStack(spacing: 0) {
-                List(Section.primarySections, selection: $selection) { section in
+                List(DashboardSection.primarySections, selection: $windowState.selection) { section in
                     Label(section.titleKey, systemImage: section.systemImage)
                         .tag(section)
                 }
@@ -60,23 +22,23 @@ struct DashboardView: View {
                 Divider()
 
                 Button {
-                    selection = .about
+                    windowState.select(section: .about)
                 } label: {
-                    Label(Section.about.titleKey, systemImage: Section.about.systemImage)
+                    Label(DashboardSection.about.titleKey, systemImage: DashboardSection.about.systemImage)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 8)
                         .frame(height: 28)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(selection == .about ? Color.white : Color.primary)
+                .foregroundStyle(windowState.selection == .about ? Color.white : Color.primary)
                 .background {
                     RoundedRectangle(cornerRadius: 5)
-                        .fill(selection == .about ? Color.accentColor : Color.clear)
+                        .fill(windowState.selection == .about ? Color.accentColor : Color.clear)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 8)
-                .accessibilityAddTraits(selection == .about ? .isSelected : [])
+                .accessibilityAddTraits(windowState.selection == .about ? .isSelected : [])
             }
             .frame(minWidth: 190, idealWidth: 230, maxWidth: 280)
             .navigationTitle("Codex94")
@@ -84,7 +46,7 @@ struct DashboardView: View {
             .toolbar(removing: .sidebarToggle)
         } detail: {
             Group {
-                switch selection ?? .connection {
+                switch windowState.selection ?? .connection {
                 case .connection:
                     ConnectionSettingsView(
                         store: store,
@@ -143,20 +105,49 @@ struct DashboardView: View {
     }
 }
 
-private struct ConnectionSettingsView: View {
+struct ConnectionSettingsView: View {
     @ObservedObject var store: AppStore
     let chooseCodex: () -> Void
     let clearManualCodex: () -> Void
+    var referenceDate: Date? = nil
+    var resetTimeZone: TimeZone = .autoupdatingCurrent
+
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         SettingsPage(title: "dashboard.connection") {
             SettingsRow("connection.status") {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 8, height: 8)
-                    Text(store.connectionState.localizedTitle)
-                    if store.isRefreshing { ProgressView().controlSize(.small) }
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 8, height: 8)
+                        Text(store.connectionState.localizedTitle)
+                        if store.isRefreshing { ProgressView().controlSize(.small) }
+                    }
+                    if store.lastIssue == .notLoggedIn {
+                        Text("connection.notLoggedIn.guidance")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("connection-login-guidance")
+                    }
+                }
+            }
+
+            SettingsDivider()
+
+            SettingsRow("connection.reset") {
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    MenuBarResetDetails(
+                        resolvedQuota: store.menuBarQuota,
+                        bucketName: store.menuBarQuota.flatMap {
+                            store.snapshot?.displayName(for: $0.bucket)
+                        },
+                        language: store.preferences.language,
+                        now: referenceDate ?? context.date,
+                        timeZone: resetTimeZone
+                    )
                 }
             }
 
@@ -226,79 +217,59 @@ private struct ConnectionSettingsView: View {
         switch store.connectionState {
         case .connected: .green
         case .stale: .orange
-        case .unavailable: .red
+        case .unavailable:
+            Codex94Palette.resolve(
+                store.preferences.theme,
+                scheme: colorScheme,
+                overrides: store.preferences.statusAccentOverrides
+            ).errorColor
         case .refreshing: .blue
         case .idle: .secondary
         }
     }
 }
 
-private struct DisplaySettingsView: View {
-    @ObservedObject var store: AppStore
-    @ObservedObject var windowState: DashboardWindowState
+struct MenuBarResetDetails: View {
+    let resolvedQuota: ResolvedQuotaWindow?
+    let bucketName: String?
+    let language: LanguagePreference
+    let now: Date
+    var locale: Locale? = nil
+    var calendar = Calendar(identifier: .gregorian)
+    var timeZone: TimeZone = .autoupdatingCurrent
 
     var body: some View {
-        SettingsPage(title: "dashboard.display") {
-            SettingsRow("display.label") {
-                MenuBarQuotaPicker(store: store)
-                .frame(maxWidth: 360)
+        let reset = QuotaResetPresentation(
+            resetsAt: resolvedQuota?.window.resetsAt,
+            now: now,
+            language: language,
+            locale: locale,
+            calendar: calendar,
+            timeZone: timeZone
+        )
+        VStack(alignment: .leading, spacing: 5) {
+            if let resolvedQuota {
+                (Text(verbatim: bucketName ?? "Codex")
+                    + Text(verbatim: " · ")
+                    + Text(resolvedQuota.window.kind.localizedKey))
+                    .fontWeight(.medium)
+                (Text("quota.resets") + Text(verbatim: " " + reset.countdown))
+                    .foregroundStyle(.secondary)
             }
-
-            SettingsDivider()
-
-            SettingsRow("display.dashboardWindowSize") {
-                Picker("display.dashboardWindowSize", selection: Binding(
-                    get: { windowState.selectedPreset },
-                    set: { preset in
-                        if let preset {
-                            windowState.request(preset)
-                        }
-                    }
-                )) {
-                    ForEach(DashboardWindowSizePreset.allCases) { preset in
-                        (Text(preset.localizedKey) + Text(verbatim: " · \(preset.dimensions)"))
-                            .tag(Optional(preset))
-                    }
-                    if windowState.selectedPreset == nil {
-                        (Text("display.windowSize.custom")
-                            + Text(verbatim: " · \(windowState.currentDimensions)"))
-                            .tag(DashboardWindowSizePreset?.none)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 260)
-            }
-
-            SettingsDivider()
-
-            SettingsRow("settings.theme") {
-                Picker("settings.theme", selection: Binding(
-                    get: { store.preferences.theme },
-                    set: { store.preferences.theme = $0 }
-                )) {
-                    ForEach(ThemePreference.allCases) { theme in
-                        Text(theme.localizedKey).tag(theme)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 220)
-            }
-
-            SettingsDivider()
-
-            SettingsRow("settings.language") {
-                Picker("settings.language", selection: Binding(
-                    get: { store.preferences.language },
-                    set: { store.preferences.language = $0 }
-                )) {
-                    ForEach(LanguagePreference.allCases) { language in
-                        Text(language.localizedKey).tag(language)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 220)
-            }
+            Text(verbatim: reset.absolute)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel(reset: reset))
+        .accessibilityIdentifier("connection-menu-bar-reset")
+    }
+
+    private func accessibilityLabel(reset: QuotaResetPresentation) -> Text {
+        guard let resolvedQuota else { return Text(verbatim: reset.accessibilityLabel) }
+        return Text(verbatim: (bucketName ?? "Codex") + ", ")
+            + StatusAccessibilityText.quotaWindow(resolvedQuota.window.kind)
+            + Text(verbatim: ", " + reset.accessibilityLabel)
     }
 }
 
@@ -449,7 +420,7 @@ private struct AboutView: View {
     }
 }
 
-private struct SettingsPage<Content: View>: View {
+struct SettingsPage<Content: View>: View {
     let title: LocalizedStringKey
     @ViewBuilder let content: Content
 
@@ -474,7 +445,7 @@ private struct SettingsPage<Content: View>: View {
     }
 }
 
-private struct SettingsRow<Content: View>: View {
+struct SettingsRow<Content: View>: View {
     let title: LocalizedStringKey
     @ViewBuilder let content: Content
 
@@ -495,7 +466,7 @@ private struct SettingsRow<Content: View>: View {
     }
 }
 
-private struct SettingsDivider: View {
+struct SettingsDivider: View {
     var body: some View {
         Divider().padding(.leading, 218)
     }

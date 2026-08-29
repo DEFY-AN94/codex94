@@ -4,6 +4,48 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
+## 0.1.8 - 2026-08-29
+
+### Added
+
+- Add Ring + Percentage, Percentage Only, and Ring Only menu-bar layouts.
+  Layout choices are saved for the next app launch; the default keeps the
+  existing 58 pt status item and 52x22 pt content.
+- Add independent, opaque sRGB overrides for healthy, warning, critical, and
+  hard-unavailable error colors. Colors update immediately; Restore Default
+  Colors clears only those overrides, leaving other preferences unchanged.
+- Show localized absolute Reset dates, minute-precision times, and the UTC
+  offset at the reset instant alongside the existing countdown. Popover rows
+  use a separate secondary line and measured natural height; Dashboard
+  Connection shows the actual resolved menu-bar quota, including fallback.
+- Add Open Connection or Open Diagnostics to issue banners. These actions only
+  navigate within the existing Dashboard; ordinary opening preserves its
+  current section. Connection includes sign-in guidance without executing login.
+- Share the Reset description across visible content and accessibility labels,
+  with English and Simplified Chinese strings and separate recovery buttons
+  with dedicated labels.
+
+### Changed
+
+- Center status badges inside a visible ring; Percentage Only uses a fixed
+  trailing badge slot. Refreshing/cached badges keep the connection accent;
+  hard-unavailable badges, banners, and the Dashboard error dot use the separate
+  error color, defaulting to the unmodified theme red.
+- Preserve fixed quota thresholds of 50% and 20%. Display preferences, Reset
+  rendering, and recovery navigation do not request quota or write quota cache;
+  the existing launch, popover, scheduled, wake, and manual refresh paths remain.
+
+### Security and privacy
+
+- Store layout and color choices under `menuBarLayout.v1` and
+  `statusAccentOverrides.v1`. Colors use normalized six-digit uppercase `RRGGBB` values;
+  invalid stored entries fall back per role. No new identity fields, quota
+  schema, credentials, network interface, or permissions are introduced.
+- Document the local UI preferences, use synthetic test/screenshot fixtures,
+  and report CI, GUI, and screenshot validation separately. Replace the four
+  popover/Dashboard images with reviewed synthetic release captures; retain
+  the unchanged default menu-bar example from the previous stable version.
+
 ## 0.1.7 - 2026-08-28
 
 ### Added

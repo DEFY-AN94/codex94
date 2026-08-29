@@ -122,3 +122,23 @@ struct StatusPresentation: Equatable, Sendable {
         }
     }
 }
+
+enum ConnectionRecoveryDestination: Equatable, Sendable {
+    case connection
+    case diagnostics
+}
+
+extension ConnectionIssue {
+    var recoveryDestination: ConnectionRecoveryDestination {
+        switch self {
+        case .codexNotFound, .codexNotExecutable, .invalidCodexVersion,
+             .processLaunchFailed, .notLoggedIn:
+            .connection
+        case .initializationTimedOut, .requestTimedOut, .totalTimedOut,
+             .serverExited, .malformedResponse, .responseTooLarge,
+             .serverError, .missingResult, .quotaUnavailable, .cacheFailure,
+             .unknown:
+            .diagnostics
+        }
+    }
+}

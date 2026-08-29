@@ -6,6 +6,9 @@ import XCTest
 
 @MainActor
 final class QuotaPopoverLayoutTests: XCTestCase {
+    private let referenceDate = Date(timeIntervalSince1970: 1_800_000_000)
+    private let resetTimeZone = TimeZone(secondsFromGMT: 0)!
+
     func testInstallUsesHostingControllerFittingHeightAndKeepsController() {
         let popover = NSPopover()
         let contentViewController = NSHostingController(
@@ -31,8 +34,8 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         XCTAssertEqual(singleSize.width, QuotaPopoverLayout.contentWidth, accuracy: 0.5)
         XCTAssertEqual(multiSize.width, QuotaPopoverLayout.contentWidth, accuracy: 0.5)
         XCTAssertGreaterThan(multiSize.height, singleSize.height)
-        XCTAssertLessThan(singleSize.height, 352)
-        XCTAssertLessThan(multiSize.height, 420)
+        assertContentMatchesPopover(for: singleFixture)
+        assertContentMatchesPopover(for: multiFixture)
     }
 
     func testPopoverTracksViewedBucketNaturalHeight() throws {
@@ -55,7 +58,8 @@ final class QuotaPopoverLayoutTests: XCTestCase {
 
         XCTAssertGreaterThan(sparkHeight, codexHeight)
         XCTAssertEqual(sparkHeight, idealHeight(of: controller), accuracy: 0.5)
-        XCTAssertLessThan(sparkHeight, 420)
+        XCTAssertEqual(sparkHeight, ceil(controller.view.fittingSize.height), accuracy: 0.5)
+        XCTAssertEqual(popover.contentSize.width, QuotaPopoverLayout.contentWidth)
 
         fixture.store.setViewedBucket("default-v2")
         XCTAssertTrue(waitForLayout {
@@ -89,6 +93,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         let cachedFixture = try makeFixture(snapshot: cachedSnapshot)
         defer { cachedFixture.cleanUp() }
         assertNaturalPopoverSize(hostingSize(for: cachedFixture))
+        assertContentMatchesPopover(for: cachedFixture)
         XCTAssertEqual(
             cachedFixture.store.viewedStatusPresentation.freshness,
             .updated(cachedSnapshot.fetchedAt)
@@ -107,6 +112,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         try await waitForRefreshToFinish(connectedFixture.store)
 
         assertNaturalPopoverSize(hostingSize(for: connectedFixture))
+        assertContentMatchesPopover(for: connectedFixture)
         XCTAssertEqual(
             connectedFixture.store.viewedStatusPresentation.freshness,
             .updated(cachedSnapshot.fetchedAt)
@@ -124,6 +130,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         refreshingFixture.store.refresh(trigger: .manual)
         XCTAssertTrue(refreshingFixture.store.isRefreshing)
         assertNaturalPopoverSize(hostingSize(for: refreshingFixture))
+        assertContentMatchesPopover(for: refreshingFixture)
         XCTAssertEqual(
             refreshingFixture.store.viewedStatusPresentation.freshness,
             .lastSuccess(cachedSnapshot.fetchedAt)
@@ -145,19 +152,23 @@ final class QuotaPopoverLayoutTests: XCTestCase {
             .noSuccessfulDataYet
         )
         assertNaturalPopoverSize(hostingSize(for: unavailableFixture))
+        assertContentMatchesPopover(for: unavailableFixture)
         try await waitForRefreshToFinish(unavailableFixture.store)
         XCTAssertEqual(
             unavailableFixture.store.viewedStatusPresentation.freshness,
             .noSuccessfulData
         )
         assertNaturalPopoverSize(hostingSize(for: unavailableFixture))
+        assertContentMatchesPopover(for: unavailableFixture)
     }
 
     func testFreshnessLayoutFitsLanguagesAndThemes() throws {
         let fixture = try makeFixture(snapshot: snapshot(includeSpark: true))
         defer { fixture.cleanUp() }
         XCTAssertEqual(
-            QuotaFormatting.relativeAge(since: try XCTUnwrap(fixture.store.snapshot?.fetchedAt)),
+            QuotaFormatting.relativeAge(
+                since: try XCTUnwrap(fixture.store.snapshot?.fetchedAt), now: referenceDate
+            ),
             .minutes(27)
         )
 
@@ -168,8 +179,10 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                 let controller = NSHostingController(
                     rootView: QuotaPopoverView(
                         store: fixture.store,
-                        openDashboard: {},
-                        quit: {}
+                        openDashboard: { _ in },
+                        quit: {},
+                        referenceDate: referenceDate,
+                        resetTimeZone: resetTimeZone
                     )
                     .codex94Environment(fixture.preferences)
                 )
@@ -178,6 +191,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                     height: .greatestFiniteMagnitude
                 ))
                 assertNaturalPopoverSize(size)
+                assertContentMatchesPopover(for: fixture)
             }
         }
     }
@@ -277,6 +291,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                     let rendered = try renderedPopoverPNG(for: fixture)
                     XCTAssertGreaterThan(rendered.data.count, 1_000, scenario)
                     assertNaturalPopoverSize(rendered.size)
+                    assertContentMatchesPopover(for: fixture)
 
                     let filename = "\(scenario)-\(language.rawValue)-\(theme.rawValue).png"
                     let attachment = XCTAttachment(
@@ -340,6 +355,249 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         XCTAssertEqual(popover.contentSize.width, QuotaPopoverLayout.contentWidth)
     }
 
+    func testMenuBarLayoutIsCapturedUntilANewViewIsCreated() async throws {
+        let fetcher = LayoutOutcomeFetcher(
+            outcome: .success(snapshot(includeSpark: true)), delay: .zero
+        )
+        let fixture = try makeFixture(snapshot: snapshot(includeSpark: true), fetcher: fetcher)
+        defer { fixture.cleanUp() }
+        let initialSnapshot = fixture.store.snapshot
+        let initialState = fixture.store.connectionState
+        let cacheURL = fixture.directory.appendingPathComponent("quota.json")
+        let cacheBytes = try Data(contentsOf: cacheURL)
+        let capturedLayout = fixture.preferences.menuBarLayout
+        let capturedView = MenuBarStatusView(store: fixture.store, layout: capturedLayout)
+        let controller = NSHostingController(rootView: capturedView)
+        let proposal = NSSize(width: 200, height: 200)
+
+        for nextLayout in MenuBarLayout.allCases {
+            fixture.preferences.menuBarLayout = nextLayout
+            fixture.preferences.statusAccentOverrides[.healthy] = StatusAccentColor(hex: "123456")
+            let size = controller.sizeThatFits(in: proposal)
+            XCTAssertEqual(capturedView.layout, capturedLayout)
+            XCTAssertEqual(size, capturedLayout.metrics.contentSize)
+            let nextLaunch = NSHostingController(rootView: MenuBarStatusView(
+                store: fixture.store, layout: fixture.preferences.menuBarLayout
+            ))
+            XCTAssertEqual(nextLaunch.sizeThatFits(in: proposal), nextLayout.metrics.contentSize)
+        }
+        await Task.yield()
+        let requests = await fetcher.requestCount()
+        XCTAssertEqual(requests, 0)
+        XCTAssertEqual(fixture.store.snapshot, initialSnapshot)
+        XCTAssertEqual(fixture.store.connectionState, initialState)
+        XCTAssertEqual(try Data(contentsOf: cacheURL), cacheBytes)
+    }
+
+    // Real accessibility, focus, and screen-frame assertions live in CI-only Codex94UITests.
+    // These unit fixtures measure detached SwiftUI hosts and store/cache invariants.
+    func testAbsoluteResetHasItsOwnFullWidthWrappingRow() throws {
+        let window = try XCTUnwrap(snapshot(includeSpark: false).defaultBucket?.window(.weekly))
+        let rowWidth = QuotaPopoverLayout.contentWidth - 36
+        let contexts: [(LanguagePreference, Locale, TimeZone)] = [
+            (.english, Locale(identifier: "en_US"), resetTimeZone),
+            (.english, Locale(identifier: "en_GB"), try XCTUnwrap(TimeZone(identifier: "Asia/Kathmandu"))),
+            (.simplifiedChinese, Locale(identifier: "zh-Hans"), try XCTUnwrap(TimeZone(identifier: "Australia/Sydney")))
+        ]
+        for (language, locale, timeZone) in contexts {
+            let reset = QuotaResetPresentation(
+                resetsAt: window.resetsAt, now: referenceDate, language: language,
+                locale: locale, timeZone: timeZone
+            )
+            let content = QuotaWindowRowContent(
+                window: window,
+                palette: .resolve(.terminalDark, scheme: .dark),
+                reset: reset
+            )
+            .environment(\.locale, language.locale)
+            let controller = NSHostingController(rootView: content)
+            let size = controller.sizeThatFits(in: NSSize(width: rowWidth, height: .greatestFiniteMagnitude))
+            let mainRow = NSHostingController(rootView: QuotaWindowMainRow(
+                window: window,
+                palette: .resolve(.terminalDark, scheme: .dark),
+                countdown: reset.countdown
+            ).environment(\.locale, language.locale))
+            let mainSize = mainRow.sizeThatFits(in: NSSize(width: rowWidth, height: .greatestFiniteMagnitude))
+            let absoluteLine = NSHostingController(rootView: QuotaAbsoluteResetLine(text: reset.absolute))
+            let fullWidthLine = absoluteLine.sizeThatFits(in: NSSize(width: rowWidth, height: .greatestFiniteMagnitude))
+            let narrowLine = absoluteLine.sizeThatFits(in: NSSize(width: 146, height: CGFloat.greatestFiniteMagnitude))
+            XCTAssertEqual(fullWidthLine.width, rowWidth, accuracy: 0.5)
+            XCTAssertGreaterThan(narrowLine.height, fullWidthLine.height, "Absolute text must wrap, never truncate")
+            XCTAssertEqual(size.height, mainSize.height + 7 + fullWidthLine.height, accuracy: 0.5,
+                           "Reset must occupy its own full-width line below the unchanged quota row")
+            let absoluteSize = (reset.absolute as NSString).boundingRect(
+                with: NSSize(width: rowWidth, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: [.font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)]
+            ).size
+            let mainLineHeight = ("Weekly" as NSString).size(withAttributes: [
+                .font: NSFont.monospacedSystemFont(ofSize: 14, weight: .medium)
+            ]).height
+            XCTAssertEqual(size.width, rowWidth, accuracy: 0.5)
+            XCTAssertGreaterThanOrEqual(size.height, floor(mainLineHeight) + 7 + floor(absoluteSize.height))
+
+            XCTAssertTrue(reset.absolute.contains("UTC"))
+        }
+    }
+
+    func testNotLoggedInSettingsMeasureInBothLanguagesWithoutAdditionalRequests() async throws {
+        let fetcher = LayoutOutcomeFetcher(outcome: .failure(.notLoggedIn), delay: .zero)
+        let fixture = try makeFixture(snapshot: nil, fetcher: fetcher)
+        defer { fixture.cleanUp() }
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRefreshToFinish(fixture.store)
+        let stateBefore = fixture.store.connectionState
+        let cacheURL = fixture.directory.appendingPathComponent("quota.json")
+        XCTAssertEqual(fixture.store.lastIssue, .notLoggedIn)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: cacheURL.path))
+
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            fixture.preferences.language = language
+            let content = ConnectionSettingsView(
+                store: fixture.store,
+                chooseCodex: { XCTFail("Rendering must not open a file chooser") },
+                clearManualCodex: { XCTFail("Rendering must not change the executable") },
+                referenceDate: referenceDate,
+                resetTimeZone: resetTimeZone
+            )
+            .environment(\.locale, language.locale)
+            let controller = NSHostingController(rootView: content)
+            let size = controller.sizeThatFits(in: NSSize(width: 900, height: 600))
+            XCTAssertEqual(size.width, 900, accuracy: 0.5)
+            XCTAssertTrue(size.height.isFinite)
+            XCTAssertGreaterThan(size.height, 0)
+            XCTAssertLessThanOrEqual(size.height, 600.5)
+            XCTAssertNil(controller.view.window)
+        }
+        await Task.yield()
+        let requestCount = await fetcher.requestCount()
+        XCTAssertEqual(requestCount, 1, "Only the explicit manual failure is permitted")
+        XCTAssertEqual(fixture.store.connectionState, stateBefore)
+        XCTAssertNil(fixture.store.snapshot)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: cacheURL.path))
+    }
+
+    func testResolvedMenuBarResetAndBrowsingRemainIndependentDuringDetachedLayout() throws {
+        let fixture = try makeFixture(snapshot: snapshot(includeSpark: true))
+        defer { fixture.cleanUp() }
+        fixture.preferences.language = .english
+        fixture.store.setViewedBucket("model-special")
+        let selections: [MenuBarQuotaSelection] = [
+            .defaultBucket(.weekly),
+            .bucket(limitID: "temporarily-missing-synthetic-model", kind: .weekly)
+        ]
+        for selection in selections {
+            fixture.preferences.menuBarQuotaSelection = selection
+            let resolved = try XCTUnwrap(fixture.store.menuBarQuota)
+            XCTAssertEqual(resolved.bucket.limitID, "default-v2")
+            XCTAssertEqual(fixture.store.menuBarSelectionUsesFallback, selection != .defaultBucket(.weekly))
+            let reset = QuotaResetPresentation(
+                resetsAt: resolved.window.resetsAt, now: referenceDate,
+                language: .english, timeZone: resetTimeZone
+            )
+            let browsedReset = QuotaResetPresentation(
+                resetsAt: fixture.store.viewedWindow?.resetsAt, now: referenceDate,
+                language: .english, timeZone: resetTimeZone
+            )
+            XCTAssertNotEqual(reset.absolute, browsedReset.absolute)
+            let row = QuotaWindowRow(
+                window: resolved.window,
+                palette: .resolve(.terminalDark, scheme: .dark),
+                language: .english,
+                referenceDate: referenceDate,
+                timeZone: resetTimeZone
+            )
+            let connection = ConnectionSettingsView(
+                store: fixture.store,
+                chooseCodex: {}, clearManualCodex: {},
+                referenceDate: referenceDate,
+                resetTimeZone: resetTimeZone
+            )
+            .codex94Environment(fixture.preferences)
+            let rowController = NSHostingController(rootView: row)
+            let rowSize = rowController.sizeThatFits(in: NSSize(width: 464, height: CGFloat.greatestFiniteMagnitude))
+            XCTAssertEqual(rowSize.width, 464, accuracy: 0.5)
+            XCTAssertTrue(rowSize.height.isFinite)
+            XCTAssertGreaterThan(rowSize.height, 0)
+            XCTAssertNil(rowController.view.window)
+
+            let connectionController = NSHostingController(rootView: connection)
+            let connectionSize = connectionController.sizeThatFits(in: NSSize(width: 900, height: 600))
+            XCTAssertEqual(connectionSize.width, 900, accuracy: 0.5)
+            XCTAssertTrue(connectionSize.height.isFinite)
+            XCTAssertGreaterThan(connectionSize.height, 0)
+            XCTAssertLessThanOrEqual(connectionSize.height, 600.5)
+            XCTAssertNil(connectionController.view.window)
+            XCTAssertEqual(fixture.preferences.menuBarQuotaSelection, selection)
+            XCTAssertEqual(fixture.store.menuBarQuota, resolved)
+        }
+        XCTAssertEqual(fixture.store.viewedBucket?.limitID, "model-special")
+    }
+
+    func testLongBucketResetLayoutKeepsFiveHundredPointNaturalSize() throws {
+        let fixture = try makeFixture(snapshot: snapshot(
+            includeSpark: true,
+            sparkName: String(repeating: "Synthetic Future Model ", count: 6)
+        ))
+        defer { fixture.cleanUp() }
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            fixture.preferences.language = language
+            for theme in ThemePreference.allCases {
+                fixture.preferences.theme = theme
+                for bucketID in ["default-v2", "model-special"] {
+                    fixture.store.setViewedBucket(bucketID)
+                    assertContentMatchesPopover(for: fixture)
+                    let content = QuotaPopoverView(
+                        store: fixture.store,
+                        openDashboard: { _ in XCTFail("Layout must not navigate") },
+                        quit: {},
+                        referenceDate: referenceDate,
+                        resetTimeZone: resetTimeZone
+                    )
+                    .codex94Environment(fixture.preferences)
+                    let controller = NSHostingController(rootView: content)
+                    let size = controller.sizeThatFits(in: NSSize(
+                        width: QuotaPopoverLayout.contentWidth,
+                        height: .greatestFiniteMagnitude
+                    ))
+                    assertNaturalPopoverSize(size)
+                    XCTAssertNil(controller.view.window)
+                    XCTAssertEqual(fixture.store.viewedBucket?.limitID, bucketID)
+                }
+            }
+        }
+    }
+
+    func testDisplaySettingsMeasureInBothLanguagesWithoutFetchingOrChangingCache() async throws {
+        let fetcher = LayoutOutcomeFetcher(
+            outcome: .success(snapshot(includeSpark: true)), delay: .zero
+        )
+        let fixture = try makeFixture(snapshot: snapshot(includeSpark: true), fetcher: fetcher)
+        defer { fixture.cleanUp() }
+        let cacheURL = fixture.directory.appendingPathComponent("quota.json")
+        let cacheBytes = try Data(contentsOf: cacheURL)
+        let stateBefore = fixture.store.connectionState
+        let snapshotBefore = fixture.store.snapshot
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            fixture.preferences.language = language
+            let content = DisplaySettingsView(store: fixture.store, windowState: DashboardWindowState())
+                .environment(\.locale, language.locale)
+            let controller = NSHostingController(rootView: content)
+            let size = controller.sizeThatFits(in: NSSize(width: 900, height: 720))
+            XCTAssertEqual(size.width, 900, accuracy: 0.5)
+            XCTAssertTrue(size.height.isFinite)
+            XCTAssertGreaterThan(size.height, 0)
+            XCTAssertLessThanOrEqual(size.height, 720.5)
+            XCTAssertNil(controller.view.window)
+        }
+        await Task.yield()
+        let requestCount = await fetcher.requestCount()
+        XCTAssertEqual(requestCount, 0)
+        XCTAssertEqual(fixture.store.connectionState, stateBefore)
+        XCTAssertEqual(fixture.store.snapshot, snapshotBefore)
+        XCTAssertEqual(try Data(contentsOf: cacheURL), cacheBytes)
+    }
+
     private func hostingSize(for fixture: StoreFixture) -> NSSize {
         let popover = NSPopover()
         let controller = makeHostingController(for: fixture)
@@ -355,8 +613,10 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         QuotaPopoverHostingController(
             rootView: QuotaPopoverView(
                 store: fixture.store,
-                openDashboard: {},
-                quit: {}
+                openDashboard: { _ in },
+                quit: {},
+                referenceDate: referenceDate,
+                resetTimeZone: resetTimeZone
             )
             .codex94Environment(fixture.preferences)
         )
@@ -374,7 +634,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
     private func waitForLayout(until condition: () -> Bool) -> Bool {
         let deadline = Date(timeIntervalSinceNow: 2)
         while !condition(), Date() < deadline {
-            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.01))
+            RunLoop.main.run(until: min(deadline, Date(timeIntervalSinceNow: 0.01)))
         }
         return condition()
     }
@@ -392,7 +652,25 @@ final class QuotaPopoverLayoutTests: XCTestCase {
             line: line
         )
         XCTAssertGreaterThan(size.height, 0, file: file, line: line)
-        XCTAssertLessThan(size.height, 420, file: file, line: line)
+        XCTAssertTrue(size.height.isFinite, file: file, line: line)
+    }
+
+    private func assertContentMatchesPopover(
+        for fixture: StoreFixture,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let controller = makeHostingController(for: fixture)
+        let popover = NSPopover()
+        controller.install(in: popover)
+        controller.synchronizeSize()
+        let fitted = controller.sizeThatFits(in: NSSize(
+            width: QuotaPopoverLayout.contentWidth, height: .greatestFiniteMagnitude
+        ))
+        XCTAssertEqual(popover.contentSize.width, fitted.width, accuracy: 0.5, file: file, line: line)
+        XCTAssertEqual(popover.contentSize.height, ceil(fitted.height), accuracy: 0.5, file: file, line: line)
+        XCTAssertGreaterThanOrEqual(popover.contentSize.height, fitted.height, file: file, line: line)
+        XCTAssertLessThan(popover.contentSize.height - fitted.height, 1, file: file, line: line)
     }
 
     private func renderedPopoverPNG(
@@ -473,10 +751,10 @@ final class QuotaPopoverLayoutTests: XCTestCase {
 
         let suiteName = "Codex94PopoverPreferences-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.set(true, forKey: "hasChosenIdentityMode")
+        defaults.set(IdentityMode.quotaOnly.rawValue, forKey: "identityMode")
+        defaults.set(executable.path, forKey: "manualCodexPath")
         let preferences = PreferencesStore(defaults: defaults)
-        preferences.hasChosenIdentityMode = true
-        preferences.identityMode = .quotaOnly
-        preferences.manualCodexPath = executable.path
 
         let cache = SnapshotCache(fileURL: directory.appendingPathComponent("quota.json"))
         if let snapshot { try cache.save(snapshot) }
@@ -495,8 +773,11 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         )
     }
 
-    private func snapshot(includeSpark: Bool) -> QuotaSnapshot {
-        let now = Date()
+    private func snapshot(
+        includeSpark: Bool,
+        sparkName: String = "GPT-5.3-Codex-Spark"
+    ) -> QuotaSnapshot {
+        let now = referenceDate
         var buckets = [
             QuotaBucketSnapshot(
                 limitID: "default-v2",
@@ -517,7 +798,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
             buckets.append(
                 QuotaBucketSnapshot(
                     limitID: "model-special",
-                    limitName: "GPT-5.3-Codex-Spark",
+                    limitName: sparkName,
                     planType: "pro",
                     windows: [
                         QuotaWindowSnapshot(
@@ -530,7 +811,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
                             kind: .weekly,
                             usedPercent: 16,
                             windowMinutes: 10_080,
-                            resetsAt: now.addingTimeInterval(2 * 86_400 + 5 * 3_600)
+                            resetsAt: now.addingTimeInterval(3 * 86_400 + 5 * 3_600)
                         )
                     ]
                 )
@@ -540,9 +821,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         return QuotaSnapshot(
             buckets: buckets,
             defaultLimitID: "default-v2",
-            fetchedAt: Date(
-                timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down) - 27 * 60
-            ),
+            fetchedAt: referenceDate.addingTimeInterval(-27 * 60),
             account: nil,
             codex: nil
         )
@@ -562,6 +841,7 @@ private struct StoreFixture {
         try? FileManager.default.removeItem(at: directory)
     }
 }
+
 
 private enum LayoutFetchOutcome: Sendable {
     case success(QuotaSnapshot)

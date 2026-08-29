@@ -34,12 +34,27 @@ selection, refresh frequency, account-information mode, and an optional
 manually selected Codex path. See [PRIVACY.md](PRIVACY.md) for the complete
 inventory.
 
+Version `0.1.8` adds only local UI preferences for menu-bar
+layout (`menuBarLayout.v1`) and four independent opaque sRGB color overrides
+(`statusAccentOverrides.v1`, normalized uppercase `RRGGBB`). Restoring colors removes only
+those overrides. Absolute Reset text uses the existing timestamp without a new
+cache schema, and the Dashboard section is session-only. Recovery actions only
+navigate to Connection or Diagnostics; login guidance does not execute login.
+These display/navigation changes do not add credential access, permissions,
+quota requests, or quota-cache writes.
+
 ## Supported versions
 
-`0.1.7` is the current maintained source version, with stable source tag
-`v0.1.7`. A source release is available only after its tag is published. The
+This maintained source version is `0.1.8`; its stable source tag is `v0.1.8`.
+A source release is available only after its tag is published. The
 `main` branch may contain unreleased documentation or development work.
 Security fixes are applied to the latest maintained source version.
+
+Version `0.1.8 (9)` passed the full GitHub test/release job, synthetic Display
+and click-functional Recovery UI jobs, Actions/Swift CodeQL, and separate
+synthetic A/B GUI smokes. Its synthetic documentation images were reviewed.
+Contributor validation guidance is documented in [CONTRIBUTING.md](CONTRIBUTING.md);
+static source checks alone are not runtime security or release evidence.
 
 ## Reporting
 

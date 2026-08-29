@@ -4,6 +4,107 @@ import XCTest
 final class StatusPresentationTests: XCTestCase {
     private let lastSuccess = Date(timeIntervalSince1970: 1_900_000_000)
 
+    func testAllConnectionIssuesMapToExpectedRecoveryDestination() {
+        let expectations: [(ConnectionIssue, ConnectionRecoveryDestination)] = [
+            (.codexNotFound, .connection),
+            (.codexNotExecutable, .connection),
+            (.invalidCodexVersion, .connection),
+            (.processLaunchFailed, .connection),
+            (.notLoggedIn, .connection),
+            (.initializationTimedOut, .diagnostics),
+            (.requestTimedOut, .diagnostics),
+            (.totalTimedOut, .diagnostics),
+            (.serverExited, .diagnostics),
+            (.malformedResponse, .diagnostics),
+            (.responseTooLarge, .diagnostics),
+            (.serverError, .diagnostics),
+            (.missingResult, .diagnostics),
+            (.quotaUnavailable, .diagnostics),
+            (.cacheFailure, .diagnostics),
+            (.unknown, .diagnostics)
+        ]
+
+        XCTAssertEqual(Set(expectations.map { $0.0.rawValue }).count, 16)
+        for (issue, expectedDestination) in expectations {
+            XCTAssertEqual(issue.recoveryDestination, expectedDestination, issue.rawValue)
+        }
+    }
+
+    func testRecoveryDestinationsUseExistingDashboardSections() {
+        XCTAssertEqual(ConnectionRecoveryDestination.connection.dashboardSection, .connection)
+        XCTAssertEqual(ConnectionRecoveryDestination.diagnostics.dashboardSection, .diagnostics)
+        XCTAssertEqual(
+            DashboardSection.primarySections,
+            [.connection, .display, .startup, .diagnostics]
+        )
+    }
+
+    func testStatusWithoutAnIssueHasNoRecoveryDestination() {
+        let states: [ConnectionState] = [.idle, .refreshing, .connected]
+        for state in states {
+            let presentation = makePresentation(
+                state: state,
+                lastSuccessfulFetch: state == .connected ? lastSuccess : nil
+            )
+            XCTAssertNil(presentation.issue?.recoveryDestination)
+        }
+    }
+
+    @MainActor
+    func testOrdinaryDashboardOpenPreservesDefaultAndSelectedSection() {
+        let windowState = DashboardWindowState()
+        XCTAssertEqual(windowState.selection, .connection)
+
+        windowState.select(section: nil)
+        XCTAssertEqual(windowState.selection, .connection)
+
+        windowState.selection = .about
+        windowState.select(section: nil)
+        XCTAssertEqual(windowState.selection, .about)
+
+        windowState.selection = nil
+        windowState.select(section: nil)
+        XCTAssertNil(windowState.selection)
+    }
+
+    @MainActor
+    func testDirectedDashboardOpenSelectsSectionForNewAndExistingState() {
+        let windowState = DashboardWindowState()
+
+        windowState.select(section: ConnectionRecoveryDestination.diagnostics.dashboardSection)
+        XCTAssertEqual(windowState.selection, .diagnostics)
+
+        windowState.selection = .display
+        windowState.select(section: ConnectionRecoveryDestination.connection.dashboardSection)
+        XCTAssertEqual(windowState.selection, .connection)
+
+        for section in DashboardSection.allCases {
+            windowState.select(section: section)
+            XCTAssertEqual(windowState.selection, section)
+            windowState.select(section: nil)
+            XCTAssertEqual(windowState.selection, section)
+        }
+    }
+
+    @MainActor
+    func testRecoverySelectionDoesNotRequestWindowResizeOrChangeSizeState() {
+        let windowState = DashboardWindowState()
+        let initialWidth = windowState.currentWidth
+        let initialHeight = windowState.currentHeight
+        let initialPreset = windowState.selectedPreset
+        var resizeRequests: [DashboardWindowSizePreset] = []
+        windowState.setResizeHandler { resizeRequests.append($0) }
+
+        windowState.select(section: .diagnostics)
+        windowState.select(section: nil)
+        windowState.select(section: .connection)
+
+        XCTAssertTrue(resizeRequests.isEmpty)
+        XCTAssertEqual(windowState.currentWidth, initialWidth)
+        XCTAssertEqual(windowState.currentHeight, initialHeight)
+        XCTAssertEqual(windowState.selectedPreset, initialPreset)
+    }
+
     func testQuotaLevelThresholds() {
         let expectations: [(Int?, QuotaLevel)] = [
             (nil, .unknown),
@@ -196,7 +297,7 @@ final class StatusPresentationTests: XCTestCase {
                 now: now,
                 language: .english
             ),
-            "Codex, Weekly quota, 32% remaining, Connected, updated 27 minutes ago"
+            "Codex, Weekly quota, 32% remaining, Reset time unavailable, Connected, updated 27 minutes ago"
         )
     }
 
@@ -217,7 +318,7 @@ final class StatusPresentationTests: XCTestCase {
                 now: now,
                 language: .simplifiedChinese
             ),
-            "GPT-5.3-Codex-Spark, 5 小时额度, 剩余 100%, 正在刷新, 缓存数据, 上次成功于 27 分钟前"
+            "GPT-5.3-Codex-Spark, 5 小时额度, 剩余 100%, 重置时间不可用, 正在刷新, 缓存数据, 上次成功于 27 分钟前"
         )
     }
 
@@ -274,7 +375,7 @@ final class StatusPresentationTests: XCTestCase {
 
         XCTAssertEqual(
             label,
-            "Codex, Weekly quota, 80% remaining, Connected, updated just now"
+            "Codex, Weekly quota, 80% remaining, Reset time unavailable, Connected, updated just now"
         )
         XCTAssertFalse(label.contains("limit-id"))
         XCTAssertFalse(label.contains("@"))
