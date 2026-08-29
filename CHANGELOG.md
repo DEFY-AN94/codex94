@@ -4,8 +4,9 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
-The working candidate is `0.1.8 (9)`, not a stable source release. Build/test
-CI, GUI smoke, and updated fixture screenshot verification are pending.
+The working candidate is `0.1.8 (9)`, not a stable source release. Candidate
+`164ae10` passed 155 compiled tests, the release gate, and CI display smoke.
+Recovery CI failed; remaining isolated GUI acceptance is pending.
 
 ### Added
 
@@ -43,8 +44,9 @@ CI, GUI smoke, and updated fixture screenshot verification are pending.
   invalid stored entries fall back per role. No new identity fields, quota
   schema, credentials, network interface, or permissions are introduced.
 - Document the local UI preferences, use synthetic test/screenshot fixtures,
-  and report CI, GUI, and screenshot validation separately. Existing images
-  remain previous stable fixtures until candidate replacements are reviewed.
+  and report CI, GUI, and screenshot validation separately. Replace the four
+  popover/Dashboard images with reviewed synthetic candidate captures; retain
+  the unchanged default menu-bar example from the previous stable version.
 
 ## 0.1.7 - 2026-08-28
 

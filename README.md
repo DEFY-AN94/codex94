@@ -24,9 +24,10 @@ tested, and security-scanned before it is tagged.
 
 The values below come from an isolated documentation fixture. They are
 illustrative and do not contain a real account, identity, or quota.
-These images still show the previous stable UI, not the `0.1.8` candidate.
-Updated popover and Dashboard screenshots are pending a fixture render and
-review; the existing images are retained without claiming candidate validation.
+The popover and Dashboard images show the unreleased `0.1.8` candidate, captured
+in isolated CI and reviewed before inclusion. Their fixed future Reset dates
+are test values, not live reset schedules. The unchanged default menu-bar
+sample is retained from `v0.1.7`; screenshots alone do not establish acceptance.
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 menu bar ring showing 79 percent remaining" width="144">
@@ -39,16 +40,17 @@ review; the existing images are retained without claiming candidate validation.
 <p align="center"><strong>CLI-style quota popover</strong></p>
 
 <p align="center">
-  <img src="docs/images/readme/dashboard-en.png" alt="Codex94 English Connection Dashboard in Terminal Dark" width="900">
+  <img src="docs/images/readme/dashboard-en.png" alt="Codex94 English Display settings in Terminal Dark" width="900">
 </p>
-<p align="center"><strong>Connection Dashboard</strong></p>
+<p align="center"><strong>Display settings</strong></p>
 
 ## Distribution status
 
 - The current stable source is `0.1.7 (8)`, tagged `v0.1.7`.
 - This development tree prepares an **unreleased `0.1.8 (9)` candidate**.
-  Build/test CI and GUI verification are pending; source review and
-  static checks are not runtime validation or a stable release.
+  Candidate `164ae10` passed compiled tests, the release gate, and CI display
+  smoke. Recovery CI failed and remaining isolated GUI verification is pending;
+  this is not full candidate acceptance or a stable release.
 - A source release is available only after its tag is published. `main` may
   contain release preparation.
 - This public repository can be cloned without GitHub authentication.
@@ -264,9 +266,12 @@ security/signature checks:
 ./script/release_check.sh
 ```
 
-The candidate's CI and GUI checks and replacement documentation screenshots are
-still pending. Build/test results, GUI validation, and screenshot review are
-reported separately.
+Validation snapshot for candidate `164ae10`: [155 compiled tests, the release
+gate, and CI display smoke](https://github.com/DEFY-AN94/codex94/actions/runs/33186827804)
+passed. The recovery CI job failed; keyboard recovery and fresh no-cache GUI
+Smoke B remain unverified. The four candidate popover/Dashboard screenshots have
+been visually and privacy reviewed. These results are reported separately and
+do not establish full candidate acceptance or validate later code changes.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See

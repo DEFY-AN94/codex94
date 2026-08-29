@@ -51,7 +51,9 @@ quota requests, or quota-cache writes.
 Security fixes are applied to the latest maintained source version.
 
 The working `0.1.8 (9)` candidate is unreleased and does not replace that stable
-version. Candidate CI, GUI, and updated screenshot verification are pending.
+version. The `164ae10` validation snapshot passed compiled tests, the release
+gate, and CI display smoke; its synthetic documentation images were reviewed.
+Recovery CI failed and remaining isolated GUI verification is pending.
 Contributor validation guidance is documented in [CONTRIBUTING.md](CONTRIBUTING.md);
 static source checks alone are not runtime security or release evidence.
 

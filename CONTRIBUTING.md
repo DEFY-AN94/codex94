@@ -90,11 +90,13 @@ Reset labels must include the countdown and absolute time; public test data and
 screenshots must remain synthetic or redacted.
 
 Report source/static checks, compiled tests, GUI smoke, screenshots, and release
-status separately, tied to the actual candidate tree and artifacts. The current
-README images remain previous stable fixtures; their `0.1.8` replacements and
-candidate CI/GUI verification are pending. Keep new feature notes under
-Unreleased and stable installation instructions on `v0.1.7` until a separately
-reviewed source release is finalized.
+status separately, tied to the actual candidate tree and artifacts. The four
+README popover/Dashboard images are reviewed synthetic `0.1.8` captures; the
+unchanged default menu-bar example remains from `v0.1.7`. Candidate `164ae10`
+passed compiled tests, the release gate, and CI display smoke. Recovery CI
+failed; remaining isolated GUI acceptance is pending. Keep new feature notes
+under Unreleased and stable installation instructions on `v0.1.7` until a
+separately reviewed source release is finalized.
 
 Do not open a public issue for a suspected vulnerability. Follow
 [SECURITY.md](SECURITY.md).

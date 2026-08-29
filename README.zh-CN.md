@@ -20,9 +20,9 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 ## 界面截图
 
 以下数值来自隔离的文档渲染夹具，仅用于展示，不包含真实账号、身份信息或额度。
-这些图片仍是之前稳定版的界面示例，并非 `0.1.8` 候选版截图。
-Popover 和 Dashboard 的新截图仍待合成夹具渲染与审查；目前保留原图，不据此宣称
-候选版已经通过验证。
+Popover 和 Dashboard 图片来自隔离 CI 中尚未发布的 `0.1.8` 候选版，已在纳入前审查。
+图中固定的未来 Reset 日期是测试值，并非实时重置时间。未改变的默认菜单栏示例
+保留自 `v0.1.7`；截图本身不代表候选版已完成验收。
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 菜单栏圆环显示剩余 79%" width="144">
@@ -35,15 +35,16 @@ Popover 和 Dashboard 的新截图仍待合成夹具渲染与审查；目前保�
 <p align="center"><strong>CLI 风格额度面板</strong></p>
 
 <p align="center">
-  <img src="docs/images/readme/dashboard-zh-Hans.png" alt="Codex94 Terminal Dark 简体中文连接设置页面" width="900">
+  <img src="docs/images/readme/dashboard-zh-Hans.png" alt="Codex94 Terminal Dark 简体中文显示设置页面" width="900">
 </p>
-<p align="center"><strong>连接设置页面</strong></p>
+<p align="center"><strong>显示设置页面</strong></p>
 
 ## 当前分发状态
 
 - 当前稳定源码版本为 `0.1.7 (8)`，稳定标签为 `v0.1.7`。
-- 当前开发树正在准备**尚未发布的 `0.1.8 (9)` 候选版**。构建/测试 CI 与 GUI
-  验证仍待完成；源码审查和静态检查不等于运行验证或正式稳定发布。
+- 当前开发树正在准备**尚未发布的 `0.1.8 (9)` 候选版**。候选提交 `164ae10` 的
+  编译测试、发布检查和 CI 显示 smoke 已通过；恢复 CI 未通过，其余隔离 GUI 验证
+  仍待完成。这不等于候选版已完整验收或正式稳定发布。
 - 标签发布后才视为稳定源码发布；`main` 可能包含发布准备内容。
 - 仓库已公开，任何人都可以在无需 GitHub 认证的情况下 clone 源码。
 - 当前没有 GitHub Release、DMG、经过公证的二进制或自动更新功能。
@@ -221,8 +222,10 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ./script/release_check.sh
 ```
 
-候选版的 CI、GUI 检查及替换文档截图仍待完成。构建/测试结果、GUI 验证和截图审查
-会分别报告。
+候选提交 `164ae10` 的验收快照：[155 项编译测试、发布检查和 CI 显示 smoke](https://github.com/DEFY-AN94/codex94/actions/runs/33186827804)
+已通过。恢复 CI 未通过；键盘恢复和全新无缓存实例的 GUI Smoke B 仍待验证。
+四张候选版 Popover/Dashboard 截图已完成视觉和隐私审查。上述结果分别报告，
+不代表候选版已完整验收，也不自动证明后续代码改动通过。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。贡献与发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 和
