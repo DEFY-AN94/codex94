@@ -1258,9 +1258,12 @@ final class Codex94UITests: XCTestCase {
     private func capture(_ element: XCUIElement, named filename: String) throws {
         // No desktop screenshots, Connection paths, Diagnostics or clipboard.
         if filename.hasPrefix("dashboard-") {
-            try require(identified("menu-bar-layout", in: element).exists
-                        && !identified("connection-menu-bar-reset", in: element).exists,
-                        "Dashboard artifacts may contain only the Display page")
+            try require(identified("overview-page", in: element).exists
+                        && !identified("connection-menu-bar-reset", in: element).exists
+                        && !identified("menu-bar-layout", in: element).exists
+                        && !identified("copy-diagnostics", in: element).exists
+                        && !identified("about-version", in: element).exists,
+                        "Dashboard artifacts may contain only the Overview page")
         } else {
             try require(identified("quota-popover-header", in: element).exists,
                         "Popover artifacts must be cropped to the application's own surface")
