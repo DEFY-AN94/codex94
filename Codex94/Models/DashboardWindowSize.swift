@@ -2,6 +2,7 @@ import AppKit
 import Combine
 
 enum DashboardSection: String, CaseIterable, Identifiable, Sendable {
+    case overview
     case connection
     case display
     case startup
@@ -11,6 +12,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     static let primarySections: [DashboardSection] = [
+        .overview,
         .connection,
         .display,
         .startup,
@@ -19,6 +21,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Sendable {
 
     var systemImage: String {
         switch self {
+        case .overview: "square.grid.2x2"
         case .connection: "point.3.connected.trianglepath.dotted"
         case .display: "rectangle.on.rectangle"
         case .startup: "power.circle"
@@ -108,7 +111,7 @@ enum DashboardWindowSizing {
 
 @MainActor
 final class DashboardWindowState: ObservableObject {
-    @Published var selection: DashboardSection? = .connection
+    @Published var selection: DashboardSection? = .overview
     @Published private(set) var selectedPreset: DashboardWindowSizePreset?
     @Published private(set) var currentWidth = Int(DashboardWindowSizing.minimumSize.width)
     @Published private(set) var currentHeight = Int(DashboardWindowSizing.minimumSize.height)
@@ -117,6 +120,10 @@ final class DashboardWindowState: ObservableObject {
 
     var currentDimensions: String {
         "\(currentWidth)\u{00D7}\(currentHeight)"
+    }
+
+    var resolvedSelection: DashboardSection {
+        selection ?? .overview
     }
 
     func select(section: DashboardSection?) {

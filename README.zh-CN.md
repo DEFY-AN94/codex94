@@ -6,7 +6,8 @@
 
 Codex94 是一款与 OpenAI Codex 兼容的非官方、独立 macOS 菜单栏额度监控工具。
 菜单栏中的紧凑圆环会显示所选模型额度桶与额度窗口的剩余百分比；点击后会展开
-CLI 风格的额度面板。App 不显示 Dock 图标，Dashboard 主要用于连接与显示设置。
+CLI 风格的额度面板。App 不显示 Dock 图标，新建 Dashboard 窗口默认进入总览，集中
+呈现所有可显示额度桶及服务实际返回的窗口，并提供连接与显示设置。
 
 Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可执行文件，
 并且没有第三方运行时依赖。
@@ -20,9 +21,10 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 ## 界面截图
 
 以下数值来自隔离的文档渲染夹具，仅用于展示，不包含真实账号、身份信息或额度。
-Popover 和 Dashboard 图片来自隔离 CI 中的 `0.1.8`，已在纳入前审查。图中固定的
-未来 Reset 日期是测试值，并非实时重置时间。未改变的默认菜单栏示例保留自
-`v0.1.7`。
+当前嵌入的 Popover 图片仍是经过审查的合成 `0.1.8` 产物；Dashboard 图片已经
+替换为从 GitHub-hosted CI 中取得、并完成视觉与隐私审查的合成 `0.1.9` 总览产物。
+图中固定的未来 Reset 日期是测试值，并非实时重置时间。
+未改变的默认菜单栏示例保留自 `v0.1.7`。
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 菜单栏圆环显示剩余 79%" width="144">
@@ -35,14 +37,16 @@ Popover 和 Dashboard 图片来自隔离 CI 中的 `0.1.8`，已在纳入前审�
 <p align="center"><strong>CLI 风格额度面板</strong></p>
 
 <p align="center">
-  <img src="docs/images/readme/dashboard-zh-Hans.png" alt="Codex94 Terminal Dark 简体中文显示设置页面" width="900">
+  <img src="docs/images/readme/dashboard-zh-Hans.png" alt="Codex94 Terminal Dark 简体中文总览展示合成额度桶" width="900">
 </p>
-<p align="center"><strong>显示设置页面</strong></p>
+<p align="center"><strong>额度总览</strong></p>
 
 ## 当前分发状态
 
-- 本文档对应源码版本 `0.1.8 (9)`，稳定源码标签为 `v0.1.8`。
-- 标签发布后才视为稳定源码发布；`main` 可能包含发布准备内容。
+- 当前源码树版本为 `0.1.9 (10)`。在 annotated `v0.1.9` 标签发布前，最新稳定
+  源码标签是 `v0.1.8`；标签发布后，`v0.1.9` 才成为稳定源码标签。
+- `0.1.9` 只有在标签发布后才是源码发布；在此发布门之前，`main` 与功能分支可能
+  包含未发布准备内容。
 - 仓库已公开，任何人都可以在无需 GitHub 认证的情况下 clone 源码。
 - 当前没有 GitHub Release、DMG、经过公证的二进制或自动更新功能。
 - `script/install.sh` 会构建本地 Release App，应用 ad-hoc Hardened
@@ -64,12 +68,24 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 
 ## 从源码安装
 
-`v0.1.8` 标签发布后，可使用以下命令安装其稳定源码：
+请只选择一个已经发布的标签进行 clone。在 annotated `v0.1.9` 标签出现前，使用
+当前稳定的 `v0.1.8` 源码：
 
 ```bash
-brew install ripgrep
 git clone --branch v0.1.8 --depth 1 https://github.com/DEFY-AN94/codex94.git
+```
+
+annotated `v0.1.9` 标签发布后，改用：
+
+```bash
+git clone --branch v0.1.9 --depth 1 https://github.com/DEFY-AN94/codex94.git
+```
+
+然后构建所选标签：
+
+```bash
 cd codex94
+brew install ripgrep
 
 sudo xcodebuild -license accept
 sudo xcodebuild -runFirstLaunch
@@ -89,9 +105,14 @@ sudo xcodebuild -runFirstLaunch
 
 ## 主要行为
 
+- 新建 Dashboard 窗口默认打开**总览**，复用当前连接状态、数据新鲜度文案和菜单栏
+  额度选择器，再按既有显示顺序展示所有可显示额度桶，以及服务实际返回的 5 小时或 Weekly
+  窗口。缺失数据会显示明确空状态，不伪造 `0%`。打开、浏览或滚动总览不会刷新或
+  写额度缓存；页面不显示邮箱、可执行文件路径或原始额度桶标识，刷新仍使用
+  Dashboard 现有工具栏入口。
 - 在 Dashboard → 显示中选择**圆环 + 百分比**、**仅百分比**或
-  **仅圆环**。保存的布局在下次启动 Codex94 时生效，不会即时改变正在运行的
-  菜单栏宽度；状态标记位于圆环中央，或在“仅百分比”模式下占用固定尾部位置。
+  **仅圆环**。正在运行的菜单栏状态项会立即改变布局与宽度，并且不会被删除或
+  重建；状态标记位于圆环中央，或在“仅百分比”模式下占用固定尾部位置。
 - 分别自定义充足（50–100%）、偏低（20–49%）、紧张（0–19%）
   和无可用数据时连接不可用的四种颜色；阈值不可调整。颜色即时生效，按不透明
   sRGB 的规范化六位大写 `RRGGBB` 保存，不含透明度。紧张色和错误色彼此独立，
@@ -105,12 +126,16 @@ sudo xcodebuild -runFirstLaunch
 - 错误横幅提供**打开连接设置**或**打开诊断**，复用同一个 Dashboard
   窗口；普通打开 Dashboard 会保留当前页面。这些按钮只负责导航，重试仍使用
   原有**刷新**。未登录时会提示先在 Codex 中登录、再回来刷新；Codex94 不代为登录。
-- 修改布局/颜色、渲染重置时间以及恢复导航本身不会请求额度、写入额度缓存或改变
-  连接状态；打开 Popover 仍按下述既有行为刷新。
+- 修改布局/颜色、呈现总览、渲染重置时间文案以及恢复导航本身不会请求额度、写入
+  额度缓存或改变连接状态；打开 Popover 和独立的 post-reset 调度仍按下述行为刷新。
 - App 启动、每次展开菜单栏面板，以及按所选的 1、5、15 或 30 分钟间隔刷新。
 - Mac 唤醒后，如果没有成功快照，或上次成功已过去至少 60 秒，则刷新一次；
   更鲜的快照保持不变。唤醒、后台、手动和展开面板触发的请求共用同一条单飞
   刷新路径。
+- 每次成功快照后，会从所有可显示窗口中选择最早的未来 Reset，仅在
+  `resetsAt + 5` 秒或更晚安排一次内存中的刷新。相同目标会去重，相邻请求复用同一
+  单飞路径，已消费目标不会进行 Reset 专属重试。唤醒与系统时钟变化会重新协调这项
+  一次性计划；不新增持久化 Reset 账本或后台刷新周期。
 - 使用 `account/rateLimits/read` 读取实时额度；在 **额度 + 账号信息** 模式下，
   还会调用 `account/read`，并固定使用 `refreshToken: false`。
 - 将 Codex 返回的标准/默认额度桶与额外命名的模型额度桶分开处理。默认额度桶显示
@@ -135,6 +160,9 @@ sudo xcodebuild -runFirstLaunch
   `/usr/local/bin`、`~/.local/bin`，最后是 `PATH` 中的绝对路径。
 - Dashboard 提供 900x600、1280x720、1440x810 和 1920x1080 逻辑点窗口预设；
   超出当前屏幕时会按比例适配。
+- Dashboard → 关于显示当前源码树的精确版本值 `0.1.9 (10)`，由用户触发的复制结果
+  与之完全一致；
+  项目链接指向 `https://github.com/DEFY-AN94/codex94`，不会增加更新器或网络客户端。
 - 支持跟随系统、Terminal Dark、Terminal Light 主题，以及 English 和简体中文。
 - 只使用当前 Codex 登录；不管理多账号或其他 `CODEX_HOME` 目录。
 
@@ -160,10 +188,12 @@ OAuth，不接收 access token 或 refresh token，不直接发送额度 HTTP �
 带版本的本地缓存仅保存额度桶标识与可选名称、套餐类型、窗口时长与类型、百分比、
 重置时间和获取时间，并使用仅限当前用户的文件权限。**额度 + 账号信息** 模式下
 的邮箱只存在于内存；切换为 **仅额度** 后会从内存快照移除。UserDefaults 保存
-界面选项（包括菜单栏额度偏好）和用户手动选择的可执行文件路径。版本 0.1.8 新增
-`menuBarLayout.v1` 与 `statusAccentOverrides.v1`，分别保存布局和四种颜色覆盖。
-重置时间文案只从现有重置时间戳派生，不新增缓存字段。Popover 中浏览的模型和
-Dashboard 当前页面只在本次运行中保存；窗口 frame autosave 行为保持不变。
+界面选项（包括菜单栏额度偏好）和用户手动选择的可执行文件路径。版本 0.1.8 引入
+`menuBarLayout.v1` 与 `statusAccentOverrides.v1`，分别保存布局和四种颜色覆盖；
+0.1.9 保持这些 key 与迁移不变，并让布局即时生效。重置时间文案和内存中的
+post-reset 调度只使用现有重置时间戳，不新增缓存字段或持久化账本。总览复用现有
+快照，不存储新的身份数据。Popover 中浏览的模型和 Dashboard 当前页面只在本次
+运行中保存；窗口 frame autosave 行为保持不变。
 Codex94 没有分析、广告、遥测上传、崩溃上报 SDK、
 更新检查器或项目自营服务器。
 
@@ -173,8 +203,9 @@ Hardened Runtime 仍然启用；子进程参数固定、环境变量最小化、
 版本验证只检查协议兼容性，不验证发布者身份，因此用户必须信任自己的
 ChatGPT/Codex 安装以及手动选择的可执行文件。
 
-复制诊断时，Codex94 会先规范化可执行文件路径与版本，再将文本写入系统剪贴板。
-分享前仍应由用户再次检查内容；Codex94 不会上传诊断信息。
+诊断与关于页面的复制按钮只会在用户操作后写入剪贴板。复制诊断时，Codex94 会先
+规范化可执行文件路径与版本；关于页面复制与显示完全一致的版本和 build。分享诊断
+前仍应由用户再次检查内容；Codex94 不读取或上传剪贴板内容及诊断信息。
 
 完整边界请参阅 [PRIVACY.md](PRIVACY.md) 和 [SECURITY.md](SECURITY.md)
 （英文）。
@@ -217,10 +248,11 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ```
 
 版本 0.1.8 已通过完整 GitHub 测试/发布任务、合成 Display 与点击功能 Recovery UI
-任务，以及 Actions/Swift CodeQL。独立的合成 A/B GUI smoke 覆盖三种下次启动布局、
-颜色恢复、绝对 Reset 文案、hard-unavailable 恢复和手动刷新。四张
-Popover/Dashboard 截图已完成视觉和隐私审查。键盘激活、AXPress 与托管运行器
-tooltip 暴露不声明为已通过。
+任务，以及 Actions/Swift CodeQL。对于 `0.1.9 (10)`，PR #11 是精确 head 测试、
+Display/Recovery UI、Actions/Python/Swift CodeQL 与最终 App 人工验收状态的权威
+记录；上方嵌入的合成总览截图已经完成布局与隐私审查。键盘激活、AXPress 与托管
+运行器 tooltip 暴露仍不声明为已通过。候选审查事实并非源码发布证据；只有最终
+`main` 通过复核并发布 annotated tag 后，`0.1.9` 才成为正式源码版本。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。贡献与发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 和

@@ -314,6 +314,7 @@ enum RefreshTrigger: String, Sendable {
     case manual
     case systemWake
     case preferenceChange
+    case quotaReset
 }
 
 enum ConnectionIssue: String, Codable, Equatable, Sendable, LocalizedError {

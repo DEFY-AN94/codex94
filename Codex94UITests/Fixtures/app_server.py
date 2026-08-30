@@ -66,7 +66,7 @@ def reply(value):
 
 def main():
     global log_ready, mode_name
-    require(ROOT.parent == Path("/private/tmp") and ROOT.name.startswith("codex94-v018-ui-"))
+    require(ROOT.parent == Path("/private/tmp") and ROOT.name.startswith("codex94-ui-v1-"))
     require(ROOT == ROOT.resolve() and ROOT.stat().st_uid == os.getuid())
     require(stat.S_IMODE(ROOT.stat().st_mode) == 0o700)
     # The production locator uses Foundation's resolvingSymlinksInPath, which

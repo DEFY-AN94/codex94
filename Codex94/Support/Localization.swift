@@ -3,6 +3,7 @@ import SwiftUI
 extension DashboardSection {
     var titleKey: LocalizedStringKey {
         switch self {
+        case .overview: "dashboard.overview"
         case .connection: "dashboard.connection"
         case .display: "dashboard.display"
         case .startup: "dashboard.startup"

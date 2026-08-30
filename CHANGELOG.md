@@ -4,6 +4,47 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
+### Added
+
+- Add a default Dashboard Overview that reuses the existing connection status,
+  freshness presentation, menu-bar quota picker, bucket ordering, and quota rows
+  to show every displayable bucket and only its returned 5-hour or Weekly
+  windows. Empty data is explicit and never presented as `0%`.
+- Schedule one in-memory post-reset refresh for the earliest future target among
+  displayable windows, strictly at `resetsAt + 5` seconds or later. Equal targets
+  are deduplicated; wake, system-clock, and adjacent refresh handling continue
+  through the existing single-flight coordinator without a Reset-specific retry.
+- Show the exact version and build in About with a user-triggered copy action,
+  and add a project link to `https://github.com/DEFY-AN94/codex94` while retaining
+  the existing creator link.
+
+### Changed
+
+- Apply all three saved menu-bar layouts immediately to the existing status item
+  and its width instead of waiting for the next app launch.
+- Derive UI-fixture version and build metadata from the exact committed app
+  target at `GITHUB_SHA`, retain the explicit build-input allowlist, and use a
+  fixture-schema temporary-path prefix rather than a release-version prefix.
+
+### Security and privacy
+
+- Reuse `menuBarLayout.v1`, cache schema v2, the existing RPC/parser/process
+  boundary, and the existing permission set. No preference key, cache field,
+  persistent Reset ledger, identity field, authentication access, direct network
+  interface, background helper, telemetry, or system permission is added.
+- Keep Overview rendering read-only with respect to quota requests, cache, and
+  connection state, and omit email, executable paths, and raw bucket identifiers
+  from the page and its accessibility identifiers.
+- Share one user-triggered clipboard component between redacted Diagnostics and
+  About version copying. Tests use an isolated named pasteboard rather than
+  reading, clearing, or overwriting the user's general pasteboard.
+
+### Validation
+
+- Add deterministic coverage for Overview routing and rendering, exact About
+  metadata and isolated copying, Reset target/single-flight/wake/clock behavior,
+  live menu-bar layout changes, and committed-metadata UI fixture preparation.
+
 ## 0.1.8 - 2026-08-29
 
 ### Added

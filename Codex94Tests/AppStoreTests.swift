@@ -701,6 +701,45 @@ final class AppStoreTests: XCTestCase {
         XCTAssertNil(onboarding.store.snapshot)
     }
 
+    func testFreshSystemWakeRearmsBackgroundAndResetWithoutFetching() async throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let resetTarget = now.addingTimeInterval(3_600)
+        let fetchedAt = now.addingTimeInterval(-59)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: fetchedAt,
+            defaultResetsAt: resetTarget.addingTimeInterval(-5)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached,
+            hasChosenIdentityMode: false
+        )
+
+        fixture.store.start()
+        let originalBackgroundTask = try XCTUnwrap(fixture.store.backgroundTask)
+        XCTAssertFalse(originalBackgroundTask.isCancelled)
+        originalBackgroundTask.cancel()
+        XCTAssertTrue(originalBackgroundTask.isCancelled)
+
+        fixture.preferences.hasChosenIdentityMode = true
+        fixture.store.handleSystemWake(now: now)
+
+        let replacementBackgroundTask = try XCTUnwrap(fixture.store.backgroundTask)
+        XCTAssertFalse(replacementBackgroundTask.isCancelled)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, resetTarget)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+        let requestCount = await fetcher.requestCount()
+        XCTAssertEqual(requestCount, 0)
+        XCTAssertFalse(fixture.store.isRefreshing)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, fetchedAt)
+        fixture.store.shutdown()
+    }
+
     func testSystemWakeSuccessAdvancesSnapshotWithoutRestoringAccountInQuotaOnlyMode() async throws {
         let oldDate = Date(timeIntervalSince1970: 1_000)
         let newDate = Date(timeIntervalSince1970: 2_000)
@@ -996,6 +1035,688 @@ final class AppStoreTests: XCTestCase {
         XCTAssertEqual(finalMaximum, 1)
         XCTAssertEqual(fixture.store.connectionState, .connected)
         XCTAssertEqual(fixture.store.snapshot?.fetchedAt, recovered.fetchedAt)
+    }
+
+    func testResetScheduleArmsEarliestAndSuccessfulSnapshotReplacesTarget() async throws {
+        let base = Date(timeIntervalSince1970: 4_000_000_000)
+        let originalTarget = base.addingTimeInterval(100)
+        let replacementTarget = base.addingTimeInterval(50)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: base,
+            defaultResetsAt: originalTarget.addingTimeInterval(-5)
+        )
+        let replacement = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 35,
+            sparkUsed: nil,
+            fetchedAt: base.addingTimeInterval(2),
+            defaultResetsAt: replacementTarget.addingTimeInterval(-5)
+        )
+        let fixture = try makeStoreFixture(
+            fetcher: SnapshotSequenceFetcher([replacement]),
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, originalTarget)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+
+        fixture.store.refresh(trigger: .manual, startedAt: base.addingTimeInterval(1))
+        try await waitForRefreshToFinish(fixture.store)
+
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, replacementTarget)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+        fixture.store.shutdown()
+    }
+
+    func testQuotaResetRemainsDisabledDuringOnboardingWithoutChosenIdentity() async throws {
+        let base = Date(timeIntervalSince1970: 4_000_000_000)
+        let target = base.addingTimeInterval(100)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: base,
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached,
+            hasChosenIdentityMode: false
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        fixture.store.handleSystemClockChange(now: target)
+        fixture.store.handleSystemWake(now: target)
+        fixture.store.handleQuotaResetRefreshTimer(expectedDate: target, now: target)
+
+        let requestCount = await fetcher.requestCount()
+        XCTAssertEqual(requestCount, 0)
+        XCTAssertNil(fixture.store.resetRefreshTask)
+        XCTAssertNil(fixture.store.scheduledResetRefreshDate)
+        XCTAssertNil(fixture.store.pendingResetRefreshDate)
+        fixture.store.shutdown()
+    }
+
+    func testChoosingIdentityArmsCachedResetScheduleAndStartsOneRefresh() async throws {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let target = now.addingTimeInterval(3_600)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: now,
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [.failure(.requestTimedOut)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached,
+            hasChosenIdentityMode: false
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: now)
+        XCTAssertNil(fixture.store.scheduledResetRefreshDate)
+        XCTAssertNil(fixture.store.resetRefreshTask)
+
+        fixture.store.chooseIdentityMode(.quotaOnly, now: now)
+        try await waitForRequestCount(1, fetcher: fetcher)
+
+        XCTAssertTrue(fixture.preferences.hasChosenIdentityMode)
+        XCTAssertEqual(fixture.preferences.identityMode, .quotaOnly)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, target)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        let requestCount = await fetcher.requestCount()
+        let maximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(requestCount, 1)
+        XCTAssertEqual(maximum, 1)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, target)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+        fixture.store.shutdown()
+    }
+
+    func testConsecutiveDistinctResetTargetsEachProduceOneAttempt() async throws {
+        let base = Date(timeIntervalSince1970: 4_000_000_000)
+        let firstTarget = base.addingTimeInterval(100)
+        let secondTarget = base.addingTimeInterval(200)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: 30,
+            fetchedAt: base,
+            defaultResetsAt: firstTarget.addingTimeInterval(-5),
+            sparkResetsAt: secondTarget.addingTimeInterval(-5)
+        )
+        let afterFirstReset = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 35,
+            sparkUsed: 25,
+            fetchedAt: firstTarget.addingTimeInterval(1),
+            sparkResetsAt: secondTarget.addingTimeInterval(-5)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [
+            .success(afterFirstReset),
+            .failure(.requestTimedOut)
+        ])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, firstTarget)
+
+        fixture.store.handleQuotaResetRefreshTimer(expectedDate: firstTarget, now: firstTarget)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, secondTarget)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+
+        fixture.store.handleQuotaResetRefreshTimer(expectedDate: secondTarget, now: secondTarget)
+        try await waitForRequestCount(2, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        fixture.store.handleQuotaResetRefreshTimer(expectedDate: secondTarget, now: secondTarget)
+        fixture.store.handleSystemClockChange(now: secondTarget.addingTimeInterval(1))
+
+        let requestCount = await fetcher.requestCount()
+        let maximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(requestCount, 2)
+        XCTAssertEqual(maximum, 1)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, secondTarget)
+        XCTAssertNil(fixture.store.resetRefreshTask)
+        fixture.store.shutdown()
+    }
+
+    func testSameInstantAcrossMultipleWindowsProducesOneResetAttempt() async throws {
+        let base = Date(timeIntervalSince1970: 1_500_000_000)
+        let target = base.addingTimeInterval(100)
+        let reset = target.addingTimeInterval(-5)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: 30,
+            fetchedAt: base,
+            defaultResetsAt: reset,
+            sparkResetsAt: reset
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [.failure(.requestTimedOut)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        fixture.store.handleQuotaResetRefreshTimer(expectedDate: target, now: target)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        fixture.store.handleQuotaResetRefreshTimer(expectedDate: target, now: target)
+        fixture.store.handleSystemWake(now: target)
+
+        let inFlightCount = await fetcher.requestCount()
+        let inFlightMaximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(inFlightCount, 1)
+        XCTAssertEqual(inFlightMaximum, 1)
+
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        let finalCount = await fetcher.requestCount()
+        XCTAssertEqual(finalCount, 1)
+        fixture.store.shutdown()
+    }
+
+    func testResetBatchIsConsumedAfterSuccessOrFailureAndClockRollbackDoesNotRearmIt() async throws {
+        let base = Date(timeIntervalSince1970: 1_500_000_000)
+        let target = base.addingTimeInterval(100)
+        let sameExpiredReset = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 35,
+            sparkUsed: nil,
+            fetchedAt: target.addingTimeInterval(1),
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let cases: [(String, FetchOutcome)] = [
+            ("success", .success(sameExpiredReset)),
+            ("failure", .failure(.requestTimedOut))
+        ]
+
+        for (name, outcome) in cases {
+            let cached = makeSnapshot(
+                defaultLimitID: "default-v2",
+                defaultUsed: 40,
+                sparkUsed: nil,
+                fetchedAt: base,
+                defaultResetsAt: target.addingTimeInterval(-5)
+            )
+            let fetcher = GatedRecordingFetcher(outcomes: [outcome])
+            let fixture = try makeStoreFixture(
+                fetcher: fetcher,
+                selection: .automatic,
+                cachedSnapshot: cached
+            )
+
+            fixture.store.configureQuotaResetRefresh(now: base)
+            fixture.store.handleQuotaResetRefreshTimer(
+                expectedDate: target,
+                now: target.addingTimeInterval(-0.001)
+            )
+            let earlyRequestCount = await fetcher.requestCount()
+            XCTAssertEqual(earlyRequestCount, 0, name)
+
+            let scheduledTask = try XCTUnwrap(fixture.store.resetRefreshTask)
+            fixture.store.handleQuotaResetRefreshTimer(expectedDate: target, now: target)
+            XCTAssertTrue(scheduledTask.isCancelled, name)
+            try await waitForRequestCount(1, fetcher: fetcher)
+            await fetcher.releaseOne()
+            try await waitForRefreshToFinish(fixture.store)
+
+            XCTAssertEqual(fixture.store.scheduledResetRefreshDate, target, name)
+            XCTAssertNil(fixture.store.resetRefreshTask, name)
+            fixture.store.handleSystemClockChange(now: base)
+            fixture.store.handleQuotaResetRefreshTimer(
+                expectedDate: target,
+                now: target.addingTimeInterval(1)
+            )
+            try await Task.sleep(for: .milliseconds(50))
+            let finalRequestCount = await fetcher.requestCount()
+            XCTAssertEqual(finalRequestCount, 1, name)
+            XCTAssertNil(fixture.store.resetRefreshTask, name)
+            fixture.store.shutdown()
+        }
+    }
+
+    func testResetDueDuringManualBackgroundPopoverAndWakeQueuesOneFollowUpWithoutConcurrency() async throws {
+        let base = Date(timeIntervalSince1970: 1_500_000_000)
+        let target = base.addingTimeInterval(100)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: base,
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let recovered = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 30,
+            sparkUsed: nil,
+            fetchedAt: target.addingTimeInterval(1)
+        )
+
+        for initialTrigger in [
+            RefreshTrigger.manual,
+            .background,
+            .popover,
+            .systemWake
+        ] {
+            let fetcher = GatedRecordingFetcher(outcomes: [
+                .failure(.requestTimedOut),
+                .success(recovered)
+            ])
+            let fixture = try makeStoreFixture(
+                fetcher: fetcher,
+                selection: .automatic,
+                cachedSnapshot: cached
+            )
+
+            fixture.store.configureQuotaResetRefresh(now: base)
+            if initialTrigger == .systemWake {
+                fixture.store.handleSystemWake(now: target.addingTimeInterval(-1))
+            } else {
+                fixture.store.refresh(
+                    trigger: initialTrigger,
+                    startedAt: target.addingTimeInterval(-1)
+                )
+            }
+            try await waitForRequestCount(1, fetcher: fetcher)
+            fixture.store.handleQuotaResetRefreshTimer(expectedDate: target, now: target)
+            XCTAssertEqual(
+                fixture.store.pendingResetRefreshDate,
+                target,
+                initialTrigger.rawValue
+            )
+            let initialMaximum = await fetcher.maximumConcurrentRequests()
+            XCTAssertEqual(initialMaximum, 1, initialTrigger.rawValue)
+
+            await fetcher.releaseOne()
+            try await waitForRequestCount(2, fetcher: fetcher)
+            XCTAssertNil(fixture.store.pendingResetRefreshDate, initialTrigger.rawValue)
+            let followUpMaximum = await fetcher.maximumConcurrentRequests()
+            XCTAssertEqual(followUpMaximum, 1, initialTrigger.rawValue)
+
+            await fetcher.releaseOne()
+            try await waitForRefreshToFinish(fixture.store)
+            let finalRequestCount = await fetcher.requestCount()
+            let finalMaximum = await fetcher.maximumConcurrentRequests()
+            XCTAssertEqual(finalRequestCount, 2, initialTrigger.rawValue)
+            XCTAssertEqual(finalMaximum, 1, initialTrigger.rawValue)
+            fixture.store.shutdown()
+        }
+    }
+
+    func testPreTargetCompletionReconcilesDueResetBeforeReplacingItsSchedule() async throws {
+        let base = Date(timeIntervalSince1970: 1_500_000_000)
+        let target = base.addingTimeInterval(100)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: base,
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let earlySnapshot = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 35,
+            sparkUsed: nil,
+            fetchedAt: target.addingTimeInterval(-1),
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let recovered = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 30,
+            sparkUsed: nil,
+            fetchedAt: target.addingTimeInterval(1)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [
+            .success(earlySnapshot),
+            .success(recovered)
+        ])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        // Model the timer becoming ready without its MainActor handler winning
+        // the race against this request's completion continuation.
+        fixture.store.resetRefreshTask?.cancel()
+        fixture.store.refresh(trigger: .manual, startedAt: target.addingTimeInterval(-1))
+        try await waitForRequestCount(1, fetcher: fetcher)
+
+        await fetcher.releaseOne()
+        try await waitForRequestCount(2, fetcher: fetcher)
+        let followUpMaximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(followUpMaximum, 1)
+
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        let finalRequestCount = await fetcher.requestCount()
+        let finalMaximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(finalRequestCount, 2)
+        XCTAssertEqual(finalMaximum, 1)
+        XCTAssertNil(fixture.store.pendingResetRefreshDate)
+        fixture.store.shutdown()
+    }
+
+    func testPreTargetSuccessFetchedAtTargetSatisfiesPendingReset() async throws {
+        let base = Date(timeIntervalSince1970: 1_500_000_000)
+        let target = base.addingTimeInterval(100)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: base,
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let covered = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 35,
+            sparkUsed: nil,
+            fetchedAt: target,
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [.success(covered)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        fixture.store.refresh(trigger: .manual, startedAt: target.addingTimeInterval(-1))
+        try await waitForRequestCount(1, fetcher: fetcher)
+        fixture.store.handleQuotaResetRefreshTimer(expectedDate: target, now: target)
+        XCTAssertEqual(fixture.store.pendingResetRefreshDate, target)
+
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await Task.sleep(for: .milliseconds(50))
+
+        let requestCount = await fetcher.requestCount()
+        XCTAssertEqual(requestCount, 1)
+        XCTAssertNil(fixture.store.pendingResetRefreshDate)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, target)
+        XCTAssertNil(fixture.store.resetRefreshTask)
+        fixture.store.shutdown()
+    }
+
+    func testPostTargetActiveFailureConsumesResetWithoutFollowUp() async throws {
+        let base = Date(timeIntervalSince1970: 1_500_000_000)
+        let target = base.addingTimeInterval(100)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: base,
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [.failure(.requestTimedOut)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        fixture.store.refresh(trigger: .manual, startedAt: target)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        fixture.store.handleQuotaResetRefreshTimer(expectedDate: target, now: target)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await Task.sleep(for: .milliseconds(50))
+
+        let requestCount = await fetcher.requestCount()
+        XCTAssertEqual(requestCount, 1)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, target)
+        XCTAssertNil(fixture.store.resetRefreshTask)
+        fixture.store.shutdown()
+    }
+
+    func testPreferenceChangeFollowUpHasPriorityAndAlsoConsumesPendingReset() async throws {
+        let base = Date(timeIntervalSince1970: 1_500_000_000)
+        let target = base.addingTimeInterval(100)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: base,
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let updated = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 30,
+            sparkUsed: 20,
+            fetchedAt: target.addingTimeInterval(1)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [
+            .failure(.requestTimedOut),
+            .success(updated)
+        ])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        fixture.store.refresh(trigger: .manual, startedAt: target.addingTimeInterval(-1))
+        try await waitForRequestCount(1, fetcher: fetcher)
+        fixture.store.handleQuotaResetRefreshTimer(expectedDate: target, now: target)
+        fixture.store.setIdentityMode(.quotaAndAccount)
+
+        await fetcher.releaseOne()
+        try await waitForRequestCount(2, fetcher: fetcher)
+        let requestedModes = await fetcher.requestedModes()
+        let queuedMaximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(requestedModes, [.quotaOnly, .quotaAndAccount])
+        XCTAssertEqual(queuedMaximum, 1)
+
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await Task.sleep(for: .milliseconds(50))
+        let finalRequestCount = await fetcher.requestCount()
+        XCTAssertEqual(finalRequestCount, 2)
+        XCTAssertNil(fixture.store.pendingResetRefreshDate)
+        fixture.store.shutdown()
+    }
+
+    func testClockForwardUsesLatestDueAndBackwardRearmsWithoutEarlyFollowUp() async throws {
+        let base = Date(timeIntervalSince1970: 4_000_000_000)
+        let firstTarget = base.addingTimeInterval(100)
+        let secondTarget = base.addingTimeInterval(200)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: 30,
+            fetchedAt: base,
+            defaultResetsAt: firstTarget.addingTimeInterval(-5),
+            sparkResetsAt: secondTarget.addingTimeInterval(-5)
+        )
+        let recovered = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 25,
+            sparkUsed: nil,
+            fetchedAt: secondTarget.addingTimeInterval(1)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [
+            .failure(.requestTimedOut),
+            .success(recovered)
+        ])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        fixture.store.refresh(trigger: .manual, startedAt: firstTarget.addingTimeInterval(-1))
+        try await waitForRequestCount(1, fetcher: fetcher)
+
+        fixture.store.handleSystemClockChange(now: secondTarget)
+        XCTAssertEqual(fixture.store.pendingResetRefreshDate, secondTarget)
+        let forwardRequestCount = await fetcher.requestCount()
+        XCTAssertEqual(forwardRequestCount, 1)
+
+        fixture.store.handleSystemClockChange(now: base.addingTimeInterval(25))
+        XCTAssertNil(fixture.store.pendingResetRefreshDate)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, secondTarget)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        let rolledBackRequestCount = await fetcher.requestCount()
+        XCTAssertEqual(rolledBackRequestCount, 1)
+
+        fixture.store.handleQuotaResetRefreshTimer(
+            expectedDate: secondTarget,
+            now: secondTarget
+        )
+        try await waitForRequestCount(2, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+
+        let finalRequestCount = await fetcher.requestCount()
+        let finalMaximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(finalRequestCount, 2)
+        XCTAssertEqual(finalMaximum, 1)
+        fixture.store.shutdown()
+    }
+
+    func testWakeAtResetAndWakeFreshnessShareOneRequest() async throws {
+        let base = Date(timeIntervalSince1970: 1_500_000_000)
+        let target = base.addingTimeInterval(100)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: target.addingTimeInterval(-120),
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let updated = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 30,
+            sparkUsed: nil,
+            fetchedAt: target.addingTimeInterval(1)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [.success(updated)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        fixture.store.handleSystemWake(now: target)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        fixture.store.handleSystemWake(now: target)
+        try await Task.sleep(for: .milliseconds(50))
+
+        let requestCount = await fetcher.requestCount()
+        let maximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(requestCount, 1)
+        XCTAssertEqual(maximum, 1)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        fixture.store.shutdown()
+    }
+
+    func testWakeBeforeResetDoesNotFetchAndWakeAfterResetFetchesOnce() async throws {
+        let base = Date(timeIntervalSince1970: 1_500_000_000)
+        let target = base.addingTimeInterval(100)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: target.addingTimeInterval(-20),
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [.failure(.requestTimedOut)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        fixture.store.handleSystemWake(now: target.addingTimeInterval(-10))
+        XCTAssertFalse(fixture.store.isRefreshing)
+        try await Task.sleep(for: .milliseconds(50))
+        let beforeTargetCount = await fetcher.requestCount()
+        XCTAssertEqual(beforeTargetCount, 0)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, target)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+
+        fixture.store.handleSystemWake(now: target.addingTimeInterval(0.001))
+        try await waitForRequestCount(1, fetcher: fetcher)
+        fixture.store.handleSystemWake(now: target.addingTimeInterval(1))
+        try await Task.sleep(for: .milliseconds(50))
+
+        let duringRequestCount = await fetcher.requestCount()
+        let duringRequestMaximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(duringRequestCount, 1)
+        XCTAssertEqual(duringRequestMaximum, 1)
+
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        let finalRequestCount = await fetcher.requestCount()
+        XCTAssertEqual(finalRequestCount, 1)
+        fixture.store.shutdown()
+    }
+
+    func testShutdownClearsResetStateAndRejectsTimerClockAndWake() async throws {
+        let base = Date(timeIntervalSince1970: 4_000_000_000)
+        let target = base.addingTimeInterval(100)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: base,
+            defaultResetsAt: target.addingTimeInterval(-5)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached
+        )
+
+        fixture.store.configureQuotaResetRefresh(now: base)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+        fixture.store.shutdown()
+
+        XCTAssertNil(fixture.store.resetRefreshTask)
+        XCTAssertNil(fixture.store.scheduledResetRefreshDate)
+        XCTAssertNil(fixture.store.pendingResetRefreshDate)
+        XCTAssertNil(fixture.store.activeRefreshStartedAt)
+
+        fixture.store.handleQuotaResetRefreshTimer(expectedDate: target, now: target)
+        fixture.store.handleSystemClockChange(now: target)
+        fixture.store.handleSystemWake(now: target)
+        try await Task.sleep(for: .milliseconds(50))
+        let requestCount = await fetcher.requestCount()
+        XCTAssertEqual(requestCount, 0)
     }
 
     func testShutdownIsIdempotentStopsRefreshAndRejectsFutureTriggers() async throws {

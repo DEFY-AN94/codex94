@@ -4,6 +4,32 @@ import XCTest
 @testable import Codex94
 
 final class DashboardWindowSizeTests: XCTestCase {
+    @MainActor
+    func testOverviewIsTheDefaultWhileNilSelectionPreservesTheCurrentPage() {
+        XCTAssertEqual(DashboardSection.primarySections.first, .overview)
+        XCTAssertEqual(DashboardSection.overview.systemImage, "square.grid.2x2")
+
+        let state = DashboardWindowState()
+        XCTAssertEqual(state.selection, .overview)
+        XCTAssertEqual(state.resolvedSelection, .overview)
+
+        state.selection = nil
+        XCTAssertEqual(state.resolvedSelection, .overview)
+
+        state.select(section: .display)
+        state.select(section: nil)
+        XCTAssertEqual(state.selection, .display)
+
+        XCTAssertEqual(
+            ConnectionIssue.notLoggedIn.recoveryDestination.dashboardSection,
+            .connection
+        )
+        XCTAssertEqual(
+            ConnectionIssue.quotaUnavailable.recoveryDestination.dashboardSection,
+            .diagnostics
+        )
+    }
+
     func testPresetDimensions() {
         XCTAssertEqual(DashboardWindowSizePreset.compact.size, NSSize(width: 900, height: 600))
         XCTAssertEqual(DashboardWindowSizePreset.standard.size, NSSize(width: 1_280, height: 720))
@@ -98,6 +124,28 @@ final class AppMetadataTests: XCTestCase {
         XCTAssertEqual(metadata.versionAndBuild, "0.0.0 (0)")
         XCTAssertEqual(metadata.bundleIdentifier, "com.defyan94.codex94")
         XCTAssertEqual(metadata.minimumSystemVersion, "14.0")
+    }
+
+    func testProjectURLIsTheRepositoryRoot() {
+        XCTAssertEqual(
+            AppMetadata.projectURL.absoluteString,
+            "https://github.com/DEFY-AN94/codex94"
+        )
+    }
+
+    @MainActor
+    func testCopyWriterUsesANamedPasteboardAndLeavesGeneralUnchanged() {
+        let metadata = AppMetadata(infoDictionary: [
+            "CFBundleShortVersionString": "0.1.9",
+            "CFBundleVersion": "10"
+        ])
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let generalChangeCount = NSPasteboard.general.changeCount
+
+        XCTAssertTrue(CopyTextButton.write(metadata.versionAndBuild, to: pasteboard))
+        XCTAssertEqual(pasteboard.string(forType: .string), "0.1.9 (10)")
+        XCTAssertEqual(NSPasteboard.general.changeCount, generalChangeCount)
     }
 }
 

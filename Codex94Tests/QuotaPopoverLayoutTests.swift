@@ -355,7 +355,7 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         XCTAssertEqual(popover.contentSize.width, QuotaPopoverLayout.contentWidth)
     }
 
-    func testMenuBarLayoutIsCapturedUntilANewViewIsCreated() async throws {
+    func testMenuBarLayoutUpdatesTheExistingHostedViewWithoutSideEffects() async throws {
         let fetcher = LayoutOutcomeFetcher(
             outcome: .success(snapshot(includeSpark: true)), delay: .zero
         )
@@ -365,21 +365,20 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         let initialState = fixture.store.connectionState
         let cacheURL = fixture.directory.appendingPathComponent("quota.json")
         let cacheBytes = try Data(contentsOf: cacheURL)
-        let capturedLayout = fixture.preferences.menuBarLayout
-        let capturedView = MenuBarStatusView(store: fixture.store, layout: capturedLayout)
-        let controller = NSHostingController(rootView: capturedView)
+        let controller = NSHostingController(rootView: MenuBarStatusView(store: fixture.store))
         let proposal = NSSize(width: 200, height: 200)
 
-        for nextLayout in MenuBarLayout.allCases {
+        for nextLayout in [
+            MenuBarLayout.ringAndPercentage,
+            .percentageOnly,
+            .ringOnly,
+            .ringAndPercentage,
+        ] {
             fixture.preferences.menuBarLayout = nextLayout
-            fixture.preferences.statusAccentOverrides[.healthy] = StatusAccentColor(hex: "123456")
-            let size = controller.sizeThatFits(in: proposal)
-            XCTAssertEqual(capturedView.layout, capturedLayout)
-            XCTAssertEqual(size, capturedLayout.metrics.contentSize)
-            let nextLaunch = NSHostingController(rootView: MenuBarStatusView(
-                store: fixture.store, layout: fixture.preferences.menuBarLayout
-            ))
-            XCTAssertEqual(nextLaunch.sizeThatFits(in: proposal), nextLayout.metrics.contentSize)
+            XCTAssertTrue(waitForLayout {
+                controller.view.layoutSubtreeIfNeeded()
+                return controller.sizeThatFits(in: proposal) == nextLayout.metrics.contentSize
+            })
         }
         await Task.yield()
         let requests = await fetcher.requestCount()
@@ -387,6 +386,102 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         XCTAssertEqual(fixture.store.snapshot, initialSnapshot)
         XCTAssertEqual(fixture.store.connectionState, initialState)
         XCTAssertEqual(try Data(contentsOf: cacheURL), cacheBytes)
+    }
+
+    func testOverviewMeasuresMultiBucketAndEmptyStatesWithoutRequestingQuota() async throws {
+        let cases: [QuotaSnapshot?] = [
+            snapshot(includeSpark: true),
+            snapshot(
+                includeSpark: true,
+                sparkName: String(repeating: "Synthetic-Long-Model-", count: 8)
+            ),
+            snapshot(includeSpark: false),
+            QuotaSnapshot(
+                buckets: [QuotaBucketSnapshot(
+                    limitID: "default-v2",
+                    limitName: nil,
+                    planType: "pro",
+                    windows: [QuotaWindowSnapshot(
+                        kind: .fiveHour,
+                        usedPercent: 42,
+                        windowMinutes: 300,
+                        resetsAt: referenceDate.addingTimeInterval(3_600)
+                    )]
+                )],
+                defaultLimitID: "default-v2",
+                fetchedAt: referenceDate,
+                account: nil,
+                codex: nil
+            ),
+            QuotaSnapshot(
+                buckets: [QuotaBucketSnapshot(
+                    limitID: "default-v2",
+                    limitName: nil,
+                    planType: "pro",
+                    windows: []
+                )],
+                defaultLimitID: "default-v2",
+                fetchedAt: referenceDate,
+                account: nil,
+                codex: nil
+            ),
+            nil,
+        ]
+
+        for snapshot in cases {
+            let fetcher = LayoutOutcomeFetcher(
+                outcome: .success(self.snapshot(includeSpark: true)), delay: .zero
+            )
+            let fixture = try makeFixture(snapshot: snapshot, fetcher: fetcher)
+            defer { fixture.cleanUp() }
+            let stateBefore = fixture.store.connectionState
+            let snapshotBefore = fixture.store.snapshot
+            let cacheURL = fixture.directory.appendingPathComponent("quota.json")
+            let cacheBytes = try? Data(contentsOf: cacheURL)
+
+            for language in [LanguagePreference.english, .simplifiedChinese] {
+                fixture.preferences.language = language
+                for theme in ThemePreference.allCases {
+                    fixture.preferences.theme = theme
+                    let controller = NSHostingController(rootView: OverviewView(
+                        store: fixture.store,
+                        referenceDate: referenceDate,
+                        resetTimeZone: resetTimeZone
+                    ).codex94Environment(fixture.preferences))
+                    controller.view.frame = NSRect(x: 0, y: 0, width: 900, height: 600)
+                    controller.view.layoutSubtreeIfNeeded()
+                    let size = controller.sizeThatFits(in: NSSize(width: 900, height: 600))
+                    XCTAssertGreaterThan(size.width, 0)
+                    XCTAssertGreaterThan(size.height, 0)
+                    XCTAssertTrue(size.width.isFinite)
+                    XCTAssertTrue(size.height.isFinite)
+                }
+            }
+
+            await Task.yield()
+            let requestCount = await fetcher.requestCount()
+            XCTAssertEqual(requestCount, 0)
+            XCTAssertEqual(fixture.store.connectionState, stateBefore)
+            XCTAssertEqual(fixture.store.snapshot, snapshotBefore)
+            XCTAssertEqual(try? Data(contentsOf: cacheURL), cacheBytes)
+        }
+    }
+
+    func testQuotaWindowIdentifierOverrideLeavesPopoverDefaultAvailable() throws {
+        let window = try XCTUnwrap(snapshot(includeSpark: false).defaultBucket?.window(.weekly))
+        let palette = Codex94Palette.resolve(.terminalDark, scheme: .dark)
+
+        XCTAssertNil(QuotaWindowRow(
+            window: window,
+            palette: palette,
+            language: .english
+        ).accessibilityIdentifier)
+        XCTAssertEqual(QuotaWindowRow(
+            window: window,
+            palette: palette,
+            language: .english,
+            accessibilityIdentifier: "overview-bucket-0-weekly"
+        ).accessibilityIdentifier, "overview-bucket-0-weekly")
     }
 
     // Real accessibility, focus, and screen-frame assertions live in CI-only Codex94UITests.

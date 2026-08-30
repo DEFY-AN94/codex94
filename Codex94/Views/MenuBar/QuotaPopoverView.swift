@@ -392,6 +392,7 @@ struct QuotaWindowRow: View {
     var locale: Locale? = nil
     var calendar = Calendar(identifier: .gregorian)
     var timeZone: TimeZone = .autoupdatingCurrent
+    var accessibilityIdentifier: String? = nil
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -403,7 +404,12 @@ struct QuotaWindowRow: View {
                 calendar: calendar,
                 timeZone: timeZone
             )
-            QuotaWindowRowContent(window: window, palette: palette, reset: reset)
+            QuotaWindowRowContent(
+                window: window,
+                palette: palette,
+                reset: reset,
+                accessibilityIdentifier: accessibilityIdentifier
+            )
         }
     }
 }
@@ -412,6 +418,7 @@ struct QuotaWindowRowContent: View {
     let window: QuotaWindowSnapshot
     let palette: Codex94Palette
     let reset: QuotaResetPresentation
+    var accessibilityIdentifier: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -421,7 +428,9 @@ struct QuotaWindowRowContent: View {
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityIdentifier("quota-window-" + window.kind.rawValue)
+        .accessibilityIdentifier(
+            accessibilityIdentifier ?? "quota-window-" + window.kind.rawValue
+        )
     }
 
     private var accessibilityLabel: Text {

@@ -6,6 +6,8 @@ import Darwin
 @MainActor
 private final class Codex94CIReadOnlyFocusProbe: NSObject {
     private static let rootPath = __CODEX94_CI_FIXTURE_ROOT_LITERAL__
+    private static let expectedVersion = __CODEX94_CI_EXPECTED_VERSION_LITERAL__
+    private static let expectedBuild = __CODEX94_CI_EXPECTED_BUILD_LITERAL__
     private static let stages = ["before-header", "after-tabs", "after-space"]
     private weak var popover: NSPopover?
     private var timer: Timer?
@@ -25,12 +27,12 @@ private final class Codex94CIReadOnlyFocusProbe: NSObject {
               environment["GITHUB_ACTIONS"] == "true",
               environment["RUNNER_ENVIRONMENT"] == "github-hosted",
               environment["RUNNER_OS"] == "macOS", getuid() != 0,
-              rootPath.hasPrefix("/private/tmp/codex94-v018-ui-"),
+              rootPath.hasPrefix("/private/tmp/codex94-ui-v1-"),
               rootPath.split(separator: "/").count == 3,
               registered(Bundle.main.bundleURL.path, expected: productPath),
               Bundle.main.bundleIdentifier == "com.defyan94.codex94",
-              Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == "0.1.8",
-              Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String == "9",
+              Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == expectedVersion,
+              Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String == expectedBuild,
               privateDirectory(rootPath), privateDirectory(rootPath + "/control") else {
             return nil
         }

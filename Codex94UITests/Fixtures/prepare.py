@@ -18,7 +18,10 @@ import tempfile
 
 
 BUNDLE_ID = "com.defyan94.codex94"
-PREFIX = "codex94-v018-ui-"
+PREFIX = "codex94-ui-v1-"
+PROJECT_FILE = "Codex94.xcodeproj/project.pbxproj"
+SEMANTIC_VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)")
+POSITIVE_BUILD = re.compile(r"[1-9][0-9]*")
 
 # Only these tracked build inputs may enter the disposable recovery source copy.
 # No repository metadata, documentation, scripts, local state or directory copy.
@@ -62,9 +65,11 @@ BUILD_INPUTS = (
     "Codex94/Support/StatusPresentation.swift",
     "Codex94/Support/Theme.swift",
     "Codex94/Views/Components/ConnectionBadgeView.swift",
+    "Codex94/Views/Components/CopyTextButton.swift",
     "Codex94/Views/Components/QuotaBarView.swift",
     "Codex94/Views/Dashboard/DashboardView.swift",
     "Codex94/Views/Dashboard/DisplaySettingsView.swift",
+    "Codex94/Views/Dashboard/OverviewView.swift",
     "Codex94/Views/MenuBar/MenuBarStatusView.swift",
     "Codex94/Views/MenuBar/QuotaPopoverView.swift",
     "Codex94Tests/AppServerClientTests.swift",
@@ -97,7 +102,110 @@ def json_bytes(value):
     return (json.dumps(value, sort_keys=True, indent=2) + "\n").encode("utf-8")
 
 
-def recovery_project(repository, root, source_revision):
+def git_output(repository, arguments, maximum_bytes):
+    result = subprocess.run(
+        ["/usr/bin/git", *arguments], cwd=repository,
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    require(result.returncode == 0 and 0 < len(result.stdout) <= maximum_bytes,
+            "Could not read the tested Git object")
+    return result.stdout
+
+
+def object_body(project, object_id):
+    pattern = re.compile(
+        r"(?m)^\t\t" + re.escape(object_id) + r"(?:\s+/\*[^\n]*\*/)?\s*=\s*\{"
+    )
+    matches = list(pattern.finditer(project))
+    require(len(matches) == 1, "The committed Xcode object graph is ambiguous")
+    opening = project.find("{", matches[0].start(), matches[0].end())
+    depth = 0
+    for index in range(opening, len(project)):
+        if project[index] == "{":
+            depth += 1
+        elif project[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return project[opening + 1:index]
+    raise RuntimeError("The committed Xcode object graph is incomplete")
+
+
+def unique_match(pattern, text, message):
+    matches = re.findall(pattern, text, flags=re.MULTILINE | re.DOTALL)
+    require(len(matches) == 1, message)
+    return matches[0]
+
+
+def committed_app_version(repository, source_revision):
+    head = git_output(repository, ["rev-parse", "HEAD"], 128).decode("ascii").strip()
+    require(head == source_revision, "The checked-out HEAD must equal GITHUB_SHA")
+    payload = git_output(
+        repository, ["show", source_revision + ":" + PROJECT_FILE], 1_048_576
+    )
+    project = payload.decode("utf-8")
+
+    target_ids = []
+    for match in re.finditer(r"(?m)^\t\t([A-Za-z0-9]+)\s+/\*\s*Codex94\s*\*/\s*=\s*\{", project):
+        body = object_body(project, match.group(1))
+        if (re.search(r"(?m)^\s*isa\s*=\s*PBXNativeTarget\s*;", body)
+                and re.search(r"(?m)^\s*name\s*=\s*Codex94\s*;", body)
+                and re.search(
+                    r'(?m)^\s*productType\s*=\s*"com\.apple\.product-type\.application"\s*;', body
+                )):
+            target_ids.append(match.group(1))
+    require(len(target_ids) == 1, "The committed project must contain one Codex94 App target")
+    target = object_body(project, target_ids[0])
+    configuration_list_id = unique_match(
+        r"^\s*buildConfigurationList\s*=\s*([A-Za-z0-9]+)\s+/\*[^\n]*\*/\s*;",
+        target, "The Codex94 App target must have one configuration list",
+    )
+    configuration_list = object_body(project, configuration_list_id)
+    require(re.search(r"(?m)^\s*isa\s*=\s*XCConfigurationList\s*;", configuration_list) is not None,
+            "The Codex94 App configuration list has the wrong type")
+    raw_configurations = unique_match(
+        r"\bbuildConfigurations\s*=\s*\(([^)]*)\)\s*;",
+        configuration_list, "The Codex94 App configuration list is ambiguous",
+    )
+    configurations = re.findall(
+        r"([A-Za-z0-9]+)\s+/\*\s*(Debug|Release)\s*\*/", raw_configurations
+    )
+    require(len(configurations) == 2 and {name for _, name in configurations} == {"Debug", "Release"},
+            "The Codex94 App target must have unique Debug and Release configurations")
+
+    values = {}
+    for configuration_id, expected_name in configurations:
+        configuration = object_body(project, configuration_id)
+        require(re.search(r"(?m)^\s*isa\s*=\s*XCBuildConfiguration\s*;", configuration) is not None,
+                "The Codex94 App build configuration has the wrong type")
+        actual_name = unique_match(
+            r"^\s*name\s*=\s*([^;\n]+)\s*;", configuration,
+            "The Codex94 App build configuration must have one name",
+        ).strip().strip('"')
+        require(actual_name == expected_name, "The Codex94 App configuration name changed")
+        settings = unique_match(
+            r"^\s*buildSettings\s*=\s*\{(.*?)^\s*\}\s*;",
+            configuration, "The Codex94 App build settings are ambiguous",
+        )
+        version = unique_match(
+            r"^\s*MARKETING_VERSION\s*=\s*([^;\n]+)\s*;", settings,
+            "The Codex94 App configuration must define one marketing version",
+        ).strip()
+        build = unique_match(
+            r"^\s*CURRENT_PROJECT_VERSION\s*=\s*([^;\n]+)\s*;", settings,
+            "The Codex94 App configuration must define one build number",
+        ).strip()
+        require(SEMANTIC_VERSION.fullmatch(version) is not None,
+                "The Codex94 App marketing version must be semantic")
+        require(POSITIVE_BUILD.fullmatch(build) is not None,
+                "The Codex94 App build number must be a positive integer")
+        values[expected_name] = (version, build)
+    require(values["Debug"] == values["Release"],
+            "Codex94 Debug and Release version/build must match")
+    return values["Debug"]
+
+
+def recovery_project(repository, root, source_revision, expected_version, expected_build):
     """Inject a read-only observer into one private copy, never the checkout."""
     require(repository == repository.resolve(), "The build checkout must be canonical")
     head = subprocess.run(
@@ -140,25 +248,24 @@ def recovery_project(repository, root, source_revision):
 
     original = contents["Codex94/App/AppDelegate.swift"]
     source_text = original.decode("utf-8")
-    anchors = (
-        ("    private let popover = NSPopover()\n",
-         "    private let popover = NSPopover()\n"
-         "    private var ciReadOnlyFocusProbe: Codex94CIReadOnlyFocusProbe?\n"),
-        ("        configurePopover()\n        store.start()\n",
-         "        configurePopover()\n"
-         "        ciReadOnlyFocusProbe = Codex94CIReadOnlyFocusProbe.start(popover: popover)\n"
-         "        store.start()\n"),
-        ("    func applicationWillTerminate(_ notification: Notification) {\n",
-         "    func applicationWillTerminate(_ notification: Notification) {\n"
-         "        ciReadOnlyFocusProbe?.stop()\n"),
+    anchor = "        configurePopover()\n"
+    require(source_text.count(anchor) == 1, "The bounded AppDelegate injection anchor changed")
+    source_text = source_text.replace(
+        anchor,
+        "        configurePopover()\n"
+        "        _ = Codex94CIReadOnlyFocusProbe.start(popover: popover)\n",
+        1,
     )
-    for before, after in anchors:
-        require(source_text.count(before) == 1, "The bounded AppDelegate injection anchor changed")
-        source_text = source_text.replace(before, after, 1)
     template = contents[FOCUS_TEMPLATE].decode("utf-8")
-    require(template.count("__CODEX94_CI_FIXTURE_ROOT_LITERAL__") == 1,
-            "The read-only observer root placeholder must be unique")
-    template = template.replace("__CODEX94_CI_FIXTURE_ROOT_LITERAL__", json.dumps(str(root)), 1)
+    replacements = {
+        "__CODEX94_CI_FIXTURE_ROOT_LITERAL__": str(root),
+        "__CODEX94_CI_EXPECTED_VERSION_LITERAL__": expected_version,
+        "__CODEX94_CI_EXPECTED_BUILD_LITERAL__": expected_build,
+    }
+    for placeholder, value in replacements.items():
+        require(template.count(placeholder) == 1,
+                "Each read-only observer placeholder must be unique")
+        template = template.replace(placeholder, json.dumps(value), 1)
     instrumented = (source_text + "\n" + template).encode("utf-8")
 
     copy_root = root / "recovery-source"
@@ -198,6 +305,9 @@ def main():
     require(os.getuid() != 0, "Do not prepare UI fixtures as root")
     source_revision = os.environ.get("GITHUB_SHA", "")
     require(re.fullmatch(r"[0-9a-f]{40}", source_revision) is not None, "A tested source revision is required")
+    repository = Path(__file__).resolve().parents[2]
+    require(repository == repository.resolve(), "The build checkout must be canonical")
+    expected_version, expected_build = committed_app_version(repository, source_revision)
     output = os.environ.get("GITHUB_OUTPUT")
     require(bool(output), "GitHub step output channel is required")
     output_path = Path(output)
@@ -261,11 +371,12 @@ def main():
         "mode": "normal", "defaultUsedPercent": 68, "sparkUsedPercent": 12, "includeSpark": True,
     }))
 
-    repository = Path(__file__).absolute().parents[2]
     project = repository / "Codex94.xcodeproj"
     focus_probe = {"enabled": False}
     if scenario == "recovery":
-        project, focus_probe = recovery_project(repository, root, source_revision)
+        project, focus_probe = recovery_project(
+            repository, root, source_revision, expected_version, expected_build
+        )
 
     initial_preferences = {
         "identityMode": "quotaOnly",
@@ -284,8 +395,8 @@ def main():
         "schemaVersion": 1,
         "scenario": scenario,
         "bundleID": BUNDLE_ID,
-        "expectedVersion": "0.1.8",
-        "expectedBuild": "9",
+        "expectedVersion": expected_version,
+        "expectedBuild": expected_build,
         "fixtureRoot": str(root),
         "executable": str(executable),
         "invalidExecutable": str(invalid_executable),
