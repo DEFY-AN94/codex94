@@ -4,6 +4,8 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
+## 0.1.9 - 2026-08-30
+
 ### Added
 
 - Add a default Dashboard Overview that reuses the existing connection status,
