@@ -53,19 +53,22 @@ telemetry, entitlement, or system permission.
 
 ## Supported versions
 
-This tree is the working `0.1.9 (10)` source candidate; the latest published
-stable source tag remains `v0.1.8`. The candidate is not a source release until
-an annotated `v0.1.9` tag is published from the separately verified final
-`main`. Feature branches and `main` may contain unreleased development work.
-Until that tag exists, `v0.1.8` remains the published stable source.
+This tree contains `0.1.9 (10)`. Before an annotated `v0.1.9` tag is published
+from the separately verified final `main`, `v0.1.8` remains the published stable
+source; after publication, `v0.1.9` becomes the supported stable source tag.
+Feature branches and `main` may contain unreleased development work before that
+gate.
 
 Version `0.1.8 (9)` passed the full GitHub test/release job, synthetic Display
 and click-functional Recovery UI jobs, Actions/Swift CodeQL, and separate
-synthetic A/B GUI smokes. Its synthetic documentation images were reviewed.
-Contributor validation guidance is documented in [CONTRIBUTING.md](CONTRIBUTING.md);
-static source checks alone are not runtime security or release evidence.
-Draft PR CI, exact-head App review, and visual/privacy review of a synthetic
-`0.1.9` Overview artifact remain pending; none is claimed as release evidence.
+synthetic A/B GUI smokes. For `0.1.9 (10)`, PR #11 is the authoritative record
+for exact-head test, Display/Recovery UI, Actions/Python/Swift CodeQL, and final
+App acceptance. The synthetic Overview image embedded in the README has been
+visually and privacy reviewed. Contributor validation guidance is documented in
+[CONTRIBUTING.md](CONTRIBUTING.md); static source checks alone are not runtime
+security or release evidence. Candidate facts do not become source-release
+evidence until final `main` and the annotated `v0.1.9` tag are separately
+verified.
 
 ## Reporting
 

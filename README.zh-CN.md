@@ -21,9 +21,9 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 ## 界面截图
 
 以下数值来自隔离的文档渲染夹具，仅用于展示，不包含真实账号、身份信息或额度。
-当前嵌入的 Popover 和 Dashboard 图片仍来自隔离 CI 中的 `0.1.8`，并已在纳入前
-审查。图中固定的未来 Reset 日期是测试值，并非实时重置时间。Draft PR CI 才会
-生成首张 `0.1.9` 总览产物；在替换本文图片前，仍需完成人工视觉与隐私审查。
+当前嵌入的 Popover 图片仍是经过审查的合成 `0.1.8` 产物；Dashboard 图片已经
+替换为从 GitHub-hosted CI 中取得、并完成视觉与隐私审查的合成 `0.1.9` 总览产物。
+图中固定的未来 Reset 日期是测试值，并非实时重置时间。
 未改变的默认菜单栏示例保留自 `v0.1.7`。
 
 <p align="center">
@@ -37,14 +37,16 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 <p align="center"><strong>CLI 风格额度面板</strong></p>
 
 <p align="center">
-  <img src="docs/images/readme/dashboard-zh-Hans.png" alt="Codex94 Terminal Dark 简体中文显示设置页面" width="900">
+  <img src="docs/images/readme/dashboard-zh-Hans.png" alt="Codex94 Terminal Dark 简体中文总览展示合成额度桶" width="900">
 </p>
-<p align="center"><strong>显示设置页面</strong></p>
+<p align="center"><strong>额度总览</strong></p>
 
 ## 当前分发状态
 
-- 当前工作源码候选版本为 `0.1.9 (10)`；最新已发布稳定源码标签仍为 `v0.1.8`。
-- `0.1.9` 只有在标签发布后才是源码发布；`main` 与功能分支可能包含未发布准备内容。
+- 当前源码树版本为 `0.1.9 (10)`。在 annotated `v0.1.9` 标签发布前，最新稳定
+  源码标签是 `v0.1.8`；标签发布后，`v0.1.9` 才成为稳定源码标签。
+- `0.1.9` 只有在标签发布后才是源码发布；在此发布门之前，`main` 与功能分支可能
+  包含未发布准备内容。
 - 仓库已公开，任何人都可以在无需 GitHub 认证的情况下 clone 源码。
 - 当前没有 GitHub Release、DMG、经过公证的二进制或自动更新功能。
 - `script/install.sh` 会构建本地 Release App，应用 ad-hoc Hardened
@@ -66,12 +68,24 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 
 ## 从源码安装
 
-可使用以下命令安装当前稳定的 `v0.1.8` 源码：
+请只选择一个已经发布的标签进行 clone。在 annotated `v0.1.9` 标签出现前，使用
+当前稳定的 `v0.1.8` 源码：
 
 ```bash
-brew install ripgrep
 git clone --branch v0.1.8 --depth 1 https://github.com/DEFY-AN94/codex94.git
+```
+
+annotated `v0.1.9` 标签发布后，改用：
+
+```bash
+git clone --branch v0.1.9 --depth 1 https://github.com/DEFY-AN94/codex94.git
+```
+
+然后构建所选标签：
+
+```bash
 cd codex94
+brew install ripgrep
 
 sudo xcodebuild -license accept
 sudo xcodebuild -runFirstLaunch
@@ -146,7 +160,8 @@ sudo xcodebuild -runFirstLaunch
   `/usr/local/bin`、`~/.local/bin`，最后是 `PATH` 中的绝对路径。
 - Dashboard 提供 900x600、1280x720、1440x810 和 1920x1080 逻辑点窗口预设；
   超出当前屏幕时会按比例适配。
-- Dashboard → 关于显示精确候选值 `0.1.9 (10)`，由用户触发的复制结果与之完全一致；
+- Dashboard → 关于显示当前源码树的精确版本值 `0.1.9 (10)`，由用户触发的复制结果
+  与之完全一致；
   项目链接指向 `https://github.com/DEFY-AN94/codex94`，不会增加更新器或网络客户端。
 - 支持跟随系统、Terminal Dark、Terminal Light 主题，以及 English 和简体中文。
 - 只使用当前 Codex 登录；不管理多账号或其他 `CODEX_HOME` 目录。
@@ -233,12 +248,11 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ```
 
 版本 0.1.8 已通过完整 GitHub 测试/发布任务、合成 Display 与点击功能 Recovery UI
-任务，以及 Actions/Swift CodeQL。独立的合成 A/B GUI smoke 覆盖三种下次启动布局、
-颜色恢复、绝对 Reset 文案、hard-unavailable 恢复和手动刷新。四张
-Popover/Dashboard 截图已完成视觉和隐私审查。键盘激活、AXPress 与托管运行器
-tooltip 暴露不声明为已通过。
-Draft PR CI、exact-head GUI 证据和首张 `0.1.9` 总览产物仍处于待完成状态，本文不把
-它们描述为发布证据。
+任务，以及 Actions/Swift CodeQL。对于 `0.1.9 (10)`，PR #11 是精确 head 测试、
+Display/Recovery UI、Actions/Python/Swift CodeQL 与最终 App 人工验收状态的权威
+记录；上方嵌入的合成总览截图已经完成布局与隐私审查。键盘激活、AXPress 与托管
+运行器 tooltip 暴露仍不声明为已通过。候选审查事实并非源码发布证据；只有最终
+`main` 通过复核并发布 annotated tag 后，`0.1.9` 才成为正式源码版本。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。贡献与发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 和

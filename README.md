@@ -25,12 +25,10 @@ tested, and security-scanned before it is tagged.
 
 The values below come from an isolated documentation fixture. They are
 illustrative and do not contain a real account, identity, or quota.
-The currently embedded popover and Dashboard images still show `0.1.8`; they
-were captured in isolated CI and reviewed before inclusion. Their fixed future
-Reset dates are test values, not live reset schedules. Draft PR CI will produce
-the first `0.1.9` Overview artifact, which must be visually and privacy reviewed
-before it replaces an image here. The unchanged default menu-bar sample is
-retained from `v0.1.7`.
+The embedded popover images remain reviewed synthetic `0.1.8` captures. The
+Dashboard image is a reviewed synthetic `0.1.9` Overview capture from
+GitHub-hosted CI. Its fixed future Reset dates are test values, not live reset
+schedules. The unchanged default menu-bar sample is retained from `v0.1.7`.
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 menu bar ring showing 79 percent remaining" width="144">
@@ -43,16 +41,17 @@ retained from `v0.1.7`.
 <p align="center"><strong>CLI-style quota popover</strong></p>
 
 <p align="center">
-  <img src="docs/images/readme/dashboard-en.png" alt="Codex94 English Display settings in Terminal Dark" width="900">
+  <img src="docs/images/readme/dashboard-en.png" alt="Codex94 English Overview showing synthetic quota buckets in Terminal Dark" width="900">
 </p>
-<p align="center"><strong>Display settings</strong></p>
+<p align="center"><strong>Quota Overview</strong></p>
 
 ## Distribution status
 
-- This working source candidate is `0.1.9 (10)`; the latest published stable
-  source tag remains `v0.1.8`.
+- This tree contains `0.1.9 (10)`. Before the annotated `v0.1.9` tag is
+  published, the latest stable source tag is `v0.1.8`; after publication,
+  `v0.1.9` becomes the stable source tag.
 - `0.1.9` is not a source release until its tag is published. `main` and feature
-  branches may contain unreleased preparation.
+  branches may contain unreleased preparation before that gate.
 - This public repository can be cloned without GitHub authentication.
 - There is no GitHub Release, DMG, notarized binary, or automatic updater.
 - `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
@@ -76,12 +75,24 @@ executable selected manually.
 
 ## Install from source
 
-Install the current stable `v0.1.8` source with:
+Choose exactly one clone command for a tag that is already published. Until the
+annotated `v0.1.9` tag appears, use the current stable `v0.1.8` source:
 
 ```bash
-brew install ripgrep
 git clone --branch v0.1.8 --depth 1 https://github.com/DEFY-AN94/codex94.git
+```
+
+After the annotated `v0.1.9` tag is published, use:
+
+```bash
+git clone --branch v0.1.9 --depth 1 https://github.com/DEFY-AN94/codex94.git
+```
+
+Then build the selected tag:
+
+```bash
 cd codex94
+brew install ripgrep
 
 sudo xcodebuild -license accept
 sudo xcodebuild -runFirstLaunch
@@ -180,7 +191,7 @@ at the stable path above.
   Homebrew, `/usr/local/bin`, `~/.local/bin`, then absolute `PATH` entries.
 - Offers Dashboard window presets at 900x600, 1280x720, 1440x810, and 1920x1080
   logical points, with proportional fitting to the current display.
-- Dashboard → About shows the exact candidate value `0.1.9 (10)`. A
+- Dashboard → About shows this tree's exact value `0.1.9 (10)`. A
   user-triggered copy action preserves that string, and the project link targets
   `https://github.com/DEFY-AN94/codex94`. It adds no updater or network client.
 - Supports system, Terminal Dark, and Terminal Light themes plus English and
@@ -283,13 +294,13 @@ security/signature checks:
 ```
 
 Version 0.1.8 passed the full GitHub test/release job, synthetic Display and
-click-functional Recovery UI jobs, and Actions/Swift CodeQL. Separate synthetic
-A/B GUI smokes covered all three next-launch layouts, color restoration,
-absolute Reset text, hard-unavailable recovery, and manual refresh. The four
-popover/Dashboard screenshots were visually and privacy reviewed. Keyboard
+click-functional Recovery UI jobs, and Actions/Swift CodeQL. For `0.1.9 (10)`,
+PR #11 is the authoritative record for exact-head test, Display/Recovery UI,
+Actions/Python/Swift CodeQL, and final App acceptance. The synthetic Overview
+capture embedded above has been reviewed for layout and privacy. Keyboard
 activation, AXPress, and hosted tooltip exposure are not claimed as passed.
-Draft PR CI, exact-head GUI evidence, and the first `0.1.9` Overview artifact
-remain pending and are not claimed as release evidence here.
+Candidate-review facts are not source-release evidence; `0.1.9` remains
+unreleased until final `main` is verified and the annotated tag is published.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See

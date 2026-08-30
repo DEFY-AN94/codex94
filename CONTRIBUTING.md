@@ -103,17 +103,20 @@ must include the countdown and absolute time; public test data and screenshots
 must remain synthetic or redacted.
 
 Report source/static checks, compiled tests, GUI smoke, screenshots, and release
-status separately, tied to the actual candidate tree and artifacts. The four
-README popover/Dashboard images are reviewed synthetic `0.1.8` captures;
-the unchanged default menu-bar example remains from `v0.1.7`. A `0.1.9`
-Overview artifact is not documentation evidence until exact-head Draft PR CI
-produces it and a person reviews the image itself for layout and privacy.
+status separately, tied to the actual candidate tree and artifacts. The README
+popover images are reviewed synthetic `0.1.8` captures; the Dashboard images
+are reviewed synthetic `0.1.9` Overview captures from GitHub-hosted CI, and the
+unchanged default menu-bar example remains from `v0.1.7`.
 Version 0.1.8 passed the full test/release job, synthetic Display and
 click-functional Recovery UI jobs, CodeQL, and separate synthetic A/B GUI
-smokes. Keyboard activation, AXPress, and hosted tooltip exposure are not
-claimed as passed. The working candidate is `0.1.9 (10)`, while stable install
-instructions remain on `v0.1.8`. Keep candidate notes under Unreleased without
-a guessed date or release claim until the source release is finalized.
+smokes. For `0.1.9 (10)`, keep the exact-head test, Display/Recovery UI,
+Actions/Python/Swift CodeQL, and final App acceptance status on the pull request;
+the README images establish only the reviewed captures they display. Keyboard
+activation, AXPress, and hosted tooltip exposure are not claimed as passed. The
+README install section distinguishes the published `v0.1.8` command from the
+`v0.1.9` command that applies only after its annotated tag is published. Keep
+candidate notes under Unreleased without a guessed date or release claim until
+the source release is finalized.
 
 A release pull request begins as Draft. Required CI and exact-head synthetic UI
 artifacts must be complete and reviewed, and the maintainer must accept the
