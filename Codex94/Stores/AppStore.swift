@@ -20,7 +20,7 @@ final class AppStore: ObservableObject {
     private let logger = Logger(subsystem: "com.defyan94.codex94", category: "state")
     private var refreshTask: Task<Void, Never>?
     private var pendingRefreshTrigger: RefreshTrigger?
-    private var backgroundTask: Task<Void, Never>?
+    private(set) var backgroundTask: Task<Void, Never>?
     private(set) var resetRefreshTask: Task<Void, Never>?
     private(set) var scheduledResetRefreshDate: Date?
     private(set) var pendingResetRefreshDate: Date?
@@ -206,9 +206,9 @@ final class AppStore: ObservableObject {
 
     func handleSystemWake(now: Date = Date()) {
         guard !isShuttingDown else { return }
+        configureBackgroundRefresh()
         guard preferences.hasChosenIdentityMode else { return }
         if reconcileQuotaResetRefresh(now: now) {
-            configureBackgroundRefresh()
             return
         }
         guard RefreshPolicy.shouldRefreshAfterWake(
@@ -216,7 +216,6 @@ final class AppStore: ObservableObject {
             now: now
         ) else { return }
 
-        configureBackgroundRefresh()
         refresh(trigger: .systemWake, startedAt: now)
     }
 

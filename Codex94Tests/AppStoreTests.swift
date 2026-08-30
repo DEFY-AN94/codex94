@@ -701,6 +701,45 @@ final class AppStoreTests: XCTestCase {
         XCTAssertNil(onboarding.store.snapshot)
     }
 
+    func testFreshSystemWakeRearmsBackgroundAndResetWithoutFetching() async throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let resetTarget = now.addingTimeInterval(3_600)
+        let fetchedAt = now.addingTimeInterval(-59)
+        let cached = makeSnapshot(
+            defaultLimitID: "default-v2",
+            defaultUsed: 40,
+            sparkUsed: nil,
+            fetchedAt: fetchedAt,
+            defaultResetsAt: resetTarget.addingTimeInterval(-5)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher,
+            selection: .automatic,
+            cachedSnapshot: cached,
+            hasChosenIdentityMode: false
+        )
+
+        fixture.store.start()
+        let originalBackgroundTask = try XCTUnwrap(fixture.store.backgroundTask)
+        XCTAssertFalse(originalBackgroundTask.isCancelled)
+        originalBackgroundTask.cancel()
+        XCTAssertTrue(originalBackgroundTask.isCancelled)
+
+        fixture.preferences.hasChosenIdentityMode = true
+        fixture.store.handleSystemWake(now: now)
+
+        let replacementBackgroundTask = try XCTUnwrap(fixture.store.backgroundTask)
+        XCTAssertFalse(replacementBackgroundTask.isCancelled)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, resetTarget)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+        let requestCount = await fetcher.requestCount()
+        XCTAssertEqual(requestCount, 0)
+        XCTAssertFalse(fixture.store.isRefreshing)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, fetchedAt)
+        fixture.store.shutdown()
+    }
+
     func testSystemWakeSuccessAdvancesSnapshotWithoutRestoringAccountInQuotaOnlyMode() async throws {
         let oldDate = Date(timeIntervalSince1970: 1_000)
         let newDate = Date(timeIntervalSince1970: 2_000)
