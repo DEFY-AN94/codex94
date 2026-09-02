@@ -2,21 +2,66 @@ import XCTest
 @testable import Codex94
 
 final class LaunchAtLoginControllerTests: XCTestCase {
-    func testAcceptsSystemApplicationsInstall() {
-        XCTAssertTrue(isStableInstall(bundlePath: "/Applications/Codex94.app"))
-    }
+    func testAcceptsSystemApplicationsInstall() throws {
+        let fixture = try makeStableInstallFixture()
 
-    func testAcceptsHomeApplicationsInstall() {
-        XCTAssertTrue(isStableInstall(bundlePath: "/Users/example/Applications/Codex94.app"))
-    }
-
-    func testAcceptsEquivalentStandardizedPaths() {
         XCTAssertTrue(
-            isStableInstall(bundlePath: "/Applications/Utilities/.././Codex94.app")
+            LaunchAtLoginController.isStableInstall(
+                bundleURL: fixture.systemBundleURL,
+                homeDirectoryURL: fixture.homeDirectoryURL,
+                systemApplicationsDirectoryURL: fixture.systemApplicationsDirectoryURL
+            )
+        )
+    }
+
+    func testAcceptsHomeApplicationsInstall() throws {
+        let fixture = try makeStableInstallFixture()
+
+        XCTAssertTrue(
+            LaunchAtLoginController.isStableInstall(
+                bundleURL: fixture.homeBundleURL,
+                homeDirectoryURL: fixture.homeDirectoryURL,
+                systemApplicationsDirectoryURL: fixture.systemApplicationsDirectoryURL
+            )
+        )
+    }
+
+    func testAcceptsEquivalentStandardizedPaths() throws {
+        let fixture = try makeStableInstallFixture()
+        let systemUtilitiesDirectoryURL = fixture.systemApplicationsDirectoryURL
+            .appendingPathComponent("Utilities", isDirectory: true)
+        let homeNestedDirectoryURL = fixture.homeDirectoryURL
+            .appendingPathComponent("Applications", isDirectory: true)
+            .appendingPathComponent("Nested", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: systemUtilitiesDirectoryURL,
+            withIntermediateDirectories: false
+        )
+        try FileManager.default.createDirectory(
+            at: homeNestedDirectoryURL,
+            withIntermediateDirectories: false
+        )
+
+        XCTAssertTrue(
+            LaunchAtLoginController.isStableInstall(
+                bundleURL: URL(
+                    fileURLWithPath: systemUtilitiesDirectoryURL.path
+                        + "/.././Codex94.app",
+                    isDirectory: true
+                ),
+                homeDirectoryURL: fixture.homeDirectoryURL,
+                systemApplicationsDirectoryURL: fixture.systemApplicationsDirectoryURL
+            )
         )
         XCTAssertTrue(
-            isStableInstall(
-                bundlePath: "/Users/example/Applications/Nested/../../Applications/Codex94.app"
+            LaunchAtLoginController.isStableInstall(
+                bundleURL: URL(
+                    fileURLWithPath: homeNestedDirectoryURL.path
+                        + "/../../Applications/Codex94.app",
+                    isDirectory: true
+                ),
+                homeDirectoryURL: fixture.homeDirectoryURL,
+                systemApplicationsDirectoryURL: fixture.systemApplicationsDirectoryURL
             )
         )
     }
@@ -208,6 +253,41 @@ final class LaunchAtLoginControllerTests: XCTestCase {
                 fileURLWithPath: "/Applications",
                 isDirectory: true
             )
+        )
+    }
+
+    private func makeStableInstallFixture() throws -> (
+        homeDirectoryURL: URL,
+        systemApplicationsDirectoryURL: URL,
+        homeBundleURL: URL,
+        systemBundleURL: URL
+    ) {
+        let directory = try makeTemporaryDirectory()
+        let homeDirectoryURL = directory.appendingPathComponent("home", isDirectory: true)
+        let homeBundleURL = homeDirectoryURL
+            .appendingPathComponent("Applications", isDirectory: true)
+            .appendingPathComponent("Codex94.app", isDirectory: true)
+        let systemApplicationsDirectoryURL = directory.appendingPathComponent(
+            "system-applications",
+            isDirectory: true
+        )
+        let systemBundleURL = systemApplicationsDirectoryURL.appendingPathComponent(
+            "Codex94.app",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: homeBundleURL,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: systemBundleURL,
+            withIntermediateDirectories: true
+        )
+        return (
+            homeDirectoryURL,
+            systemApplicationsDirectoryURL,
+            homeBundleURL,
+            systemBundleURL
         )
     }
 
