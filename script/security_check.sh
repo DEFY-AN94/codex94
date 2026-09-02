@@ -8,27 +8,118 @@ SECRET_PATTERN='-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sk-(proj-|a
 PII_PATTERN='(/Users/[A-Za-z0-9._/-]+)|(/(private/)?var/folders/[A-Za-z0-9._/-]+)|([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,})'
 ALLOWED_FIXTURE_PII='^(/Users/(example|private|another-person)(/[A-Za-z0-9._/-]+)?|(user|test|private|account)@example[.]com)$'
 
-for required_command in rg git; do
+for required_command in rg git sort; do
   if ! command -v "$required_command" >/dev/null 2>&1; then
     echo "Security check failed: required command '$required_command' is unavailable." >&2
     exit 1
   fi
 done
 
+scan_matches() {
+  local label="$1"
+  shift
+
+  local output
+  local status
+  if output="$("$@")"; then
+    printf '%s' "$output"
+    return 0
+  else
+    status=$?
+  fi
+
+  if [[ "$status" -eq 1 ]]; then
+    return 0
+  fi
+
+  echo "Security check failed: $label (scanner exit $status)." >&2
+  return "$status"
+}
+
+filter_matches() {
+  local input="$1"
+  local label="$2"
+  shift 2
+
+  if [[ -z "$input" ]]; then
+    return 0
+  fi
+
+  local output
+  local status
+  if output="$("$@" <<< "$input")"; then
+    printf '%s' "$output"
+    return 0
+  else
+    status=$?
+  fi
+
+  if [[ "$status" -eq 1 ]]; then
+    return 0
+  fi
+
+  echo "Security check failed: $label (filter exit $status)." >&2
+  return "$status"
+}
+
+sort_unique_lines() {
+  local input="$1"
+  local label="$2"
+
+  if [[ -z "$input" ]]; then
+    return 0
+  fi
+
+  local output
+  local status
+  if output="$(sort -u <<< "$input")"; then
+    printf '%s' "$output"
+    return 0
+  else
+    status=$?
+  fi
+
+  echo "Security check failed: $label (sort exit $status)." >&2
+  return "$status"
+}
+
+append_matches() {
+  local variable_name="$1"
+  local matches="$2"
+
+  if [[ -z "$matches" ]]; then
+    return 0
+  fi
+
+  if [[ -n "${!variable_name}" ]]; then
+    printf -v "$variable_name" '%s\n%s' "${!variable_name}" "$matches"
+  else
+    printf -v "$variable_name" '%s' "$matches"
+  fi
+}
+
 cd "$ROOT_DIR"
 
-if rg -l --glob '*.swift' "$FORBIDDEN" "$SOURCE_DIR"; then
+forbidden_matches="$(
+  scan_matches \
+    "prohibited source-pattern scan could not be completed" \
+    rg -l --glob '*.swift' "$FORBIDDEN" "$SOURCE_DIR"
+)"
+if [[ -n "$forbidden_matches" ]]; then
+  printf '%s\n' "$forbidden_matches" >&2
   echo "Security check failed: prohibited credential or direct-HTTP pattern found." >&2
   exit 1
 fi
 
 current_secret_matches="$(
-  rg -n -I --hidden \
-  --glob '!.git/**' \
-  --glob '!.build/**' \
-  --glob '!script/security_check.sh' \
-  -- \
-  "$SECRET_PATTERN" . || true
+  scan_matches \
+    "current-tree credential scan could not be completed" \
+    rg -n -I --hidden \
+      --glob '!.git/**' \
+      --glob '!.build/**' \
+      --glob '!script/security_check.sh' \
+      -- \
+      "$SECRET_PATTERN" .
 )"
 if [[ -n "$current_secret_matches" ]]; then
   printf '%s\n' "$current_secret_matches" >&2
@@ -36,26 +127,48 @@ if [[ -n "$current_secret_matches" ]]; then
   exit 1
 fi
 
-history_matches="$(
-  while IFS= read -r commit; do
-    git grep -l -I -E -e "$SECRET_PATTERN" "$commit" -- \
-      . ':(exclude)script/security_check.sh' || true
-  done < <(git rev-list --all)
-)"
+if ! history_commits="$(git rev-list --all)"; then
+  echo "Security check failed: Git history enumeration could not be completed." >&2
+  exit 1
+fi
+if [[ -z "$history_commits" ]]; then
+  echo "Security check failed: Git history enumeration returned no commits." >&2
+  exit 1
+fi
+
+history_matches=""
+while IFS= read -r commit; do
+  [[ -n "$commit" ]] || continue
+  commit_secret_matches="$(
+    scan_matches \
+      "credential history scan could not read commit $commit" \
+      git grep -l -I -E -e "$SECRET_PATTERN" "$commit" -- \
+        . ':(exclude)script/security_check.sh'
+  )"
+  append_matches history_matches "$commit_secret_matches"
+done <<< "$history_commits"
 if [[ -n "$history_matches" ]]; then
   printf '%s\n' "$history_matches" >&2
   echo "Security check failed: possible credential or private key exists in Git history." >&2
   exit 1
 fi
 
-current_pii_matches="$(
-  rg -n -I -i --hidden \
+current_pii_raw_matches="$(
+  scan_matches \
+    "current-tree privacy scan could not be completed" \
+  rg -n -o -I -i --hidden \
     --glob '!.git/**' \
     --glob '!.build/**' \
     --glob '!Codex94Tests/**' \
     --glob '!Codex94/Assets.xcassets/**' \
     --glob '!script/security_check.sh' \
-    -- "$PII_PATTERN" . | rg -v 'git@github[.]com' || true
+    -- "$PII_PATTERN" .
+)"
+current_pii_matches="$(
+  filter_matches \
+    "$current_pii_raw_matches" \
+    "current-tree privacy allowlist filter could not be completed" \
+    rg -v '(^|:)git@github[.]com$'
 )"
 if [[ -n "$current_pii_matches" ]]; then
   printf '%s\n' "$current_pii_matches" >&2
@@ -63,13 +176,19 @@ if [[ -n "$current_pii_matches" ]]; then
   exit 1
 fi
 
+fixture_pii_raw="$(
+  scan_matches \
+    "test-fixture privacy scan could not be completed" \
+    rg -o -I -i --no-filename -- "$PII_PATTERN" Codex94Tests
+)"
 fixture_pii="$(
-  rg -o -I -i --no-filename -- "$PII_PATTERN" Codex94Tests | sort -u || true
+  sort_unique_lines "$fixture_pii_raw" "test-fixture privacy results could not be sorted"
 )"
 unexpected_fixture_pii="$(
-  if [[ -n "$fixture_pii" ]]; then
-    printf '%s\n' "$fixture_pii" | rg -v "$ALLOWED_FIXTURE_PII" || true
-  fi
+  filter_matches \
+    "$fixture_pii" \
+    "test-fixture privacy allowlist filter could not be completed" \
+    rg -v "$ALLOWED_FIXTURE_PII"
 )"
 if [[ -n "$unexpected_fixture_pii" ]]; then
   printf '%s\n' "$unexpected_fixture_pii" >&2
@@ -77,30 +196,52 @@ if [[ -n "$unexpected_fixture_pii" ]]; then
   exit 1
 fi
 
-history_pii_matches="$(
-  while IFS= read -r commit; do
-    git grep -n -I -i -E -e "$PII_PATTERN" "$commit" -- \
+history_pii_matches=""
+while IFS= read -r commit; do
+  [[ -n "$commit" ]] || continue
+  commit_pii_raw_matches="$(
+    scan_matches \
+      "privacy history scan could not read commit $commit" \
+      git grep -n -o -I -i -E -e "$PII_PATTERN" "$commit" -- \
       . \
       ':(exclude)Codex94Tests/**' \
       ':(exclude)Codex94/Assets.xcassets/**' \
-      ':(exclude)script/security_check.sh' | rg -v 'git@github[.]com' || true
-  done < <(git rev-list --all)
-)"
+      ':(exclude)script/security_check.sh'
+  )"
+  commit_pii_matches="$(
+    filter_matches \
+      "$commit_pii_raw_matches" \
+      "privacy history allowlist filter failed at commit $commit" \
+      rg -v '(^|:)git@github[.]com$'
+  )"
+  append_matches history_pii_matches "$commit_pii_matches"
+done <<< "$history_commits"
 if [[ -n "$history_pii_matches" ]]; then
   printf '%s\n' "$history_pii_matches" >&2
   echo "Security check failed: machine path or email exists in Git history." >&2
   exit 1
 fi
 
+history_fixture_pii_raw=""
+while IFS= read -r commit; do
+  [[ -n "$commit" ]] || continue
+  commit_fixture_pii="$(
+    scan_matches \
+      "test-fixture privacy history scan could not read commit $commit" \
+      git grep -h -I -i -o -E -e "$PII_PATTERN" "$commit" -- Codex94Tests
+  )"
+  append_matches history_fixture_pii_raw "$commit_fixture_pii"
+done <<< "$history_commits"
 history_fixture_pii="$(
-  while IFS= read -r commit; do
-    git grep -h -I -i -o -E -e "$PII_PATTERN" "$commit" -- Codex94Tests || true
-  done < <(git rev-list --all) | sort -u
+  sort_unique_lines \
+    "$history_fixture_pii_raw" \
+    "test-fixture privacy history results could not be sorted"
 )"
 unexpected_history_fixture_pii="$(
-  if [[ -n "$history_fixture_pii" ]]; then
-    printf '%s\n' "$history_fixture_pii" | rg -v "$ALLOWED_FIXTURE_PII" || true
-  fi
+  filter_matches \
+    "$history_fixture_pii" \
+    "test-fixture privacy history allowlist filter could not be completed" \
+    rg -v "$ALLOWED_FIXTURE_PII"
 )"
 if [[ -n "$unexpected_history_fixture_pii" ]]; then
   printf '%s\n' "$unexpected_history_fixture_pii" >&2
@@ -114,7 +255,13 @@ if ! rg -q '"-s", "read-only", "-a", "never", "app-server", "--stdio"' \
   exit 1
 fi
 
-if rg -q '"-a", "untrusted"' "$SOURCE_DIR"; then
+removed_policy_matches="$(
+  scan_matches \
+    "removed approval-policy scan could not be completed" \
+    rg -n '"-a", "untrusted"' "$SOURCE_DIR"
+)"
+if [[ -n "$removed_policy_matches" ]]; then
+  printf '%s\n' "$removed_policy_matches" >&2
   echo "Security check failed: removed Codex approval policy 'untrusted' is still used." >&2
   exit 1
 fi
@@ -129,8 +276,14 @@ if ! rg -q 'ENABLE_APP_SANDBOX = NO;' "$ROOT_DIR/Codex94.xcodeproj/project.pbxpr
   exit 1
 fi
 
-if rg -q 'let[[:space:]]+(email|account)(:|[[:space:]])' \
-  "$SOURCE_DIR/Services/SnapshotCache.swift"; then
+identity_cache_matches="$(
+  scan_matches \
+    "quota-cache identity scan could not be completed" \
+    rg -n 'let[[:space:]]+(email|account)(:|[[:space:]])' \
+      "$SOURCE_DIR/Services/SnapshotCache.swift"
+)"
+if [[ -n "$identity_cache_matches" ]]; then
+  printf '%s\n' "$identity_cache_matches" >&2
   echo "Security check failed: identity data must not enter the quota cache." >&2
   exit 1
 fi

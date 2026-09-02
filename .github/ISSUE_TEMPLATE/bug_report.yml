@@ -11,7 +11,15 @@ body:
     id: app-version
     attributes:
       label: Codex94 version
-      placeholder: 0.1.9 (10)
+      placeholder: 0.2.0 (11)
+    validations:
+      required: true
+  - type: input
+    id: install-method
+    attributes:
+      label: Installation method and App location
+      description: Say whether you used the Universal DMG or source installer. Do not include a private path.
+      placeholder: Universal DMG at /Applications/Codex94.app, or source install at ~/Applications/Codex94.app
     validations:
       required: true
   - type: input

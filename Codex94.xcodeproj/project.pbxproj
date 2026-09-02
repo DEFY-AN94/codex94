@@ -47,6 +47,7 @@
 		B00000000000000000000108 /* QuotaPopoverLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000108 /* QuotaPopoverLayoutTests.swift */; };
 		B00000000000000000000109 /* StatusPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000109 /* StatusPresentationTests.swift */; };
 		B0000000000000000000010A /* RefreshPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000010A /* RefreshPolicyTests.swift */; };
+		B0000000000000000000010B /* LaunchAtLoginControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000010B /* LaunchAtLoginControllerTests.swift */; };
 		B00000000000000000000301 /* Codex94UITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000301 /* Codex94UITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -109,6 +110,7 @@
 		F00000000000000000000108 /* QuotaPopoverLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaPopoverLayoutTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000109 /* StatusPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusPresentationTests.swift; sourceTree = "<group>"; };
 		F0000000000000000000010A /* RefreshPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshPolicyTests.swift; sourceTree = "<group>"; };
+		F0000000000000000000010B /* LaunchAtLoginControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginControllerTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000201 /* Codex94.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Codex94.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F00000000000000000000202 /* Codex94Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Codex94Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F00000000000000000000203 /* Codex94UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Codex94UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -193,6 +195,7 @@
 				F00000000000000000000108 /* QuotaPopoverLayoutTests.swift */,
 				F00000000000000000000109 /* StatusPresentationTests.swift */,
 				F0000000000000000000010A /* RefreshPolicyTests.swift */,
+				F0000000000000000000010B /* LaunchAtLoginControllerTests.swift */,
 			);
 			path = Codex94Tests;
 			sourceTree = "<group>";
@@ -342,6 +345,7 @@
 				B00000000000000000000108 /* QuotaPopoverLayoutTests.swift in Sources */,
 				B00000000000000000000109 /* StatusPresentationTests.swift in Sources */,
 				B0000000000000000000010A /* RefreshPolicyTests.swift in Sources */,
+				B0000000000000000000010B /* LaunchAtLoginControllerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -413,7 +417,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -421,7 +425,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.1.9;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -439,19 +443,21 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
+				DEPLOYMENT_POSTPROCESSING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.1.9;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
+				STRIP_INSTALLED_PRODUCT = YES;
 			};
 			name = Release;
 		};

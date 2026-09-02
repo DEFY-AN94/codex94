@@ -36,6 +36,12 @@ pure `RefreshPolicy` owns wake freshness and Reset-target decisions. SwiftUI
 views must not observe those notifications, schedule Reset requests, or start
 requests from relative-time rendering.
 
+`LaunchAtLoginController` owns the stable-install decision. Keep its pure path
+helper independent of `SMAppService`: the only accepted App locations are exact
+`/Applications/Codex94.app` and `~/Applications/Codex94.app` after the documented
+root/leaf symlink handling. Add synthetic-URL tests for every accepted and
+rejected path; tests must not read or change real Login Items.
+
 ## Development and validation
 
 Use synthetic data for automated tests and published screenshots, and keep
@@ -52,10 +58,20 @@ test preferences, caches, and output paths separate from daily app data.
 - Do not clear or rewrite daily preferences, cache, or authentication data as
   test setup. Fixture cleanup should target only exact test-created resources.
 - Understand script side effects before running them: `release_check.sh` runs
-  hosted tests, builds, and signature checks; `build_and_run.sh` stops named
-  Codex94 processes and launches a Debug app; `install.sh` replaces the app at
-  its installation path and may launch it. These scripts are not read-only
-  source checks.
+  hosted tests, owns the single Universal Release build, verifies both
+  architecture slices, and drives DMG packaging; `build_and_run.sh` stops named
+  Codex94 processes and launches a Debug app; `install.sh` replaces the source
+  App at `~/Applications/Codex94.app` and may launch it. These scripts are not
+  read-only source checks.
+- `package_dmg.sh` has the narrow `create` and `verify` interface. It packages
+  the exact App supplied by `release_check.sh`; it must not build, call
+  `install.sh`, stop/launch a user App, read the home directory, alter
+  quarantine, or change system security settings. Use isolated run directories
+  for negative tests and never damage or overwrite the formal candidate.
+- Local `release_check.sh` runs respect the caller's `DEVELOPER_DIR`, or the
+  current `xcode-select` choice when it is unset. CI explicitly selects and
+  verifies Xcode 16.4; do not hide a toolchain mismatch by overriding it inside
+  the script.
 - GitHub CI runs the release gate on a macOS runner. Report source
   review, compiled tests, GUI smoke, and screenshot review separately; passing
   CI or producing a nonempty image is not evidence of GUI correctness.
@@ -103,27 +119,39 @@ must include the countdown and absolute time; public test data and screenshots
 must remain synthetic or redacted.
 
 Report source/static checks, compiled tests, GUI smoke, screenshots, and release
-status separately, tied to the actual candidate tree and artifacts. The README
+status separately, tied to the actual candidate tree and artifacts. For pull
+requests, record the PR head SHA and the exact tested merge SHA/tree separately;
+the default merge-ref artifact identifies the tested merge SHA, not the head.
+The README
 popover images are reviewed synthetic `0.1.8` captures; the Dashboard images
 are reviewed synthetic `0.1.9` Overview captures from GitHub-hosted CI, and the
 unchanged default menu-bar example remains from `v0.1.7`.
 Version 0.1.8 passed the full test/release job, synthetic Display and
 click-functional Recovery UI jobs, CodeQL, and separate synthetic A/B GUI
-smokes. For `0.1.9 (10)`, keep the exact-head test, Display/Recovery UI,
-Actions/Python/Swift CodeQL, and final App acceptance status on the pull request;
-the README images establish only the reviewed captures they display. Keyboard
-activation, AXPress, and hosted tooltip exposure are not claimed as passed. The
-README install section distinguishes the published `v0.1.8` command from the
-`v0.1.9` command that applies only after its annotated tag is published. Keep
-candidate notes under Unreleased without a guessed date or release claim until
-the source release is finalized.
+smokes. For `0.1.9 (10)`, PR #11 remains the historical exact-head test,
+Display/Recovery UI, Actions/Python/Swift CodeQL, and final App acceptance
+record; the README images establish only the reviewed captures they display.
+Keyboard activation, AXPress, and hosted tooltip exposure are not claimed as
+passed. Keep `0.2.0` candidate notes under Unreleased without a guessed date.
+Use the actual release date only after it is known and before tagging; if it
+changes, correct it through a reviewed docs-only Draft PR rather than tagging
+first and repairing the tree later.
 
-A release pull request begins as Draft. Required CI and exact-head synthetic UI
-artifacts must be complete and reviewed, and the maintainer must accept the
-exact-head App before separately authorizing Ready for review. Ready does not
-authorize merge; merge, the final `main` checks, and creation/push of an
-annotated source tag remain separate gates. Follow
-[docs/RELEASING.md](docs/RELEASING.md).
+A release pull request begins as Draft. Platform-required CI and the additional
+fail-closed UI smoke/CodeQL gates must be complete and reviewed. The Universal
+candidate needs an exact SHA, two-file allowlist, and signing/attestation
+classification; attestation is provenance, not Apple trust. Ready does not
+authorize merge. Follow all seven separate authorization gates in
+[docs/RELEASING.md](docs/RELEASING.md): commit/push/Draft PR, Ready, merge,
+annotated tag, Draft Release/two assets, maintainer-led install/Open Anyway
+acceptance, and Publish. Never infer a later gate from an earlier one.
+
+The outer DMG is unsigned and unnotarized; only the App inside is ad-hoc signed.
+Do not recommend deleting quarantine or disabling Gatekeeper. Published assets
+follow a manual non-replacement policy, not a platform-enforced guarantee:
+hashes, API digests, and attestation detect drift, while GitHub does not prevent
+an authorized maintainer from replacing an asset when Immutable Releases is not
+enabled.
 
 Do not open a public issue for a suspected vulnerability. Follow
 [SECURITY.md](SECURITY.md).

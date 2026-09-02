@@ -4,6 +4,52 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
+### Added
+
+- Add a first-party, Universal 2 (`arm64` + `x86_64`) DMG path for technical
+  users on macOS 14+, while retaining source installation from the annotated
+  `v0.2.0` tag through `script/install.sh`.
+- Add a native `package_dmg.sh` create/verify workflow for the unsigned,
+  unnotarized `Codex94-0.2.0-macos-universal-unnotarized.dmg` and its one-line
+  SHA-256 checksum file. The mounted image contains only `Codex94.app` and an
+  `Applications -> /Applications` shortcut.
+- Upload short-lived CI candidates and generate main-only GitHub artifact
+  attestation for the DMG. Attestation records repository/workflow/commit
+  provenance; it is not Apple signing, notarization, or a security verdict.
+
+### Changed
+
+- Accept both `/Applications/Codex94.app` and
+  `~/Applications/Codex94.app` as stable Launch at Login locations while
+  rejecting mounted images, translocation, downloads, temporary locations,
+  approximate paths, and symlinked App leaves.
+- Build the Release App once as exact Universal 2, verify both architecture
+  slices as ad-hoc signed with Hardened Runtime, no Team ID, and no entitlement
+  keys, then pass that same App into DMG packaging.
+- Document the DMG and source-install tracks, checksum and attestation checks,
+  Apple Privacy & Security → Open Anyway flow, two uninstall locations, and the
+  requirement not to run both installed copies at once.
+
+### Security and privacy
+
+- Keep the outer DMG completely unsigned, without Developer ID, Apple
+  notarization, stapling, or an automatic updater. Only the App inside has the
+  existing ad-hoc Hardened Runtime signature; users must verify the exact
+  checksum and make their own trust decision before using Apple's official
+  Open Anyway flow.
+- Keep runtime data access, cache/preferences, subprocess behavior, network
+  boundary, entitlements, and permissions unchanged. DMG staging and CI upload
+  allowlists exclude source, credentials, identity, real quota, preferences,
+  cache, logs, screenshots, and private paths.
+- Adopt a manual non-replacement policy for published assets. SHA-256, GitHub
+  Release API digests, and attestation can detect drift, but Immutable Releases
+  is not enabled and the platform does not prevent an authorized maintainer
+  from replacing an asset.
+
+The `0.2.0` entry remains under **Unreleased** without a guessed date. Move it
+to a dated `0.2.0` heading only when the actual release date is known and before
+creating the annotated tag; preserve the historical entries below unchanged.
+
 ## 0.1.9 - 2026-08-30
 
 ### Added

@@ -14,8 +14,8 @@ settings.
 Codex94 is an MIT-licensed source project. It uses the Codex executable already
 installed on the Mac and has no third-party runtime dependencies.
 
-**Vibe-built with Codex.** Each source release is still maintainer-reviewed,
-tested, and security-scanned before it is tagged.
+**Vibe-built with Codex.** Each release is still maintainer-reviewed, tested,
+and security-scanned before it is tagged.
 
 > Codex94 is not affiliated with, endorsed by, or sponsored by OpenAI. Codex
 > `app-server` is an experimental interface and may change in future Codex
@@ -47,45 +47,90 @@ schedules. The unchanged default menu-bar sample is retained from `v0.1.7`.
 
 ## Distribution status
 
-- This tree contains `0.1.9 (10)`. Before the annotated `v0.1.9` tag is
-  published, the latest stable source tag is `v0.1.8`; after publication,
-  `v0.1.9` becomes the stable source tag.
-- `0.1.9` is not a source release until its tag is published. `main` and feature
-  branches may contain unreleased preparation before that gate.
+- This tree contains `0.2.0 (11)`. Until annotated `v0.2.0` is published from
+  the separately verified final `main`, it is a release candidate and the latest
+  published stable source tag remains annotated `v0.1.9`; after publication,
+  `v0.2.0` becomes the stable tag.
+- Once published, `v0.2.0` has two distribution tracks: a Universal 2 DMG for
+  technical users who understand its trust limitations, and source installation
+  from the same annotated tag.
 - This public repository can be cloned without GitHub authentication.
-- There is no GitHub Release, DMG, notarized binary, or automatic updater.
+- There is no automatic updater. A `v0.2.0` GitHub Release and its DMG are not
+  public until the separately authorized release gates are complete.
 - `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
   Runtime signature, and installs it at `~/Applications/Codex94.app`.
 - Re-running the installer replaces that one app in place; it does not retain a
   separate copy for each version.
 
-Do not present a locally ad-hoc-signed build as a publicly notarized download.
+The downloadable DMG itself is completely unsigned, has no Apple Developer ID
+signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
+signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
+trust status.
 
 ## Requirements
 
 - macOS 14 or later.
-- Full Xcode 16.4 or later. Command Line Tools alone are insufficient.
-- `ripgrep` (`rg`) for the installer's static security check.
 - A compatible Codex executable and a current Codex login for live quota data.
+
+DMG installation does not require Xcode. Source installation additionally
+requires full Xcode 16.4 or later (Command Line Tools alone are insufficient)
+and `ripgrep` (`rg`) for the installer's static security check.
 
 Codex94 can use the Codex executable bundled inside the ChatGPT app, so a
 standalone Codex CLI installation is not required when that bundled executable
 is compatible. It can also detect Homebrew and standard CLI locations or use an
 executable selected manually.
 
+## Install the Universal DMG
+
+After the `v0.2.0` GitHub Release is published, download both of these assets
+from the [release page](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0):
+
+- `Codex94-0.2.0-macos-universal-unnotarized.dmg`
+- `Codex94-0.2.0-SHA256SUMS.txt`
+
+The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS 14 or
+later. Verify the checksum before opening it:
+
+```bash
+shasum -a 256 -c Codex94-0.2.0-SHA256SUMS.txt
+```
+
+If you have the GitHub CLI, you can also verify that the DMG came from this
+repository's GitHub workflow and commit:
+
+```bash
+gh attestation verify Codex94-0.2.0-macos-universal-unnotarized.dmg \
+  -R DEFY-AN94/codex94
+```
+
+Attestation is build provenance, not an Apple signature, notarization, malware
+review, or Gatekeeper approval.
+
+Quit every running Codex94 copy, open the DMG, and drag `Codex94.app` onto its
+`Applications` shortcut. This installs it at `/Applications/Codex94.app`. Do
+not run that copy at the same time as a copy in `~/Applications`; both use the
+same bundle identifier, preferences, cache, and login-item registration.
+
+Because this technical-user DMG is unsigned and unnotarized, macOS may block
+opening it or the first App launch. If you trust the exact verified release,
+follow Apple's official
+[Privacy & Security → Open Anyway](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/26/mac/26)
+flow. Do not remove quarantine attributes or disable Gatekeeper.
+
 ## Install from source
 
 Choose exactly one clone command for a tag that is already published. Until the
-annotated `v0.1.9` tag appears, use the current stable `v0.1.8` source:
-
-```bash
-git clone --branch v0.1.8 --depth 1 https://github.com/DEFY-AN94/codex94.git
-```
-
-After the annotated `v0.1.9` tag is published, use:
+annotated `v0.2.0` tag appears, use the current stable `v0.1.9` source:
 
 ```bash
 git clone --branch v0.1.9 --depth 1 https://github.com/DEFY-AN94/codex94.git
+```
+
+After the annotated `v0.2.0` tag is published, use:
+
+```bash
+git clone --branch v0.2.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
@@ -109,8 +154,9 @@ it:
 ```
 
 On first launch, choose whether Codex94 may request **Quota + account** or
-**Quota only**. Launch at login can be enabled only after the app is installed
-at the stable path above.
+**Quota only**. Launch at login accepts exactly the stable
+`/Applications/Codex94.app` and `~/Applications/Codex94.app` locations. The
+source installer does not migrate or remove a DMG-installed copy.
 
 ## Main behavior
 
@@ -191,7 +237,7 @@ at the stable path above.
   Homebrew, `/usr/local/bin`, `~/.local/bin`, then absolute `PATH` entries.
 - Offers Dashboard window presets at 900x600, 1280x720, 1440x810, and 1920x1080
   logical points, with proportional fitting to the current display.
-- Dashboard → About shows this tree's exact value `0.1.9 (10)`. A
+- Dashboard → About shows this tree's exact value `0.2.0 (11)`. A
   user-triggered copy action preserves that string, and the project link targets
   `https://github.com/DEFY-AN94/codex94`. It adds no updater or network client.
 - Supports system, Terminal Dark, and Terminal Light themes plus English and
@@ -235,6 +281,12 @@ are session-only; Dashboard frame autosave is unchanged.
 Codex94 has no analytics, advertising,
 telemetry upload, crash-reporting SDK, update checker, or project-operated
 server.
+
+Version 0.2.0 adds distribution packaging and the second stable installation
+path only. The DMG, checksum, and CI artifact contain the App, not account data,
+credentials, preferences, cache, logs, or real quota. Browser download and
+Gatekeeper quarantine handling are macOS distribution behavior; they do not add
+a Codex94 network client, data collection, entitlement, or permission.
 
 App Sandbox is intentionally disabled because the Codex child process must
 access its own login state. Hardened Runtime remains enabled; subprocess
@@ -280,14 +332,14 @@ Keep test preferences and cache separate from daily app data; see
 Run the unit and fake app-server integration tests:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer \
   xcodebuild -project Codex94.xcodeproj -scheme Codex94 \
   -destination 'platform=macOS' -derivedDataPath .build/DerivedData \
   CODE_SIGNING_ALLOWED=NO test
 ```
 
-Run the complete release gate, including hosted tests, a Release build, and
-security/signature checks:
+Run the complete release gate, including hosted tests, one Universal Release
+build, all-architecture signature checks, and DMG create/verify:
 
 ```bash
 ./script/release_check.sh
@@ -295,12 +347,13 @@ security/signature checks:
 
 Version 0.1.8 passed the full GitHub test/release job, synthetic Display and
 click-functional Recovery UI jobs, and Actions/Swift CodeQL. For `0.1.9 (10)`,
-PR #11 is the authoritative record for exact-head test, Display/Recovery UI,
+PR #11 remains the historical record for exact-head test, Display/Recovery UI,
 Actions/Python/Swift CodeQL, and final App acceptance. The synthetic Overview
 capture embedded above has been reviewed for layout and privacy. Keyboard
 activation, AXPress, and hosted tooltip exposure are not claimed as passed.
-Candidate-review facts are not source-release evidence; `0.1.9` remains
-unreleased until final `main` is verified and the annotated tag is published.
+The `0.2.0` candidate does not become release evidence until its exact PR merge
+SHA/tree, final `main` artifact and attestation, annotated tag, and public assets
+have passed their separate gates.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See
@@ -309,11 +362,19 @@ for contribution and release workflows.
 
 ## Uninstall
 
-First disable **Launch at login** in Dashboard and quit Codex94. Then remove the
-installed app, local cache, and preferences:
+First disable **Launch at login** in Dashboard and quit every Codex94 copy.
+Remove only the App locations that you actually installed; neither installer
+automatically removes the other copy:
 
 ```bash
+rm -rf "/Applications/Codex94.app"
 rm -rf "$HOME/Applications/Codex94.app"
+```
+
+Removing the App does not remove its local data. To remove that too, separately
+delete the cache and preferences:
+
+```bash
 rm -rf "$HOME/Library/Application Support/Codex94"
 defaults delete com.defyan94.codex94
 ```

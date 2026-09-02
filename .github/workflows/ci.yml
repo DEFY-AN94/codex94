@@ -26,11 +26,54 @@ jobs:
       - name: Select Xcode 16.4
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
+      - name: Verify Xcode 16.4 selection
+        run: |
+          test "$(xcode-select -p)" = "/Applications/Xcode_16.4.app/Contents/Developer"
+          test "$(xcodebuild -version | sed -n '1p')" = "Xcode 16.4"
+
+      - name: Record tested source identity
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          tested_sha="$(git rev-parse HEAD)"
+          tested_tree="$(git rev-parse 'HEAD^{tree}')"
+          test "$tested_sha" = "$GITHUB_SHA"
+          {
+            echo "Tested commit SHA: $tested_sha"
+            echo "Tested tree: $tested_tree"
+            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+              test -n "$PR_HEAD_SHA"
+              echo "PR head SHA: $PR_HEAD_SHA"
+              echo "Tested merge SHA: $tested_sha"
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Install release tools
         run: brew install ripgrep jq
 
       - name: Release gate
         run: ./script/release_check.sh
+
+      - name: Verify candidate artifact allowlist
+        run: |
+          distribution="$GITHUB_WORKSPACE/.build/Distribution/0.2.0"
+          dmg="$distribution/Codex94-0.2.0-macos-universal-unnotarized.dmg"
+          checksum="$distribution/Codex94-0.2.0-SHA256SUMS.txt"
+          test -d "$distribution"
+          test -f "$dmg" && test ! -L "$dmg"
+          test -f "$checksum" && test ! -L "$checksum"
+          test "$(LC_ALL=C /bin/ls -A1 "$distribution" | /usr/bin/wc -l | /usr/bin/tr -d ' ')" = "2"
+
+      - name: Upload DMG candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codex94-dmg-${{ github.sha }}
+          path: |
+            .build/Distribution/0.2.0/Codex94-0.2.0-macos-universal-unnotarized.dmg
+            .build/Distribution/0.2.0/Codex94-0.2.0-SHA256SUMS.txt
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 7
 
   ui-test:
     name: UI smoke (${{ matrix.scenario }})
@@ -55,6 +98,11 @@ jobs:
 
       - name: Select Xcode 16.4
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+
+      - name: Verify Xcode 16.4 selection
+        run: |
+          test "$(xcode-select -p)" = "/Applications/Xcode_16.4.app/Contents/Developer"
+          test "$(xcodebuild -version | sed -n '1p')" = "Xcode 16.4"
 
       - name: Prepare synthetic UI fixtures
         id: fixtures
@@ -108,3 +156,49 @@ jobs:
           if-no-files-found: error
           include-hidden-files: false
           retention-days: 7
+
+  attest-dmg:
+    name: Attest DMG
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: macos-15
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download tested DMG candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: codex94-dmg-${{ github.sha }}
+          path: .build/AttestationInput/0.2.0
+
+      - name: Verify downloaded candidate
+        run: |
+          input="$GITHUB_WORKSPACE/.build/AttestationInput/0.2.0"
+          dmg="$input/Codex94-0.2.0-macos-universal-unnotarized.dmg"
+          checksum="$input/Codex94-0.2.0-SHA256SUMS.txt"
+          test -d "$input"
+          test -f "$dmg" && test ! -L "$dmg"
+          test -f "$checksum" && test ! -L "$checksum"
+          test "$(LC_ALL=C /bin/ls -A1 "$input" | /usr/bin/wc -l | /usr/bin/tr -d ' ')" = "2"
+          ./script/package_dmg.sh verify "$dmg" "$checksum" 0.2.0 11
+
+      - name: Attest DMG provenance
+        id: attest-dmg
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: .build/AttestationInput/0.2.0/Codex94-0.2.0-macos-universal-unnotarized.dmg
+
+      - name: Record attestation URL
+        env:
+          ATTESTATION_URL: ${{ steps.attest-dmg.outputs.attestation-url }}
+        run: |
+          test -n "$ATTESTATION_URL"
+          echo "Attestation URL: $ATTESTATION_URL" | tee -a "$GITHUB_STEP_SUMMARY"

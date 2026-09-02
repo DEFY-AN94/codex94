@@ -12,7 +12,7 @@ CLI 风格的额度面板。App 不显示 Dock 图标，新建 Dashboard 窗口�
 Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可执行文件，
 并且没有第三方运行时依赖。
 
-**本项目通过 Codex 辅助的 vibe coding 工作流构建。** 每个源码版本在创建标签前
+**本项目通过 Codex 辅助的 vibe coding 工作流构建。** 每个版本在创建标签前
 仍会由维护者检查，并通过测试与安全扫描。
 
 > Codex94 与 OpenAI 没有隶属关系，也未获得 OpenAI 的认可、背书或赞助。Codex
@@ -43,42 +43,85 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 ## 当前分发状态
 
-- 当前源码树版本为 `0.1.9 (10)`。在 annotated `v0.1.9` 标签发布前，最新稳定
-  源码标签是 `v0.1.8`；标签发布后，`v0.1.9` 才成为稳定源码标签。
-- `0.1.9` 只有在标签发布后才是源码发布；在此发布门之前，`main` 与功能分支可能
-  包含未发布准备内容。
+- 当前源码树版本为 `0.2.0 (11)`。在经过独立复核的最终 `main` 发布 annotated
+  `v0.2.0` 前，它仍是发布候选，最新已发布的稳定源码标签仍是 annotated
+  `v0.1.9`；发布后，`v0.2.0` 成为稳定标签。
+- `v0.2.0` 发布后提供双轨分发：面向理解其信任边界的技术用户的 Universal 2
+  DMG，以及来自同一个 annotated 标签的源码安装。
 - 仓库已公开，任何人都可以在无需 GitHub 认证的情况下 clone 源码。
-- 当前没有 GitHub Release、DMG、经过公证的二进制或自动更新功能。
+- 本项目没有自动更新功能；只有分别完成各发布授权门后，`v0.2.0` GitHub Release
+  及其 DMG 才会公开。
 - `script/install.sh` 会构建本地 Release App，应用 ad-hoc Hardened
   Runtime 签名，并安装到 `~/Applications/Codex94.app`。
 - 再次运行安装脚本会原位覆盖这一个 App，不会为每个版本保留单独副本。
 
-请勿把本地 ad-hoc 签名构建描述成可公开分发的已公证下载版本。
+可下载的 DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
+attestation 都不会改变这一 Apple 信任状态。
 
 ## 系统要求
 
 - macOS 14 或更高版本。
-- 完整版 Xcode 16.4 或更高版本；仅有 Command Line Tools 不够。
-- 安装脚本的静态安全检查需要 `ripgrep`（`rg`）。
 - 一个兼容的 Codex 可执行文件，以及用于读取实时额度的当前 Codex 登录状态。
+
+使用 DMG 安装不需要 Xcode。源码安装还需要完整版 Xcode 16.4 或更高版本
+（仅有 Command Line Tools 不够），以及安装脚本静态安全检查使用的
+`ripgrep`（`rg`）。
 
 Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内置版本兼容，
 就不需要额外安装独立 Codex CLI。它也可以检测 Homebrew 与常见 CLI 路径，
 或使用用户手动选择的可执行文件。
 
-## 从源码安装
+## 安装 Universal DMG
 
-请只选择一个已经发布的标签进行 clone。在 annotated `v0.1.9` 标签出现前，使用
-当前稳定的 `v0.1.8` 源码：
+`v0.2.0` GitHub Release 发布后，请从
+[Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0)
+同时下载以下两个资产：
+
+- `Codex94-0.2.0-macos-universal-unnotarized.dmg`
+- `Codex94-0.2.0-SHA256SUMS.txt`
+
+DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
+打开前先验证 checksum：
 
 ```bash
-git clone --branch v0.1.8 --depth 1 https://github.com/DEFY-AN94/codex94.git
+shasum -a 256 -c Codex94-0.2.0-SHA256SUMS.txt
 ```
 
-annotated `v0.1.9` 标签发布后，改用：
+如果已安装 GitHub CLI，还可以核验该 DMG 来自本仓库指定的 GitHub workflow
+与 commit：
+
+```bash
+gh attestation verify Codex94-0.2.0-macos-universal-unnotarized.dmg \
+  -R DEFY-AN94/codex94
+```
+
+Attestation 只是构建来源证明，不是 Apple 签名、公证、恶意软件审查或 Gatekeeper
+放行证明。
+
+先退出所有正在运行的 Codex94，再打开 DMG，把 `Codex94.app` 拖到其中的
+`Applications` 快捷方式，安装位置是 `/Applications/Codex94.app`。不要同时运行
+这里的副本和 `~/Applications` 中的副本；两者共用同一个 bundle identifier、
+偏好、缓存与登录项注册。
+
+由于此技术用户 DMG 未签名且未公证，macOS 可能阻止打开 DMG 或首次启动 App。
+若你信任已经精确核验的该版本，请遵循 Apple 官方的
+[“隐私与安全性 → 仍要打开”](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/26/mac/26)
+流程。不要删除 quarantine 属性，也不要关闭 Gatekeeper。
+
+## 从源码安装
+
+请只选择一个已经发布的标签进行 clone。在 annotated `v0.2.0` 标签出现前，使用
+当前稳定的 `v0.1.9` 源码：
 
 ```bash
 git clone --branch v0.1.9 --depth 1 https://github.com/DEFY-AN94/codex94.git
+```
+
+annotated `v0.2.0` 标签发布后，改用：
+
+```bash
+git clone --branch v0.2.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
@@ -101,7 +144,9 @@ sudo xcodebuild -runFirstLaunch
 ```
 
 首次启动时，可以选择允许 Codex94 请求 **额度 + 账号信息** 或 **仅额度**。
-只有从上述稳定路径运行时，Dashboard 才允许启用登录时启动。
+登录时启动精确接受 `/Applications/Codex94.app` 与
+`~/Applications/Codex94.app` 两个稳定位置。源码安装脚本不会迁移或删除 DMG
+安装的副本。
 
 ## 主要行为
 
@@ -160,7 +205,7 @@ sudo xcodebuild -runFirstLaunch
   `/usr/local/bin`、`~/.local/bin`，最后是 `PATH` 中的绝对路径。
 - Dashboard 提供 900x600、1280x720、1440x810 和 1920x1080 逻辑点窗口预设；
   超出当前屏幕时会按比例适配。
-- Dashboard → 关于显示当前源码树的精确版本值 `0.1.9 (10)`，由用户触发的复制结果
+- Dashboard → 关于显示当前源码树的精确版本值 `0.2.0 (11)`，由用户触发的复制结果
   与之完全一致；
   项目链接指向 `https://github.com/DEFY-AN94/codex94`，不会增加更新器或网络客户端。
 - 支持跟随系统、Terminal Dark、Terminal Light 主题，以及 English 和简体中文。
@@ -196,6 +241,11 @@ post-reset 调度只使用现有重置时间戳，不新增缓存字段或持久
 运行中保存；窗口 frame autosave 行为保持不变。
 Codex94 没有分析、广告、遥测上传、崩溃上报 SDK、
 更新检查器或项目自营服务器。
+
+0.2.0 只增加分发打包和第二个稳定安装路径。DMG、checksum 与 CI artifact
+包含 App，不包含账号数据、凭证、偏好、缓存、日志或真实额度。浏览器下载与
+Gatekeeper quarantine 处理属于 macOS 分发流程，不会为 Codex94 增加网络客户端、
+数据收集、entitlement 或权限。
 
 App Sandbox 被有意关闭，因为 Codex 子进程需要访问它自己的登录状态。
 Hardened Runtime 仍然启用；子进程参数固定、环境变量最小化、输出有大小限制、
@@ -235,24 +285,26 @@ App。`install.sh` 会替换安装路径中的 App，并可能启动它。这些
 运行单元测试与 fake app-server 集成测试：
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer \
   xcodebuild -project Codex94.xcodeproj -scheme Codex94 \
   -destination 'platform=macOS' -derivedDataPath .build/DerivedData \
   CODE_SIGNING_ALLOWED=NO test
 ```
 
-运行完整发布检查，包括 hosted tests、Release 构建和安全/签名检查：
+运行完整发布检查，包括 hosted tests、一次 Universal Release 构建、全架构签名
+检查和 DMG create/verify：
 
 ```bash
 ./script/release_check.sh
 ```
 
 版本 0.1.8 已通过完整 GitHub 测试/发布任务、合成 Display 与点击功能 Recovery UI
-任务，以及 Actions/Swift CodeQL。对于 `0.1.9 (10)`，PR #11 是精确 head 测试、
-Display/Recovery UI、Actions/Python/Swift CodeQL 与最终 App 人工验收状态的权威
+任务，以及 Actions/Swift CodeQL。对于 `0.1.9 (10)`，PR #11 仍是精确 head 测试、
+Display/Recovery UI、Actions/Python/Swift CodeQL 与最终 App 人工验收状态的历史
 记录；上方嵌入的合成总览截图已经完成布局与隐私审查。键盘激活、AXPress 与托管
-运行器 tooltip 暴露仍不声明为已通过。候选审查事实并非源码发布证据；只有最终
-`main` 通过复核并发布 annotated tag 后，`0.1.9` 才成为正式源码版本。
+运行器 tooltip 暴露仍不声明为已通过。`0.2.0` 候选只有在 exact PR merge
+SHA/tree、最终 `main` artifact 与 attestation、annotated tag 和公开资产分别通过
+各自发布门后，才成为发布证据。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。贡献与发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 和
@@ -260,11 +312,17 @@ Dashboard 窗口生命周期。贡献与发布流程见 [CONTRIBUTING.md](CONTRI
 
 ## 卸载
 
-先在 Dashboard 中关闭 **登录时启动**，然后退出 Codex94。再删除已安装 App、
-本地缓存和偏好设置：
+先在 Dashboard 中关闭 **登录时启动**，然后退出所有 Codex94 副本。只删除你实际
+安装过的位置；两种安装方式都不会自动删除另一个副本：
 
 ```bash
+rm -rf "/Applications/Codex94.app"
 rm -rf "$HOME/Applications/Codex94.app"
+```
+
+删除 App 不会删除本地数据。如需同时移除本地缓存与偏好，请再单独执行：
+
+```bash
 rm -rf "$HOME/Library/Application Support/Codex94"
 defaults delete com.defyan94.codex94
 ```
