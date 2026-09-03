@@ -70,6 +70,29 @@ section; they do not execute a login or introduce a separate retry request. The
 post-reset task is a new trigger for the existing quota refresh path: each
 consumed target gets at most one attempt and no Reset-specific immediate retry.
 
+## Distribution and CI artifacts
+
+Version `0.2.0` adds packaging and stable-path compatibility, not a new runtime
+data flow. The Universal DMG contains only `Codex94.app` and an
+`Applications -> /Applications` shortcut. The published checksum identifies the
+DMG; GitHub artifact attestation records repository/workflow/commit provenance.
+Neither file contains or grants access to Codex login state.
+
+DMG staging, short-lived CI candidates, and the two-file Release upload
+allowlist exclude source checkout metadata, credentials, account identity, real
+quota, preferences, cache, Application Support, logs, test screenshots,
+diagnostics, and private filesystem paths. Automated tests and retained UI
+artifacts continue to use isolated synthetic data.
+
+Downloading a Release in a browser and macOS recording quarantine or presenting
+Gatekeeper/Privacy & Security UI are operating-system distribution behaviors.
+Codex94 does not read browser data, change quarantine, automate Open Anyway, or
+gain a browser, network, analytics, update, or telemetry interface from the DMG
+workflow. Installing at `/Applications/Codex94.app` or
+`~/Applications/Codex94.app` does not duplicate the cache schema: both locations
+use the same bundle identifier and local data, which is why users should not run
+both copies at once.
+
 Unified Logging receives only operation stage, duration, byte count, executable
 source category, and normalized error category. Raw RPC payloads, email,
 credentials, full executable paths, Reset timestamps, quota-bucket identifiers,
@@ -90,9 +113,10 @@ is no updater or project-operated network client.
 
 Codex94 does not request browser, Documents, Keychain, Accessibility, contacts,
 camera, microphone, or location access. A standard file picker appears only when
-the user explicitly chooses a Codex executable. Version `0.1.9` does not add a
-system permission or entitlement.
+the user explicitly chooses a Codex executable. Version `0.1.9` added no system
+permission or entitlement, and version `0.2.0` likewise adds none.
 
 See [SECURITY.md](SECURITY.md) for the executable trust boundary and security
-reporting process. The uninstall commands in [README.md](README.md) remove the
-app's stored data and preferences.
+reporting process. Removing either App copy does not automatically remove local
+data; the separate uninstall commands in [README.md](README.md) let users remove
+the installed locations, cache, and preferences they choose.

@@ -9,11 +9,41 @@ final class LaunchAtLoginController: ObservableObject {
     @Published private(set) var lastIssue: String?
 
     var isStableInstall: Bool {
-        let expected = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Applications/Codex94.app")
+        Self.isStableInstall(
+            bundleURL: Bundle.main.bundleURL,
+            homeDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
+            systemApplicationsDirectoryURL: URL(
+                fileURLWithPath: "/Applications",
+                isDirectory: true
+            )
+        )
+    }
+
+    nonisolated static func isStableInstall(
+        bundleURL: URL,
+        homeDirectoryURL: URL,
+        systemApplicationsDirectoryURL: URL
+    ) -> Bool {
+        let resolvedBundleURL = bundleURL.standardizedFileURL.resolvingSymlinksInPath()
+        let homeApplicationsDirectoryURL = homeDirectoryURL
+            .appendingPathComponent("Applications", isDirectory: true)
             .standardizedFileURL
             .resolvingSymlinksInPath()
-        return Bundle.main.bundleURL.standardizedFileURL.resolvingSymlinksInPath() == expected
+        let resolvedSystemApplicationsDirectoryURL = systemApplicationsDirectoryURL
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let expectedBundleURLs = [
+            homeApplicationsDirectoryURL.appendingPathComponent(
+                "Codex94.app",
+                isDirectory: true
+            ),
+            resolvedSystemApplicationsDirectoryURL.appendingPathComponent(
+                "Codex94.app",
+                isDirectory: true
+            )
+        ]
+
+        return expectedBundleURLs.contains(resolvedBundleURL)
     }
 
     init() {
@@ -54,4 +84,3 @@ final class LaunchAtLoginController: ObservableObject {
         refresh()
     }
 }
-

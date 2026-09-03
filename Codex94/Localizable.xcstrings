@@ -783,8 +783,8 @@
     },
     "startup.installRequired" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Install Codex94 in ~/Applications first" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请先将 Codex94 安装到 ~/Applications" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Install Codex94 in /Applications or ~/Applications first" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请先将 Codex94 安装到 /Applications 或 ~/Applications" } }
       }
     },
     "startup.login" : {

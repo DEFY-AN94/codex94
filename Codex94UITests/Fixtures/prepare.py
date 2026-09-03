@@ -77,6 +77,7 @@ BUILD_INPUTS = (
     "Codex94Tests/DashboardWindowSizeTests.swift",
     "Codex94Tests/DiagnosticsRedactorTests.swift",
     "Codex94Tests/ExecutableLocatorTests.swift",
+    "Codex94Tests/LaunchAtLoginControllerTests.swift",
     "Codex94Tests/QuotaModelsTests.swift",
     "Codex94Tests/QuotaPopoverLayoutTests.swift",
     "Codex94Tests/RefreshPolicyTests.swift",

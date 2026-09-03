@@ -21,6 +21,30 @@ or publisher-identity guarantee. Users must trust the installed or manually
 selected Codex executable. Codex may make network requests using its existing
 login, but Codex94 never receives that credential.
 
+## Distribution trust boundary
+
+Version `0.2.0` adds a Universal 2 DMG for technical users alongside the
+existing source-install path. The outer DMG is completely unsigned, has no
+Apple Developer ID signature, and is not notarized or stapled. The App inside
+is ad-hoc signed with Hardened Runtime only; its two architecture slices are
+checked for integrity, runtime, no Team ID, and no entitlement keys. This does
+not establish publisher identity or Apple trust, and macOS may block the first
+launch.
+
+Verify `Codex94-0.2.0-SHA256SUMS.txt` before opening the DMG. The optional
+GitHub command
+`gh attestation verify Codex94-0.2.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
+can prove repository/workflow/commit provenance for the exact DMG. A matching
+checksum or attestation is not notarization, malware review, a security audit,
+or Gatekeeper approval. If the exact release is trusted, use only Apple's
+[Privacy & Security → Open Anyway](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/26/mac/26)
+flow. Do not disable Gatekeeper or remove quarantine attributes.
+
+Codex94 has no automatic updater. Published DMG/checksum assets follow a manual
+non-replacement policy. SHA-256, GitHub Release API digests, and attestation can
+detect drift, but GitHub Immutable Releases is not enabled and the platform
+does not prevent an authorized maintainer from replacing an asset.
+
 ## Stored data
 
 Cache v2 contains only quota-bucket identifiers and optional names, plan type,
@@ -51,24 +75,30 @@ redacted Diagnostics. These changes add no credential access, identity field,
 cache field, preference key, direct network interface, background helper,
 telemetry, entitlement, or system permission.
 
+Version `0.2.0` does not change that runtime boundary, cache schema, preference
+inventory, authentication access, direct-network behavior, entitlement set, or
+system permissions. DMG staging and CI upload allowlists contain the packaged
+App and release metadata only; they exclude credentials, identity, real quota,
+preferences, cache, logs, screenshots, and private filesystem paths.
+
 ## Supported versions
 
-This tree contains `0.1.9 (10)`. Before an annotated `v0.1.9` tag is published
-from the separately verified final `main`, `v0.1.8` remains the published stable
-source; after publication, `v0.1.9` becomes the supported stable source tag.
-Feature branches and `main` may contain unreleased development work before that
-gate.
+This tree contains `0.2.0 (11)`. Until annotated `v0.2.0` and its separately
+verified GitHub Release are published, it remains a candidate and annotated
+`v0.1.9` remains the supported stable source tag; after publication, `v0.2.0`
+becomes the supported release. Feature branches and `main` may contain
+unreleased development work before those gates.
 
 Version `0.1.8 (9)` passed the full GitHub test/release job, synthetic Display
 and click-functional Recovery UI jobs, Actions/Swift CodeQL, and separate
-synthetic A/B GUI smokes. For `0.1.9 (10)`, PR #11 is the authoritative record
+synthetic A/B GUI smokes. For `0.1.9 (10)`, PR #11 remains the historical record
 for exact-head test, Display/Recovery UI, Actions/Python/Swift CodeQL, and final
 App acceptance. The synthetic Overview image embedded in the README has been
 visually and privacy reviewed. Contributor validation guidance is documented in
 [CONTRIBUTING.md](CONTRIBUTING.md); static source checks alone are not runtime
-security or release evidence. Candidate facts do not become source-release
-evidence until final `main` and the annotated `v0.1.9` tag are separately
-verified.
+security or release evidence. The `0.2.0` candidate does not become release
+evidence until final `main`, its artifact/attestation, annotated tag, manual
+Gatekeeper acceptance, and public Release are separately verified.
 
 ## Reporting
 
