@@ -2,7 +2,7 @@
 
 All notable changes to Codex94 are documented here.
 
-## Unreleased
+## 0.2.0 - 2026-09-03
 
 ### Added
 
@@ -45,10 +45,6 @@ All notable changes to Codex94 are documented here.
   Release API digests, and attestation can detect drift, but Immutable Releases
   is not enabled and the platform does not prevent an authorized maintainer
   from replacing an asset.
-
-The `0.2.0` entry remains under **Unreleased** without a guessed date. Move it
-to a dated `0.2.0` heading only when the actual release date is known and before
-creating the annotated tag; preserve the historical entries below unchanged.
 
 ## 0.1.9 - 2026-08-30
 
