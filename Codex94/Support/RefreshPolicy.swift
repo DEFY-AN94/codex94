@@ -38,10 +38,11 @@ enum RefreshPolicy {
         }
     }
 
-    private static func quotaResetDates(
+    static func quotaResetDates(
         in snapshot: QuotaSnapshot?,
-        delay: TimeInterval
+        delay: TimeInterval = quotaResetDelay
     ) -> [Date] {
+        precondition(delay >= 0)
         guard let snapshot else { return [] }
         return Array(Set(snapshot.displayableBuckets.flatMap { bucket in
             bucket.windows.compactMap { window in

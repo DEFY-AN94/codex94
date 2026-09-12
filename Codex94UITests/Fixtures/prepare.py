@@ -19,9 +19,7 @@ import tempfile
 
 BUNDLE_ID = "com.defyan94.codex94"
 PREFIX = "codex94-ui-v1-"
-PROJECT_FILE = "Codex94.xcodeproj/project.pbxproj"
-SEMANTIC_VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)")
-POSITIVE_BUILD = re.compile(r"[1-9][0-9]*")
+METADATA_HELPER = "script/release_metadata.py"
 
 # Only these tracked build inputs may enter the disposable recovery source copy.
 # No repository metadata, documentation, scripts, local state or directory copy.
@@ -114,96 +112,36 @@ def git_output(repository, arguments, maximum_bytes):
     return result.stdout
 
 
-def object_body(project, object_id):
-    pattern = re.compile(
-        r"(?m)^\t\t" + re.escape(object_id) + r"(?:\s+/\*[^\n]*\*/)?\s*=\s*\{"
-    )
-    matches = list(pattern.finditer(project))
-    require(len(matches) == 1, "The committed Xcode object graph is ambiguous")
-    opening = project.find("{", matches[0].start(), matches[0].end())
-    depth = 0
-    for index in range(opening, len(project)):
-        if project[index] == "{":
-            depth += 1
-        elif project[index] == "}":
-            depth -= 1
-            if depth == 0:
-                return project[opening + 1:index]
-    raise RuntimeError("The committed Xcode object graph is incomplete")
-
-
-def unique_match(pattern, text, message):
-    matches = re.findall(pattern, text, flags=re.MULTILINE | re.DOTALL)
-    require(len(matches) == 1, message)
-    return matches[0]
-
-
 def committed_app_version(repository, source_revision):
+    """Load only the tested helper bytes, without changing isolated import paths."""
     head = git_output(repository, ["rev-parse", "HEAD"], 128).decode("ascii").strip()
     require(head == source_revision, "The checked-out HEAD must equal GITHUB_SHA")
-    payload = git_output(
-        repository, ["show", source_revision + ":" + PROJECT_FILE], 1_048_576
+    record = git_output(
+        repository, ["ls-tree", "-z", source_revision, "--", METADATA_HELPER], 1024
     )
-    project = payload.decode("utf-8")
-
-    target_ids = []
-    for match in re.finditer(r"(?m)^\t\t([A-Za-z0-9]+)\s+/\*\s*Codex94\s*\*/\s*=\s*\{", project):
-        body = object_body(project, match.group(1))
-        if (re.search(r"(?m)^\s*isa\s*=\s*PBXNativeTarget\s*;", body)
-                and re.search(r"(?m)^\s*name\s*=\s*Codex94\s*;", body)
-                and re.search(
-                    r'(?m)^\s*productType\s*=\s*"com\.apple\.product-type\.application"\s*;', body
-                )):
-            target_ids.append(match.group(1))
-    require(len(target_ids) == 1, "The committed project must contain one Codex94 App target")
-    target = object_body(project, target_ids[0])
-    configuration_list_id = unique_match(
-        r"^\s*buildConfigurationList\s*=\s*([A-Za-z0-9]+)\s+/\*[^\n]*\*/\s*;",
-        target, "The Codex94 App target must have one configuration list",
-    )
-    configuration_list = object_body(project, configuration_list_id)
-    require(re.search(r"(?m)^\s*isa\s*=\s*XCConfigurationList\s*;", configuration_list) is not None,
-            "The Codex94 App configuration list has the wrong type")
-    raw_configurations = unique_match(
-        r"\bbuildConfigurations\s*=\s*\(([^)]*)\)\s*;",
-        configuration_list, "The Codex94 App configuration list is ambiguous",
-    )
-    configurations = re.findall(
-        r"([A-Za-z0-9]+)\s+/\*\s*(Debug|Release)\s*\*/", raw_configurations
-    )
-    require(len(configurations) == 2 and {name for _, name in configurations} == {"Debug", "Release"},
-            "The Codex94 App target must have unique Debug and Release configurations")
-
-    values = {}
-    for configuration_id, expected_name in configurations:
-        configuration = object_body(project, configuration_id)
-        require(re.search(r"(?m)^\s*isa\s*=\s*XCBuildConfiguration\s*;", configuration) is not None,
-                "The Codex94 App build configuration has the wrong type")
-        actual_name = unique_match(
-            r"^\s*name\s*=\s*([^;\n]+)\s*;", configuration,
-            "The Codex94 App build configuration must have one name",
-        ).strip().strip('"')
-        require(actual_name == expected_name, "The Codex94 App configuration name changed")
-        settings = unique_match(
-            r"^\s*buildSettings\s*=\s*\{(.*?)^\s*\}\s*;",
-            configuration, "The Codex94 App build settings are ambiguous",
-        )
-        version = unique_match(
-            r"^\s*MARKETING_VERSION\s*=\s*([^;\n]+)\s*;", settings,
-            "The Codex94 App configuration must define one marketing version",
-        ).strip()
-        build = unique_match(
-            r"^\s*CURRENT_PROJECT_VERSION\s*=\s*([^;\n]+)\s*;", settings,
-            "The Codex94 App configuration must define one build number",
-        ).strip()
-        require(SEMANTIC_VERSION.fullmatch(version) is not None,
-                "The Codex94 App marketing version must be semantic")
-        require(POSITIVE_BUILD.fullmatch(build) is not None,
-                "The Codex94 App build number must be a positive integer")
-        values[expected_name] = (version, build)
-    require(values["Debug"] == values["Release"],
-            "Codex94 Debug and Release version/build must match")
-    return values["Debug"]
+    records = list(filter(None, record.split(b"\0")))
+    require(len(records) == 1, "The metadata helper must be uniquely tracked")
+    metadata, name = records[0].split(b"\t", 1)
+    mode, kind, digest = metadata.split(b" ")
+    require(mode == b"100644" and kind == b"blob" and name.decode("utf-8") == METADATA_HELPER,
+            "The metadata helper must be a regular tracked source file")
+    helper_path = repository / METADATA_HELPER
+    require(helper_path == helper_path.resolve(strict=True),
+            "The metadata helper must not traverse symbolic links")
+    descriptor = os.open(helper_path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(descriptor, "rb") as stream:
+        info = os.fstat(stream.fileno())
+        require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
+                and 0 < info.st_size <= 1_048_576, "Invalid bounded metadata helper")
+        payload = stream.read(1_048_577)
+    require(0 < len(payload) <= 1_048_576, "The metadata helper exceeded its size bound")
+    blob = b"blob " + str(len(payload)).encode("ascii") + b"\0" + payload
+    require(hashlib.sha1(blob).hexdigest() == digest.decode("ascii"),
+            "The metadata helper changed after checkout")
+    # Execute the bytes already checked, not a second file read or a sys.path import.
+    namespace = {"__name__": "codex94_release_metadata", "__file__": str(helper_path)}
+    exec(compile(payload, str(helper_path), "exec"), namespace)
+    return namespace["read_app_version"](repository, source_revision)
 
 
 def recovery_project(repository, root, source_revision, expected_version, expected_build):

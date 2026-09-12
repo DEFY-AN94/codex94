@@ -244,7 +244,7 @@ validate_entitlements_for_architecture() {
     entitlements_json="$(/usr/bin/plutil -convert json -o - "$ENTITLEMENTS_TEMP")" ||
       fail "$arch entitlement output could not be normalized."
     [[ "$entitlements_json" == "{}" ]] ||
-      fail "$arch contains one or more entitlements; v0.2.0 requires an empty entitlement dictionary."
+      fail "$arch contains one or more entitlements; Release requires an empty entitlement dictionary."
   fi
 
   /bin/rm -f "$ENTITLEMENTS_TEMP"

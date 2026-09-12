@@ -23,7 +23,7 @@ login, but Codex94 never receives that credential.
 
 ## Distribution trust boundary
 
-Version `0.2.0` adds a Universal 2 DMG for technical users alongside the
+Since version `0.2.0`, Codex94 offers a Universal 2 DMG for technical users alongside the
 existing source-install path. The outer DMG is completely unsigned, has no
 Apple Developer ID signature, and is not notarized or stapled. The App inside
 is ad-hoc signed with Hardened Runtime only; its two architecture slices are
@@ -81,13 +81,21 @@ system permissions. DMG staging and CI upload allowlists contain the packaged
 App and release metadata only; they exclude credentials, identity, real quota,
 preferences, cache, logs, screenshots, and private filesystem paths.
 
+The `0.2.1` candidate keeps these boundaries. Extreme numeric inputs are
+clamped before remaining-quota arithmetic, and a session-only watermark avoids
+repeating consumed Resets after clock rollback. A fresh successful snapshot
+may change an unavailable pinned quota selection to Auto using the existing
+preference; cached data and failed requests cannot trigger that change.
+Launch at Login tests use a fake service, not real registration. The source
+installer requires running copies to be quit, verifies a unique staged App,
+and retains recovery files when rollback cannot safely restore the old App.
+
 ## Supported versions
 
-This tree contains `0.2.0 (11)`. Until annotated `v0.2.0` and its separately
-verified GitHub Release are published, it remains a candidate and annotated
-`v0.1.9` remains the supported stable source tag; after publication, `v0.2.0`
-becomes the supported release. Feature branches and `main` may contain
-unreleased development work before those gates.
+The supported published stable version is [`v0.2.0 (11)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0).
+This tree contains the unreleased `0.2.1 (12)` candidate. Feature branches and
+`main` may contain development work that has not passed release acceptance.
+Update current stable-version links only after the new Release is public.
 
 Version `0.1.8 (9)` passed the full GitHub test/release job, synthetic Display
 and click-functional Recovery UI jobs, Actions/Swift CodeQL, and separate
@@ -96,9 +104,9 @@ for exact-head test, Display/Recovery UI, Actions/Python/Swift CodeQL, and final
 App acceptance. The synthetic Overview image embedded in the README has been
 visually and privacy reviewed. Contributor validation guidance is documented in
 [CONTRIBUTING.md](CONTRIBUTING.md); static source checks alone are not runtime
-security or release evidence. The `0.2.0` candidate does not become release
-evidence until final `main`, its artifact/attestation, annotated tag, manual
-Gatekeeper acceptance, and public Release are separately verified.
+security or release evidence. The `0.2.1` candidate needs its own checks,
+candidate App acceptance before Ready, and final CI artifact/tag/Release
+verification and maintainer acceptance before publication.
 
 ## Reporting
 

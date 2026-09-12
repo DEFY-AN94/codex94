@@ -13,11 +13,11 @@ Describe the focused change and why it is needed.
 - [ ] I kept `README.md` and `README.zh-CN.md` synchronized when applicable.
 - [ ] I documented any user-visible or security-boundary change.
 
-For a `0.2.0` source + DMG release candidate:
+For a source + DMG release candidate:
 
 - [ ] I opened this PR as Draft and recorded baseline `main`, the PR head SHA,
-  exact tested merge SHA/tree, `0.2.0 (11)`, risks, rollback, checks, and final
-  DMG/App acceptance as Pending.
+  exact tested merge SHA/tree, version/build, risks, rollback, checks, candidate
+  App acceptance, and final CI DMG/install acceptance separately as Pending.
 - [ ] I verified the candidate allowlist contains only the Universal,
   unnotarized DMG and its checksum, recorded the exact SHA, and classified the
   outer DMG as unsigned and the inner App as ad-hoc signed only.
@@ -25,9 +25,13 @@ For a `0.2.0` source + DMG release candidate:
   Apple signing, notarization, malware review, or Gatekeeper approval.
 - [ ] I reviewed the actual synthetic UI images for layout and privacy; I did not
   treat a nonempty artifact as visual evidence.
-- [ ] I kept release notes under Unreleased and stable install instructions on
-  the latest published tag until the actual release date is known. I will use a
-  reviewed docs-only Draft PR before tagging if the date or text changes.
+- [ ] I kept candidate notes under Unreleased until the maintainer confirmed
+  the release date. The date is reviewed before tagging and included in final
+  CI/DMG evidence. Stable links stay on the published tag until publication;
+  their later docs-only PR needs separate authorization and never moves a tag.
+- [ ] The maintainer explicitly accepted the candidate App from this PR head
+  before Ready. App source/resources/build-setting changes invalidate that
+  acceptance; final CI DMG installation still needs its later acceptance.
 - [ ] I documented both `/Applications/Codex94.app` and
   `~/Applications/Codex94.app`, the no-double-run/uninstall boundary, SHA and
   attestation checks, and Apple's official Open Anyway flow without suggesting
@@ -39,7 +43,7 @@ authorizes a later one):
 - [ ] 1. Commit, push, and create this Draft PR were explicitly authorized.
 - [ ] 2. Marking the reviewed Draft Ready was explicitly authorized.
 - [ ] 3. Merge was explicitly authorized.
-- [ ] 4. Creating and narrowly pushing annotated `v0.2.0` was explicitly
+- [ ] 4. Creating and narrowly pushing the annotated release tag was explicitly
   authorized.
 - [ ] 5. Creating the Draft Release and uploading exactly two assets was
   explicitly authorized.

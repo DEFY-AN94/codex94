@@ -1,56 +1,63 @@
 # Release workflow: source + technical-user DMG
 
-Codex94 `0.2.0 (11)` uses two release tracks from one verified final `main`
-commit and one annotated `v0.2.0` tag:
+The published stable version is `v0.2.0 (11)`; this tree is the unreleased
+`0.2.1 (12)` candidate. Keep public download and source-clone instructions on
+the published release until publication is confirmed.
 
-- source installation with `script/install.sh`; and
-- a Universal 2, explicitly unnotarized DMG for technical users.
+Each release uses one verified source commit, one annotated tag, and exactly
+two manual assets: a Universal 2 DMG and its one-line SHA-256 checksum. The outer
+DMG is unsigned and unnotarized. The inner App is ad-hoc signed with Hardened
+Runtime, no Team ID, and no entitlements. GitHub attestation proves provenance
+of the DMG; it is not Apple signing, notarization, malware review, or Gatekeeper
+approval. The checksum is the second asset, not a separately attested subject.
 
-The DMG itself is completely unsigned. It has no Apple Developer ID signature
-and is not notarized or stapled. The `Codex94.app` inside is ad-hoc signed with
-Hardened Runtime only. SHA-256 and GitHub artifact attestation provide integrity
-and workflow provenance; they do not provide Apple trust, malware review, or
-Gatekeeper approval.
+## 1. Authorization and acceptance
 
-## 1. Authorization gates
+Each gate needs separate explicit maintainer authorization:
 
-The release is deliberately fail-closed. Each item below requires a separate,
-explicit maintainer authorization; an earlier authorization never includes a
-later one:
+1. Commit, push the development branch, and create a Draft PR.
+2. Mark that Draft Ready, after the maintainer accepts the candidate App.
+3. Merge the reviewed PR.
+4. Create and narrowly push the annotated tag at the verified release commit.
+5. Create a Draft GitHub Release using that existing tag and upload two assets.
+6. Install/replace the final CI App and perform maintainer-led Open Anyway
+   acceptance where needed.
+7. Publish that Draft as the public Latest Release, not a prerelease.
 
-1. commit, push the release branch, and create a Draft pull request;
-2. mark the reviewed Draft pull request Ready;
-3. merge it;
-4. create and narrowly push annotated `v0.2.0`;
-5. create a Draft GitHub Release and upload exactly two assets;
-6. install/replace the App and let the maintainer complete current-account
-   Gatekeeper/Open Anyway acceptance; and
-7. publish the same Draft as the public Latest Release.
+An earlier authorization does not authorize a later gate. Candidate App
+acceptance before Ready and final CI DMG/install acceptance are separate.
+Launching an explicitly approved candidate does not authorize replacing an
+installed App or operating real Login Items/System Settings. Keep pending
+acceptance visible in the PR. Never mark Ready merely because CI is green.
 
-Before the corresponding gate, do not commit, push, create or update a pull
-request, merge, create/push a tag, create/upload a Release, install an App,
-operate Privacy & Security/Open Anyway/Login Items, publish, or modify repository
-settings.
+## 2. Local candidate and shared metadata
 
-## 2. Prepare and verify the candidate
+Start from a clean, freshly fetched baseline. Review changes since the published
+tag and any branch/tag/Release name conflicts. Preserve unknown worktree
+changes and existing tags; do not stash/reset/clean or force-push as preparation.
+Keep candidate changelog notes under Unreleased without inventing a date.
+Historical release entries and the existing synthetic screenshot provenance
+remain unchanged. Planning and Goal files stay outside the Git repository.
 
-Start from a clean, fetched repository and review every commit since the latest
-published tag. Confirm that the intended version is `0.2.0 (11)`, the target
-branch and tag do not conflict, and the previous annotated tags remain
-unchanged. Never stash, reset, clean, force-push, move a tag, or overwrite an
-unknown local change as release preparation.
+Read version/build from the App target using the shared standard-library
+helper. It requires one App target and matching explicit Debug/Release values:
 
-During implementation and the initial Draft PR:
+```bash
+metadata="$(/usr/bin/python3 -I script/release_metadata.py)"
+release_version="$(jq -er '.version' <<< "$metadata")"
+release_build="$(jq -er '.build' <<< "$metadata")"
+release_tag="v$release_version"
+dmg_name="Codex94-$release_version-macos-universal-unnotarized.dmg"
+checksum_name="Codex94-$release_version-SHA256SUMS.txt"
+distribution="$PWD/.build/Distribution/$release_version"
+```
 
-- keep the `0.2.0` changelog entry under **Unreleased**, without a guessed date;
-- keep `README.md` and `README.zh-CN.md` synchronized;
-- preserve the historical `0.1.9` facts and screenshot provenance;
-- keep real identity, quota, credentials, preferences, cache, private paths,
-  Finder/system-settings screenshots, and full-screen captures out of fixtures,
-  artifacts, and documentation; and
-- do not copy external planning or Goal files into Git or an artifact.
+Do not use shell `eval` or a second VERSION file. Local checks read worktree
+metadata; CI uses `--revision "$GITHUB_SHA"` and requires HEAD to equal that
+SHA. UI fixture preparation validates the helper's regular tracked blob before
+loading it, retaining Python `-I` and the explicit build-input allowlist.
 
-Install contributor tools if needed, then run the release gate:
+Run the gate with full Xcode and the existing contributor tools:
 
 ```bash
 brew install ripgrep jq
@@ -59,240 +66,214 @@ git diff --check
 git status --short
 ```
 
-`release_check.sh` owns the only Release build. It must produce one exact
-Universal 2 App and verify both `arm64` and `x86_64` slices, ad-hoc signing,
-Hardened Runtime, no Team ID, and no entitlement keys. `package_dmg.sh` only
-packages or verifies that App; it must not build, install, launch, stop a user
-App, or read user data.
+The gate runs isolated metadata/installer tests, the static security check,
+hosted XCTest, and one Universal Release build. The packager owns the complete
+App verifier and checks both the supplied App and its mounted DMG copy:
+metadata, exact arm64/x86_64 slices, signature integrity, runtime, empty
+entitlements, and absence of private builder paths. The gate compares built
+version/build to the project metadata before invoking packaging.
 
-The formal candidate directory is `.build/Distribution/0.2.0/` and contains
-exactly these two regular files:
-
-- `Codex94-0.2.0-macos-universal-unnotarized.dmg`
-- `Codex94-0.2.0-SHA256SUMS.txt`
-
-The checksum contains one lowercase SHA-256 line for the DMG. Verify it and the
-mounted App with the repository script:
+`package_dmg.sh` keeps its narrow `create APP OUTPUT_ROOT` and
+`verify DMG CHECKSUM VERSION BUILD` interfaces. It never builds, installs,
+launches/stops Apps, reads credentials, or changes quarantine. Output is exactly
+the DMG and checksum, with no screenshots or auxiliary manifest:
 
 ```bash
 ./script/package_dmg.sh verify \
-  .build/Distribution/0.2.0/Codex94-0.2.0-macos-universal-unnotarized.dmg \
-  .build/Distribution/0.2.0/Codex94-0.2.0-SHA256SUMS.txt \
-  0.2.0 11
+  "$distribution/$dmg_name" "$distribution/$checksum_name" \
+  "$release_version" "$release_build"
 ```
 
-Damaged-DMG/checksum tests use copies in an isolated run directory; they never
-modify the formal candidate. If a formal candidate becomes invalid after an
-App, script, resource, project-setting, or Info.plist change, record its SHA and
-the invalidation reason, then recoverably archive it under the approved
-`.build/DistributionArchive/<UTC YYYYMMDDTHHMMSSZ>-<12-char HEAD>/0.2.0/`
-layout before generating a new one. Stop if that exact archive destination
-already exists. Do not delete or overwrite it.
+Preserve the readonly UDZO mount, strict two-entry payload, literal
+`Applications -> /Applications` link, unsigned outer image, checksum grammar,
+no-overwrite lock, atomic output-directory publication, and exact mount cleanup.
+`spctl` rejection is expected for this distribution and is diagnostic only.
 
-## 3. Draft PR, Ready, and merge
+Tests use synthetic data and disposable directories. The source installer
+requires running Codex94 copies to be quit and uses lock/staging/signature
+checks plus rollback; two renames are not crash-atomic. Never run its production
+entry point as an automated test or delete an unrecognized transaction, backup,
+or lock. Do not wait for real Reset/sleep, alter system time, use real quota, or
+repeat extensive manual UI checks for this patch.
 
-Only after gate 1 authorization, commit the reviewed local implementation,
-explicitly push the release branch, and create a **Draft** pull request. Record:
+If implementation changes invalidate a local candidate, record its hash and
+archive it recoverably under the approved
+`.build/DistributionArchive/<UTC timestamp>-<12-character HEAD>/<version>/`
+layout before rebuilding. Do not overwrite a destination or damage the formal
+candidate during negative tests.
 
-- baseline `main`, PR head SHA, exact tested merge SHA, and tested tree;
-- `0.2.0 (11)`, scope, risk, rollback, and privacy/signing boundaries;
-- the candidate artifact name and SHA;
-- test, Display/Recovery UI, CodeQL, artifact, and attestation states; and
-- final DMG/install acceptance as **Pending**.
+## 3. Draft PR, candidate App, and merge
 
-GitHub pull requests test the default merge ref. `${{ github.sha }}` and the
-candidate artifact name therefore identify the exact tested merge SHA, not the
-PR head. Record both values, and invalidate old evidence whenever the PR head or
-merge ref changes.
+After gate 1, record baseline main, PR head, the tested merge SHA/tree,
+version/build, checks, risks, rollback, artifact hashes, and both acceptance
+states. GitHub's default PR artifact identifies the tested merge SHA, not the
+PR head; record them separately.
 
-Wait for the platform-required checks and the additional fail-closed release
-checks. UI smoke and CodeQL remain mandatory human release gates even if the
-repository ruleset does not mark them required. Pending, skipped, cancelled,
-environment-limited, or failed is not passed. Inspect the actual synthetic UI
-images; a nonempty file is not visual proof.
+Wait for CI, both synthetic UI smokes, and CodeQL on the actual tested revision.
+Skipped, cancelled, unavailable, pending, or failed is not passed. Review the
+synthetic images themselves for UI and privacy. Retain the existing screenshots
+as historical captures unless separately replacing them with reviewed evidence.
 
-Gate 2 authorizes Ready only. Gate 3 separately authorizes merge. After merge,
-fetch the exact remote `main`, record its commit and tree, and wait for all
-final-main checks. If a release-facing document, version, or date is wrong, use
-a small docs-only Draft PR through the same Draft/Ready/merge gates. Do not tag
-first and repair the tagged tree later.
+Prepare the candidate App from the exact PR head and give its version/build,
+commit and hash to the maintainer for a brief acceptance of changed behavior.
+Any App source/resource/project-setting/Info.plist change invalidates this
+acceptance. Pure documentation edits need relevant checks and CI, not repeated
+App interaction. Only then may gate 2 mark Ready. Gate 3 separately permits
+merge.
 
-## 4. Final-main artifact, attestation, and tag
+Before tagging, the maintainer confirms the actual release date. Replace the
+candidate's Unreleased heading through a reviewed change and the normal
+Draft/Ready/merge gates; do not permanently tag an Unreleased changelog. If
+the release day changes before tagging, correct the date and repeat the checks
+on the revised commit. Public stable links still point to the published version.
 
-The final `main` test run must generate the DMG/checksum and the main-only
-attestation job must succeed. Download that exact artifact, run the standalone
-verify command, and record its workflow run, final-main commit, DMG SHA, checksum
-file SHA, and attestation URL. The public Release must use these exact CI bytes;
-do not rebuild a local substitute. If the seven-day artifact expires, rerun the
-controlled workflow only on the same exact final-main commit and reverify it.
+After the date change is merged, fetch and freeze the release commit as
+`RELEASE_SHA`.
+Wait for all checks on that commit, its two-file DMG artifact, and main-only
+attestation. Resolve release-blocking source/docs defects through the normal
+Draft/Ready/merge flow before tagging; do not repair a tagged binary in place.
 
-Verify provenance with:
+## 4. Final CI bytes, tag, and Draft Release
+
+Download the artifact named `codex94-dmg-<RELEASE_SHA>` from its verified
+final-main workflow run after the date change into a new review directory.
+Record the run ID,
+release SHA/tree, both file hashes, and attestation URL. Reverify those exact
+files with `package_dmg.sh verify`. Public assets must use these CI bytes,
+not a locally rebuilt substitute. If the seven-day artifact expires, rerun the
+workflow on the same release commit, reverify the new bytes and obtain fresh
+asset acceptance.
+
+From a checkout at the frozen release commit, re-read committed metadata:
 
 ```bash
-gh attestation verify Codex94-0.2.0-macos-universal-unnotarized.dmg \
-  -R DEFY-AN94/codex94
+test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+metadata="$(/usr/bin/python3 -I script/release_metadata.py --revision "$RELEASE_SHA")"
+release_version="$(jq -er '.version' <<< "$metadata")"
+release_build="$(jq -er '.build' <<< "$metadata")"
+release_tag="v$release_version"
 ```
 
-Only after gate 4 authorization, create one annotated tag on the verified final
-`main`; the message is exactly `Codex94 v0.2.0`:
+Set `dmg_path`, `checksum_path`, and `release_body_file` to the exact reviewed
+local files. The body is local review material, not a third release asset.
+Verify provenance and, only after gate 4, publish the tag:
 
 ```bash
-TAG=v0.2.0
-MAIN_SHA="$(git rev-parse origin/main)"
-
-test -z "$(git tag --list "$TAG")"
-test -z "$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")"
-git tag -a "$TAG" "$MAIN_SHA" -m "Codex94 v0.2.0"
-test "$(git cat-file -t "$TAG")" = tag
-test "$(git rev-parse "${TAG}^{}")" = "$MAIN_SHA"
-git push origin "refs/tags/$TAG:refs/tags/$TAG"
+gh attestation verify "$dmg_path" -R DEFY-AN94/codex94
+test "$(git rev-parse origin/main)" = "$RELEASE_SHA"
+test -z "$(git tag --list "$release_tag")"
+test -z "$(git ls-remote --tags origin "refs/tags/$release_tag" "refs/tags/$release_tag^{}")"
+git tag -a "$release_tag" "$RELEASE_SHA" -m "Codex94 $release_tag"
+test "$(git cat-file -t "$release_tag")" = tag
+test "$(git rev-parse "${release_tag}^{}")" = "$RELEASE_SHA"
+git push origin "refs/tags/$release_tag:refs/tags/$release_tag"
 ```
 
-Never use `git push --tags`. Re-read the remote tag object and peeled commit,
-then shallow-clone `v0.2.0` and prove its `HEAD`, version, and build match final
-`main`. Never move, delete, or recreate an existing release tag.
-
-## 5. Draft GitHub Release
-
-Gate 5 authorizes one Draft Release using the already verified tag and exact
-final-main CI files. It does not authorize Publish. Prepare a release body from
-the template below and create the Draft with all state flags explicit:
+Recheck the remote tag object and peeled commit, and a shallow clone's commit
+and version/build. Never move an existing tag or use `git push --tags`.
+Verify the Release name is unused. After gate 5:
 
 ```bash
-gh release create v0.2.0 \
-  Codex94-0.2.0-macos-universal-unnotarized.dmg \
-  Codex94-0.2.0-SHA256SUMS.txt \
-  --title "Codex94 v0.2.0" \
-  --notes-file RELEASE_BODY.md \
+gh release create "$release_tag" "$dmg_path" "$checksum_path" \
+  --title "Codex94 $release_tag" --notes-file "$release_body_file" \
   --draft --verify-tag --latest=false --prerelease=false
 ```
 
-Do not use `--clobber`. The Draft has exactly the two manual assets above;
-GitHub's automatic source ZIP/TAR files are not listed in `SHA256SUMS` and are
-not claimed to be byte-reproducible.
+Do not use `--clobber`. Download both Draft assets again, verify the DMG,
+checksum and provenance, and compare each asset's GitHub API
+`sha256:<64 lowercase hexadecimal characters>` digest with its local hash.
+Missing or mismatched digests stop publication. GitHub's automatic source
+ZIP/TAR files are additional source downloads, not manual assets and not
+covered by the DMG checksum.
 
-After upload, query each manual asset through the GitHub Release Assets API.
-Its digest must be present and exactly `sha256:<64 lowercase hexadecimal
-characters>`. Missing, empty, unknown-algorithm, or mismatched digest values
-fail closed. Download both Draft assets again, run `package_dmg.sh verify`,
-compare both local hashes/API digests, and rerun `gh attestation verify`.
+## 5. Release notes and final asset acceptance
 
-## 6. Release body template
-
-Replace `ACTUAL_RELEASE_DATE` only after the real release date is known, and
-replace `FINAL_DMG_SHA256` only with the lowercase SHA-256 of the exact verified
-final-main CI DMG. If the date changes before tagging, correct the changelog and
-this release-facing text through a reviewed docs-only Draft PR before creating
-the tag. Never guess a date or tag first and amend the tagged tree later.
+Use a concise bilingual body with actual version/build, verified DMG SHA,
+release changes, installation instructions, and this safety notice. Replace
+all placeholders before upload. Use the actual release date confirmed and
+reviewed before tagging; do not invent a date during candidate implementation.
 
 ```markdown
-# Codex94 v0.2.0
+# Codex94 VERSION (BUILD)
 
-Release date / 发布日期: ACTUAL_RELEASE_DATE
+Release date / 发布日期: CONFIRMED_RELEASE_DATE
 
-Codex94 0.2.0 (11) adds a Universal 2 technical-user DMG while retaining
-source installation from the annotated v0.2.0 tag. Launch at Login now accepts
-both /Applications/Codex94.app and ~/Applications/Codex94.app.
+Stability fixes: login-start status, quota/Reset edge cases, unavailable
+selection fallback, small UI corrections, and source-install recovery.
+稳定性修补：登录启动状态、额度与 Reset 边界、失效选项回退、小型界面修正及源码安装恢复。
 
-Codex94 0.2.0 (11) 新增面向技术用户的 Universal 2 DMG，同时保留从 annotated
-v0.2.0 标签进行源码安装。登录时启动现在同时接受 /Applications/Codex94.app 与
-~/Applications/Codex94.app。
-
-## Assets / 资产
-
-- Codex94-0.2.0-macos-universal-unnotarized.dmg
-- Codex94-0.2.0-SHA256SUMS.txt
+Assets / 资产:
+- Codex94-VERSION-macos-universal-unnotarized.dmg
+- Codex94-VERSION-SHA256SUMS.txt
 - macOS 14+, Apple Silicon arm64 + Intel x86_64
+- DMG SHA-256: VERIFIED_DMG_SHA256
 
-## Security notice / 安全提示
+The DMG is unsigned and unnotarized. The App inside is ad-hoc signed with
+Hardened Runtime only; macOS may block its first launch. GitHub attestation
+proves provenance, not Apple trust or a malware/security review.
+DMG 未签名且未公证；内部 App 只有 Hardened Runtime ad-hoc 签名，macOS 可能
+阻止首次启动。GitHub attestation 证明构建来源，不代表 Apple 信任或安全审查。
 
-This DMG itself is completely unsigned, has no Apple Developer ID signature,
-and has not been notarized or stapled by Apple. The Codex94.app inside is
-ad-hoc signed with Hardened Runtime only. macOS may block the first launch.
+Verify both downloaded assets before opening:
+请先同时下载 DMG 和 checksum，再验证：
+    shasum -a 256 -c Codex94-VERSION-SHA256SUMS.txt
+    gh attestation verify Codex94-VERSION-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 
-此 DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple 公证
-或 stapling。其中的 Codex94.app 只有带 Hardened Runtime 的 ad-hoc 签名；macOS
-可能阻止首次启动。
-
-Verify the published SHA-256 first. You may also verify GitHub workflow/commit
-provenance with:
-
-    DMG SHA-256: FINAL_DMG_SHA256
-    shasum -a 256 -c Codex94-0.2.0-SHA256SUMS.txt
-    gh attestation verify Codex94-0.2.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
-
-Attestation is not Apple signing, notarization, a security audit, or Gatekeeper
-approval. If you trust the exact verified release, drag Codex94.app to
-Applications and use Apple's official
+Quit every Codex94 copy, drag Codex94.app onto Applications, and open that
+installed copy. If blocked and you trust the verified release, follow Apple's
 [Privacy & Security → Open Anyway](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/26/mac/26)
-flow if macOS blocks it. Do not disable Gatekeeper or remove quarantine
-attributes.
+flow. Do not remove quarantine or disable Gatekeeper.
+退出所有 Codex94 副本，把 Codex94.app 拖入 Applications，再打开安装后的副本。
+如被阻止且你信任已验证版本，请使用上面的 Apple 官方“仍要打开”流程，
+不要删除 quarantine 或关闭 Gatekeeper。
 
-请先验证发布的 SHA-256；也可以使用上面的命令核验 GitHub workflow/commit 来源。
-Attestation 不是 Apple 签名、公证、安全审计或 Gatekeeper 放行。若你信任已精确
-核验的版本，请把 Codex94.app 拖到 Applications；如被 macOS 阻止，只使用 Apple
-官方[“隐私与安全性 → 仍要打开”](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/26/mac/26)
-流程。不要关闭 Gatekeeper，也不要删除 quarantine。
-
-Source installation remains available from annotated v0.2.0 through
-script/install.sh. Quit the old App before installing, do not run copies from
-both Applications locations at once, and note that Codex94 has no automatic
-updater. This DMG is intended for technical users who accept these limitations.
-
-源码安装仍可从 annotated v0.2.0 标签通过 script/install.sh 完成。安装前请退出旧
-App，不要同时运行两个 Applications 位置的副本。Codex94 没有自动更新功能；此 DMG
-面向理解并接受上述边界的技术用户。
+Source installation remains available from annotated vVERSION. Do not run
+copies from /Applications and ~/Applications together; they share local data.
+Codex94 has no automatic updater.
+仍可从 annotated vVERSION 源码安装。不要同时运行两个 Applications 位置的副本，
+它们共用本地数据；Codex94 没有自动更新功能。
 ```
 
-## 7. Current-account Gatekeeper acceptance
+Gate 6 permits final-asset installation/replacement separately from candidate
+acceptance. Download from the Draft Release in a browser, verify hashes and
+attestation, inspect quarantine without changing it, and inspect the mounted
+two-item payload. The maintainer may then replace the intended App and open the
+exact installed path; preserve any other installed copy.
 
-Only gate 6 authorizes installation/replacement and the maintainer-led manual
-acceptance. From the Draft Release page, download the assets in a browser,
-verify SHA/attestation first, and read (do not remove) the DMG's quarantine
-xattr. Mount it and confirm the only top-level items are `Codex94.app` and the
-`Applications` shortcut.
+Only the maintainer operates Privacy & Security/Open Anyway or real Login
+Items. Automation must not enter passwords, alter quarantine, disable Gatekeeper,
+or change system settings. Confirm version/build, basic launch, and the accepted
+installation paths. If quarantine is absent or an existing account approval
+allows direct launch, record first-launch Gatekeeper evidence as uncertain;
+the maintainer decides whether to accept that limitation.
 
-Quit every old Codex94 process before the maintainer drags the App to
-`/Applications`. Do not automatically delete a source-installed
-`~/Applications/Codex94.app`; do not run both copies. Record the copied App's
-quarantine xattr, launch the exact `/Applications/Codex94.app`, and, if blocked,
-let the maintainer use Apple's official Privacy & Security → Open Anyway flow.
-Automation must not enter a password, remove quarantine, disable Gatekeeper,
-operate System Settings, or change the real Login Item.
+## 6. Publish and document the actual release
 
-Confirm `0.2.0 (11)`, basic Dashboard/Popover behavior, and that Launch at Login
-is no longer disabled by the stable-install gate at `/Applications`. If either
-quarantine xattr is missing or the current account opens the App directly, mark
-first-launch Gatekeeper evidence insufficient/uncertain. Never describe direct
-opening as proof that an unnotarized App is automatically trusted. The
-maintainer decides whether to accept this constrained evidence.
-
-## 8. Publish and post-release verification
-
-Only gate 7 authorizes publishing the existing Draft. Do not create a second
-Release:
+After the maintainer accepts the exact final assets, gate 7 permits publishing
+the same Draft:
 
 ```bash
-gh release edit v0.2.0 \
-  --draft=false --latest --prerelease=false --verify-tag
+gh release edit "$release_tag" --draft=false --latest --prerelease=false --verify-tag
 ```
 
-From a public/signed-out view, redownload both assets and recheck:
+Redownload the public assets and verify names, exactly two manual files, both
+hashes/API digests, checksum, mounted structure, signature and architecture,
+attestation, annotated tag, source archives, and Latest/non-prerelease state.
+The tag must still peel to the frozen `RELEASE_SHA`.
 
-- exact filenames and exactly two manual assets;
-- `SHA256SUMS`, local DMG/checksum hashes, and each asset's
-  `sha256:<hex>` Release Assets API digest;
-- DMG structure, Universal slices, per-architecture signing/empty entitlements,
-  outer-DMG unsigned state, and attestation;
-- annotated tag object/peeled commit, final `main`, and a shallow clone;
-- `0.2.0 (11)`, bilingual README/security warnings, and public Latest/non-
-  prerelease state; and
-- the automatically generated source ZIP/TAR, without treating them as the two
-  manual assets or claiming byte reproducibility.
+Once publication is confirmed, prepare the documentation follow-up: verify the
+changelog date already matches publication and update README English/Chinese
+stable status, download
+and clone instructions, SECURITY supported version, and any current-version
+references. Remove candidate wording only for the version that was actually
+published. Recheck PR/bug templates and release notes; retain history and
+screenshot provenance. That docs-only PR still needs its own commit/push,
+Ready, and merge authorizations and passing checks; publication does not
+automatically authorize those writes.
 
-Codex94 does not enable GitHub Immutable Releases for `v0.2.0`. Published assets
-must not be replaced, deleted, or silently repaired as a manual release policy;
-SHA-256, API digests, and attestation can detect drift, but the platform does
-not prevent an authorized maintainer from replacing an asset. If App/DMG bytes
-must change, preserve `v0.2.0`, stop, and prepare a patch release such as
-`v0.2.1`.
+Such a later docs-only commit can advance main beyond `RELEASE_SHA`. Record
+that distinction: the release tag/DMG remain bound to the verified release
+commit, and the documentation follow-up does not move the tag or regenerate
+assets. Published assets follow a manual no-replacement policy; Immutable
+Releases is not enabled. If App or DMG bytes need repair, publish a new patch
+version through these gates.

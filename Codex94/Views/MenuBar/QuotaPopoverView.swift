@@ -91,10 +91,14 @@ struct QuotaPopoverView: View {
         )
     }
 
+    private var browsableBuckets: [QuotaBucketSnapshot] {
+        (store.snapshot?.displayableBuckets ?? []).filter { !$0.windows.isEmpty }
+    }
+
     private var quotaContent: some View {
         VStack(spacing: 0) {
             header
-            if (store.snapshot?.displayableBuckets.count ?? 0) > 1 {
+            if browsableBuckets.count > 1 {
                 Divider()
                 modelPicker
             }
@@ -184,7 +188,8 @@ struct QuotaPopoverView: View {
     }
 
     private var modelPicker: some View {
-        HStack(spacing: 12) {
+        let names = store.snapshot.map { QuotaFormatting.bucketMenuNames(in: $0) } ?? [:]
+        return HStack(spacing: 12) {
             Text("quota.model")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
@@ -193,10 +198,10 @@ struct QuotaPopoverView: View {
                 get: { store.viewedBucket?.limitID ?? store.snapshot?.defaultLimitID ?? "" },
                 set: { store.setViewedBucket($0) }
             )) {
-                ForEach(store.snapshot?.displayableBuckets ?? []) { bucket in
-                    Text(verbatim: QuotaFormatting.shortBucketName(
-                        store.snapshot?.displayName(for: bucket) ?? bucket.limitID
-                    ))
+                ForEach(browsableBuckets) { bucket in
+                    Text(verbatim: names[bucket.limitID] ?? "Codex")
+                    .help(Text(verbatim: store.snapshot?.displayName(for: bucket) ?? "Codex"))
+                    .accessibilityLabel(Text(verbatim: store.snapshot?.displayName(for: bucket) ?? "Codex"))
                     .tag(bucket.limitID)
                 }
             }
@@ -347,7 +352,9 @@ struct MenuBarQuotaPicker: View {
                 set: { store.setMenuBarQuotaSelection($0) }
             )) {
                 ForEach(store.menuBarQuotaOptions) { option in
-                    optionLabel(option)
+                    Text(verbatim: optionLabel(option))
+                        .help(Text(verbatim: optionLabel(option, abbreviated: false)))
+                        .accessibilityLabel(Text(verbatim: optionLabel(option, abbreviated: false)))
                         .tag(option.selection)
                         .disabled(!option.isAvailable)
                 }
@@ -364,23 +371,30 @@ struct MenuBarQuotaPicker: View {
         }
     }
 
-    private func optionLabel(_ option: MenuBarQuotaOption) -> Text {
+    func optionLabel(_ option: MenuBarQuotaOption, abbreviated: Bool = true) -> String {
+        func localized(_ key: String) -> String {
+            StatusAccessibilityString.localized(key, language: store.preferences.language, bundle: .main)
+        }
         guard option.selection != .automatic, let kind = option.kind else {
-            return Text("display.auto")
+            return localized("display.auto")
         }
+        let suffix = " · " + localized(kind == .fiveHour ? "quota.fiveHourShort" : "quota.weeklyShort")
+            + (option.isAvailable ? "" : " · " + localized("status.unavailable"))
+        let fullName = option.bucketName ?? localized("display.savedQuota")
+        guard abbreviated else { return fullName + suffix }
 
-        let bucket: Text
-        if let bucketName = option.bucketName {
-            bucket = Text(verbatim: QuotaFormatting.shortBucketName(bucketName))
-        } else {
-            bucket = Text("display.savedQuota")
+        let limit = 30 - suffix.count
+        let names = option.isAvailable
+            ? store.snapshot.map { QuotaFormatting.bucketMenuNames(in: $0, limit: limit) } ?? [:]
+            : [:]
+        let bucketID: String?
+        switch option.selection {
+        case .automatic: bucketID = nil
+        case .defaultBucket: bucketID = store.snapshot?.defaultLimitID
+        case let .bucket(limitID, _): bucketID = limitID
         }
-
-        let label = bucket + Text(verbatim: " · ") + Text(kind.localizedKey)
-        if option.isAvailable {
-            return label
-        }
-        return label + Text(verbatim: " · ") + Text("status.unavailable")
+        let name = bucketID.flatMap { names[$0] } ?? QuotaFormatting.shortBucketName(fullName, limit: limit)
+        return name + suffix
     }
 }
 

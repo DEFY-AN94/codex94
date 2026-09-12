@@ -44,7 +44,12 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
         }
 
         if !window.setFrameUsingName(Self.autosaveName) {
-            applyInitialFrame(to: window)
+            if NSScreen.main != nil {
+                windowState.request(.fullHD)
+            } else {
+                window.setContentSize(NSSize(width: 1_440, height: 810))
+                window.center()
+            }
         }
         window.setFrameAutosaveName(Self.autosaveName)
         updateWindowState()
@@ -58,6 +63,7 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
     func show(section: DashboardSection? = nil) {
         guard let window else { return }
         windowState.select(section: section)
+        windowState.isVisible = true
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window.makeKeyAndOrderFront(nil)
@@ -66,6 +72,18 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
     func windowDidResize(_ notification: Notification) {
         guard !isApplyingPreset else { return }
         updateWindowState()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        windowState.isVisible = false
+    }
+
+    func windowDidMiniaturize(_ notification: Notification) {
+        windowState.isVisible = false
+    }
+
+    func windowDidDeminiaturize(_ notification: Notification) {
+        windowState.isVisible = true
     }
 
     func windowDidMove(_ notification: Notification) {
@@ -80,7 +98,7 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
             visibleFrame: visibleFrame
         )
         isApplyingPreset = true
-        window.setFrame(targetFrame, display: true, animate: true)
+        window.setFrame(targetFrame, display: true, animate: window.isVisible)
         isApplyingPreset = false
         updateWindowState()
     }
@@ -94,19 +112,4 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
         window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
     }
 
-    private func applyInitialFrame(to window: NSWindow) {
-        guard let screen = NSScreen.main else {
-            window.setContentSize(NSSize(width: 1_440, height: 810))
-            window.center()
-            return
-        }
-
-        window.setFrame(
-            DashboardWindowSizing.fittedFrame(
-                for: .fullHD,
-                visibleFrame: screen.visibleFrame
-            ),
-            display: false
-        )
-    }
 }

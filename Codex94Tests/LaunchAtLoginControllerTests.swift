@@ -1,7 +1,117 @@
+import AppKit
+import Combine
+import ServiceManagement
+import SwiftUI
 import XCTest
 @testable import Codex94
 
 final class LaunchAtLoginControllerTests: XCTestCase {
+    @MainActor
+    func testRefreshPublishesSystemApprovalChanges() {
+        var status: SMAppService.Status = .requiresApproval
+        let controller = LaunchAtLoginController(
+            readStatus: { status }, register: { XCTFail("Read-only refresh must not register") },
+            unregister: { XCTFail("Read-only refresh must not unregister") }, stableInstall: { true }
+        )
+        XCTAssertFalse(controller.isEnabled)
+        XCTAssertTrue(controller.requiresApproval)
+        var observedEnabled: [Bool] = []
+        let observation = controller.$isEnabled.sink { observedEnabled.append($0) }
+        defer { observation.cancel() }
+
+        status = .enabled
+        controller.refresh()
+
+        XCTAssertTrue(controller.isEnabled)
+        XCTAssertFalse(controller.requiresApproval)
+        XCTAssertEqual(observedEnabled, [false, true])
+        status = .notRegistered
+        controller.refresh()
+        XCTAssertFalse(controller.isEnabled)
+        XCTAssertFalse(controller.requiresApproval)
+    }
+
+    @MainActor
+    func testRegisterAndUnregisterReadBackStatus() {
+        var status: SMAppService.Status = .notRegistered
+        var registrations = 0
+        var removals = 0
+        let controller = LaunchAtLoginController(
+            readStatus: { status },
+            register: { registrations += 1; status = .requiresApproval },
+            unregister: { removals += 1; status = .notRegistered },
+            stableInstall: { true }
+        )
+        controller.setEnabled(true)
+        XCTAssertEqual(registrations, 1)
+        XCTAssertTrue(controller.requiresApproval)
+        XCTAssertFalse(controller.isEnabled, "Pending approval is not enabled")
+        controller.setEnabled(false)
+        XCTAssertEqual(removals, 1)
+        XCTAssertFalse(controller.requiresApproval)
+        XCTAssertNil(controller.lastIssue)
+    }
+
+    @MainActor
+    func testOperationFailuresAreSanitizedAndNextSuccessClearsIssue() {
+        struct SyntheticError: Error {}
+        var shouldFail = true
+        var status: SMAppService.Status = .notRegistered
+        let controller = LaunchAtLoginController(
+            readStatus: { status },
+            register: { if shouldFail { throw SyntheticError() }; status = .enabled },
+            unregister: { if shouldFail { throw SyntheticError() }; status = .notRegistered },
+            stableInstall: { true }
+        )
+        controller.setEnabled(true)
+        XCTAssertEqual(controller.lastIssue, "service_management_error")
+        XCTAssertFalse(controller.isEnabled)
+        shouldFail = false
+        controller.setEnabled(true)
+        XCTAssertNil(controller.lastIssue)
+        XCTAssertTrue(controller.isEnabled)
+        shouldFail = true
+        controller.setEnabled(false)
+        XCTAssertEqual(controller.lastIssue, "service_management_error")
+        XCTAssertTrue(controller.isEnabled, "A failed unregister must retain actual enabled status")
+    }
+
+    @MainActor
+    func testUnstableInstallBlocksBothMutations() {
+        let controller = LaunchAtLoginController(
+            readStatus: { .notRegistered }, register: { XCTFail("Unstable app must not register") },
+            unregister: { XCTFail("Unstable app must not unregister") }, stableInstall: { false }
+        )
+        for enabled in [true, false] {
+            controller.setEnabled(enabled)
+            XCTAssertEqual(controller.lastIssue, "stable_install_required")
+            XCTAssertFalse(controller.isEnabled)
+        }
+    }
+
+    @MainActor
+    func testFailurePageFitsBothLanguagesWithFakeService() {
+        struct SyntheticError: Error {}
+        let controller = LaunchAtLoginController(
+            readStatus: { .notRegistered }, register: { throw SyntheticError() },
+            unregister: { XCTFail("No unregister expected") }, stableInstall: { true }
+        )
+        controller.setEnabled(true)
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let host = NSHostingController(rootView: StartupSettingsView(controller: controller)
+                .environment(\.locale, language.locale))
+            let size = host.sizeThatFits(in: NSSize(width: 640, height: 600))
+            XCTAssertTrue(size.height.isFinite)
+            XCTAssertGreaterThan(size.height, 0)
+            XCTAssertLessThanOrEqual(size.height, 600)
+            let text = StatusAccessibilityString.localized(
+                "startup.operationFailed", language: language, bundle: .main
+            )
+            XCTAssertNotEqual(text, "startup.operationFailed")
+            XCTAssertFalse(text.contains("SyntheticError"))
+        }
+    }
+
     func testAcceptsSystemApplicationsInstall() throws {
         let fixture = try makeStableInstallFixture()
 

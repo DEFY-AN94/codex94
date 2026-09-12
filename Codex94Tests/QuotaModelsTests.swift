@@ -9,9 +9,42 @@ final class QuotaModelsTests: XCTestCase {
     )
 
     func testRemainingPercentIsClamped() {
+        XCTAssertEqual(window(.weekly, used: Int.min).remainingPercent, 100)
         XCTAssertEqual(window(.weekly, used: -20).remainingPercent, 100)
+        XCTAssertEqual(window(.weekly, used: 0).remainingPercent, 100)
         XCTAssertEqual(window(.weekly, used: 35).remainingPercent, 65)
+        XCTAssertEqual(window(.weekly, used: 100).remainingPercent, 0)
         XCTAssertEqual(window(.weekly, used: 130).remainingPercent, 0)
+        XCTAssertEqual(window(.weekly, used: Int.max).remainingPercent, 0)
+    }
+
+    func testParserPreservesExtremePercentagesWhileProjectionClampsSafely() throws {
+        for used in [Int.min, -1, 0, 100, 101, Int.max] {
+            let parsed = try parse([
+                "rateLimits": [
+                    "secondary": ["usedPercent": used, "windowDurationMins": 10_080]
+                ]
+            ])
+            let weekly = try XCTUnwrap(parsed.defaultBucket?.window(.weekly))
+            XCTAssertEqual(weekly.usedPercent, used)
+            XCTAssertEqual(weekly.remainingPercent, used <= 0 ? 100 : 0)
+        }
+    }
+
+    func testFirstAvailableBucketSkipsEmptyDefaultAndHiddenBuckets() {
+        let snapshot = snapshot(
+            defaultLimitID: "default",
+            buckets: [
+                bucket("default", windows: []),
+                bucket("hidden", windows: [window(.weekly, used: 99)]),
+                bucket("b", name: "Beta", windows: [window(.weekly, used: 40)]),
+                bucket("a", name: "Alpha", windows: [window(.weekly, used: 20)])
+            ]
+        )
+        XCTAssertEqual(snapshot.firstAvailableBucket?.limitID, "a")
+        XCTAssertNil(self.snapshot(
+            defaultLimitID: "default", buckets: [bucket("default", windows: [])]
+        ).firstAvailableBucket)
     }
 
     func testMenuBarPercentFormattingStates() {

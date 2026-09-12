@@ -7,12 +7,6 @@ BUILD_ROOT="$ROOT_DIR/.build"
 DERIVED_DATA="$BUILD_ROOT/DerivedData-ReleaseCheck"
 MODULE_CACHE="$BUILD_ROOT/ModuleCache"
 APP="$DERIVED_DATA/Build/Products/Release/Codex94.app"
-EXPECTED_VERSION="0.2.0"
-EXPECTED_BUILD="11"
-EXPECTED_BUNDLE_ID="com.defyan94.codex94"
-EXPECTED_MINIMUM_SYSTEM_VERSION="14.0"
-
-ENTITLEMENTS_TEMP=""
 VALIDATED_BUILD_ROOT=""
 DISTRIBUTION_ROOT=""
 
@@ -20,17 +14,6 @@ fail() {
   echo "Release check failed: $*" >&2
   exit 1
 }
-
-cleanup() {
-  local exit_status=$?
-  trap - EXIT
-  if [[ -n "$ENTITLEMENTS_TEMP" && -f "$ENTITLEMENTS_TEMP" ]]; then
-    /bin/rm -f "$ENTITLEMENTS_TEMP"
-  fi
-  exit "$exit_status"
-}
-
-trap cleanup EXIT
 
 physical_directory() {
   (cd "$1" 2>/dev/null && pwd -P)
@@ -135,85 +118,6 @@ resolve_distribution_root() {
   DISTRIBUTION_ROOT="$distribution_physical"
 }
 
-validate_exact_architectures() {
-  local executable="$1"
-  local archs
-  local arch
-  local count=0
-  local has_arm64=0
-  local has_x86_64=0
-
-  [[ -f "$executable" && -x "$executable" && ! -L "$executable" ]] ||
-    fail "main executable is missing or not executable: $executable"
-  archs="$(/usr/bin/lipo -archs "$executable")" ||
-    fail "main executable is not a readable Mach-O file."
-  for arch in $archs; do
-    count=$((count + 1))
-    case "$arch" in
-      arm64) has_arm64=$((has_arm64 + 1)) ;;
-      x86_64) has_x86_64=$((has_x86_64 + 1)) ;;
-      *) fail "unexpected Release architecture '$arch'." ;;
-    esac
-  done
-  [[ "$count" -eq 2 && "$has_arm64" -eq 1 && "$has_x86_64" -eq 1 ]] ||
-    fail "Release architectures must be exactly arm64 and x86_64 (found: $archs)."
-}
-
-validate_entitlements_for_architecture() {
-  local app_path="$1"
-  local arch="$2"
-  local entitlements_json
-
-  ENTITLEMENTS_TEMP="$(/usr/bin/mktemp "$DERIVED_DATA/Codex94-$arch-entitlements.XXXXXX")" ||
-    fail "could not create a temporary $arch entitlement file."
-  if ! /usr/bin/codesign -d --arch "$arch" --entitlements - --xml "$app_path" \
-    >"$ENTITLEMENTS_TEMP"; then
-    fail "could not read the $arch entitlement state."
-  fi
-  if [[ -s "$ENTITLEMENTS_TEMP" ]]; then
-    /usr/bin/plutil -lint "$ENTITLEMENTS_TEMP" >/dev/null ||
-      fail "$arch entitlement output is not a valid property list."
-    entitlements_json="$(/usr/bin/plutil -convert json -o - "$ENTITLEMENTS_TEMP")" ||
-      fail "$arch entitlement output could not be normalized."
-    [[ "$entitlements_json" == "{}" ]] ||
-      fail "$arch contains one or more entitlements; Release requires an empty dictionary."
-  fi
-  /bin/rm -f "$ENTITLEMENTS_TEMP"
-  ENTITLEMENTS_TEMP=""
-}
-
-validate_signature_for_architecture() {
-  local app_path="$1"
-  local arch="$2"
-  local details
-  local line
-  local signature_ok=0
-  local team_ok=0
-  local runtime_ok=0
-  local flags
-
-  details="$(/usr/bin/codesign -dvvv --arch "$arch" "$app_path" 2>&1)" ||
-    fail "could not inspect the $arch code signature."
-  while IFS= read -r line; do
-    case "$line" in
-      Signature=adhoc) signature_ok=1 ;;
-      TeamIdentifier="not set") team_ok=1 ;;
-      CodeDirectory*"flags="*"("*")"*)
-        flags="${line#*\(}"
-        flags="${flags%%\)*}"
-        case ",$flags," in
-          *,runtime,*) runtime_ok=1 ;;
-        esac
-        ;;
-    esac
-  done <<<"$details"
-
-  [[ "$signature_ok" -eq 1 ]] || fail "$arch signature is not ad-hoc."
-  [[ "$runtime_ok" -eq 1 ]] || fail "$arch signature is missing Hardened Runtime."
-  [[ "$team_ok" -eq 1 ]] || fail "$arch signature unexpectedly contains a Team ID."
-  validate_entitlements_for_architecture "$app_path" "$arch"
-}
-
 for required_command in git jq rg; do
   if ! command -v "$required_command" >/dev/null 2>&1; then
     fail "required command '$required_command' is unavailable."
@@ -222,14 +126,12 @@ done
 for required_tool in \
   /usr/bin/xcode-select \
   /usr/bin/xcodebuild \
-  /usr/bin/codesign \
-  /usr/bin/lipo \
   /usr/bin/plutil \
-  /usr/bin/mktemp \
+  /usr/bin/python3 \
   /usr/bin/dirname \
   /usr/libexec/PlistBuddy \
-  /bin/mkdir \
-  /bin/rm; do
+  /bin/bash \
+  /bin/mkdir; do
   [[ -x "$required_tool" ]] || fail "required system tool '$required_tool' is unavailable."
 done
 [[ -x "$ROOT_DIR/script/package_dmg.sh" ]] || fail "script/package_dmg.sh is missing or not executable."
@@ -251,6 +153,17 @@ fi
 /usr/bin/xcodebuild -version
 
 cd "$ROOT_DIR"
+METADATA_COMMAND=(/usr/bin/python3 -I "$ROOT_DIR/script/release_metadata.py")
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  [[ -n "${GITHUB_SHA:-}" ]] || fail "CI must supply its tested commit SHA."
+  METADATA_COMMAND+=(--revision "$GITHUB_SHA")
+fi
+METADATA_JSON="$("${METADATA_COMMAND[@]}")" ||
+  fail "could not read the App target version/build."
+EXPECTED_VERSION="$(jq -er '.version' <<<"$METADATA_JSON")"
+EXPECTED_BUILD="$(jq -er '.build' <<<"$METADATA_JSON")"
+/usr/bin/python3 -I "$ROOT_DIR/script/tests/test_release_metadata.py"
+/bin/bash "$ROOT_DIR/script/tests/test_install.sh"
 git diff HEAD --check --
 PREVIOUS_TAG="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
 if [[ -n "$PREVIOUS_TAG" ]]; then
@@ -285,31 +198,11 @@ VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO
   fail "Release App version is missing."
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")" ||
   fail "Release App build is missing."
-BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST")" ||
-  fail "Release App bundle identifier is missing."
-MINIMUM_SYSTEM_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$INFO_PLIST")" ||
-  fail "Release App minimum system version is missing."
-EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$INFO_PLIST")" ||
-  fail "Release App executable name is missing."
-case "$EXECUTABLE_NAME" in
-  *$'\n'*) fail "Release App executable name contains a newline." ;;
-esac
-
 [[ "$VERSION" == "$EXPECTED_VERSION" ]] || fail "Release App version is $VERSION; expected $EXPECTED_VERSION."
 [[ "$BUILD" == "$EXPECTED_BUILD" ]] || fail "Release App build is $BUILD; expected $EXPECTED_BUILD."
-[[ "$BUNDLE_ID" == "$EXPECTED_BUNDLE_ID" ]] || fail "Release App bundle identifier is $BUNDLE_ID; expected $EXPECTED_BUNDLE_ID."
-[[ "$MINIMUM_SYSTEM_VERSION" == "$EXPECTED_MINIMUM_SYSTEM_VERSION" ]] ||
-  fail "Release App minimum system version is $MINIMUM_SYSTEM_VERSION; expected $EXPECTED_MINIMUM_SYSTEM_VERSION."
-[[ -n "$EXECUTABLE_NAME" && "$EXECUTABLE_NAME" == "${EXECUTABLE_NAME##*/}" ]] ||
-  fail "Release App executable name is unsafe."
 
-EXECUTABLE="$APP/Contents/MacOS/$EXECUTABLE_NAME"
-validate_exact_architectures "$EXECUTABLE"
-/usr/bin/codesign --verify --deep --strict --verbose=2 --all-architectures "$APP" ||
-  fail "Release App code-signature integrity verification failed."
-for arch in arm64 x86_64; do
-  validate_signature_for_architecture "$APP" "$arch"
-done
+# package_dmg.sh owns the complete App verifier. Its create path checks this
+# exact built App and the mounted payload, including both architecture slices.
 
 resolve_distribution_root
 ./script/package_dmg.sh create "$APP" "$DISTRIBUTION_ROOT"

@@ -11,7 +11,7 @@ body:
     id: app-version
     attributes:
       label: Codex94 version
-      placeholder: 0.2.0 (11)
+      placeholder: 0.2.1 (12), copied from About
     validations:
       required: true
   - type: input

@@ -47,20 +47,19 @@ schedules. The unchanged default menu-bar sample is retained from `v0.1.7`.
 
 ## Distribution status
 
-- This tree contains `0.2.0 (11)`. Until annotated `v0.2.0` is published from
-  the separately verified final `main`, it is a release candidate and the latest
-  published stable source tag remains annotated `v0.1.9`; after publication,
-  `v0.2.0` becomes the stable tag.
-- Once published, `v0.2.0` has two distribution tracks: a Universal 2 DMG for
-  technical users who understand its trust limitations, and source installation
-  from the same annotated tag.
+- The published stable release is [`v0.2.0 (11)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0),
+  available as a Universal 2 DMG and source from the same annotated tag.
+- This tree contains the unreleased `0.2.1 (12)` stability and maintenance
+  candidate. The behavior below describes this tree; stable download and clone
+  instructions continue to point to `v0.2.0` until the new release is published.
 - This public repository can be cloned without GitHub authentication.
-- There is no automatic updater. A `v0.2.0` GitHub Release and its DMG are not
-  public until the separately authorized release gates are complete.
+- There is no automatic updater.
 - `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
   Runtime signature, and installs it at `~/Applications/Codex94.app`.
-- Re-running the installer replaces that one app in place; it does not retain a
-  separate copy for each version.
+- The candidate installer requires every Codex94 copy to be quit first. It
+  verifies a unique staged copy, uses an installation lock, and preserves the
+  old App for rollback until replacement succeeds. It leaves recovery files
+  intact if rollback fails; it does not maintain a version archive.
 
 The downloadable DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
@@ -83,8 +82,8 @@ executable selected manually.
 
 ## Install the Universal DMG
 
-After the `v0.2.0` GitHub Release is published, download both of these assets
-from the [release page](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0):
+Download both stable assets from the
+[`v0.2.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0):
 
 - `Codex94-0.2.0-macos-universal-unnotarized.dmg`
 - `Codex94-0.2.0-SHA256SUMS.txt`
@@ -120,14 +119,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 
 ## Install from source
 
-Choose exactly one clone command for a tag that is already published. Until the
-annotated `v0.2.0` tag appears, use the current stable `v0.1.9` source:
-
-```bash
-git clone --branch v0.1.9 --depth 1 https://github.com/DEFY-AN94/codex94.git
-```
-
-After the annotated `v0.2.0` tag is published, use:
+Clone the published stable source tag:
 
 ```bash
 git clone --branch v0.2.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
@@ -145,9 +137,9 @@ sudo xcodebuild -runFirstLaunch
 ./script/install.sh
 ```
 
-The installer builds, signs, installs, and opens
-`~/Applications/Codex94.app`. Pass `--no-launch` to install without opening
-it:
+Quit all Codex94 copies before installing. The installer builds, signs,
+installs, and opens `~/Applications/Codex94.app`. Pass `--no-launch` to
+install without opening it:
 
 ```bash
 ./script/install.sh --no-launch
@@ -184,7 +176,7 @@ source installer does not migrate or remove a DMG-installed copy.
   missing reset is unavailable and a past date stays visible with a zero
   countdown. Dates follow the app language's locale and the current time zone.
   Dashboard → Connection shows the actual resolved menu-bar bucket/window,
-  including temporary Auto fallback, rather than the popover's browsed model.
+  rather than the popover's browsed model.
 - Issue banners offer **Open Connection** or
   **Open Diagnostics**, reusing the same Dashboard window. Ordinary Dashboard
   opening preserves its current page. These buttons only navigate; use the
@@ -204,20 +196,29 @@ source installer does not migrate or remove a DMG-installed copy.
   earliest future Reset across displayable windows, strictly at `resetsAt + 5`
   seconds or later. Equal targets are deduplicated, adjacent requests reuse the
   same single-flight path, and a consumed target gets no Reset-specific retry.
-  Wake and system-clock changes reconcile this one-shot schedule; no persistent
-  Reset ledger or new background cadence is added.
+  A session-only consumed-target watermark prevents clock rollback from
+  rearming an already attempted Reset. Wake and system-clock changes reconcile
+  the one-shot schedule without a persistent ledger or new background cadence.
 - Uses `account/rateLimits/read` for live quota data. In **Quota + account**
   mode it also uses `account/read` with `refreshToken: false`.
 - Keeps the standard/default quota bucket separate from additional named model
   buckets returned by Codex. The default bucket is shown as **Codex**; named
-  buckets use the service-provided name, such as **Spark**.
+  buckets use service-provided names. No model's availability or retirement
+  date is hard-coded. Historical synthetic screenshots may show older names.
 - The popover model picker browses one bucket at a time and is independent from
   the menu-bar selection. Browsing a model does not change the menu-bar ring.
+  If its browsed bucket disappears, the popover uses the available default
+  bucket, or the first displayable bucket when the default has no windows.
+  Long bucket names remain distinguishable in the selection menu.
 - The dynamic menu-bar quota menu offers `Auto` plus each available bucket and
   window. `Auto` chooses the lowest remaining percentage across all displayable
-  buckets and windows.
-- Hides a 5-hour or Weekly row and its selection whenever Codex does not return
-  that window; it never estimates or combines independent quota windows.
+  buckets and windows. When a fresh successful snapshot no longer contains a
+  pinned bucket/window, the saved preference becomes `Auto`. It stays Auto
+  if that option later returns; cache loading and failed requests do not
+  change the saved selection.
+- Supports only the returned 5-hour and Weekly windows. Weekly-only data is
+  valid: missing rows and selections are hidden without inferring entitlement
+  from plan type. It never estimates or combines independent quota windows.
 - Keeps quota severity separate from connection and data freshness: quota
   rings, percentages, and bars share the same resolved healthy/warning/critical
   colors, defaulting to green, amber, and red. Refreshing and cached indicators
@@ -236,8 +237,13 @@ source installer does not migrate or remove a DMG-installed copy.
 - Locates Codex in this order: manually selected path, ChatGPT app bundle,
   Homebrew, `/usr/local/bin`, `~/.local/bin`, then absolute `PATH` entries.
 - Offers Dashboard window presets at 900x600, 1280x720, 1440x810, and 1920x1080
-  logical points, with proportional fitting to the current display.
-- Dashboard → About shows this tree's exact value `0.2.0 (11)`. A
+  logical points, with proportional fitting to the current display. Screen
+  fitting preserves the requested preset; a user resize still updates it.
+- Dashboard → Startup refreshes Launch at Login status when returning to
+  the app and shows a localized failure if a requested change fails. Automated
+  tests use a fake service and never change real Login Items.
+- The executable picker follows the app's selected language.
+- Dashboard → About shows this tree's exact value `0.2.1 (12)`. A
   user-triggered copy action preserves that string, and the project link targets
   `https://github.com/DEFY-AN94/codex94`. It adds no updater or network client.
 - Supports system, Terminal Dark, and Terminal Light themes plus English and
@@ -272,8 +278,9 @@ mode and is removed from the in-memory snapshot after switching to **Quota
 only**. UserDefaults stores interface choices, including the preferred menu-bar
 quota selection, and an optional manually selected executable path. Version
 0.1.8 introduced `menuBarLayout.v1` and `statusAccentOverrides.v1` for layout
-and four color overrides; 0.1.9 reuses those keys and migration unchanged while
-applying layout changes immediately. Reset text and the in-memory post-reset
+and four color overrides; subsequent releases reuse those keys and migration.
+Version 0.2.1 changes an unavailable pinned selection to Auto only after a
+successful fresh snapshot, using the existing preference key. Reset text and the in-memory post-reset
 schedule use the existing reset timestamp, with no additional cache fields or
 persistent ledger. Overview uses the existing snapshot without storing new
 identity data. The popover's browsed model and the Dashboard's selected section
@@ -282,8 +289,8 @@ Codex94 has no analytics, advertising,
 telemetry upload, crash-reporting SDK, update checker, or project-operated
 server.
 
-Version 0.2.0 adds distribution packaging and the second stable installation
-path only. The DMG, checksum, and CI artifact contain the App, not account data,
+Version 0.2.0 added distribution packaging and the second stable installation
+path. Version 0.2.1 retains the same data and permission boundaries. The DMG, checksum, and CI artifact contain the App, not account data,
 credentials, preferences, cache, logs, or real quota. Browser download and
 Gatekeeper quarantine handling are macOS distribution behavior; they do not add
 a Codex94 network client, data collection, entitlement, or permission.
@@ -319,8 +326,9 @@ Build and run a Debug app:
 ```
 
 `build_and_run.sh` stops existing named Codex94 processes before building and
-launches the Debug app. `install.sh` replaces the app at its installation path
-and may launch it. These scripts are not read-only checks; local app runs can
+launches the Debug app. The candidate `install.sh` asks you to quit running
+copies instead of stopping them, replaces only its installation path, and may
+launch the installed App. These scripts are not read-only checks; local app runs can
 use the same preferences and cache as the installed app.
 
 Use synthetic fixtures and injected fetchers or an explicit fake executable
@@ -338,8 +346,11 @@ DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer \
   CODE_SIGNING_ALLOWED=NO test
 ```
 
-Run the complete release gate, including hosted tests, one Universal Release
-build, all-architecture signature checks, and DMG create/verify:
+Run the complete release gate, including isolated metadata/installer tests,
+hosted tests, one Universal Release build, and DMG create/verify.
+`script/release_metadata.py` reads the App target's version/build; CI and the
+UI fixture use the committed values. The packager owns the complete App
+signature and payload validation:
 
 ```bash
 ./script/release_check.sh
@@ -351,9 +362,10 @@ PR #11 remains the historical record for exact-head test, Display/Recovery UI,
 Actions/Python/Swift CodeQL, and final App acceptance. The synthetic Overview
 capture embedded above has been reviewed for layout and privacy. Keyboard
 activation, AXPress, and hosted tooltip exposure are not claimed as passed.
-The `0.2.0` candidate does not become release evidence until its exact PR merge
-SHA/tree, final `main` artifact and attestation, annotated tag, and public assets
-have passed their separate gates.
+Version `0.2.0` is published. The `0.2.1` candidate requires its own test
+results, reviewed synthetic UI evidence, candidate App acceptance before Ready,
+and final CI DMG acceptance before publication. Earlier evidence does not prove
+the new candidate passed.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See

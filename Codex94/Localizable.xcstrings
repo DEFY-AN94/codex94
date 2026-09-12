@@ -793,6 +793,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "登录时启动" } }
       }
     },
+    "startup.operationFailed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not change launch at login. Please try again." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法更改登录启动设置，请重试。" } }
+      }
+    },
     "status.cached" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Cached data" } },

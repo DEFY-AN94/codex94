@@ -99,9 +99,14 @@ enum DashboardWindowSizing {
     static func matchingPreset(
         for frame: NSRect,
         visibleFrame: NSRect,
+        preferredPreset: DashboardWindowSizePreset? = nil,
         tolerance: CGFloat = 2
     ) -> DashboardWindowSizePreset? {
-        DashboardWindowSizePreset.allCases.first { preset in
+        let presets = preferredPreset.map { preferred in
+            [preferred] + DashboardWindowSizePreset.allCases.filter { $0 != preferred }
+        }
+            ?? DashboardWindowSizePreset.allCases
+        return presets.first { preset in
             let expected = fittedFrame(for: preset, visibleFrame: visibleFrame).size
             return abs(expected.width - frame.width) <= tolerance
                 && abs(expected.height - frame.height) <= tolerance
@@ -112,11 +117,13 @@ enum DashboardWindowSizing {
 @MainActor
 final class DashboardWindowState: ObservableObject {
     @Published var selection: DashboardSection? = .overview
+    @Published var isVisible = false
     @Published private(set) var selectedPreset: DashboardWindowSizePreset?
     @Published private(set) var currentWidth = Int(DashboardWindowSizing.minimumSize.width)
     @Published private(set) var currentHeight = Int(DashboardWindowSizing.minimumSize.height)
 
     private var resizeHandler: ((DashboardWindowSizePreset) -> Void)?
+    private var preferredPreset: DashboardWindowSizePreset?
 
     var currentDimensions: String {
         "\(currentWidth)\u{00D7}\(currentHeight)"
@@ -132,6 +139,7 @@ final class DashboardWindowState: ObservableObject {
     }
 
     func request(_ preset: DashboardWindowSizePreset) {
+        preferredPreset = preset
         resizeHandler?(preset)
     }
 
@@ -144,7 +152,8 @@ final class DashboardWindowState: ObservableObject {
         currentHeight = Int(frame.height.rounded())
         selectedPreset = DashboardWindowSizing.matchingPreset(
             for: frame,
-            visibleFrame: visibleFrame
+            visibleFrame: visibleFrame,
+            preferredPreset: preferredPreset
         )
     }
 }

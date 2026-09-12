@@ -36,11 +36,21 @@ pure `RefreshPolicy` owns wake freshness and Reset-target decisions. SwiftUI
 views must not observe those notifications, schedule Reset requests, or start
 requests from relative-time rendering.
 
+`AppStore` keeps the consumed Reset watermark for the current run and changes
+a missing pinned selection to Auto only after a fresh successful snapshot.
+Cached snapshots and failures preserve preferences. Quota parsing supports
+returned 5-hour/Weekly windows, including weekly-only data; do not add plan-name
+gates, hard-coded model retirement dates, or an additional dynamic-window schema
+as part of this patch. Empty default buckets fall back to available buckets.
+
 `LaunchAtLoginController` owns the stable-install decision. Keep its pure path
 helper independent of `SMAppService`: the only accepted App locations are exact
 `/Applications/Codex94.app` and `~/Applications/Codex94.app` after the documented
 root/leaf symlink handling. Add synthetic-URL tests for every accepted and
-rejected path; tests must not read or change real Login Items.
+rejected path. The settings section observes this controller directly; app
+activation refreshes its status. Registration failures use localized feedback,
+not raw system errors. Tests inject the narrow service adapter and must not
+read or change real Login Items.
 
 ## Development and validation
 
@@ -54,20 +64,35 @@ test preferences, caches, and output paths separate from daily app data.
 - Test Reset scheduling through injected dates and internal wake/clock handlers;
   do not wait for a real Reset or change system time. Cover the strict
   `resetsAt + 5` boundary, deduplication, earliest target, single-flight
-  adjacency, failure consumption, wake/clock reconciliation, and shutdown.
+  adjacency, failure consumption, clock rollback after consuming an older Reset,
+  wake/clock reconciliation, and shutdown.
 - Do not clear or rewrite daily preferences, cache, or authentication data as
   test setup. Fixture cleanup should target only exact test-created resources.
 - Understand script side effects before running them: `release_check.sh` runs
   hosted tests, owns the single Universal Release build, verifies both
   architecture slices, and drives DMG packaging; `build_and_run.sh` stops named
-  Codex94 processes and launches a Debug app; `install.sh` replaces the source
-  App at `~/Applications/Codex94.app` and may launch it. These scripts are not
-  read-only source checks.
+  Codex94 processes and launches a Debug app; `install.sh` requires running
+  copies to be quit, replaces the source App at `~/Applications/Codex94.app`,
+  and may launch it. These scripts are not read-only source checks.
 - `package_dmg.sh` has the narrow `create` and `verify` interface. It packages
   the exact App supplied by `release_check.sh`; it must not build, call
   `install.sh`, stop/launch a user App, read the home directory, alter
   quarantine, or change system security settings. Use isolated run directories
   for negative tests and never damage or overwrite the formal candidate.
+- `package_dmg.sh` owns the complete App verifier; `release_check.sh` compares
+  built version/build with the shared project metadata and invokes `create`.
+  Preserve source-App and mounted-App verification, not a second verifier or
+  another Release build.
+- `script/release_metadata.py` owns strict App-target Debug/Release version
+  parsing. Local release checks read worktree metadata; CI uses `--revision`
+  and requires that commit to equal HEAD. CI outputs drive artifact paths and
+  verification parameters. There is no second VERSION file or shell `eval`.
+- The source installer holds its destination lock across build/replacement,
+  verifies unique staging, and uses inode-checked backup/recovery. Two renames
+  permit rollback but are not crash-atomic. Never delete a stale lock, unknown
+  destination, or failed-recovery backup automatically. Installer tests source
+  its guarded helpers in temporary directories and never run its real entry
+  point, install, stop/launch Apps, or change the user's home environment.
 - Local `release_check.sh` runs respect the caller's `DEVELOPER_DIR`, or the
   current `xcode-select` choice when it is unset. CI explicitly selects and
   verifies Xcode 16.4; do not hide a toolchain mismatch by overriding it inside
@@ -96,6 +121,11 @@ target's unique Debug/Release version and build from that same revision, and
 copy only the explicit build-input allowlist. Do not hard-code an app release
 version in runner metadata or temporary-path names; a fixture-schema version is
 separate from the app version.
+
+The fixture loads the shared metadata helper by explicit path after validating
+its regular tracked blob against the tested commit. It executes those checked
+bytes without changing `sys.path`; Python `-I` remains enabled. The helper is
+not an App build input and must not broaden the disposable-source allowlist.
 
 Status-item GUI checks distinguish the requested AppKit length from its public
 accessibility bounds. A temporary native reference owned by the test process is
@@ -132,16 +162,21 @@ smokes. For `0.1.9 (10)`, PR #11 remains the historical exact-head test,
 Display/Recovery UI, Actions/Python/Swift CodeQL, and final App acceptance
 record; the README images establish only the reviewed captures they display.
 Keyboard activation, AXPress, and hosted tooltip exposure are not claimed as
-passed. Keep `0.2.0` candidate notes under Unreleased without a guessed date.
-Use the actual release date only after it is known and before tagging; if it
-changes, correct it through a reviewed docs-only Draft PR rather than tagging
-first and repairing the tree later.
+passed. Keep `0.2.1` candidate notes under Unreleased without a guessed date.
+Before tagging, the maintainer confirms the release date and a reviewed docs
+change replaces Unreleased; final-main CI and the DMG must include that change.
+The published stable release remains `v0.2.0` until publication; only then update
+current stable links and candidate wording. A later docs-only PR uses the normal
+authorization/check gates, verifies the changelog date, and never moves a tag.
 
 A release pull request begins as Draft. Platform-required CI and the additional
 fail-closed UI smoke/CodeQL gates must be complete and reviewed. The Universal
 candidate needs an exact SHA, two-file allowlist, and signing/attestation
-classification; attestation is provenance, not Apple trust. Ready does not
-authorize merge. Follow all seven separate authorization gates in
+classification; attestation is provenance, not Apple trust. The maintainer must
+accept the candidate App built from the exact PR head before Ready; changed
+App bytes invalidate that acceptance. Final CI DMG/install acceptance remains
+a separate later gate. Ready does not authorize merge. Follow all seven
+separate authorization gates in
 [docs/RELEASING.md](docs/RELEASING.md): commit/push/Draft PR, Ready, merge,
 annotated tag, Draft Release/two assets, maintainer-led install/Open Anyway
 acceptance, and Publish. Never infer a later gate from an earlier one.

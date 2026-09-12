@@ -2,6 +2,47 @@
 
 All notable changes to Codex94 are documented here.
 
+## 0.2.1 - Unreleased
+
+### Fixed
+
+- Keep Launch at Login status observable when returning to the app and show a
+  localized failure without exposing system error details. Tests use a fake
+  service and do not register real Login Items.
+- Clamp extreme quota percentages before subtraction so malformed snapshots
+  cannot overflow while computing the remaining percentage.
+- Keep a session-only consumed Reset watermark across clock rollback and later
+  snapshots; reuse the existing single-flight refresh and no-retry behavior.
+- Change a saved bucket/window selection to Auto when a fresh successful
+  snapshot confirms it is absent. Cache loading and refresh failures preserve
+  the preference; an option returning later does not undo Auto.
+- Let the popover fall back to the first displayable bucket when the default
+  bucket has no windows. Keep weekly-only data valid without plan-type rules,
+  hard-coded model availability, or retirement dates.
+- Preserve requested window presets when fitting a smaller screen, distinguish
+  long quota-bucket names in menus, and localize the executable picker using
+  the selected app language.
+- Make source installation require running copies to be quit, use a unique
+  locked staging transaction, verify the App, and restore the old copy when a
+  replacement fails. Preserve recovery files if rollback cannot finish.
+
+### Maintenance
+
+- Share strict App-target version/build parsing between the release gate, CI,
+  and UI fixtures. CI uses committed metadata; local checks support worktree
+  changes. Keep the isolated fixture loader and tracked-input checks.
+- Keep complete App verification in the DMG packager and retain a single
+  Universal Release build, both architecture checks, and two explicit assets.
+- Correct published stable-version instructions and retain historical
+  changelog entries and synthetic screenshot provenance.
+
+### Security and privacy
+
+- Retain cache v2, existing preference keys, fixed Codex subprocess requests,
+  and current authentication, network, permission, and entitlement boundaries.
+- Continue unsigned, unnotarized Universal DMG and source distribution. This
+  candidate is not published; stable downloads remain on `v0.2.0`.
+
 ## 0.2.0 - 2026-09-03
 
 ### Added
