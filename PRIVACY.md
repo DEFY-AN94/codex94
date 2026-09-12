@@ -70,6 +70,18 @@ section; they do not execute a login or introduce a separate retry request. The
 post-reset task is a new trigger for the existing quota refresh path: each
 consumed target gets at most one attempt and no Reset-specific immediate retry.
 
+Version `0.2.1` keeps a consumed Reset watermark only in memory, including
+across clock changes; no Reset history is written to disk. If a fresh successful
+snapshot confirms that a pinned quota bucket/window is absent, the existing
+menu-bar preference becomes Auto. Loading cache or receiving a refresh error
+does not change that preference. This applies to returned 5-hour/Weekly windows
+without deriving access from plan names or model-retirement dates.
+
+Launch at Login status and localized failure feedback use the existing system
+service. Tests inject a fake service and never modify real Login Items. Numeric
+input clamping, window fitting, longer menu labels, and localized executable
+picker text add no data collection, persistent field, or permission.
+
 ## Distribution and CI artifacts
 
 Version `0.2.0` adds packaging and stable-path compatibility, not a new runtime
@@ -114,7 +126,7 @@ is no updater or project-operated network client.
 Codex94 does not request browser, Documents, Keychain, Accessibility, contacts,
 camera, microphone, or location access. A standard file picker appears only when
 the user explicitly chooses a Codex executable. Version `0.1.9` added no system
-permission or entitlement, and version `0.2.0` likewise adds none.
+permission or entitlement; versions `0.2.0` and `0.2.1` likewise add none.
 
 See [SECURITY.md](SECURITY.md) for the executable trust boundary and security
 reporting process. Removing either App copy does not automatically remove local

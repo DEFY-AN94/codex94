@@ -58,7 +58,7 @@ struct DashboardView: View {
                 case .display:
                     DisplaySettingsView(store: store, windowState: windowState)
                 case .startup:
-                    StartupSettingsView(store: store)
+                    StartupSettingsView(controller: store.launchAtLogin, isPresented: windowState.isVisible)
                 case .diagnostics:
                     DiagnosticsView(store: store)
                 case .about:
@@ -275,33 +275,53 @@ struct MenuBarResetDetails: View {
     }
 }
 
-private struct StartupSettingsView: View {
-    @ObservedObject var store: AppStore
+struct StartupSettingsView: View {
+    @ObservedObject var controller: LaunchAtLoginController
+    var isPresented = true
 
     var body: some View {
         SettingsPage(title: "dashboard.startup") {
             SettingsRow("startup.login") {
                 VStack(alignment: .leading, spacing: 7) {
                     Toggle("startup.login", isOn: Binding(
-                        get: { store.launchAtLogin.isEnabled },
-                        set: { store.launchAtLogin.setEnabled($0) }
+                        get: { controller.isEnabled },
+                        set: { controller.setEnabled($0) }
                     ))
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .disabled(!store.launchAtLogin.isStableInstall)
+                    .disabled(!controller.isStableInstall)
+                    .accessibilityIdentifier("launch-at-login-toggle")
 
-                    if !store.launchAtLogin.isStableInstall {
+                    if !controller.isStableInstall {
                         Text("startup.installRequired")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                    } else if store.launchAtLogin.requiresApproval {
+                    } else if controller.requiresApproval {
                         Text("startup.approvalRequired")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
+
+                    if controller.lastIssue == "service_management_error" {
+                        Text("startup.operationFailed")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("launch-at-login-error")
+                    }
                 }
             }
         }
+        .onAppear { refreshIfPresented() }
+        .onChange(of: isPresented) { _, _ in refreshIfPresented() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshIfPresented()
+        }
+    }
+
+    private func refreshIfPresented() {
+        guard isPresented else { return }
+        controller.refresh()
     }
 }
 

@@ -28,7 +28,7 @@ struct QuotaWindowSnapshot: Codable, Equatable, Identifiable, Sendable {
     let resetsAt: Date?
 
     var id: QuotaWindowKind { kind }
-    var remainingPercent: Int { min(100, max(0, 100 - usedPercent)) }
+    var remainingPercent: Int { 100 - min(100, max(0, usedPercent)) }
 }
 
 struct AccountSummary: Equatable, Sendable {
@@ -182,6 +182,10 @@ struct QuotaSnapshot: Equatable, Sendable {
                     || ($0.normalizedLimitName != nil && !$0.windows.isEmpty)
             }
             .sorted(by: bucketPrecedes)
+    }
+
+    var firstAvailableBucket: QuotaBucketSnapshot? {
+        displayableBuckets.first { !$0.windows.isEmpty }
     }
 
     func bucket(id: String?) -> QuotaBucketSnapshot? {

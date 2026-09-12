@@ -9,6 +9,56 @@ final class QuotaPopoverLayoutTests: XCTestCase {
     private let referenceDate = Date(timeIntervalSince1970: 1_800_000_000)
     private let resetTimeZone = TimeZone(secondsFromGMT: 0)!
 
+    func testLongBucketMenuLabelsRemainDistinctBoundedAndIndependentOfInputOrder() throws {
+        let prefix = String(repeating: "Shared long model ", count: 3)
+        let baseline = snapshot(includeSpark: false)
+        let window = try XCTUnwrap(baseline.defaultBucket?.window(.weekly))
+        let buckets = baseline.buckets + [
+            QuotaBucketSnapshot(limitID: "opaque-a", limitName: prefix + "Alpha", planType: nil, windows: [window]),
+            QuotaBucketSnapshot(limitID: "opaque-b", limitName: prefix + "Beta", planType: nil, windows: [window]),
+            QuotaBucketSnapshot(limitID: "opaque-c", limitName: prefix + "Alpha", planType: nil, windows: [window]),
+            QuotaBucketSnapshot(limitID: "opaque-d", limitName: String(repeating: "测试👩‍💻", count: 12) + "甲", planType: nil, windows: [window]),
+            QuotaBucketSnapshot(limitID: "opaque-e", limitName: String(repeating: "测试👩‍💻", count: 12) + "乙", planType: nil, windows: [window])
+        ]
+        let value = QuotaSnapshot(buckets: buckets, defaultLimitID: baseline.defaultLimitID,
+                                  fetchedAt: referenceDate, account: nil, codex: nil)
+        let reordered = QuotaSnapshot(buckets: Array(buckets.reversed()), defaultLimitID: baseline.defaultLimitID,
+                                      fetchedAt: referenceDate, account: nil, codex: nil)
+        for limit in [20, 30] {
+            let labels = QuotaFormatting.bucketMenuNames(in: value, limit: limit)
+            XCTAssertEqual(labels.count, buckets.count)
+            XCTAssertEqual(Set(labels.values).count, buckets.count)
+            XCTAssertTrue(labels.values.allSatisfy { $0.count <= limit })
+            XCTAssertTrue(labels.values.allSatisfy { !$0.contains("opaque-") })
+            XCTAssertEqual(labels, QuotaFormatting.bucketMenuNames(in: reordered, limit: limit))
+        }
+
+        let fixture = try makeFixture(snapshot: value)
+        defer { fixture.cleanUp() }
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            fixture.preferences.language = language
+            let picker = MenuBarQuotaPicker(store: fixture.store)
+            let options = fixture.store.menuBarQuotaOptions
+            let visible = options.map { picker.optionLabel($0) }
+            XCTAssertEqual(Set(visible).count, visible.count)
+            XCTAssertTrue(visible.allSatisfy { $0.count <= 30 })
+            for option in options where option.selection != .automatic {
+                XCTAssertTrue(picker.optionLabel(option, abbreviated: false).contains(try XCTUnwrap(option.bucketName)))
+            }
+            let host = NSHostingController(rootView: picker.codex94Environment(fixture.preferences))
+            XCTAssertTrue(host.sizeThatFits(in: NSSize(width: 360, height: 100)).height.isFinite)
+        }
+    }
+
+    func testExplicitPanelCaptionUsesAppLanguage() {
+        XCTAssertEqual(StatusAccessibilityString.localized(
+            "connection.choose", language: .english, bundle: .main
+        ), "Choose…")
+        XCTAssertEqual(StatusAccessibilityString.localized(
+            "connection.choose", language: .simplifiedChinese, bundle: .main
+        ), "选择…")
+    }
+
     func testInstallUsesHostingControllerFittingHeightAndKeepsController() {
         let popover = NSPopover()
         let contentViewController = NSHostingController(
@@ -36,6 +86,36 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         XCTAssertGreaterThan(multiSize.height, singleSize.height)
         assertContentMatchesPopover(for: singleFixture)
         assertContentMatchesPopover(for: multiFixture)
+    }
+
+    func testEmptyDefaultDoesNotAddAnUnselectableModelPicker() throws {
+        let baseline = snapshot(includeSpark: false)
+        let available = QuotaBucketSnapshot(
+            limitID: "available", limitName: "Codex", planType: "pro",
+            windows: try XCTUnwrap(baseline.defaultBucket).windows
+        )
+        let emptyDefault = QuotaBucketSnapshot(
+            limitID: "empty", limitName: nil, planType: "pro", windows: []
+        )
+        let withEmptyDefault = try makeFixture(snapshot: QuotaSnapshot(
+            buckets: [emptyDefault, available], defaultLimitID: "empty",
+            fetchedAt: baseline.fetchedAt, account: nil, codex: nil
+        ))
+        defer { withEmptyDefault.cleanUp() }
+        let onlyAvailable = try makeFixture(snapshot: QuotaSnapshot(
+            buckets: [available], defaultLimitID: "available",
+            fetchedAt: baseline.fetchedAt, account: nil, codex: nil
+        ))
+        defer { onlyAvailable.cleanUp() }
+
+        XCTAssertEqual(withEmptyDefault.store.viewedBucket?.limitID, "available")
+        XCTAssertEqual(
+            hostingSize(for: withEmptyDefault).height,
+            hostingSize(for: onlyAvailable).height,
+            accuracy: 0.5,
+            "An empty default must not create an enabled but unselectable model picker row"
+        )
+        assertContentMatchesPopover(for: withEmptyDefault)
     }
 
     func testPopoverTracksViewedBucketNaturalHeight() throws {

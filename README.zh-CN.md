@@ -43,17 +43,15 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 ## 当前分发状态
 
-- 当前源码树版本为 `0.2.0 (11)`。在经过独立复核的最终 `main` 发布 annotated
-  `v0.2.0` 前，它仍是发布候选，最新已发布的稳定源码标签仍是 annotated
-  `v0.1.9`；发布后，`v0.2.0` 成为稳定标签。
-- `v0.2.0` 发布后提供双轨分发：面向理解其信任边界的技术用户的 Universal 2
-  DMG，以及来自同一个 annotated 标签的源码安装。
-- 仓库已公开，任何人都可以在无需 GitHub 认证的情况下 clone 源码。
-- 本项目没有自动更新功能；只有分别完成各发布授权门后，`v0.2.0` GitHub Release
-  及其 DMG 才会公开。
-- `script/install.sh` 会构建本地 Release App，应用 ad-hoc Hardened
-  Runtime 签名，并安装到 `~/Applications/Codex94.app`。
-- 再次运行安装脚本会原位覆盖这一个 App，不会为每个版本保留单独副本。
+- 已发布的稳定版为 [`v0.2.0 (11)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0)，
+  提供 Universal 2 DMG 与来自同一个 annotated 标签的源码安装。
+- 当前源码树是尚未发布的 `0.2.1 (12)` 稳定性与维护修补候选。下文行为描述对应
+  当前源码树；新版本正式发布前，稳定下载和 clone 指令继续指向 `v0.2.0`。
+- 仓库已公开，无需 GitHub 认证即可 clone；本项目没有自动更新功能。
+- `script/install.sh` 构建本地 Release App，应用 ad-hoc Hardened Runtime
+  签名，并安装到 `~/Applications/Codex94.app`。
+- 候选版安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
+  替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
 可下载的 DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
@@ -74,7 +72,7 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 
 ## 安装 Universal DMG
 
-`v0.2.0` GitHub Release 发布后，请从
+请从已发布的 `v0.2.0`
 [Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0)
 同时下载以下两个资产：
 
@@ -111,14 +109,7 @@ Attestation 只是构建来源证明，不是 Apple 签名、公证、恶意软�
 
 ## 从源码安装
 
-请只选择一个已经发布的标签进行 clone。在 annotated `v0.2.0` 标签出现前，使用
-当前稳定的 `v0.1.9` 源码：
-
-```bash
-git clone --branch v0.1.9 --depth 1 https://github.com/DEFY-AN94/codex94.git
-```
-
-annotated `v0.2.0` 标签发布后，改用：
+Clone 当前已经发布的稳定源码标签：
 
 ```bash
 git clone --branch v0.2.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
@@ -136,7 +127,7 @@ sudo xcodebuild -runFirstLaunch
 ./script/install.sh
 ```
 
-安装脚本会构建、签名、安装并打开
+安装前请先退出所有 Codex94 副本。安装脚本会构建、签名、安装并打开
 `~/Applications/Codex94.app`。如需安装后不自动打开：
 
 ```bash
@@ -166,7 +157,7 @@ sudo xcodebuild -runFirstLaunch
 - 额度行下方独立显示绝对**重置时间**，包含完整日期、小时/分钟及
   重置时刻的 UTC 偏移，正确区分夏令时。原倒计时保留；没有日期则显示不可用，
   过去日期仍显示原时间，倒计时不低于零。日期遵循 App 语言的 locale 和当前时区。
-  Dashboard → 连接显示菜单栏实际解析的额度桶与窗口（包括暂时回退到自动的结果），
+  Dashboard → 连接显示菜单栏实际解析的额度桶与窗口，
   而不是 Popover 中单独浏览的模型。
 - 错误横幅提供**打开连接设置**或**打开诊断**，复用同一个 Dashboard
   窗口；普通打开 Dashboard 会保留当前页面。这些按钮只负责导航，重试仍使用
@@ -179,18 +170,24 @@ sudo xcodebuild -runFirstLaunch
   刷新路径。
 - 每次成功快照后，会从所有可显示窗口中选择最早的未来 Reset，仅在
   `resetsAt + 5` 秒或更晚安排一次内存中的刷新。相同目标会去重，相邻请求复用同一
-  单飞路径，已消费目标不会进行 Reset 专属重试。唤醒与系统时钟变化会重新协调这项
-  一次性计划；不新增持久化 Reset 账本或后台刷新周期。
+  单飞路径，已消费目标不会进行 Reset 专属重试。仅保存在本次运行中的已消费时间
+  水位防止时钟回拨后重新安排旧 Reset。唤醒与系统时钟变化会重新协调这项一次性
+  计划；不新增持久化 Reset 账本或后台刷新周期。
 - 使用 `account/rateLimits/read` 读取实时额度；在 **额度 + 账号信息** 模式下，
   还会调用 `account/read`，并固定使用 `refreshToken: false`。
 - 将 Codex 返回的标准/默认额度桶与额外命名的模型额度桶分开处理。默认额度桶显示
-  为 **Codex**；其他额度桶使用服务端提供的名称，例如 **Spark**。
+  为 **Codex**；其他额度桶使用服务端提供的名称，不写死模型可用性或下架日期。
+  历史合成截图可能仍包含旧模型名称。
 - Popover 中的模型选择器每次浏览一个额度桶，与菜单栏选择相互独立；浏览模型
-  不会改变菜单栏圆环。
+  不会改变菜单栏圆环。正在浏览的额度桶消失时，优先使用有窗口的默认额度桶；
+  默认桶无可用窗口时使用首个可显示桶。选择菜单仍能区分较长的额度桶名称。
 - 动态的菜单栏额度菜单提供 `自动` 以及每个可用额度桶与窗口；`自动` 会在所有
-  可显示额度桶和窗口中选择剩余比例最低的一项。
-- Codex 未返回某个 5 小时或 Weekly 窗口时，会隐藏对应额度行与选择项；App
-  不估算额度，也不会合并彼此独立的额度窗口。
+  可显示额度桶和窗口中选择剩余比例最低的一项。新的成功快照确认固定选项已消失后，
+  已保存偏好改为 `自动`；该选项重新出现时也保持自动。加载缓存或刷新失败不会
+  改写这项偏好。
+- 仅支持服务实际返回的 5 小时和 Weekly 窗口。仅有 Weekly 是有效数据；缺失
+  窗口的额度行和选择项会隐藏，不根据套餐名称推断权限，不估算额度，也不合并
+  彼此独立的窗口。
 - 将额度严重度与连接/数据新鲜度分开：额度圆环、百分比和进度条使用同一套解析后
   的充足/偏低/紧张颜色，默认依次为绿色、琥珀色和红色。刷新中与缓存标记保持
   蓝色/青色连接强调色。在没有可用数据且连接不可用时，标记、横幅和
@@ -204,8 +201,12 @@ sudo xcodebuild -runFirstLaunch
 - Codex 检测顺序为：手动路径、ChatGPT App 内置文件、Homebrew、
   `/usr/local/bin`、`~/.local/bin`，最后是 `PATH` 中的绝对路径。
 - Dashboard 提供 900x600、1280x720、1440x810 和 1920x1080 逻辑点窗口预设；
-  超出当前屏幕时会按比例适配。
-- Dashboard → 关于显示当前源码树的精确版本值 `0.2.0 (11)`，由用户触发的复制结果
+  超出当前屏幕时会按比例适配，并保留用户选择的预设；用户主动拖动调整窗口时
+  仍更新预设。
+- Dashboard → 启动在返回 App 时重新读取登录启动状态，修改失败会显示本地化提示；
+  自动测试使用模拟服务，不操作真实登录项。
+- 可执行文件选择面板跟随 App 中选择的语言。
+- Dashboard → 关于显示当前源码树的精确版本值 `0.2.1 (12)`，由用户触发的复制结果
   与之完全一致；
   项目链接指向 `https://github.com/DEFY-AN94/codex94`，不会增加更新器或网络客户端。
 - 支持跟随系统、Terminal Dark、Terminal Light 主题，以及 English 和简体中文。
@@ -235,14 +236,16 @@ OAuth，不接收 access token 或 refresh token，不直接发送额度 HTTP �
 的邮箱只存在于内存；切换为 **仅额度** 后会从内存快照移除。UserDefaults 保存
 界面选项（包括菜单栏额度偏好）和用户手动选择的可执行文件路径。版本 0.1.8 引入
 `menuBarLayout.v1` 与 `statusAccentOverrides.v1`，分别保存布局和四种颜色覆盖；
-0.1.9 保持这些 key 与迁移不变，并让布局即时生效。重置时间文案和内存中的
+后续版本继续复用这些 key 和迁移。0.2.1 仅在新的成功快照确认固定额度选项
+消失后，使用已有偏好 key 将选择改为自动。重置时间文案和内存中的
 post-reset 调度只使用现有重置时间戳，不新增缓存字段或持久化账本。总览复用现有
 快照，不存储新的身份数据。Popover 中浏览的模型和 Dashboard 当前页面只在本次
 运行中保存；窗口 frame autosave 行为保持不变。
 Codex94 没有分析、广告、遥测上传、崩溃上报 SDK、
 更新检查器或项目自营服务器。
 
-0.2.0 只增加分发打包和第二个稳定安装路径。DMG、checksum 与 CI artifact
+0.2.0 增加了分发打包和第二个稳定安装路径；0.2.1 保持相同的数据与权限边界。
+DMG、checksum 与 CI artifact
 包含 App，不包含账号数据、凭证、偏好、缓存、日志或真实额度。浏览器下载与
 Gatekeeper quarantine 处理属于 macOS 分发流程，不会为 Codex94 增加网络客户端、
 数据收集、entitlement 或权限。
@@ -275,7 +278,8 @@ brew install ripgrep jq
 ```
 
 `build_and_run.sh` 会在构建前关闭现有的匹配名称 Codex94 进程，然后启动 Debug
-App。`install.sh` 会替换安装路径中的 App，并可能启动它。这些脚本并非只读检查；
+App。候选版 `install.sh` 会要求用户自行退出正在运行的副本，仅替换自身安装路径，
+并且可能启动安装后的 App。这些脚本并非只读检查；
 本机运行的 App 可能使用与已安装 App 相同的偏好和缓存。
 
 自动测试和文档截图应使用合成数据、注入 fetcher 或显式指定的 fake executable。
@@ -291,8 +295,10 @@ DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer \
   CODE_SIGNING_ALLOWED=NO test
 ```
 
-运行完整发布检查，包括 hosted tests、一次 Universal Release 构建、全架构签名
-检查和 DMG create/verify：
+运行完整发布检查，包括隔离的 metadata/installer 脚本测试、hosted tests、一次
+Universal Release 构建和 DMG create/verify。`script/release_metadata.py` 统一读取
+App target 的版本与 build，CI 与 UI fixture 使用 committed 值；完整 App 签名与
+payload 验证由打包脚本负责：
 
 ```bash
 ./script/release_check.sh
@@ -302,9 +308,9 @@ DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer \
 任务，以及 Actions/Swift CodeQL。对于 `0.1.9 (10)`，PR #11 仍是精确 head 测试、
 Display/Recovery UI、Actions/Python/Swift CodeQL 与最终 App 人工验收状态的历史
 记录；上方嵌入的合成总览截图已经完成布局与隐私审查。键盘激活、AXPress 与托管
-运行器 tooltip 暴露仍不声明为已通过。`0.2.0` 候选只有在 exact PR merge
-SHA/tree、最终 `main` artifact 与 attestation、annotated tag 和公开资产分别通过
-各自发布门后，才成为发布证据。
+运行器 tooltip 暴露仍不声明为已通过。`0.2.0` 已正式发布；`0.2.1` 候选需要独立
+的测试结果、已审阅合成 UI 证据、Ready 前的候选 App 人工验收，以及发布前的最终
+CI DMG 验收。旧版本证据不能证明新候选已通过。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。贡献与发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 和

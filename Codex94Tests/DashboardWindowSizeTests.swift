@@ -5,6 +5,43 @@ import XCTest
 
 final class DashboardWindowSizeTests: XCTestCase {
     @MainActor
+    func testExplicitPresetWinsWhenSmallScreenFitsSeveralToSameSize() {
+        let visibleFrame = NSRect(x: 0, y: 24, width: 1_440, height: 900)
+        let state = DashboardWindowState()
+        state.setResizeHandler { preset in
+            state.update(
+                frame: DashboardWindowSizing.fittedFrame(for: preset, visibleFrame: visibleFrame),
+                visibleFrame: visibleFrame
+            )
+        }
+        XCTAssertEqual(
+            DashboardWindowSizing.fittedFrame(for: .large, visibleFrame: visibleFrame).size,
+            DashboardWindowSizing.fittedFrame(for: .fullHD, visibleFrame: visibleFrame).size
+        )
+        for preset in [DashboardWindowSizePreset.fullHD, .large, .fullHD] {
+            state.request(preset)
+            XCTAssertEqual(state.selectedPreset, preset)
+        }
+        let movedFrame = DashboardWindowSizing.fittedFrame(for: .fullHD, visibleFrame: visibleFrame)
+            .offsetBy(dx: 20, dy: 10)
+        state.update(frame: movedFrame, visibleFrame: visibleFrame)
+        XCTAssertEqual(state.selectedPreset, .fullHD, "A move must not rename an explicit preset")
+        state.update(frame: NSRect(x: 10, y: 10, width: 1_111, height: 777), visibleFrame: visibleFrame)
+        XCTAssertNil(state.selectedPreset)
+        state.update(frame: movedFrame, visibleFrame: visibleFrame)
+        XCTAssertEqual(state.selectedPreset, .fullHD)
+    }
+
+    func testPreferenceDoesNotHideAnotherMatchingPreset() {
+        let visibleFrame = NSRect(x: 0, y: 0, width: 2_560, height: 1_600)
+        let frame = DashboardWindowSizing.fittedFrame(for: .compact, visibleFrame: visibleFrame)
+        XCTAssertEqual(
+            DashboardWindowSizing.matchingPreset(for: frame, visibleFrame: visibleFrame, preferredPreset: .fullHD),
+            .compact
+        )
+    }
+
+    @MainActor
     func testOverviewIsTheDefaultWhileNilSelectionPreservesTheCurrentPage() {
         XCTAssertEqual(DashboardSection.primarySections.first, .overview)
         XCTAssertEqual(DashboardSection.overview.systemImage, "square.grid.2x2")

@@ -4,8 +4,8 @@ import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
-    private let preferences: PreferencesStore
-    private let store: AppStore
+    private lazy var preferences = PreferencesStore()
+    private lazy var store = AppStore(preferences: preferences)
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private var dashboardController: DashboardWindowController?
@@ -15,13 +15,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var systemClockObserver: NSObjectProtocol?
     private var themeObservation: AnyCancellable?
     private var menuBarLayoutObservation: AnyCancellable?
-
-    override init() {
-        let preferences = PreferencesStore()
-        self.preferences = preferences
-        store = AppStore(preferences: preferences)
-        super.init()
-    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
@@ -55,6 +48,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+            return
+        }
         removeWorkspaceWakeObservation()
         removeSystemClockObservation()
         store.shutdown()
@@ -270,8 +266,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func chooseCodexExecutable() {
         let panel = NSOpenPanel()
-        panel.title = String(localized: "connection.choose")
-        panel.prompt = String(localized: "connection.choose")
+        panel.title = StatusAccessibilityString.localized(
+            "connection.choose", language: preferences.language, bundle: .main
+        )
+        panel.prompt = panel.title
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false

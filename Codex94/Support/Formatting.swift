@@ -112,6 +112,32 @@ enum QuotaFormatting {
         return String(value.prefix(limit - 1)) + "…"
     }
 
+    /// Keep full display names in the model; only native menu labels are shortened.
+    /// Reserve the initial labels as well as generated ones so a natural "(1)"
+    /// suffix cannot collide with a suffix introduced for another bucket.
+    static func bucketMenuNames(in snapshot: QuotaSnapshot, limit: Int = 30) -> [String: String] {
+        let buckets = snapshot.displayableBuckets
+        let fullNames = buckets.map { snapshot.displayName(for: $0) }
+        let shortNames = fullNames.map { shortBucketName($0, limit: limit) }
+        let counts = Dictionary(grouping: shortNames, by: { $0 }).mapValues(\.count)
+        var reserved = Set(shortNames)
+        var result: [String: String] = [:]
+        for (index, bucket) in buckets.enumerated() {
+            var label = shortNames[index]
+            if counts[label, default: 0] > 1 {
+                var ordinal = index + 1
+                repeat {
+                    let suffix = " (\(ordinal))"
+                    label = shortBucketName(fullNames[index], limit: limit - suffix.count) + suffix
+                    ordinal += 1
+                } while reserved.contains(label)
+                reserved.insert(label)
+            }
+            result[bucket.limitID] = label
+        }
+        return result
+    }
+
     private static func numericDisambiguationSuffix(in value: String) -> String? {
         guard value.last == ")",
               let opening = value.lastIndex(of: "("),

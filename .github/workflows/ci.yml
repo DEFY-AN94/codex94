@@ -16,6 +16,9 @@ jobs:
   test:
     runs-on: macos-15
     timeout-minutes: 20
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      build: ${{ steps.metadata.outputs.build }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,14 +54,27 @@ jobs:
       - name: Install release tools
         run: brew install ripgrep jq
 
+      - name: Read committed App metadata
+        id: metadata
+        run: |
+          metadata="$(/usr/bin/python3 -I script/release_metadata.py --revision "$GITHUB_SHA")"
+          version="$(jq -er '.version' <<< "$metadata")"
+          build="$(jq -er '.build' <<< "$metadata")"
+          {
+            echo "version=$version"
+            echo "build=$build"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Release gate
         run: ./script/release_check.sh
 
       - name: Verify candidate artifact allowlist
+        env:
+          RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
         run: |
-          distribution="$GITHUB_WORKSPACE/.build/Distribution/0.2.0"
-          dmg="$distribution/Codex94-0.2.0-macos-universal-unnotarized.dmg"
-          checksum="$distribution/Codex94-0.2.0-SHA256SUMS.txt"
+          distribution="$GITHUB_WORKSPACE/.build/Distribution/$RELEASE_VERSION"
+          dmg="$distribution/Codex94-$RELEASE_VERSION-macos-universal-unnotarized.dmg"
+          checksum="$distribution/Codex94-$RELEASE_VERSION-SHA256SUMS.txt"
           test -d "$distribution"
           test -f "$dmg" && test ! -L "$dmg"
           test -f "$checksum" && test ! -L "$checksum"
@@ -69,8 +85,8 @@ jobs:
         with:
           name: codex94-dmg-${{ github.sha }}
           path: |
-            .build/Distribution/0.2.0/Codex94-0.2.0-macos-universal-unnotarized.dmg
-            .build/Distribution/0.2.0/Codex94-0.2.0-SHA256SUMS.txt
+            .build/Distribution/${{ steps.metadata.outputs.version }}/Codex94-${{ steps.metadata.outputs.version }}-macos-universal-unnotarized.dmg
+            .build/Distribution/${{ steps.metadata.outputs.version }}/Codex94-${{ steps.metadata.outputs.version }}-SHA256SUMS.txt
           if-no-files-found: error
           include-hidden-files: false
           retention-days: 7
@@ -177,24 +193,27 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: codex94-dmg-${{ github.sha }}
-          path: .build/AttestationInput/0.2.0
+          path: .build/AttestationInput/${{ needs.test.outputs.version }}
 
       - name: Verify downloaded candidate
+        env:
+          RELEASE_VERSION: ${{ needs.test.outputs.version }}
+          RELEASE_BUILD: ${{ needs.test.outputs.build }}
         run: |
-          input="$GITHUB_WORKSPACE/.build/AttestationInput/0.2.0"
-          dmg="$input/Codex94-0.2.0-macos-universal-unnotarized.dmg"
-          checksum="$input/Codex94-0.2.0-SHA256SUMS.txt"
+          input="$GITHUB_WORKSPACE/.build/AttestationInput/$RELEASE_VERSION"
+          dmg="$input/Codex94-$RELEASE_VERSION-macos-universal-unnotarized.dmg"
+          checksum="$input/Codex94-$RELEASE_VERSION-SHA256SUMS.txt"
           test -d "$input"
           test -f "$dmg" && test ! -L "$dmg"
           test -f "$checksum" && test ! -L "$checksum"
           test "$(LC_ALL=C /bin/ls -A1 "$input" | /usr/bin/wc -l | /usr/bin/tr -d ' ')" = "2"
-          ./script/package_dmg.sh verify "$dmg" "$checksum" 0.2.0 11
+          ./script/package_dmg.sh verify "$dmg" "$checksum" "$RELEASE_VERSION" "$RELEASE_BUILD"
 
       - name: Attest DMG provenance
         id: attest-dmg
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: .build/AttestationInput/0.2.0/Codex94-0.2.0-macos-universal-unnotarized.dmg
+          subject-path: .build/AttestationInput/${{ needs.test.outputs.version }}/Codex94-${{ needs.test.outputs.version }}-macos-universal-unnotarized.dmg
 
       - name: Record attestation URL
         env:

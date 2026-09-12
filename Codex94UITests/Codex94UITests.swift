@@ -68,6 +68,7 @@ final class Codex94UITests: XCTestCase {
         try assertOverview(in: dashboard, scrollToLastRow: true)
         try selectPage(.about, in: dashboard)
         try assertAbout(in: dashboard)
+        try assertStartupReadOnly(in: dashboard)
         try selectPage(.connection, in: dashboard)
         try assertDashboardReset(in: dashboard, spark: false)
         try selectPage(.display, in: dashboard)
@@ -81,6 +82,7 @@ final class Codex94UITests: XCTestCase {
         try capture(dashboard, named: "dashboard-zh-Hans.png")
         try selectPage(.about, in: dashboard)
         try assertAbout(in: dashboard)
+        try assertStartupReadOnly(in: dashboard)
         popover = try openPopover(expectedRequestDelta: 1)
         try assertQuotaLayout(in: popover, spark: true)
         try assertNoRecoveryAction(in: popover)
@@ -123,24 +125,28 @@ final class Codex94UITests: XCTestCase {
         let savedSparkSelection = try selectedQuotaPreference()
         try require(savedSparkSelection != originalSelection, "The test must save an explicit Spark selection")
 
-        // Remove a bucket from the fake response, not from the user's preference.
-        // The fallback is runtime-only and the saved bucket resumes when it returns.
+        // A successful response confirms the selected bucket was removed. Save
+        // Auto once; a later return must not silently restore the old selection.
         try fixture.setMode("normal", includeSpark: false)
         try manualRefresh(in: popover)
         popover = try currentPopover()
         try assertQuotaLayout(in: popover, spark: false)
-        try require(elementWithText(language.fallback, in: popover).exists,
-                    "A missing saved quota must disclose the Auto fallback")
-        XCTAssertEqual(try selectedQuotaPreference(), savedSparkSelection)
+        try require(!elementWithText(language.fallback, in: popover).exists,
+                    "Successful normalization must not retain a missing-selection warning")
+        let autoSelection = try selectedQuotaPreference()
+        let autoJSON = try JSONSerialization.jsonObject(with: autoSelection) as? [String: Any]
+        XCTAssertEqual(autoJSON?["mode"] as? String, "automatic")
+        XCTAssertNil(autoJSON?["limitID"])
+        XCTAssertNotEqual(autoSelection, savedSparkSelection)
         dashboard = try openDashboard(from: popover)
         try selectPage(.connection, in: dashboard)
         try assertDashboardReset(in: dashboard, spark: false)
         popover = try openPopover(expectedRequestDelta: 1)
         try fixture.setMode("normal", includeSpark: true)
         try manualRefresh(in: popover)
-        XCTAssertEqual(try selectedQuotaPreference(), savedSparkSelection)
+        XCTAssertEqual(try selectedQuotaPreference(), autoSelection)
         dashboard = try openDashboard(from: try currentPopover())
-        try assertDashboardReset(in: dashboard, spark: true)
+        try assertDashboardReset(in: dashboard, spark: false)
         try selectPage(.display, in: dashboard)
         try withoutRequests("Restoring the menu-bar selection") {
             try chooseQuota("Codex · Weekly", in: dashboard)
@@ -228,6 +234,9 @@ final class Codex94UITests: XCTestCase {
             "languages": ["en", "zh-Hans"], "themes": UITheme.allCases.map(\.rawValue),
             "requestedStatusItemWidths": [58, 50, 28, 58],
             "sameProcessLayoutTransitions": true,
+            "missingBucketSavedAuto": true,
+            "returningBucketKeepsAuto": true,
+            "startupReadOnlyLanguages": ["en", "zh-Hans"],
             "observedStatusItemAXWidths": observedStatusWidths,
             "rawTestResultsUploaded": false
         ])
@@ -714,6 +723,7 @@ final class Codex94UITests: XCTestCase {
             case .overview: marker = identified("overview-page", in: dashboard)
             case .connection: marker = identified("connection-menu-bar-reset", in: dashboard)
             case .display: marker = identified("menu-bar-layout", in: dashboard)
+            case .startup: marker = identified("launch-at-login-toggle", in: dashboard)
             case .diagnostics: marker = elementWithText(language.copyDiagnostics, in: dashboard)
             case .about: marker = identified("about-version", in: dashboard)
             }
@@ -740,6 +750,7 @@ final class Codex94UITests: XCTestCase {
         case .overview: report["expectedPage"] = "overview"
         case .connection: report["expectedPage"] = "connection"
         case .display: report["expectedPage"] = "display"
+        case .startup: report["expectedPage"] = "startup"
         case .diagnostics: report["expectedPage"] = "diagnostics"
         case .about: report["expectedPage"] = "about"
         }
@@ -916,8 +927,10 @@ final class Codex94UITests: XCTestCase {
     private func choose(_ option: String, in control: XCUIElement, container: XCUIElement) throws {
         try reveal(control, in: container)
         control.click()
+        let labels = option == shortName(fixture.longName)
+            ? [option, fixture.longName.trimmingCharacters(in: .whitespacesAndNewlines)] : [option]
         let items = application.menuItems.matching(NSPredicate(
-            format: "label == %@ OR title == %@", option, option
+            format: "label IN %@ OR title IN %@", labels, labels
         ))
         try require(items.firstMatch.waitForExistence(timeout: 4), "The requested synthetic menu option is missing")
         let hittable = items.allElementsBoundByIndex.filter(\.isHittable)
@@ -928,7 +941,8 @@ final class Codex94UITests: XCTestCase {
 
     private func chooseModel(_ option: String, in popover: XCUIElement) throws {
         let control = try picker(label: language.quotaModel,
-                                 values: ["Codex", fixture.sparkName, shortName(fixture.longName)], in: popover)
+                                 values: ["Codex", fixture.sparkName, shortName(fixture.longName),
+                                          fixture.longName.trimmingCharacters(in: .whitespacesAndNewlines)], in: popover)
         try choose(option, in: control, container: popover)
         try waitUntil("The browsed bucket did not change") {
             let header = self.identified("quota-popover-header", in: self.application)
@@ -1437,10 +1451,26 @@ final class Codex94UITests: XCTestCase {
         return running.processIdentifier
     }
 
+    private func assertStartupReadOnly(in dashboard: XCUIElement) throws {
+        try withoutRequests("Opening the Startup page") {
+            try selectPage(.startup, in: dashboard)
+            let toggle = try uniqueIdentified("launch-at-login-toggle", in: dashboard)
+            try require(!toggle.isEnabled,
+                        "The disposable app outside Applications must never mutate Login Items")
+            try require(!identified("launch-at-login-error", in: dashboard).exists,
+                        "Reading system status must not invent an operation failure")
+        }
+    }
+
     private func chooseSyntheticExecutable(in dashboard: XCUIElement) throws {
         let chooseButton = try commandButton(language.choose, in: dashboard)
         try reveal(chooseButton, in: dashboard)
         chooseButton.click()
+        try waitUntil("The native Open panel must use the application's chosen language") {
+            self.application.buttons.matching(NSPredicate(
+                format: "label == %@ OR title == %@", self.language.choose, self.language.choose
+            )).allElementsBoundByIndex.contains { $0.isHittable }
+        }
         // Go to Folder targets a single manifest-validated file. No shell,
         // clipboard, Finder navigation, automatic lookup or login command.
         application.typeKey("g", modifierFlags: [.command, .shift])
@@ -1529,7 +1559,7 @@ private enum ReadOnlyFocusStage: String, CaseIterable {
         "focusedElementIdentityUnknown": true, "focusedElementIsRecoveryButton": false,
     ]
 }
-private enum UIPage { case overview, connection, display, diagnostics, about }
+private enum UIPage { case overview, connection, display, startup, diagnostics, about }
 private enum UITheme: String, CaseIterable { case system, terminalDark, terminalLight }
 
 private enum UILanguage: String, CaseIterable {
@@ -1561,6 +1591,7 @@ private enum UILanguage: String, CaseIterable {
         case .overview: chinese ? "总览" : "Overview"
         case .connection: chinese ? "连接" : "Connection"
         case .display: chinese ? "显示" : "Display"
+        case .startup: chinese ? "启动" : "Startup"
         case .diagnostics: chinese ? "诊断" : "Diagnostics"
         case .about: chinese ? "关于 Codex94" : "About Codex94"
         }

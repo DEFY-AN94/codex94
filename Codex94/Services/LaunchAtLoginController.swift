@@ -8,15 +8,13 @@ final class LaunchAtLoginController: ObservableObject {
     @Published private(set) var requiresApproval = false
     @Published private(set) var lastIssue: String?
 
+    private let readStatus: () -> SMAppService.Status
+    private let register: () throws -> Void
+    private let unregister: () throws -> Void
+    private let stableInstall: () -> Bool
+
     var isStableInstall: Bool {
-        Self.isStableInstall(
-            bundleURL: Bundle.main.bundleURL,
-            homeDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-            systemApplicationsDirectoryURL: URL(
-                fileURLWithPath: "/Applications",
-                isDirectory: true
-            )
-        )
+        stableInstall()
     }
 
     nonisolated static func isStableInstall(
@@ -46,12 +44,27 @@ final class LaunchAtLoginController: ObservableObject {
         return expectedBundleURLs.contains(resolvedBundleURL)
     }
 
-    init() {
+    init(
+        readStatus: @escaping () -> SMAppService.Status = { SMAppService.mainApp.status },
+        register: @escaping () throws -> Void = { try SMAppService.mainApp.register() },
+        unregister: @escaping () throws -> Void = { try SMAppService.mainApp.unregister() },
+        stableInstall: @escaping () -> Bool = {
+            LaunchAtLoginController.isStableInstall(
+                bundleURL: Bundle.main.bundleURL,
+                homeDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
+                systemApplicationsDirectoryURL: URL(fileURLWithPath: "/Applications", isDirectory: true)
+            )
+        }
+    ) {
+        self.readStatus = readStatus
+        self.register = register
+        self.unregister = unregister
+        self.stableInstall = stableInstall
         refresh()
     }
 
     func refresh() {
-        switch SMAppService.mainApp.status {
+        switch readStatus() {
         case .enabled:
             isEnabled = true
             requiresApproval = false
@@ -74,9 +87,9 @@ final class LaunchAtLoginController: ObservableObject {
 
         do {
             if enabled {
-                try SMAppService.mainApp.register()
+                try register()
             } else {
-                try SMAppService.mainApp.unregister()
+                try unregister()
             }
         } catch {
             lastIssue = "service_management_error"

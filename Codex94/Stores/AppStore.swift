@@ -24,6 +24,7 @@ final class AppStore: ObservableObject {
     private(set) var resetRefreshTask: Task<Void, Never>?
     private(set) var scheduledResetRefreshDate: Date?
     private(set) var pendingResetRefreshDate: Date?
+    private(set) var consumedResetRefreshDate: Date?
     private(set) var activeRefreshStartedAt: Date?
     private var preferencesObservation: AnyCancellable?
     private var isShuttingDown = false
@@ -43,7 +44,7 @@ final class AppStore: ObservableObject {
 
         if let cached = cache.load() {
             snapshot = cached
-            viewedBucketID = cached.defaultLimitID
+            viewedBucketID = cached.firstAvailableBucket?.limitID
             connectionState = .stale(lastSuccess: cached.fetchedAt, issue: .unknown)
         }
 
@@ -70,10 +71,12 @@ final class AppStore: ObservableObject {
 
     var viewedBucket: QuotaBucketSnapshot? {
         guard let snapshot else { return nil }
-        if let bucket = snapshot.displayableBuckets.first(where: { $0.limitID == viewedBucketID }) {
+        if let bucket = snapshot.displayableBuckets.first(where: {
+            $0.limitID == viewedBucketID && !$0.windows.isEmpty
+        }) {
             return bucket
         }
-        return snapshot.defaultBucket
+        return snapshot.firstAvailableBucket
     }
 
     var viewedWindow: QuotaWindowSnapshot? {
@@ -236,6 +239,7 @@ final class AppStore: ObservableObject {
         resetRefreshTask = nil
         scheduledResetRefreshDate = nil
         pendingResetRefreshDate = nil
+        consumedResetRefreshDate = nil
         refreshTask?.cancel()
         refreshTask = nil
         activeRefreshStartedAt = nil
@@ -263,7 +267,9 @@ final class AppStore: ObservableObject {
     }
 
     func setViewedBucket(_ limitID: String) {
-        guard snapshot?.displayableBuckets.contains(where: { $0.limitID == limitID }) == true else {
+        guard snapshot?.displayableBuckets.contains(where: {
+            $0.limitID == limitID && !$0.windows.isEmpty
+        }) == true else {
             return
         }
         viewedBucketID = limitID
@@ -310,13 +316,22 @@ final class AppStore: ObservableObject {
             visibleSnapshot = freshSnapshot
         }
 
+        // Account for targets covered by this response before replacing the old
+        // windows: a completed reset may disappear from the successful snapshot.
+        consumeCoveredQuotaResets(through: visibleSnapshot.fetchedAt)
         snapshot = visibleSnapshot
         locatedCodex = located
         lastIssue = nil
         connectionState = .connected
 
-        if !visibleSnapshot.displayableBuckets.contains(where: { $0.limitID == viewedBucketID }) {
-            viewedBucketID = visibleSnapshot.defaultLimitID
+        if !visibleSnapshot.displayableBuckets.contains(where: {
+            $0.limitID == viewedBucketID && !$0.windows.isEmpty
+        }) {
+            viewedBucketID = visibleSnapshot.firstAvailableBucket?.limitID
+        }
+
+        if menuBarSelectionUsesFallback {
+            preferences.menuBarQuotaSelection = .automatic
         }
 
         do {
@@ -344,23 +359,13 @@ final class AppStore: ObservableObject {
             return
         }
 
-        let consumedFrontier = resetRefreshTask == nil && pendingResetRefreshDate == nil
-            ? scheduledResetRefreshDate
-            : nil
-        resetRefreshTask?.cancel()
-        resetRefreshTask = nil
-
-        let threshold = Self.latest(now, consumedFrontier) ?? now
+        cancelScheduledQuotaResetRefresh()
+        let threshold = Self.latest(now, consumedResetRefreshDate) ?? now
         if let next = RefreshPolicy.earliestFutureQuotaResetDate(
             in: snapshot,
             now: threshold
         ) {
             armQuotaResetRefresh(for: next, now: now)
-        } else {
-            scheduledResetRefreshDate = Self.latest(
-                consumedFrontier,
-                RefreshPolicy.latestDueQuotaResetDate(in: snapshot, now: threshold)
-            )
         }
     }
 
@@ -382,43 +387,31 @@ final class AppStore: ObservableObject {
             return false
         }
 
-        resetRefreshTask?.cancel()
-        resetRefreshTask = nil
+        cancelScheduledQuotaResetRefresh()
         let batchDate = Self.latest(
             expectedDate,
-            RefreshPolicy.latestDueQuotaResetDate(in: snapshot, now: now)
+            RefreshPolicy.latestDueQuotaResetDate(
+                in: snapshot, now: now, strictlyAfter: consumedResetRefreshDate
+            )
         ) ?? expectedDate
-        advanceQuotaResetFrontier(consuming: batchDate, now: now)
         processDueQuotaResetBatch(batchDate, now: now)
         return true
     }
 
     private func finishRefresh(successfulFetchedAt: Date?, now: Date) {
-        // A reset timer and a request completion can become runnable together.
-        // Reconcile while this request is still marked active so a pre-target
-        // result cannot cancel a newly due target before it becomes pending.
-        _ = reconcileQuotaResetRefresh(now: now)
-
         if let successfulFetchedAt {
-            if let pendingResetRefreshDate,
-               successfulFetchedAt >= pendingResetRefreshDate {
-                self.pendingResetRefreshDate = nil
-            }
-            replaceQuotaResetScheduleAfterSuccess(
-                fetchedAt: successfulFetchedAt,
-                now: now
-            )
+            replaceQuotaResetScheduleAfterSuccess(fetchedAt: successfulFetchedAt)
         }
+
+        // Reconcile while the request is still active, after removing deadlines
+        // for windows that disappeared. A still-valid pre-target result can
+        // queue one follow-up even when completion wins the timer race.
+        _ = reconcileQuotaResetRefresh(now: now)
 
         let queuedTrigger = pendingRefreshTrigger
         pendingRefreshTrigger = nil
         refreshTask = nil
         activeRefreshStartedAt = nil
-
-        if let pendingResetRefreshDate, now < pendingResetRefreshDate {
-            self.pendingResetRefreshDate = nil
-            armQuotaResetRefresh(for: pendingResetRefreshDate, now: now)
-        }
 
         if let queuedTrigger {
             refresh(trigger: queuedTrigger, startedAt: now)
@@ -429,51 +422,18 @@ final class AppStore: ObservableObject {
         }
     }
 
-    private func replaceQuotaResetScheduleAfterSuccess(
-        fetchedAt: Date,
-        now: Date
-    ) {
-        let consumedFrontier = resetRefreshTask == nil && pendingResetRefreshDate == nil
-            ? scheduledResetRefreshDate
-            : nil
-        resetRefreshTask?.cancel()
-        resetRefreshTask = nil
-
-        let threshold = Self.latest(Self.latest(now, fetchedAt), consumedFrontier) ?? now
-        if let next = RefreshPolicy.earliestFutureQuotaResetDate(
-            in: snapshot,
-            now: threshold
-        ) {
-            armQuotaResetRefresh(for: next, now: now)
-        } else {
-            scheduledResetRefreshDate = Self.latest(
-                consumedFrontier,
-                RefreshPolicy.latestDueQuotaResetDate(in: snapshot, now: threshold)
-            )
+    private func replaceQuotaResetScheduleAfterSuccess(fetchedAt: Date) {
+        consumeCoveredQuotaResets(through: fetchedAt)
+        let currentTargets = RefreshPolicy.quotaResetDates(in: snapshot)
+        if let pendingResetRefreshDate, !currentTargets.contains(pendingResetRefreshDate) {
+            self.pendingResetRefreshDate = nil
         }
+        cancelScheduledQuotaResetRefresh()
     }
 
     private func consumeDueQuotaResetsForAcceptedRefresh(startedAt: Date) {
-        if let pendingResetRefreshDate, pendingResetRefreshDate <= startedAt {
-            self.pendingResetRefreshDate = nil
-        }
-
-        let latestDue = RefreshPolicy.latestDueQuotaResetDate(in: snapshot, now: startedAt)
-        if resetRefreshTask != nil,
-           let scheduledResetRefreshDate,
-           scheduledResetRefreshDate <= startedAt {
-            let batchDate = Self.latest(scheduledResetRefreshDate, latestDue)
-                ?? scheduledResetRefreshDate
-            advanceQuotaResetFrontier(consuming: batchDate, now: startedAt)
-            return
-        }
-
-        guard resetRefreshTask == nil, let latestDue else { return }
-        if let consumedFrontier = scheduledResetRefreshDate,
-           latestDue <= consumedFrontier {
-            return
-        }
-        advanceQuotaResetFrontier(consuming: latestDue, now: startedAt)
+        consumeCoveredQuotaResets(through: startedAt)
+        configureQuotaResetRefresh(now: startedAt)
     }
 
     @discardableResult
@@ -485,73 +445,49 @@ final class AppStore: ObservableObject {
 
         if let pendingResetRefreshDate, now < pendingResetRefreshDate {
             self.pendingResetRefreshDate = nil
-            armQuotaResetRefresh(for: pendingResetRefreshDate, now: now)
-            return false
-        }
-        if pendingResetRefreshDate != nil {
-            return true
         }
 
-        if let expectedDate = scheduledResetRefreshDate, resetRefreshTask != nil {
-            if now < expectedDate {
-                armQuotaResetRefresh(for: expectedDate, now: now)
-                return false
-            }
-            return handleQuotaResetRefreshTimer(expectedDate: expectedDate, now: now)
-        }
-
-        let consumedFrontier = scheduledResetRefreshDate
         if let latestDue = RefreshPolicy.latestDueQuotaResetDate(
             in: snapshot,
             now: now,
-            strictlyAfter: consumedFrontier
+            strictlyAfter: consumedResetRefreshDate
         ) {
-            advanceQuotaResetFrontier(consuming: latestDue, now: now)
             processDueQuotaResetBatch(latestDue, now: now)
             return true
         }
 
-        let threshold = Self.latest(now, consumedFrontier) ?? now
-        if let next = RefreshPolicy.earliestFutureQuotaResetDate(
-            in: snapshot,
-            now: threshold
-        ) {
-            armQuotaResetRefresh(for: next, now: now)
-        } else if consumedFrontier == nil {
-            scheduledResetRefreshDate = RefreshPolicy.latestDueQuotaResetDate(
-                in: snapshot,
-                now: threshold
-            )
-        }
+        configureQuotaResetRefresh(now: now)
         return false
     }
 
     private func processDueQuotaResetBatch(_ batchDate: Date, now: Date) {
         if refreshTask != nil {
             if let activeRefreshStartedAt, activeRefreshStartedAt >= batchDate {
-                if let pendingResetRefreshDate,
-                   pendingResetRefreshDate <= activeRefreshStartedAt {
-                    self.pendingResetRefreshDate = nil
-                }
-                return
+                consumeCoveredQuotaResets(through: activeRefreshStartedAt)
+            } else {
+                pendingResetRefreshDate = Self.latest(pendingResetRefreshDate, batchDate)
             }
-            pendingResetRefreshDate = Self.latest(pendingResetRefreshDate, batchDate)
+            configureQuotaResetRefresh(now: now)
             return
         }
 
         refresh(trigger: .quotaReset, startedAt: now)
     }
 
-    private func advanceQuotaResetFrontier(consuming batchDate: Date, now: Date) {
-        resetRefreshTask?.cancel()
-        resetRefreshTask = nil
-        if let next = RefreshPolicy.earliestFutureQuotaResetDate(
-            in: snapshot,
-            now: now
-        ) {
-            armQuotaResetRefresh(for: next, now: now)
-        } else {
-            scheduledResetRefreshDate = batchDate
+    private func consumeCoveredQuotaResets(through coveredAt: Date) {
+        let coveredTargets = [
+            RefreshPolicy.latestDueQuotaResetDate(in: snapshot, now: coveredAt),
+            scheduledResetRefreshDate,
+            pendingResetRefreshDate
+        ].compactMap { $0 }.filter { $0 <= coveredAt }
+        guard let latestCovered = coveredTargets.max() else { return }
+
+        consumedResetRefreshDate = Self.latest(consumedResetRefreshDate, latestCovered)
+        if let pendingResetRefreshDate, pendingResetRefreshDate <= latestCovered {
+            self.pendingResetRefreshDate = nil
+        }
+        if let scheduledResetRefreshDate, scheduledResetRefreshDate <= latestCovered {
+            cancelScheduledQuotaResetRefresh()
         }
     }
 
@@ -578,10 +514,15 @@ final class AppStore: ObservableObject {
     }
 
     private func clearQuotaResetRefreshState() {
+        cancelScheduledQuotaResetRefresh()
+        pendingResetRefreshDate = nil
+        consumedResetRefreshDate = nil
+    }
+
+    private func cancelScheduledQuotaResetRefresh() {
         resetRefreshTask?.cancel()
         resetRefreshTask = nil
         scheduledResetRefreshDate = nil
-        pendingResetRefreshDate = nil
     }
 
     private static func latest(_ lhs: Date?, _ rhs: Date?) -> Date? {

@@ -2,6 +2,29 @@ import XCTest
 @testable import Codex94
 
 final class SnapshotCacheTests: XCTestCase {
+    func testV2ExtremePercentagesRoundTripWithoutOverflowOrSchemaChanges() throws {
+        let directory = try makeTemporaryDirectory()
+        let cache = SnapshotCache(fileURL: directory.appendingPathComponent("quota.json"))
+        for used in [Int.min, -1, 0, 100, 101, Int.max] {
+            let snapshot = QuotaSnapshot(
+                buckets: [QuotaBucketSnapshot(
+                    limitID: "default",
+                    limitName: nil,
+                    planType: "pro",
+                    windows: [window(.weekly, used: used, minutes: 10_080, reset: nil)]
+                )],
+                defaultLimitID: "default",
+                fetchedAt: Date(timeIntervalSince1970: 1_900_000_000),
+                account: nil,
+                codex: nil
+            )
+            try cache.save(snapshot)
+            let restored = try XCTUnwrap(cache.load()?.defaultBucket?.window(.weekly))
+            XCTAssertEqual(restored.usedPercent, used)
+            XCTAssertEqual(restored.remainingPercent, used <= 0 ? 100 : 0)
+        }
+    }
+
     func testV2RoundTripPreservesBucketsAndUsesOwnerOnlyPermissions() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("Codex94CacheTests-\(UUID().uuidString)", isDirectory: true)
