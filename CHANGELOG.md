@@ -40,8 +40,8 @@ All notable changes to Codex94 are documented here.
 
 - Retain cache v2, existing preference keys, fixed Codex subprocess requests,
   and current authentication, network, permission, and entitlement boundaries.
-- Continue unsigned, unnotarized Universal DMG and source distribution. This
-  candidate is not published; stable downloads remain on `v0.2.0`.
+- Continue unsigned, unnotarized Universal DMG and source distribution from
+  the published `v0.2.1` tag.
 
 ## 0.2.0 - 2026-09-03
 

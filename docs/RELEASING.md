@@ -1,8 +1,10 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is `v0.2.0 (11)`; this tree is the unreleased
-`0.2.1 (12)` candidate. Keep public download and source-clone instructions on
-the published release until publication is confirmed.
+The published stable version is [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1).
+Its tag and DMG remain bound to release commit
+`2eb2319c70c827637e8820066d5c2ba0a532a17c`; later docs-only commits do not move
+that tag or regenerate its assets. Keep public download and source-clone
+instructions on the published release until a later publication is confirmed.
 
 Each release uses one verified source commit, one annotated tag, and exactly
 two manual assets: a Universal 2 DMG and its one-line SHA-256 checksum. The outer

@@ -162,12 +162,13 @@ smokes. For `0.1.9 (10)`, PR #11 remains the historical exact-head test,
 Display/Recovery UI, Actions/Python/Swift CodeQL, and final App acceptance
 record; the README images establish only the reviewed captures they display.
 Keyboard activation, AXPress, and hosted tooltip exposure are not claimed as
-passed. Keep `0.2.1` candidate notes under Unreleased without a guessed date.
+passed. Keep release-candidate notes under Unreleased without a guessed date.
 Before tagging, the maintainer confirms the release date and a reviewed docs
 change replaces Unreleased; final-main CI and the DMG must include that change.
-The published stable release remains `v0.2.0` until publication; only then update
-current stable links and candidate wording. A later docs-only PR uses the normal
-authorization/check gates, verifies the changelog date, and never moves a tag.
+Keep stable links on the currently published release until a later release is
+public; only then update current stable links and candidate wording. A later
+docs-only PR uses the normal authorization/check gates, verifies the changelog
+date, and never moves a tag.
 
 A release pull request begins as Draft. Platform-required CI and the additional
 fail-closed UI smoke/CodeQL gates must be complete and reviewed. The Universal

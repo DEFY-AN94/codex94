@@ -47,16 +47,16 @@ schedules. The unchanged default menu-bar sample is retained from `v0.1.7`.
 
 ## Distribution status
 
-- The published stable release is [`v0.2.0 (11)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0),
+- The published stable release is [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1),
   available as a Universal 2 DMG and source from the same annotated tag.
-- This tree contains the unreleased `0.2.1 (12)` stability and maintenance
-  candidate. The behavior below describes this tree; stable download and clone
-  instructions continue to point to `v0.2.0` until the new release is published.
+- Version `0.2.1 (12)` is a stability and maintenance update. Download and
+  source-clone instructions below refer to this published tag; `main` may
+  contain later development work.
 - This public repository can be cloned without GitHub authentication.
 - There is no automatic updater.
 - `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
   Runtime signature, and installs it at `~/Applications/Codex94.app`.
-- The candidate installer requires every Codex94 copy to be quit first. It
+- The installer requires every Codex94 copy to be quit first. It
   verifies a unique staged copy, uses an installation lock, and preserves the
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
@@ -83,23 +83,23 @@ executable selected manually.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v0.2.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0):
+[`v0.2.1` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1):
 
-- `Codex94-0.2.0-macos-universal-unnotarized.dmg`
-- `Codex94-0.2.0-SHA256SUMS.txt`
+- `Codex94-0.2.1-macos-universal-unnotarized.dmg`
+- `Codex94-0.2.1-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS 14 or
 later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-0.2.0-SHA256SUMS.txt
+shasum -a 256 -c Codex94-0.2.1-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, you can also verify that the DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-0.2.0-macos-universal-unnotarized.dmg \
+gh attestation verify Codex94-0.2.1-macos-universal-unnotarized.dmg \
   -R DEFY-AN94/codex94
 ```
 
@@ -122,7 +122,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v0.2.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.2.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
@@ -326,7 +326,7 @@ Build and run a Debug app:
 ```
 
 `build_and_run.sh` stops existing named Codex94 processes before building and
-launches the Debug app. The candidate `install.sh` asks you to quit running
+launches the Debug app. `install.sh` asks you to quit running
 copies instead of stopping them, replaces only its installation path, and may
 launch the installed App. These scripts are not read-only checks; local app runs can
 use the same preferences and cache as the installed app.
@@ -362,10 +362,10 @@ PR #11 remains the historical record for exact-head test, Display/Recovery UI,
 Actions/Python/Swift CodeQL, and final App acceptance. The synthetic Overview
 capture embedded above has been reviewed for layout and privacy. Keyboard
 activation, AXPress, and hosted tooltip exposure are not claimed as passed.
-Version `0.2.0` is published. The `0.2.1` candidate requires its own test
-results, reviewed synthetic UI evidence, candidate App acceptance before Ready,
-and final CI DMG acceptance before publication. Earlier evidence does not prove
-the new candidate passed.
+Version [`0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)
+is published. Every release needs its own test results, reviewed synthetic UI
+evidence, candidate App acceptance before Ready, and final CI DMG acceptance
+before publication. Earlier evidence does not prove a later candidate passed.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See
