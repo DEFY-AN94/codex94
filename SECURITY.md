@@ -31,9 +31,9 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-0.2.0-SHA256SUMS.txt` before opening the DMG. The optional
+Verify `Codex94-0.2.1-SHA256SUMS.txt` before opening the DMG. The optional
 GitHub command
-`gh attestation verify Codex94-0.2.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
+`gh attestation verify Codex94-0.2.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
 can prove repository/workflow/commit provenance for the exact DMG. A matching
 checksum or attestation is not notarization, malware review, a security audit,
 or Gatekeeper approval. If the exact release is trusted, use only Apple's
@@ -81,7 +81,7 @@ system permissions. DMG staging and CI upload allowlists contain the packaged
 App and release metadata only; they exclude credentials, identity, real quota,
 preferences, cache, logs, screenshots, and private filesystem paths.
 
-The `0.2.1` candidate keeps these boundaries. Extreme numeric inputs are
+Version `0.2.1` keeps these boundaries. Extreme numeric inputs are
 clamped before remaining-quota arithmetic, and a session-only watermark avoids
 repeating consumed Resets after clock rollback. A fresh successful snapshot
 may change an unavailable pinned quota selection to Auto using the existing
@@ -92,10 +92,9 @@ and retains recovery files when rollback cannot safely restore the old App.
 
 ## Supported versions
 
-The supported published stable version is [`v0.2.0 (11)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0).
-This tree contains the unreleased `0.2.1 (12)` candidate. Feature branches and
-`main` may contain development work that has not passed release acceptance.
-Update current stable-version links only after the new Release is public.
+The supported published stable version is [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1).
+Feature branches and `main` may contain development work that has not passed
+release acceptance. Current stable-version links identify the published release.
 
 Version `0.1.8 (9)` passed the full GitHub test/release job, synthetic Display
 and click-functional Recovery UI jobs, Actions/Swift CodeQL, and separate
@@ -104,7 +103,7 @@ for exact-head test, Display/Recovery UI, Actions/Python/Swift CodeQL, and final
 App acceptance. The synthetic Overview image embedded in the README has been
 visually and privacy reviewed. Contributor validation guidance is documented in
 [CONTRIBUTING.md](CONTRIBUTING.md); static source checks alone are not runtime
-security or release evidence. The `0.2.1` candidate needs its own checks,
+security or release evidence. Every release candidate needs its own checks,
 candidate App acceptance before Ready, and final CI artifact/tag/Release
 verification and maintainer acceptance before publication.
 

@@ -43,14 +43,14 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 ## 当前分发状态
 
-- 已发布的稳定版为 [`v0.2.0 (11)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0)，
+- 已发布的稳定版为 [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)，
   提供 Universal 2 DMG 与来自同一个 annotated 标签的源码安装。
-- 当前源码树是尚未发布的 `0.2.1 (12)` 稳定性与维护修补候选。下文行为描述对应
-  当前源码树；新版本正式发布前，稳定下载和 clone 指令继续指向 `v0.2.0`。
+- `0.2.1 (12)` 是稳定性与维护修补版本。下方下载和源码 clone 指令指向该已发布
+  标签；`main` 可能包含后续开发内容。
 - 仓库已公开，无需 GitHub 认证即可 clone；本项目没有自动更新功能。
 - `script/install.sh` 构建本地 Release App，应用 ad-hoc Hardened Runtime
   签名，并安装到 `~/Applications/Codex94.app`。
-- 候选版安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
+- 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
 可下载的 DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
@@ -72,25 +72,25 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 
 ## 安装 Universal DMG
 
-请从已发布的 `v0.2.0`
-[Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.0)
+请从已发布的 `v0.2.1`
+[Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)
 同时下载以下两个资产：
 
-- `Codex94-0.2.0-macos-universal-unnotarized.dmg`
-- `Codex94-0.2.0-SHA256SUMS.txt`
+- `Codex94-0.2.1-macos-universal-unnotarized.dmg`
+- `Codex94-0.2.1-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-0.2.0-SHA256SUMS.txt
+shasum -a 256 -c Codex94-0.2.1-SHA256SUMS.txt
 ```
 
 如果已安装 GitHub CLI，还可以核验该 DMG 来自本仓库指定的 GitHub workflow
 与 commit：
 
 ```bash
-gh attestation verify Codex94-0.2.0-macos-universal-unnotarized.dmg \
+gh attestation verify Codex94-0.2.1-macos-universal-unnotarized.dmg \
   -R DEFY-AN94/codex94
 ```
 
@@ -112,7 +112,7 @@ Attestation 只是构建来源证明，不是 Apple 签名、公证、恶意软�
 Clone 当前已经发布的稳定源码标签：
 
 ```bash
-git clone --branch v0.2.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.2.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
@@ -278,7 +278,7 @@ brew install ripgrep jq
 ```
 
 `build_and_run.sh` 会在构建前关闭现有的匹配名称 Codex94 进程，然后启动 Debug
-App。候选版 `install.sh` 会要求用户自行退出正在运行的副本，仅替换自身安装路径，
+App。`install.sh` 会要求用户自行退出正在运行的副本，仅替换自身安装路径，
 并且可能启动安装后的 App。这些脚本并非只读检查；
 本机运行的 App 可能使用与已安装 App 相同的偏好和缓存。
 
@@ -308,9 +308,10 @@ payload 验证由打包脚本负责：
 任务，以及 Actions/Swift CodeQL。对于 `0.1.9 (10)`，PR #11 仍是精确 head 测试、
 Display/Recovery UI、Actions/Python/Swift CodeQL 与最终 App 人工验收状态的历史
 记录；上方嵌入的合成总览截图已经完成布局与隐私审查。键盘激活、AXPress 与托管
-运行器 tooltip 暴露仍不声明为已通过。`0.2.0` 已正式发布；`0.2.1` 候选需要独立
-的测试结果、已审阅合成 UI 证据、Ready 前的候选 App 人工验收，以及发布前的最终
-CI DMG 验收。旧版本证据不能证明新候选已通过。
+运行器 tooltip 暴露仍不声明为已通过。
+[`0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)
+已正式发布。每个版本都需要独立的测试结果、已审阅合成 UI 证据、Ready 前的候选
+App 人工验收，以及发布前的最终 CI DMG 验收。旧版本证据不能证明后续候选已通过。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。贡献与发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 和
