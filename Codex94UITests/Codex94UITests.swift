@@ -361,7 +361,7 @@ final class Codex94UITests: XCTestCase {
         for (range, count) in [(UITokenRange.sevenDays, 7), (.thirtyDays, 30), (.all, 35)] {
             try withoutTokenUsageRequests("Changing the visible token-usage range") {
                 try chooseTokenRange(range, in: dashboard)
-                try assertTokenUsageContent(in: dashboard, visibleDays: count)
+                try assertTokenUsageContent(in: dashboard, visibleDays: count, includeSummary: false)
             }
             if range == .sevenDays {
                 try withoutTokenUsageRequests("Bringing the seven-day chart into the page viewport") {
@@ -519,12 +519,20 @@ final class Codex94UITests: XCTestCase {
         }
     }
 
-    private func assertTokenUsageContent(in dashboard: XCUIElement, visibleDays: Int) throws {
-        for identifier in [
-            "token-usage-summary", "token-usage-lifetime", "token-usage-peak",
-            "token-usage-current-streak", "token-usage-longest-streak", "token-usage-longest-turn",
-            "token-usage-chart", "token-usage-daily-table", "token-usage-coverage"
-        ] {
+    private func assertTokenUsageContent(
+        in dashboard: XCUIElement, visibleDays: Int, includeSummary: Bool = true
+    ) throws {
+        var identifiers = ["token-usage-chart", "token-usage-daily-table", "token-usage-coverage"]
+        if includeSummary {
+            // Verify all summaries on entry and after explicit refresh. A range
+            // change keeps the viewport at the chart, where LazyVGrid may have
+            // removed offscreen summary cards from the accessibility tree.
+            identifiers = [
+                "token-usage-summary", "token-usage-lifetime", "token-usage-peak",
+                "token-usage-current-streak", "token-usage-longest-streak", "token-usage-longest-turn"
+            ] + identifiers
+        }
+        for identifier in identifiers {
             try require(identified(identifier, in: dashboard).waitForExistence(timeout: 5),
                         "A token summary, chart or daily-table component is missing: \(identifier)")
         }
@@ -534,7 +542,9 @@ final class Codex94UITests: XCTestCase {
         try require(!identified("token-usage-error", in: dashboard).exists
                     && !identified("token-usage-partial", in: dashboard).exists,
                     "Complete synthetic usage must not expose an error or partial state")
-        try assertTokenMetric("token-usage-lifetime", contains: "1,234,567", in: dashboard)
+        if includeSummary {
+            try assertTokenMetric("token-usage-lifetime", contains: "1,234,567", in: dashboard)
+        }
     }
 
     private func assertTokenMetric(_ identifier: String, contains expected: String, in dashboard: XCUIElement) throws {

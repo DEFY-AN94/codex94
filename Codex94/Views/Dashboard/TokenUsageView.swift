@@ -235,6 +235,7 @@ struct TokenUsageView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("token-usage-error")
     }
 
