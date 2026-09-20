@@ -364,6 +364,9 @@ final class Codex94UITests: XCTestCase {
                 try assertTokenUsageContent(in: dashboard, visibleDays: count)
             }
             if range == .sevenDays {
+                try withoutTokenUsageRequests("Bringing the seven-day chart into the page viewport") {
+                    try revealTokenChartForCapture(in: dashboard)
+                }
                 try capture(dashboard, named: "usage-seven-days-en.png")
             }
         }
@@ -471,16 +474,49 @@ final class Codex94UITests: XCTestCase {
 
     private func chooseTokenRange(_ range: UITokenRange, in dashboard: XCUIElement) throws {
         let control = try uniqueIdentified("token-usage-range", in: dashboard)
-        try reveal(control, in: dashboard)
         let title = language.tokenRange(range)
         let matches = control.descendants(matching: .any).matching(NSPredicate(
             format: "label == %@ OR title == %@ OR value == %@", title, title, title
-        )).allElementsBoundByIndex
-        let buttons = matches.filter { $0.elementType == .button || $0.elementType == .radioButton }
-        let candidates = buttons.isEmpty ? matches.filter { $0.isHittable } : buttons
+        ))
+        func matchingButtons() -> [XCUIElement] {
+            matches.allElementsBoundByIndex.filter {
+                $0.elementType == .button || $0.elementType == .radioButton
+            }
+        }
+        let initialCandidates = matchingButtons()
+        try require(initialCandidates.count == 1 && initialCandidates[0].isEnabled,
+                    "The token range must expose one enabled radio button or button")
+        // On macOS the segmented Picker is an accessibility RadioGroup, which
+        // need not be hittable even when all of its native radio buttons are.
+        // Scroll to the actual click target, then re-query and validate it.
+        try reveal(initialCandidates[0], in: dashboard)
+        let candidates = matchingButtons()
         try require(candidates.count == 1 && candidates[0].isEnabled && candidates[0].isHittable,
                     "The token range must be one uniquely identified segmented choice")
         candidates[0].click()
+    }
+
+    private func revealTokenChartForCapture(in dashboard: XCUIElement) throws {
+        let page = try uniqueIdentified("token-usage-page", in: dashboard)
+        let chart = try uniqueIdentified("token-usage-chart", in: dashboard)
+        try require(page.elementType == .scrollView,
+                    "Chart evidence must scroll only the identified token page")
+        func chartIsFullyVisible() -> Bool {
+            let frame = chart.frame
+            let viewport = page.frame.intersection(dashboard.frame)
+            return [frame.minX, frame.minY, frame.width, frame.height,
+                    viewport.minX, viewport.minY, viewport.width, viewport.height].allSatisfy(\.isFinite)
+                && frame.width > 0 && frame.height > 0 && viewport.contains(frame)
+        }
+        if !chartIsFullyVisible() {
+            // At this point the range control has just been clicked above the
+            // chart. One bounded outer-page scroll exposes the whole plot; no
+            // click or hittability assertion is made against the chart itself.
+            page.scroll(byDeltaX: 0, deltaY: -360)
+        }
+        try waitUntil("The complete seven-day chart must be inside its page viewport") {
+            chartIsFullyVisible()
+        }
     }
 
     private func assertTokenUsageContent(in dashboard: XCUIElement, visibleDays: Int) throws {
