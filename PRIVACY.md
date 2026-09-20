@@ -1,9 +1,10 @@
 # Privacy
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
-crash-reporting SDK, system profiling, or Codex94-operated server. The unreleased
-`0.3.0 (14)` candidate adds a user-triggered public GitHub release check, as
-described below. The published stable release remains `0.2.2`.
+crash-reporting SDK, system profiling, or Codex94-operated server. The published
+stable version is [`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0),
+released on 2026-09-21 (Australia/Melbourne). It includes the user-triggered
+public GitHub release check described below, without automatic installation.
 
 ## Data access
 
@@ -14,7 +15,7 @@ requests over the child process's standard input/output:
   reset-credit count
 - `account/read` with `refreshToken: false` only when **Quota + account** is
   selected
-- `account/usage/read` on demand from the `0.3.0` candidate's Token usage page,
+- `account/usage/read` on demand from the Token usage page introduced in `0.3.0`,
   independently of the quota/account-display choice
 
 The Codex child process may contact OpenAI services using the login it already
@@ -40,7 +41,7 @@ held only in memory, including a visibly cached last value after a failure.
 It is not saved in the quota cache and returns to an unfetched state at a cold
 start. Codex94 does not redeem reset credits or send a consume request.
 
-## Token statistics (0.3.0 candidate)
+## Token statistics (0.3.0)
 
 First opening Token usage or pressing its Refresh button requests
 `account/usage/read` through the same local Codex executable. The feature does
@@ -155,7 +156,7 @@ app policy state does not mean delivered notifications leave no local record.
 This is a local operating-system service and permission, not a Codex94 remote
 telemetry channel or project-operated server.
 
-## Manual release checks (0.3.0 candidate)
+## Manual release checks (0.3.0)
 
 Only **About → Check for updates** initiates an update check. It sends an
 unauthenticated HTTPS request to the fixed public endpoint
@@ -196,7 +197,7 @@ artifacts continue to use isolated synthetic data.
 Downloading a Release in a browser and macOS recording quarantine or presenting
 Gatekeeper/Privacy & Security UI are operating-system distribution behaviors.
 Codex94 does not read browser data, change quarantine, or automate Open Anyway.
-The candidate's explicit GitHub check is a separate runtime network path, not
+The explicit GitHub check is a separate runtime network path, not
 an effect of DMG installation. Installing at `/Applications/Codex94.app` or
 `~/Applications/Codex94.app` does not duplicate the cache schema: both locations
 use the same bundle identifier and local data, which is why users should not run
@@ -216,7 +217,7 @@ it writes the exact displayed version and build. Both writes happen only after a
 user action. Codex94 does not read or upload clipboard contents or diagnostics,
 and users should review copied diagnostics before sharing them. Selecting the
 project link similarly opens the exact repository URL through the system.
-The candidate's release-check request is separate and does not upload clipboard
+The release-check request is separate and does not upload clipboard
 contents or diagnostics.
 
 ## Permissions

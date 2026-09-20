@@ -1,9 +1,9 @@
 # Update checks
 
-This document describes the **Unreleased `0.3.0 (14)` candidate**. The current
-public stable release and the README download/source instructions remain on
-[`v0.2.2`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2).
-This change has not published a new version.
+This document describes the published stable release
+[`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0), released
+on 2026-09-21 (Australia/Melbourne). README download and source instructions
+refer to this release. Update checks are manual; installation remains user-managed.
 
 ## User flow
 
@@ -22,9 +22,9 @@ does not make the candidate a published stable version. Network failures,
 GitHub rate limits, and invalid responses are errors rather than evidence that
 the installed app is up to date.
 
-`0.2.2` has no check command. Its users must manually install the first released
-version that includes this feature. Later versions still use browser-based,
-user-managed installation under this initial design.
+`0.2.2` has no check command. Its users must manually install `0.3.0` or a
+newer published stable version to gain this feature. Subsequent version checks
+still lead to browser-based, user-managed installation under this design.
 
 ## How the check works
 
@@ -96,11 +96,12 @@ be proposed. This document does not claim that path already exists.
 
 ## 中文使用说明
 
-`0.3.0 (14)` 尚未发布，稳定下载仍为 `0.2.2`。候选版的“关于 → 检查新版本”只在
+[`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0) 已于
+2026-09-21（Australia/Melbourne）正式发布，现为稳定下载。“关于 → 检查新版本”只在
 用户点击后查询本仓库最新公开稳定 Release，显示版本和纯文本说明，并可通过系统
 浏览器打开经过验证的发布页面。下载、校验和安装仍由用户完成，不会自动替换或重启
-App。`0.2.2` 用户需要先手动安装首个正式发布的包含检查入口的版本。
+App。`0.2.2` 用户需先手动安装 `0.3.0` 或之后的正式稳定版本，才能使用检查入口。
 
 检查不发送账号或用量数据，结果不落盘；GitHub 仍能看到普通网络连接信息。检查失败
 不等于“已是最新”。它也不代表安装包已完成签名、公证或安全审查。未来自动安装需在
-Developer ID 分发与完整升级验收准备好后另行设计，不属于本次候选范围。
+Developer ID 分发与完整升级验收准备好后另行设计，不属于 `0.3.0` 的功能范围。

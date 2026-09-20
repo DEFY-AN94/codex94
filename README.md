@@ -4,19 +4,20 @@
 
 ## Overview
 
-Codex94 is an unofficial, independent macOS menu bar quota monitor compatible
-with OpenAI Codex. It keeps remaining quota and reset times close at hand,
-without a Dock icon. Its compact popover and Dashboard Overview show the quota
-buckets and 5-hour or Weekly windows returned by Codex.
+Codex94 is an unofficial, independent macOS app for OpenAI Codex quota
+monitoring and **Token usage statistics**. It keeps remaining quota and reset
+times in the menu bar without a Dock icon, with details in the popover and
+Dashboard.
 
-Version `0.2.2 (13)` offers four menu-bar layouts, including a dual-window
-view, optional low-quota and recovery alerts, and a configurable global shortcut.
-Either mouse button opens or closes the same popover. A prominent, read-only
-**Manual quota resets** card shows the available reset count in both the popover
-and Overview; it does not redeem a reset.
+Version `0.3.0 (14)` adds service-reported summary cards, switchable **bar and
+line charts**, and **CSV export** of daily Token records. A manual update check
+shows newer stable GitHub Releases; downloading and installing remain manual.
 
-The unreleased `0.3.0 (14)` candidate adds a **Token usage** page and
-user-initiated stable-release checks. The public stable release remains `0.2.2`.
+The quota features introduced in `0.2.2 (13)` remain: four menu-bar layouts,
+including a dual-window view, optional low-quota and recovery alerts, and a
+configurable global shortcut. Either mouse button toggles the same popover.
+The read-only **Manual quota resets** card shows the available reset count in
+the popover and Overview without redeeming a reset.
 
 Codex94 is an MIT-licensed source project. It uses the Codex executable already
 installed on the Mac and has no third-party runtime dependencies.
@@ -31,9 +32,9 @@ and security-scanned before it is tagged.
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.
-The chart previews show the `0.3.0 (14)` candidate's **Bar chart** and
-**Line chart** over the same seven reported days. They are unedited captures
-from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
+The chart previews were captured during `0.3.0 (14)` candidate testing and
+show **Bar chart** and **Line chart** over the same seven reported days. These
+original synthetic captures remain unchanged, from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
 The usage dates are fixed in **2033**; the zero on May 15 is an explicit fixture
 value, not a filled-in missing day.
 
@@ -53,7 +54,7 @@ The retained menu-bar sample is from `v0.1.7`, the popover images from `0.1.8`,
 and the Dashboard Overview images from `0.1.9` GitHub-hosted CI. Their fixed
 future Reset dates are synthetic test values. These files remain unchanged
 and show their original interfaces, not the `0.2.2` additions or the `0.3.0`
-candidate's statistics and update UI.
+statistics and update UI.
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 menu bar ring showing 79 percent remaining" width="144">
@@ -75,16 +76,14 @@ candidate's statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v0.2.2 (13)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2),
-  released on **2026-09-20** as a Universal 2 DMG and source from the same
-  annotated tag.
+  [`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0),
+  released on **2026-09-21** (Australia/Melbourne) as a Universal 2 DMG and
+  source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
   Later documentation commits do not move its tag or regenerate its assets.
 - This public repository can be cloned without GitHub authentication.
-- The published `0.2.2` app has no update-check command. Its users must manually
-  install the first released version containing that command.
-- `0.3.0 (14)` is an **Unreleased candidate**, not a new stable download.
-  Tests and maintainer release acceptance remain separate from implementation.
+- Users of `0.2.2`, which has no update-check command, must manually install
+  `0.3.0` to gain that command. Update downloads and installation remain manual.
 - `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
   Runtime signature, and installs it at `~/Applications/Codex94.app`.
 - The installer requires every Codex94 copy to be quit first. It
@@ -92,7 +91,7 @@ candidate's statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `0.2.2` DMG itself is completely unsigned, has no Apple Developer ID
+The published `0.3.0` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -114,23 +113,23 @@ executable selected manually.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v0.2.2` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2):
+[`v0.3.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0):
 
-- `Codex94-0.2.2-macos-universal-unnotarized.dmg`
-- `Codex94-0.2.2-SHA256SUMS.txt`
+- `Codex94-0.3.0-macos-universal-unnotarized.dmg`
+- `Codex94-0.3.0-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-0.2.2-SHA256SUMS.txt
+shasum -a 256 -c Codex94-0.3.0-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-0.2.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-0.3.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -152,7 +151,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v0.2.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.3.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
@@ -182,7 +181,7 @@ source installer does not migrate or remove a DMG-installed copy.
 
 ## Main behavior
 
-### 0.3.0 candidate: statistics and manual update checks
+### Token statistics and manual update checks
 
 - Dashboard → **Token usage** loads the service's `account/usage/read` data on
   first entry or a manual statistics refresh, independently of quota polling.
@@ -339,7 +338,7 @@ their own provenance above.
 - Dashboard → About shows the running app's exact version and build. A
   user-triggered copy action preserves that string, and the project link targets
   `https://github.com/DEFY-AN94/codex94`. Opening that link uses the system browser;
-  the candidate's separate update flow is described above.
+  the separate manual update-check flow is described above.
 - Supports system, Terminal Dark, and Terminal Light themes plus English and
   Simplified Chinese.
 - Uses only the current Codex login. It does not manage multiple accounts or
@@ -389,7 +388,7 @@ shortcut uses system hotkey registration and does not record typed text.
 Opt-in notifications use the local macOS notification service, which can retain
 delivered bucket/window/percentage messages in Notification Center. This is an
 explicit new permission and local system data flow, not remote telemetry.
-The `0.3.0` candidate's statistics remain in memory unless the user exports CSV.
+Token statistics in `0.3.0` remain in memory unless the user exports CSV.
 Its separate update check makes a direct request to GitHub's fixed public
 latest-release API only after user action, without sending account or usage
 data. Update results stay in memory. Codex94 has no analytics, advertising,
@@ -399,8 +398,8 @@ server. Opening the Release page hands navigation to the system browser.
 Version 0.2.0 added distribution packaging and the second stable installation
 path. Version 0.2.1 retains the same data and permission boundaries. The DMG, checksum, and CI artifact contain the App, not account data,
 credentials, preferences, cache, logs, or real quota. Browser download and
-Gatekeeper quarantine handling are macOS distribution behavior. The `0.3.0`
-candidate deliberately adds an update-network path; it does not change how
+Gatekeeper quarantine handling are macOS distribution behavior. Version `0.3.0`
+adds an explicit update-network path; it does not change how
 Codex credentials or quota data are accessed.
 
 App Sandbox is intentionally disabled because the Codex child process must
@@ -470,10 +469,10 @@ PR #11 remains the historical record for exact-head test, Display/Recovery UI,
 Actions/Python/Swift CodeQL, and final App acceptance. The synthetic Overview
 capture embedded above has been reviewed for layout and privacy. Keyboard
 activation, AXPress, and hosted tooltip exposure are not claimed as passed.
-Version [`0.2.2 (13)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2)
-was published on 2026-09-20. Every release needs its own test results, reviewed synthetic UI
-evidence, candidate App acceptance before Ready, and final CI DMG acceptance
-before publication. Earlier evidence does not prove a later candidate passed.
+Version [`0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0)
+was published on 2026-09-21 (Australia/Melbourne). Its source and distribution
+artifacts remain bound to that release tag. Later documentation changes do not
+replace the recorded evidence, and future versions require their own validation.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See

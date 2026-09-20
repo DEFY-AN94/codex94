@@ -1,8 +1,8 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v0.2.2 (13)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2),
-released on 2026-09-20. Its tag and DMG remain bound to release commit
-`41a27d2877dd1777dec6d055d58bd8fb8f916df1`; later docs-only commits do not move
+The published stable version is [`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0),
+released on 2026-09-21 (Australia/Melbourne). Its tag and DMG remain bound to
+release commit `21f2b60097b742a036af0ab9eac0535c7361c77d`; later docs-only commits do not move
 that tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -44,9 +44,15 @@ remain unchanged. Planning and Goal files stay outside the Git repository.
 Version `0.2.2 (13)` was published on 2026-09-20. It introduced a fourth
 dual-window layout with independent bucket selection, mouse left/right clicks
 toggling the same popover, a global shortcut unset by default, opt-in local
-quota notifications, and a read-only Manual quota resets card. Stable download,
-asset, and source-clone references point to `v0.2.2`. Later documentation commits
-must not move the release tag or regenerate its verified assets.
+quota notifications, and a read-only Manual quota resets card. These quota
+features remain available in `0.3.0`.
+
+Version `0.3.0 (14)` was published on 2026-09-21 (Australia/Melbourne). It adds
+service-reported Token statistics, bar/line daily charts and CSV export, plus
+manual checks of the latest public stable GitHub Release. Downloading and
+installing an App remain user-managed. Stable download, asset, and source-clone
+references point to `v0.3.0`. Later documentation commits must not move the
+release tag or regenerate its verified assets.
 
 Regression checks for the `0.2.2` features should cover the three legacy layouts and
 their saved selection, the independent dual-window preference, and both mouse
@@ -65,7 +71,7 @@ details on disk. The new preference keys are `dualWindowBucketSelection.v1`,
 `globalHotKey.v1`, and `notifications.v1`; history, updater, and multi-account
 features were not included in `0.2.2`.
 
-Regression checks for the `0.3.0 (14)` candidate also cover the following:
+Regression checks for the `0.3.0 (14)` features also cover the following:
 
 - Token statistics use only the official `account/usage/read` request, on first
   page entry or an explicit statistics refresh. Keep requests and error states

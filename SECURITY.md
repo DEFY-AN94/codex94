@@ -4,7 +4,7 @@
 
 Codex94 launches the user's existing Codex executable with the fixed command
 `codex -s read-only -a never app-server --stdio`, then requests quota data through
-`account/rateLimits/read` over local stdio JSON-RPC. The `0.3.0 (14)` candidate
+`account/rateLimits/read` over local stdio JSON-RPC. Version `0.3.0 (14)`
 also requests service-reported aggregate Token usage through the official
 `account/usage/read` method on first entry to the statistics page or an explicit
 statistics refresh. This request is independent of quota polling. The sandbox
@@ -25,7 +25,7 @@ or publisher-identity guarantee. Users must trust the installed or manually
 selected Codex executable. Codex may make network requests using its existing
 login, but Codex94 never receives that credential.
 
-The `0.3.0` candidate adds one separate direct network client for the About
+Version `0.3.0` adds one separate direct network client for the About
 page's user-initiated **Check for updates** action. It requests only
 `https://api.github.com/repos/DEFY-AN94/codex94/releases/latest`, using a bounded,
 timed HTTPS request and an ephemeral session with cookie, credential, and cache
@@ -51,9 +51,9 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-0.2.2-SHA256SUMS.txt` before opening the DMG. The optional
+Verify `Codex94-0.3.0-SHA256SUMS.txt` before opening the DMG. The optional
 GitHub command
-`gh attestation verify Codex94-0.2.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
+`gh attestation verify Codex94-0.3.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
 can prove repository/workflow/commit provenance for the exact DMG. A matching
 checksum or attestation is not notarization, malware review, a security audit,
 or Gatekeeper approval. If the exact release is trusted, use only Apple's
@@ -110,7 +110,7 @@ Launch at Login tests use a fake service, not real registration. The source
 installer requires running copies to be quit, verifies a unique staged App,
 and retains recovery files when rollback cannot safely restore the old App.
 
-The `0.3.0` candidate keeps Token usage summaries and daily date/token pairs in
+Version `0.3.0` keeps Token usage summaries and daily date/token pairs in
 memory. It ignores thread-level response fields and does not add statistics to
 cache v2. Each successful read replaces the previous snapshot rather than
 accumulating usage. Missing values and dates remain unknown, not zero. A
@@ -127,7 +127,8 @@ dependency. These additions do not change the distribution signing policy.
 
 ## Supported versions
 
-The supported published stable version is [`v0.2.2 (13)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2).
+The supported published stable version is [`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0),
+released on 2026-09-21 (Australia/Melbourne).
 Feature branches and `main` may contain development work that has not passed
 release acceptance. Current stable-version links identify the published release.
 
