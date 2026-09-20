@@ -13,6 +13,7 @@ final class TokenUsageStore: ObservableObject {
     private var locator = CodexExecutableLocator()
     private let fetcherFactory: @Sendable () -> any TokenUsageFetching
     private let resolve: (@Sendable (String?) async throws -> LocatedCodex)?
+    private let cleanupQueue = DispatchQueue(label: "com.defyan94.codex94.usage-cleanup", qos: .utility)
     private var task: Task<Void, Never>?
     private var generation = 0
     private var stopped = false
@@ -30,8 +31,11 @@ final class TokenUsageStore: ObservableObject {
 
     deinit {
         task?.cancel()
-        fetcher.shutdown()
-        locator.shutdown()
+        if !stopped {
+            fetcher.shutdown()
+            locator.shutdown()
+            cleanupQueue.sync {}
+        }
     }
 
     func loadIfNeeded() {
@@ -80,24 +84,35 @@ final class TokenUsageStore: ObservableObject {
     /// Invalidate old requests on identity or executable changes; never mix snapshots.
     func reset() {
         guard !stopped else { return }
-        generation += 1
-        task?.cancel()
-        task = nil
-        fetcher.shutdown()
-        locator.shutdown()
+        invalidateCurrentGeneration()
+        let oldFetcher = fetcher
+        let oldLocator = locator
         fetcher = fetcherFactory()
         locator = CodexExecutableLocator()
-        snapshot = nil
-        issue = nil
-        isRefreshing = false
+        // Never retain the store here: cleanup owns only the invalidated generation.
+        cleanupQueue.async { [oldFetcher, oldLocator] in
+            oldFetcher.shutdown()
+            oldLocator.shutdown()
+        }
     }
 
     func shutdown() {
         guard !stopped else { return }
-        reset()
         stopped = true
+        invalidateCurrentGeneration()
         fetcher.shutdown()
         locator.shutdown()
+        // Quitting still waits until every retired generation has been stopped.
+        cleanupQueue.sync {}
+    }
+
+    private func invalidateCurrentGeneration() {
+        generation += 1
+        task?.cancel()
+        task = nil
+        snapshot = nil
+        issue = nil
+        isRefreshing = false
     }
 
     private static func map(_ error: Error) -> TokenUsageIssue {

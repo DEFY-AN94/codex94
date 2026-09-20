@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import XCTest
 @testable import Codex94
@@ -180,6 +181,106 @@ final class TokenUsagePresentationTests: XCTestCase {
         ]), range: .all)
         XCTAssertNil(value.reportedTotal)
         XCTAssertEqual(value.visibleDays.first?.tokens, Int.max)
+        XCTAssertEqual(value.maximumY, Double(Int.max) * 1.15)
+    }
+
+    func testMemoResolvesCurrentSnapshotSynchronouslyAndInvalidatesCorrections() {
+        let cache = TokenUsagePresentationCache()
+        let source = snapshot([
+            TokenUsageDay(startDate: "2033-05-17", tokens: 10),
+            TokenUsageDay(startDate: "2033-05-18", tokens: 20)
+        ])
+        let first = cache.resolve(snapshot: source, range: .all)
+        XCTAssertEqual(first.reportedTotal, 30)
+        XCTAssertEqual(first.maximumY, 23)
+
+        let corrected = snapshot([
+            TokenUsageDay(startDate: "2033-05-17", tokens: 10),
+            TokenUsageDay(startDate: "2033-05-18", tokens: 80)
+        ])
+        let next = cache.resolve(snapshot: corrected, range: .all)
+        XCTAssertEqual(next.reportedTotal, 90)
+        XCTAssertEqual(next.maximumY, 92)
+        XCTAssertEqual(next.visibleDays.last?.tokens, 80)
+        XCTAssertEqual(next.csv, "source_date,tokens\r\n2033-05-17,10\r\n2033-05-18,80\r\n")
+    }
+
+    func testMemoPreservesDataAcrossMetadataChangesAndUpdatesRangeImmediately() {
+        let cache = TokenUsagePresentationCache()
+        let source = snapshot([
+            TokenUsageDay(startDate: "2033-05-01", tokens: 10),
+            TokenUsageDay(startDate: "2033-05-18", tokens: 20)
+        ])
+        let all = cache.resolve(snapshot: source, range: .all)
+        let metadataOnly = TokenUsageSnapshot(
+            summary: TokenUsageSummary(lifetimeTokens: 12_000),
+            dailyUsageBuckets: source.dailyUsageBuckets,
+            fetchedAt: source.fetchedAt.addingTimeInterval(60)
+        )
+        XCTAssertEqual(cache.resolve(snapshot: metadataOnly, range: .all), all)
+
+        let recent = cache.resolve(snapshot: metadataOnly, range: .sevenDays)
+        XCTAssertEqual(recent.visibleDays.map(\.startDate), ["2033-05-18"])
+        XCTAssertEqual(recent.reportedTotal, 20)
+        XCTAssertEqual(recent.missingDayCount, 6)
+        XCTAssertEqual(cache.resolve(snapshot: metadataOnly, range: .all), all)
+    }
+
+    func testMemoClearsOldDailyDataWithoutPublishingViewInvalidations() {
+        let cache = TokenUsagePresentationCache()
+        var publications = 0
+        let observation = cache.objectWillChange.sink { publications += 1 }
+        let source = snapshot([TokenUsageDay(startDate: "2033-05-18", tokens: 20)])
+        _ = cache.resolve(snapshot: source, range: .all)
+        let cleared = cache.resolve(snapshot: snapshot(nil), range: .all)
+        XCTAssertTrue(cleared.visibleDays.isEmpty)
+        XCTAssertTrue(cleared.lineSegments.isEmpty)
+        XCTAssertNil(cleared.reportedTotal)
+        XCTAssertEqual(cleared.maximumY, 1)
+        XCTAssertNil(cleared.day(on: source.fetchedAt))
+        XCTAssertEqual(cache.resolve(snapshot: nil, range: .all), cleared)
+        XCTAssertEqual(publications, 0)
+        withExtendedLifetime(observation) {}
+    }
+
+    func testReusedDateFormattingPreservesLegacyLocaleCalendarAndUTCOutput() throws {
+        let dates = try ["2024-02-29", "2026-09-21", "2033-05-18"].map {
+            try XCTUnwrap(TokenUsagePresentation.sourceDate($0))
+        }
+        let locales = ["en", "en_AU", "zh-Hans", "de_DE", "ar_SA", "ja_JP", "th_TH"].map(Locale.init(identifier:))
+        for locale in locales {
+            for includeYear in [true, false] {
+                for date in dates {
+                    XCTAssertEqual(
+                        TokenUsageFormatting.date(date, locale: locale, includeYear: includeYear),
+                        legacyDate(date, locale: locale, includeYear: includeYear),
+                        "\(locale.identifier) year=\(includeYear)"
+                    )
+                }
+            }
+        }
+    }
+
+    func testReusedDateFormattersStayIsolatedAcrossConcurrentLocales() async throws {
+        let date = try XCTUnwrap(TokenUsagePresentation.sourceDate("2033-05-18"))
+        let samples = ["en", "zh-Hans", "ar_SA", "ja_JP"].flatMap { identifier in
+            [true, false].map { includeYear in
+                let locale = Locale(identifier: identifier)
+                return (locale, includeYear, legacyDate(date, locale: locale, includeYear: includeYear))
+            }
+        }
+        let allMatch = await withTaskGroup(of: Bool.self) { group in
+            for _ in 0..<32 {
+                group.addTask {
+                    samples.allSatisfy { locale, includeYear, expected in
+                        TokenUsageFormatting.date(date, locale: locale, includeYear: includeYear) == expected
+                    }
+                }
+            }
+            for await matches in group where !matches { return false }
+            return true
+        }
+        XCTAssertTrue(allMatch)
     }
 
     func testCSVExportsOnlyVisibleReportedRowsWithExactIntegers() {
@@ -210,5 +311,16 @@ final class TokenUsagePresentationTests: XCTestCase {
             summary: TokenUsageSummary(lifetimeTokens: 999_999), dailyUsageBuckets: days,
             fetchedAt: Date(timeIntervalSince1970: 1_900_000_000)
         )
+    }
+
+    private func legacyDate(_ date: Date, locale: Locale, includeYear: Bool) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(includeYear ? "yMMMd" : "MMMd")
+        return formatter.string(from: date)
     }
 }

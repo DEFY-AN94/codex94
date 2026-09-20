@@ -15,7 +15,7 @@ final class TokenUsageStoreTests: XCTestCase {
         store.refresh()
         try await wait { await first.count == 1 }
         store.reset()
-        XCTAssertEqual(first.shutdownCounter.value, 1)
+        try await wait { first.shutdownCounter.value == 1 }
         XCTAssertEqual(factory.clients.count, 2)
         let second = factory.clients[1]
         store.refresh()
@@ -26,6 +26,68 @@ final class TokenUsageStoreTests: XCTestCase {
         try await wait { !store.isRefreshing }
         XCTAssertEqual(store.snapshot?.summary.lifetimeTokens, 20)
         XCTAssertNil(store.issue)
+    }
+
+    func testResetDoesNotWaitForOldCleanupAndShutdownDrainsIt() async throws {
+        let fixture = makeStore()
+        fixture.preferences.hasChosenIdentityMode = true
+        let gate = UsageShutdownGate()
+        let factory = UsageClientFactory(initialShutdownGate: gate)
+        let store = TokenUsageStore(preferences: fixture.preferences, fetcherFactory: { factory.make() }, resolve: { _ in
+            LocatedCodex(executableURL: URL(fileURLWithPath: "/usr/bin/false"), version: "test", source: .manual)
+        })
+        defer {
+            gate.release()
+            store.shutdown()
+            fixture.store.shutdown()
+        }
+        let first = factory.clients[0]
+        store.refresh()
+        try await wait { await first.count == 1 }
+        store.reset()
+        try await wait { gate.didEnter }
+        XCTAssertFalse(gate.didTimeOut, "Reset must not block until the cleanup gate's safety timeout")
+        XCTAssertEqual(first.completedShutdownCounter.value, 0)
+        XCTAssertEqual(factory.clients.count, 2)
+
+        let second = factory.clients[1]
+        store.refresh()
+        try await wait { await second.count == 1 }
+        await second.complete(0, with: .success(snapshot(20, date: 2)))
+        await first.complete(0, with: .success(snapshot(999, date: 1)))
+        try await wait { !store.isRefreshing }
+        XCTAssertEqual(store.snapshot?.summary.lifetimeTokens, 20)
+        XCTAssertEqual(first.completedShutdownCounter.value, 0,
+                       "The new request completes while the previous generation is still stopping")
+
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(50)) {
+            gate.release()
+        }
+        store.shutdown()
+        XCTAssertFalse(gate.didTimeOut)
+        XCTAssertEqual(first.completedShutdownCounter.value, 1,
+                       "Shutdown must not return before retired-generation cleanup completes")
+        XCTAssertEqual(second.shutdownCounter.value, 1)
+        XCTAssertEqual(factory.clients.count, 2, "Shutdown must not construct another client")
+    }
+
+    func testShutdownIsIdempotentWithoutCreatingAReplacementClient() async {
+        let fixture = makeStore()
+        defer { fixture.store.shutdown() }
+        let factory = UsageClientFactory()
+        var store: TokenUsageStore? = TokenUsageStore(
+            preferences: fixture.preferences, fetcherFactory: { factory.make() }
+        )
+        let first = factory.clients[0]
+        store?.shutdown()
+        store?.shutdown()
+        store?.reset()
+        store?.refresh()
+        store = nil
+        XCTAssertEqual(factory.clients.count, 1)
+        XCTAssertEqual(first.shutdownCounter.value, 1)
+        let requestCount = await first.count
+        XCTAssertEqual(requestCount, 0)
     }
 
     func testOnDemandCoalescingAndReplacement() async throws {
@@ -130,8 +192,14 @@ final class TokenUsageStoreTests: XCTestCase {
 
 private actor ControlledUsageFetcher: TokenUsageFetching {
     nonisolated let shutdownCounter = UsageShutdownCounter()
+    nonisolated let completedShutdownCounter = UsageShutdownCounter()
+    private nonisolated let shutdownGate: UsageShutdownGate?
     private var requests: [CheckedContinuation<TokenUsageSnapshot, Error>?] = []
     var count: Int { requests.count }
+
+    init(shutdownGate: UsageShutdownGate? = nil) {
+        self.shutdownGate = shutdownGate
+    }
 
     func fetchUsage(executable: LocatedCodex) async throws -> TokenUsageSnapshot {
         try await withCheckedThrowingContinuation { requests.append($0) }
@@ -146,7 +214,38 @@ private actor ControlledUsageFetcher: TokenUsageFetching {
         }
     }
 
-    nonisolated func shutdown() { shutdownCounter.increment() }
+    nonisolated func shutdown() {
+        shutdownCounter.increment()
+        shutdownGate?.waitForRelease()
+        completedShutdownCounter.increment()
+    }
+}
+
+private final class UsageShutdownGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private let semaphore = DispatchSemaphore(value: 0)
+    private var entered = false
+    private var released = false
+    private var timedOut = false
+
+    var didEnter: Bool { lock.withLock { entered } }
+    var didTimeOut: Bool { lock.withLock { timedOut } }
+
+    func waitForRelease() {
+        lock.withLock { entered = true }
+        if semaphore.wait(timeout: .now() + .seconds(2)) == .timedOut {
+            lock.withLock { timedOut = true }
+        }
+    }
+
+    func release() {
+        let shouldRelease = lock.withLock {
+            if released { return false }
+            released = true
+            return true
+        }
+        if shouldRelease { semaphore.signal() }
+    }
 }
 
 private final class UsageShutdownCounter: @unchecked Sendable {
@@ -159,10 +258,16 @@ private final class UsageShutdownCounter: @unchecked Sendable {
 private final class UsageClientFactory: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [ControlledUsageFetcher] = []
+    private let initialShutdownGate: UsageShutdownGate?
+
+    init(initialShutdownGate: UsageShutdownGate? = nil) {
+        self.initialShutdownGate = initialShutdownGate
+    }
+
     var clients: [ControlledUsageFetcher] { lock.withLock { values } }
     func make() -> ControlledUsageFetcher {
         lock.withLock {
-            let value = ControlledUsageFetcher()
+            let value = ControlledUsageFetcher(shutdownGate: values.isEmpty ? initialShutdownGate : nil)
             values.append(value)
             return value
         }

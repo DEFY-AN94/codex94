@@ -34,6 +34,7 @@ final class AppStore: ObservableObject {
     private(set) var activeRefreshStartedAt: Date?
     private var preferencesObservation: AnyCancellable?
     private var isShuttingDown = false
+    private var connectionGeneration = 0
 
     init(
         preferences: PreferencesStore = PreferencesStore(),
@@ -42,10 +43,11 @@ final class AppStore: ObservableObject {
         fetcher: any QuotaFetching = CodexAppServerClient(),
         cache: SnapshotCache = SnapshotCache(),
         hotKeyController: GlobalHotKeyController = GlobalHotKeyController(),
-        notificationController: NotificationController = NotificationController()
+        notificationController: NotificationController = NotificationController(),
+        usageStore: TokenUsageStore? = nil
     ) {
         self.preferences = preferences
-        self.usageStore = TokenUsageStore(preferences: preferences)
+        self.usageStore = usageStore ?? TokenUsageStore(preferences: preferences)
         self.launchAtLogin = launchAtLogin
         self.locator = locator
         self.fetcher = fetcher
@@ -206,27 +208,40 @@ final class AppStore: ObservableObject {
         if snapshot == nil { connectionState = .refreshing }
         let manualPath = preferences.manualCodexPath
         let identityMode = preferences.identityMode
+        let requestGeneration = connectionGeneration
 
         refreshTask = Task { [weak self] in
             guard let self, !isShuttingDown else { return }
+            guard requestGeneration == connectionGeneration else {
+                finishRefresh(successfulFetchedAt: nil, now: Date())
+                return
+            }
             var successfulFetchedAt: Date?
             do {
                 let located = try await Task.detached(priority: .utility) { [locator] in
                     try locator.locate(manualPath: manualPath)
                 }.value
                 guard !Task.isCancelled, !isShuttingDown else { return }
-                let freshSnapshot = try await fetcher.fetch(
-                    executable: located,
-                    identityMode: identityMode
-                )
-                guard !Task.isCancelled, !isShuttingDown else { return }
-                applySuccess(freshSnapshot, located: located)
-                successfulFetchedAt = freshSnapshot.fetchedAt
+                if requestGeneration == connectionGeneration {
+                    let freshSnapshot = try await fetcher.fetch(
+                        executable: located,
+                        identityMode: identityMode
+                    )
+                    guard !Task.isCancelled, !isShuttingDown else { return }
+                    if requestGeneration == connectionGeneration {
+                        applySuccess(freshSnapshot, located: located)
+                        successfulFetchedAt = freshSnapshot.fetchedAt
+                    }
+                }
             } catch {
                 guard !Task.isCancelled, !isShuttingDown else { return }
-                applyFailure(Self.issue(from: error))
+                if requestGeneration == connectionGeneration {
+                    applyFailure(Self.issue(from: error))
+                }
             }
 
+            // An obsolete request still releases the single-flight slot so the
+            // queued request can use the latest connection preferences.
             guard !isShuttingDown else { return }
             finishRefresh(successfulFetchedAt: successfulFetchedAt, now: Date())
         }
@@ -283,7 +298,7 @@ final class AppStore: ObservableObject {
     }
 
     func chooseIdentityMode(_ mode: IdentityMode, now: Date = Date()) {
-        usageStore.reset()
+        invalidateConnectionContext()
         preferences.identityMode = mode
         preferences.hasChosenIdentityMode = true
         if mode == .quotaOnly, let snapshot {
@@ -351,8 +366,7 @@ final class AppStore: ObservableObject {
     }
 
     func setIdentityMode(_ mode: IdentityMode) {
-        usageStore.reset()
-        notificationPolicy.reset()
+        invalidateConnectionContext()
         preferences.identityMode = mode
         if mode == .quotaOnly, let snapshot {
             self.snapshot = snapshot.removingAccount()
@@ -361,10 +375,15 @@ final class AppStore: ObservableObject {
     }
 
     func setManualCodexPath(_ path: String?) {
-        usageStore.reset()
-        notificationPolicy.reset()
+        invalidateConnectionContext()
         preferences.manualCodexPath = path
         refresh(trigger: .preferenceChange)
+    }
+
+    private func invalidateConnectionContext() {
+        connectionGeneration += 1
+        usageStore.reset()
+        notificationPolicy.reset()
     }
 
     func diagnostics(now: Date = Date()) -> RedactedDiagnostics {

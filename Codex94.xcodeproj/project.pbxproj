@@ -71,6 +71,7 @@
 		9255E5885A6461CA8F30AC4B /* TokenUsageParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C23D0A0DCB1907F4D9EE422 /* TokenUsageParserTests.swift */; };
 		D699D37347702A5B8D993E44 /* TokenUsageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2987324D9D8BFC24169C3CFD /* TokenUsageStoreTests.swift */; };
 		A880BA9903D5172FAC214F3E /* TokenUsagePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7177F44EA3C39D17BA13E1 /* TokenUsagePresentation.swift */; };
+		E30100000000000000000002 /* ServiceValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30100000000000000000001 /* ServiceValues.swift */; };
 		CE080DBB71E84E6BE94D0F51 /* TokenUsageCSVDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7311DCE2AB0087156BFFB13 /* TokenUsageCSVDocument.swift */; };
 		278C09CCC25CF8DCD20508EA /* TokenUsageChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7B92516F1730A62C5ACC924 /* TokenUsageChartView.swift */; };
 		8C0E75C9E27F929DD2058F92 /* TokenUsageDailyTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D4C51CA677EE9FCEB95CEE /* TokenUsageDailyTable.swift */; };
@@ -171,6 +172,7 @@
 		8C23D0A0DCB1907F4D9EE422 /* TokenUsageParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TokenUsageParserTests.swift"; sourceTree = "<group>"; };
 		2987324D9D8BFC24169C3CFD /* TokenUsageStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TokenUsageStoreTests.swift"; sourceTree = "<group>"; };
 		5F7177F44EA3C39D17BA13E1 /* TokenUsagePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Support/TokenUsagePresentation.swift"; sourceTree = "<group>"; };
+		E30100000000000000000001 /* ServiceValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Support/ServiceValues.swift"; sourceTree = "<group>"; };
 		B7311DCE2AB0087156BFFB13 /* TokenUsageCSVDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Dashboard/TokenUsageCSVDocument.swift"; sourceTree = "<group>"; };
 		D7B92516F1730A62C5ACC924 /* TokenUsageChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Dashboard/TokenUsageChartView.swift"; sourceTree = "<group>"; };
 		53D4C51CA677EE9FCEB95CEE /* TokenUsageDailyTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Dashboard/TokenUsageDailyTable.swift"; sourceTree = "<group>"; };
@@ -225,6 +227,7 @@
 				D7B92516F1730A62C5ACC924 /* TokenUsageChartView.swift */,
 				B7311DCE2AB0087156BFFB13 /* TokenUsageCSVDocument.swift */,
 				5F7177F44EA3C39D17BA13E1 /* TokenUsagePresentation.swift */,
+				E30100000000000000000001 /* ServiceValues.swift */,
 				336A0FC5A8C6E0428A6D1265 /* TokenUsageStore.swift */,
 				661C93A7BA6C708E1C222E94 /* TokenUsageParser.swift */,
 				05B3CD069886E11691DB7016 /* TokenUsageFetching.swift */,
@@ -412,6 +415,7 @@
 				278C09CCC25CF8DCD20508EA /* TokenUsageChartView.swift in Sources */,
 				CE080DBB71E84E6BE94D0F51 /* TokenUsageCSVDocument.swift in Sources */,
 				A880BA9903D5172FAC214F3E /* TokenUsagePresentation.swift in Sources */,
+				E30100000000000000000002 /* ServiceValues.swift in Sources */,
 				5F41ABF04C5F98EBFAB77A8F /* TokenUsageStore.swift in Sources */,
 				A225F9330B910BAC212C4D9F /* TokenUsageParser.swift in Sources */,
 				98533861E9FE56CFB4EB56E5 /* TokenUsageFetching.swift in Sources */,
@@ -553,7 +557,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -561,7 +565,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 3.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -579,7 +583,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEAD_CODE_STRIPPING = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				ENABLE_APP_SANDBOX = NO;
@@ -587,7 +591,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 3.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

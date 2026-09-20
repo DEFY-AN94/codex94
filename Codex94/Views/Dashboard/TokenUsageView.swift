@@ -11,9 +11,10 @@ struct TokenUsageView: View {
     @State private var exportDocument: TokenUsageCSVDocument?
     @State private var exportFilename = "Codex94-token-usage.csv"
     @State private var exportFailed = false
+    @StateObject private var presentationCache = TokenUsagePresentationCache()
 
     var body: some View {
-        let presentation = TokenUsagePresentation(snapshot: store.snapshot, range: range)
+        let presentation = presentationCache.resolve(snapshot: store.snapshot, range: range)
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 pageHeader

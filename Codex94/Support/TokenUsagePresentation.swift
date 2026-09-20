@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 enum TokenUsageChartStyle: String, CaseIterable, Identifiable, Sendable {
@@ -42,11 +43,20 @@ struct TokenUsagePlotDay: Identifiable, Equatable {
     let startDate: String
     let date: Date
     let tokens: Int
+    let plotDate: Date
+    let barStartDate: Date
+    let barEndDate: Date
 
     var id: String { startDate }
-    var plotDate: Date { TokenUsagePresentation.plotDate(for: date) }
-    var barStartDate: Date { date.addingTimeInterval(86_400 * 0.16) }
-    var barEndDate: Date { date.addingTimeInterval(86_400 * 0.84) }
+
+    init(startDate: String, date: Date, tokens: Int) {
+        self.startDate = startDate
+        self.date = date
+        self.tokens = tokens
+        plotDate = TokenUsagePresentation.plotDate(for: date)
+        barStartDate = date.addingTimeInterval(86_400 * 0.16)
+        barEndDate = date.addingTimeInterval(86_400 * 0.84)
+    }
 }
 
 struct TokenUsageLineSegment: Identifiable, Equatable {
@@ -62,13 +72,24 @@ struct TokenUsagePresentation: Equatable {
     let visibleDays: [TokenUsagePlotDay]
     let startDate: Date?
     let endDate: Date?
+    /// Independent series preserve unreported-day gaps.
+    let lineSegments: [TokenUsageLineSegment]
+    /// Sum of reported rows only, not a claim of complete coverage.
+    let reportedTotal: Int?
+    let maximumY: Double
+    private let daysByDate: [Date: TokenUsagePlotDay]
 
     init(snapshot: TokenUsageSnapshot?, range: TokenUsageRange) {
-        self.range = range
-        allDays = (snapshot?.dailyUsageBuckets ?? []).compactMap { day in
+        let days: [TokenUsagePlotDay] = (snapshot?.dailyUsageBuckets ?? []).compactMap { day in
             guard let date = Self.sourceDate(day.startDate) else { return nil }
             return TokenUsagePlotDay(startDate: day.startDate, date: date, tokens: day.tokens)
         }.sorted { $0.date < $1.date }
+        self.init(sortedDays: days, range: range)
+    }
+
+    fileprivate init(sortedDays: [TokenUsagePlotDay], range: TokenUsageRange) {
+        self.range = range
+        allDays = sortedDays
         endDate = allDays.last?.date
         if let endDate, let count = range.dayCount {
             startDate = Self.calendar.date(byAdding: .day, value: 1 - count, to: endDate)
@@ -80,36 +101,47 @@ struct TokenUsagePresentation: Equatable {
         } else {
             visibleDays = []
         }
+
+        var segments: [[TokenUsagePlotDay]] = []
+        var lookup: [Date: TokenUsagePlotDay] = [:]
+        lookup.reserveCapacity(visibleDays.count)
+        var total = 0
+        var totalOverflowed = false
+        var maximum = 0
+        let calendar = Self.calendar
+        for day in visibleDays {
+            lookup[day.date] = day
+            maximum = max(maximum, day.tokens)
+            if !totalOverflowed {
+                let result = total.addingReportingOverflow(day.tokens)
+                totalOverflowed = result.overflow
+                total = result.partialValue
+            }
+            if let previous = segments.last?.last,
+               calendar.date(byAdding: .day, value: 1, to: previous.date) == day.date {
+                segments[segments.count - 1].append(day)
+            } else {
+                segments.append([day])
+            }
+        }
+        lineSegments = segments.map { TokenUsageLineSegment(days: $0) }
+        daysByDate = lookup
+        reportedTotal = visibleDays.isEmpty || totalOverflowed ? nil : total
+        maximumY = max(1, Double(maximum) * 1.15)
     }
 
-    static var calendar: Calendar {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        return calendar
-    }
+    static var calendar: Calendar { SourceDay.calendar }
 
     static func plotDate(for sourceDate: Date) -> Date {
         calendar.startOfDay(for: sourceDate).addingTimeInterval(43_200)
     }
 
     static func sourceDate(_ raw: String) -> Date? {
-        let parts = raw.split(separator: "-", omittingEmptySubsequences: false)
-        guard raw.utf8.count == 10, parts.count == 3,
-              parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
-              raw.utf8.allSatisfy({ (48...57).contains($0) || $0 == 45 }),
-              let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2]),
-              (1...9999).contains(year), (1...12).contains(month), (1...31).contains(day),
-              let date = calendar.date(from: DateComponents(year: year, month: month, day: day)) else {
-            return nil
-        }
-        let actual = calendar.dateComponents([.year, .month, .day], from: date)
-        guard actual.year == year, actual.month == month, actual.day == day else { return nil }
-        return date
+        SourceDay.parse(raw)
     }
 
     static func sourceLabel(for date: Date) -> String {
-        let parts = calendar.dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+        SourceDay.label(for: date)
     }
 
     var plotDomain: ClosedRange<Date>? {
@@ -122,20 +154,6 @@ struct TokenUsagePresentation: Equatable {
         guard let startDate, let endDate,
               let distance = Self.calendar.dateComponents([.day], from: startDate, to: endDate).day else { return 0 }
         return max(0, distance + 1 - visibleDays.count)
-    }
-
-    /// Separate series stop Swift Charts from drawing a line through an unreported day.
-    var lineSegments: [TokenUsageLineSegment] {
-        var segments: [[TokenUsagePlotDay]] = []
-        for day in visibleDays {
-            if let previous = segments.last?.last,
-               Self.calendar.date(byAdding: .day, value: 1, to: previous.date) == day.date {
-                segments[segments.count - 1].append(day)
-            } else {
-                segments.append([day])
-            }
-        }
-        return segments.map { TokenUsageLineSegment(days: $0) }
     }
 
     /// Tick labels share the marks' day-center coordinate, including missing calendar days.
@@ -152,21 +170,8 @@ struct TokenUsagePresentation: Equatable {
         }
     }
 
-    /// This is the sum of reported rows in the chosen range, never a coverage claim.
-    var reportedTotal: Int? {
-        guard !visibleDays.isEmpty else { return nil }
-        var total = 0
-        for day in visibleDays {
-            let sum = total.addingReportingOverflow(day.tokens)
-            guard !sum.overflow else { return nil }
-            total = sum.partialValue
-        }
-        return total
-    }
-
     func day(on date: Date) -> TokenUsagePlotDay? {
-        let key = Self.sourceLabel(for: date)
-        return visibleDays.first { $0.startDate == key }
+        daysByDate[Self.calendar.startOfDay(for: date)]
     }
 
     var csv: String {
@@ -179,7 +184,31 @@ struct TokenUsagePresentation: Equatable {
     }
 }
 
+/// One view-owned memo, resolved synchronously with the snapshot being rendered.
+/// It publishes nothing: cache updates must not invalidate a SwiftUI body.
+@MainActor
+final class TokenUsagePresentationCache: ObservableObject {
+    private var sourceDays: [TokenUsageDay]?
+    private var cached: TokenUsagePresentation?
+
+    func resolve(snapshot: TokenUsageSnapshot?, range: TokenUsageRange) -> TokenUsagePresentation {
+        let days = snapshot?.dailyUsageBuckets
+        let result: TokenUsagePresentation
+        if let cached, sourceDays == days {
+            if cached.range == range { return cached }
+            result = TokenUsagePresentation(sortedDays: cached.allDays, range: range)
+        } else {
+            result = TokenUsagePresentation(snapshot: snapshot, range: range)
+        }
+        sourceDays = days
+        cached = result
+        return result
+    }
+}
+
 enum TokenUsageFormatting {
+    private static let dateFormatters = TokenUsageDateFormatterCache()
+
     static func localized(_ key: String, language: LanguagePreference, arguments: [String] = []) -> String {
         StatusAccessibilityString.localized(
             key, arguments: arguments.map { $0 as CVarArg }, language: language, bundle: .main
@@ -195,12 +224,11 @@ enum TokenUsageFormatting {
     }
 
     static func date(_ value: Date, language: LanguagePreference, includeYear: Bool = true) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = language.locale
-        formatter.calendar = TokenUsagePresentation.calendar
-        formatter.timeZone = TokenUsagePresentation.calendar.timeZone
-        formatter.setLocalizedDateFormatFromTemplate(includeYear ? "yMMMd" : "MMMd")
-        return formatter.string(from: value)
+        date(value, locale: language.locale, includeYear: includeYear)
+    }
+
+    static func date(_ value: Date, locale: Locale, includeYear: Bool = true) -> String {
+        dateFormatters.string(from: value, locale: locale, includeYear: includeYear)
     }
 
     static func duration(_ seconds: Int?, language: LanguagePreference) -> String {
@@ -221,5 +249,50 @@ enum TokenUsageFormatting {
             values = [seconds]
         }
         return localized(key, language: language, arguments: values.map { number($0, language: language) })
+    }
+}
+
+/// Preserve the existing ICU/template output while safely reusing mutable
+/// DateFormatter instances. Both lookup and formatting are protected by the lock.
+private final class TokenUsageDateFormatterCache: @unchecked Sendable {
+    private struct Key: Hashable {
+        let locale: Locale
+        let includeYear: Bool
+    }
+
+    private let lock = NSLock()
+    private var formatters: [Key: DateFormatter] = [:]
+    private var localeObservation: NSObjectProtocol?
+
+    init() {
+        localeObservation = NotificationCenter.default.addObserver(
+            forName: NSLocale.currentLocaleDidChangeNotification, object: nil, queue: nil
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.lock.withLock { self.formatters.removeAll() }
+        }
+    }
+
+    deinit {
+        if let localeObservation { NotificationCenter.default.removeObserver(localeObservation) }
+    }
+
+    func string(from date: Date, locale: Locale, includeYear: Bool) -> String {
+        lock.withLock {
+            let key = Key(locale: locale, includeYear: includeYear)
+            let formatter: DateFormatter
+            if let cached = formatters[key] {
+                formatter = cached
+            } else {
+                formatter = DateFormatter()
+                formatter.locale = locale
+                formatter.calendar = TokenUsagePresentation.calendar
+                formatter.timeZone = TokenUsagePresentation.calendar.timeZone
+                formatter.setLocalizedDateFormatFromTemplate(includeYear ? "yMMMd" : "MMMd")
+                if formatters.count >= 16 { formatters.removeAll() }
+                formatters[key] = formatter
+            }
+            return formatter.string(from: date)
+        }
     }
 }
