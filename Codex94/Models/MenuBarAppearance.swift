@@ -1,9 +1,11 @@
 import Foundation
+import CoreGraphics
 
 enum MenuBarLayout: String, CaseIterable, Identifiable, Sendable {
     case ringAndPercentage
     case percentageOnly
     case ringOnly
+    case dualWindow
 
     var id: String { rawValue }
 
@@ -34,6 +36,15 @@ enum MenuBarLayout: String, CaseIterable, Identifiable, Sendable {
                 ringFrame: CGRect(x: 3, y: 3, width: 16, height: 16),
                 percentageFrame: nil
             )
+        case .dualWindow:
+            MenuBarLayoutMetrics(
+                statusItemWidth: 132,
+                contentSize: CGSize(width: 126, height: 22),
+                ringFrame: nil,
+                percentageFrame: nil,
+                fiveHourFrame: CGRect(x: 0, y: 0, width: 53, height: 22),
+                weeklyFrame: CGRect(x: 59, y: 0, width: 53, height: 22)
+            )
         }
     }
 }
@@ -50,6 +61,8 @@ struct MenuBarLayoutMetrics: Equatable, Sendable {
     let contentSize: CGSize
     let ringFrame: CGRect?
     let percentageFrame: CGRect?
+    var fiveHourFrame: CGRect? = nil
+    var weeklyFrame: CGRect? = nil
 
     var horizontalInset: CGFloat { (statusItemWidth - contentSize.width) / 2 }
     var ringLineWidth: CGFloat { 2.2 }

@@ -107,6 +107,10 @@ struct QuotaPopoverView: View {
 
             stateBanner
 
+            ResetCreditsView(store: store)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+
             Divider()
             menuBarQuotaPicker
             Divider()
@@ -301,7 +305,13 @@ struct QuotaPopoverView: View {
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            MenuBarQuotaPicker(store: store)
+            Group {
+                if store.preferences.menuBarLayout == .dualWindow {
+                    MenuBarBucketPicker(store: store)
+                } else {
+                    MenuBarQuotaPicker(store: store)
+                }
+            }
                 .frame(maxWidth: 300)
             Spacer()
         }

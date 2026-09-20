@@ -5,9 +5,12 @@
 ## 产品简介
 
 Codex94 是一款与 OpenAI Codex 兼容的非官方、独立 macOS 菜单栏额度监控工具。
-菜单栏中的紧凑圆环会显示所选模型额度桶与额度窗口的剩余百分比；点击后会展开
-CLI 风格的额度面板。App 不显示 Dock 图标，新建 Dashboard 窗口默认进入总览，集中
-呈现所有可显示额度桶及服务实际返回的窗口，并提供连接与显示设置。
+它让剩余额度与重置时间随时可见，不占用 Dock。紧凑的弹出面板与 Dashboard 总览
+呈现 Codex 实际返回的额度桶，以及 5 小时或 Weekly 窗口。
+
+`0.2.2 (13)` 候选提供四种菜单栏布局，包括同时显示两个窗口的布局，并支持
+可选的低额度／恢复提醒及可配置全局快捷键。鼠标左键或右键都能打开或关闭同一个
+面板。面板和总览中的醒目只读**手动额度重置**卡片展示可用次数，不执行重置兑换。
 
 Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可执行文件，
 并且没有第三方运行时依赖。
@@ -25,6 +28,8 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 替换为从 GitHub-hosted CI 中取得、并完成视觉与隐私审查的合成 `0.1.9` 总览产物。
 图中固定的未来 Reset 日期是测试值，并非实时重置时间。
 未改变的默认菜单栏示例保留自 `v0.1.7`。
+这些图片展示各自原版本的界面，不包含 `0.2.2` 的双窗口布局、通知设置、
+快捷键控件或新的手动额度重置卡片。
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 菜单栏圆环显示剩余 79%" width="144">
@@ -43,10 +48,13 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 ## 当前分发状态
 
-- 已发布的稳定版为 [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)，
-  提供 Universal 2 DMG 与来自同一个 annotated 标签的源码安装。
-- `0.2.1 (12)` 是稳定性与维护修补版本。下方下载和源码 clone 指令指向该已发布
-  标签；`main` 可能包含后续开发内容。
+- 本版本 PR 准备 **0.2.2 (13)**。下方候选安装包与源码安装指令均指向该版本，
+  包括新设计的手动重置次数卡片。
+- 两个候选文件上传到 [Releases](https://github.com/DEFY-AN94/codex94/releases)
+  中的 **0.2.2 草稿 Release**。草稿需要维护者权限查看，尚未公开为正式稳定版。
+- 最新已发布稳定版仍为
+  [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)；
+  候选验证、PR 审查与最终发布状态分别记录。
 - 仓库已公开，无需 GitHub 认证即可 clone；本项目没有自动更新功能。
 - `script/install.sh` 构建本地 Release App，应用 ad-hoc Hardened Runtime
   签名，并安装到 `~/Applications/Codex94.app`。
@@ -70,32 +78,25 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 就不需要额外安装独立 Codex CLI。它也可以检测 Homebrew 与常见 CLI 路径，
 或使用用户手动选择的可执行文件。
 
-## 安装 Universal DMG
+## 安装 0.2.2 候选 DMG
 
-请从已发布的 `v0.2.1`
-[Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)
-同时下载以下两个资产：
+维护者可在 [Releases](https://github.com/DEFY-AN94/codex94/releases) 中的
+**0.2.2 草稿 Release** 下载以下两个文件：
 
-- `Codex94-0.2.1-macos-universal-unnotarized.dmg`
-- `Codex94-0.2.1-SHA256SUMS.txt`
+- `Codex94-0.2.2-macos-universal-unnotarized.dmg`
+- `Codex94-0.2.2-SHA256SUMS.txt`
 
-DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
+候选包支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-0.2.1-SHA256SUMS.txt
+shasum -a 256 -c Codex94-0.2.2-SHA256SUMS.txt
 ```
 
-如果已安装 GitHub CLI，还可以核验该 DMG 来自本仓库指定的 GitHub workflow
-与 commit：
-
-```bash
-gh attestation verify Codex94-0.2.1-macos-universal-unnotarized.dmg \
-  -R DEFY-AN94/codex94
-```
-
-Attestation 只是构建来源证明，不是 Apple 签名、公证、恶意软件审查或 Gatekeeper
-放行证明。
+此草稿保存的是维护者已测试的本机构建，不是带 GitHub attestation 的最终发布包。
+SHA-256 用于确认上传文件的字节一致性，不代表 Apple 签名、公证或安全保证。
+在本 PR 与发布流程完成前，公开下载仍可使用
+[v0.2.1](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)。
 
 先退出所有正在运行的 Codex94，再打开 DMG，把 `Codex94.app` 拖到其中的
 `Applications` 快捷方式，安装位置是 `/Applications/Codex94.app`。不要同时运行
@@ -109,13 +110,13 @@ Attestation 只是构建来源证明，不是 Apple 签名、公证、恶意软�
 
 ## 从源码安装
 
-Clone 当前已经发布的稳定源码标签：
+Clone 0.2.2 版本 PR 分支（最终发布标签尚未公开）：
 
 ```bash
-git clone --branch v0.2.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch codex/release-0.2.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
-然后构建所选标签：
+然后构建该源码：
 
 ```bash
 cd codex94
@@ -141,16 +142,37 @@ sudo xcodebuild -runFirstLaunch
 
 ## 主要行为
 
+以下内容包含尚未发布的 `0.2.2 (13)` 候选行为。上方截图仍为历史版本产物，
+不能证明新增控件已经完成界面验收。
+
 - 新建 Dashboard 窗口默认打开**总览**，复用当前连接状态、数据新鲜度文案和菜单栏
   额度选择器，再按既有显示顺序展示所有可显示额度桶，以及服务实际返回的 5 小时或 Weekly
   窗口。缺失数据会显示明确空状态，不伪造 `0%`。打开、浏览或滚动总览不会刷新或
   写额度缓存；页面不显示邮箱、可执行文件路径或原始额度桶标识，刷新仍使用
   Dashboard 现有工具栏入口。
-- 在 Dashboard → 显示中选择**圆环 + 百分比**、**仅百分比**或
-  **仅圆环**。正在运行的菜单栏状态项会立即改变布局与宽度，并且不会被删除或
+- 在 Dashboard → 显示中选择四种布局：**圆环 + 百分比**、**仅百分比**、
+  **仅圆环**和新增的**双窗口**。原三种布局保留已有行为。
+  正在运行的菜单栏状态项会立即改变布局与宽度，并且不会被删除或
   重建；状态标记位于圆环中央，或在“仅百分比”模式下占用固定尾部位置。
+- `0.2.2` 候选增加第四种**双窗口**布局，同时显示所选额度桶的 5 小时与 Weekly
+  数值。它的选桶偏好独立于原三种布局的额度选择，切换布局会保留原有选择；
+  不伪造缺失窗口，也不合并不同窗口的额度。
+- 鼠标左键或右键点击菜单栏状态项，都会切换同一个 Popover 的开关状态；
+  打开后仍沿用正常的展开刷新路径。可配置的全局快捷键也切换同一个面板，
+  **默认未设置**。组合必须包含 Control 或 Option，也可另外添加 Command 和 Shift。
+- 本地额度通知**默认关闭**，只有显式启用时才请求 macOS 通知权限。剩余比例
+  默认在 **20% 和 10%** 两档提醒，均可调整或关闭；默认监测默认额度桶，
+  也可选择额外额度桶及恢复提醒。只有新的成功快照参与判断，通知基线与每个
+  窗口周期的去重状态只保存在内存。消息仅含额度桶名称、窗口和百分比，不含邮箱；
+  已送达通知由 macOS 通知中心管理和保存。
+- Popover 与总览提供独立的只读**手动额度重置**卡片，突出显示可用次数。
+  卡片仅用于展示信息，没有执行重置的按钮；数值来源为现有额度响应中的权威总数
+  `rateLimitResetCredits.availableCount`。`0` 表示零次，缺失或 `null` 不当作零次；
+  首次实时结果前显示“尚未获取”，刷新失败后保留的旧值标为缓存。次数只在内存中
+  保存，不写入额度缓存；Codex94 不提供兑换操作，也不发送消费重置次数的请求。
 - 分别自定义充足（50–100%）、偏低（20–49%）、紧张（0–19%）
-  和无可用数据时连接不可用的四种颜色；阈值不可调整。颜色即时生效，按不透明
+  和无可用数据时连接不可用的四种颜色；这些颜色阈值不可调整，与可配置的通知阈值
+  相互独立。颜色即时生效，按不透明
   sRGB 的规范化六位大写 `RRGGBB` 保存，不含透明度。紧张色和错误色彼此独立，
   即使两者默认都是主题红色也不会联动。**恢复默认颜色**只移除这四项覆盖，
   不改变布局、主题、语言、额度选择、可执行文件路径或窗口尺寸。
@@ -206,11 +228,12 @@ sudo xcodebuild -runFirstLaunch
 - Dashboard → 启动在返回 App 时重新读取登录启动状态，修改失败会显示本地化提示；
   自动测试使用模拟服务，不操作真实登录项。
 - 可执行文件选择面板跟随 App 中选择的语言。
-- Dashboard → 关于显示当前源码树的精确版本值 `0.2.1 (12)`，由用户触发的复制结果
+- Dashboard → 关于显示当前候选源码树的精确版本值 `0.2.2 (13)`，由用户触发的复制结果
   与之完全一致；
   项目链接指向 `https://github.com/DEFY-AN94/codex94`，不会增加更新器或网络客户端。
 - 支持跟随系统、Terminal Dark、Terminal Light 主题，以及 English 和简体中文。
-- 只使用当前 Codex 登录；不管理多账号或其他 `CODEX_HOME` 目录。
+- 只使用当前 Codex 登录；不管理多账号或其他 `CODEX_HOME` 目录，不收集额度历史，
+  也不提供更新器。
 
 ## 安全与隐私
 
@@ -219,6 +242,7 @@ flowchart LR
     A["Codex94"] <-->|"本地 stdio JSON-RPC"| B["Codex app-server"]
     B -->|"Codex 自己管理的登录"| C["OpenAI 账号服务"]
     A --> D["仅含额度的本地缓存"]
+    A -->|"自愿启用的本地提醒"| E["macOS 通知中心"]
 ```
 
 Codex94 使用固定参数启动已验证的可执行文件：
@@ -241,6 +265,12 @@ OAuth，不接收 access token 或 refresh token，不直接发送额度 HTTP �
 post-reset 调度只使用现有重置时间戳，不新增缓存字段或持久化账本。总览复用现有
 快照，不存储新的身份数据。Popover 中浏览的模型和 Dashboard 当前页面只在本次
 运行中保存；窗口 frame autosave 行为保持不变。
+`0.2.2` 候选增加 `dualWindowBucketSelection.v1`、`globalHotKey.v1` 与
+`notifications.v1` 偏好，分别保存独立的双窗口选桶、快捷键和通知设置。通知基线、
+去重状态及可用重置次数仅在内存中保存，缓存 schema v2 保持不变。快捷键通过系统
+热键注册实现，不记录键入内容。自愿启用的通知使用 macOS 本地通知服务，系统可以
+在通知中心保存包含额度桶、窗口与百分比的已送达消息；这是明确新增的权限与本地
+系统数据流，不是远程遥测。
 Codex94 没有分析、广告、遥测上传、崩溃上报 SDK、
 更新检查器或项目自营服务器。
 

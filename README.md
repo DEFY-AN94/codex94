@@ -5,11 +5,15 @@
 ## Overview
 
 Codex94 is an unofficial, independent macOS menu bar quota monitor compatible
-with OpenAI Codex. A compact ring shows the selected model bucket and quota
-window's percentage remaining; clicking it opens a CLI-style quota popover. The
-app has no Dock icon, and a new Dashboard window starts on an Overview of every
-displayable quota bucket and returned window, alongside connection and display
-settings.
+with OpenAI Codex. It keeps remaining quota and reset times close at hand,
+without a Dock icon. Its compact popover and Dashboard Overview show the quota
+buckets and 5-hour or Weekly windows returned by Codex.
+
+The `0.2.2 (13)` candidate offers four menu-bar layouts, including a dual-window
+view, optional low-quota and recovery alerts, and a configurable global shortcut.
+Either mouse button opens or closes the same popover. A prominent, read-only
+**Manual quota resets** card shows the available reset count in both the popover
+and Overview; it does not redeem a reset.
 
 Codex94 is an MIT-licensed source project. It uses the Codex executable already
 installed on the Mac and has no third-party runtime dependencies.
@@ -29,6 +33,9 @@ The embedded popover images remain reviewed synthetic `0.1.8` captures. The
 Dashboard image is a reviewed synthetic `0.1.9` Overview capture from
 GitHub-hosted CI. Its fixed future Reset dates are test values, not live reset
 schedules. The unchanged default menu-bar sample is retained from `v0.1.7`.
+These images show their original versions' interfaces. They do not show the
+`0.2.2` dual-window layout, notification settings, shortcut control, or new
+Manual quota resets card.
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 menu bar ring showing 79 percent remaining" width="144">
@@ -47,11 +54,14 @@ schedules. The unchanged default menu-bar sample is retained from `v0.1.7`.
 
 ## Distribution status
 
-- The published stable release is [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1),
-  available as a Universal 2 DMG and source from the same annotated tag.
-- Version `0.2.1 (12)` is a stability and maintenance update. Download and
-  source-clone instructions below refer to this published tag; `main` may
-  contain later development work.
+- This version PR prepares **0.2.2 (13)**. The candidate package and source
+  instructions below target this version, including the new reset-count card.
+- The two candidate files are uploaded to the **0.2.2 draft Release** in
+  [Releases](https://github.com/DEFY-AN94/codex94/releases). Drafts require
+  maintainer access and are not a public stable release.
+- The latest published stable release remains
+  [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1).
+  Candidate validation, PR review and final publication are recorded separately.
 - This public repository can be cloned without GitHub authentication.
 - There is no automatic updater.
 - `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
@@ -80,31 +90,26 @@ standalone Codex CLI installation is not required when that bundled executable
 is compatible. It can also detect Homebrew and standard CLI locations or use an
 executable selected manually.
 
-## Install the Universal DMG
+## Install the 0.2.2 candidate DMG
 
-Download both stable assets from the
-[`v0.2.1` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1):
+Maintainers can download both files from the **0.2.2 draft Release** in
+[Releases](https://github.com/DEFY-AN94/codex94/releases):
 
-- `Codex94-0.2.1-macos-universal-unnotarized.dmg`
-- `Codex94-0.2.1-SHA256SUMS.txt`
+- `Codex94-0.2.2-macos-universal-unnotarized.dmg`
+- `Codex94-0.2.2-SHA256SUMS.txt`
 
-The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS 14 or
-later. Verify the checksum before opening it:
-
-```bash
-shasum -a 256 -c Codex94-0.2.1-SHA256SUMS.txt
-```
-
-If you have the GitHub CLI, you can also verify that the DMG came from this
-repository's GitHub workflow and commit:
+The candidate supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
+14 or later. Verify the checksum before opening it:
 
 ```bash
-gh attestation verify Codex94-0.2.1-macos-universal-unnotarized.dmg \
-  -R DEFY-AN94/codex94
+shasum -a 256 -c Codex94-0.2.2-SHA256SUMS.txt
 ```
 
-Attestation is build provenance, not an Apple signature, notarization, malware
-review, or Gatekeeper approval.
+This draft contains the maintainer-tested local build, not a GitHub-attested
+final release. SHA-256 identifies the uploaded bytes; it is not Apple signing,
+notarization or a security verdict. Public downloads remain available from
+[v0.2.1](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1) while this PR
+and the release are being reviewed.
 
 Quit every running Codex94 copy, open the DMG, and drag `Codex94.app` onto its
 `Applications` shortcut. This installs it at `/Applications/Codex94.app`. Do
@@ -119,13 +124,13 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 
 ## Install from source
 
-Clone the published stable source tag:
+Clone the 0.2.2 version-PR branch (the final release tag is not published yet):
 
 ```bash
-git clone --branch v0.2.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch codex/release-0.2.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
-Then build the selected tag:
+Then build that checkout:
 
 ```bash
 cd codex94
@@ -152,6 +157,9 @@ source installer does not migrate or remove a DMG-installed copy.
 
 ## Main behavior
 
+The following includes the unreleased `0.2.2 (13)` candidate. The screenshots
+above remain historical captures and do not demonstrate its new controls.
+
 - A new Dashboard window starts on **Overview**, which reuses the current
   connection status, freshness context, and menu-bar quota picker, then shows
   every displayable bucket in the existing display order and only the 5-hour or Weekly
@@ -159,13 +167,41 @@ source installer does not migrate or remove a DMG-installed copy.
   `0%`. Opening, browsing, or scrolling Overview does not refresh or write the
   quota cache, and the page does not expose email, executable paths, or raw
   bucket identifiers; the existing Dashboard toolbar remains its refresh entry.
-- Choose **Ring + Percentage**, **Percentage Only**, or
-  **Ring Only** in Dashboard → Display. The running menu-bar item changes layout
-  and width immediately without being recreated. A status badge is centered in
+- Choose from four layouts in Dashboard → Display: **Ring + Percentage**,
+  **Percentage Only**, **Ring Only**, and the new dual-window layout.
+  The original three layouts retain their existing behavior. The running
+  menu-bar item changes layout and width immediately without being recreated.
+  A status badge is centered in
   a visible ring or occupies a fixed trailing slot in Percentage Only.
+- The `0.2.2` candidate adds a fourth dual-window layout, showing the
+  selected bucket's 5-hour and Weekly values together. Its saved bucket choice
+  is independent of the original three layouts' quota selection. Switching
+  layouts preserves those existing choices; an unavailable window is not
+  invented or combined with another window.
+- Left-clicking or right-clicking the menu-bar item toggles the same popover.
+  Opening follows the normal refresh-on-open path. A configurable global
+  keyboard shortcut also toggles that popover and is **unset by default**.
+  It must include Control or Option; Command and Shift may be added.
+- Optional local quota notifications are **off by default**. Explicitly enabling
+  them requests macOS notification permission. Remaining-quota warning levels
+  start at **20% and 10%** and can be adjusted or disabled. The default bucket
+  is monitored, with optional additional buckets and optional recovery alerts.
+  Only fresh successful snapshots drive alerts; baselines and per-window-cycle
+  deduplication stay in memory. Messages contain the bucket name, window, and
+  percentage, without email. macOS Notification Center manages delivered
+  notifications and their retention.
+- Popover and Overview include a distinct, read-only **Manual quota resets**
+  card with a prominent available count. It is an informational card with no
+  reset action. Its value comes from the authoritative
+  `rateLimitResetCredits.availableCount` in the existing quota response. Zero
+  means zero; missing or null data remains unavailable, not zero. Before the
+  first live result the card says it has not been fetched; a retained value after
+  failure is marked cached. The count stays in memory and is not written to the
+  quota cache. Codex94 has no reset-redemption action or consume request.
 - Customize four independent colors for healthy
   (50–100%), warning (20–49%), critical (0–19%), and hard-unavailable error
-  states. Thresholds cannot be changed. Colors update immediately and are
+  states. These color thresholds cannot be changed and are separate from the
+  configurable notification thresholds. Colors update immediately and are
   stored as opaque sRGB, normalized six-digit uppercase `RRGGBB` values without alpha.
   Critical and error remain independent even when both default to theme red.
   **Restore Default Colors** removes only the four overrides, preserving
@@ -243,13 +279,13 @@ source installer does not migrate or remove a DMG-installed copy.
   the app and shows a localized failure if a requested change fails. Automated
   tests use a fake service and never change real Login Items.
 - The executable picker follows the app's selected language.
-- Dashboard → About shows this tree's exact value `0.2.1 (12)`. A
+- Dashboard → About shows this candidate tree's exact value `0.2.2 (13)`. A
   user-triggered copy action preserves that string, and the project link targets
   `https://github.com/DEFY-AN94/codex94`. It adds no updater or network client.
 - Supports system, Terminal Dark, and Terminal Light themes plus English and
   Simplified Chinese.
 - Uses only the current Codex login. It does not manage multiple accounts or
-  alternate `CODEX_HOME` directories.
+  alternate `CODEX_HOME` directories, collect quota history, or provide an updater.
 
 ## Security and privacy
 
@@ -258,6 +294,7 @@ flowchart LR
     A["Codex94"] <-->|"local stdio JSON-RPC"| B["Codex app-server"]
     B -->|"Codex-owned login"| C["OpenAI account service"]
     A --> D["quota-only local cache"]
+    A -->|"opt-in local alerts"| E["macOS Notification Center"]
 ```
 
 Codex94 starts the validated executable with fixed arguments:
@@ -285,6 +322,14 @@ schedule use the existing reset timestamp, with no additional cache fields or
 persistent ledger. Overview uses the existing snapshot without storing new
 identity data. The popover's browsed model and the Dashboard's selected section
 are session-only; Dashboard frame autosave is unchanged.
+The `0.2.2` candidate adds `dualWindowBucketSelection.v1`, `globalHotKey.v1`,
+and `notifications.v1` preferences for the independent dual-window bucket,
+chosen shortcut, and alert settings. Notification baselines, deduplication, and
+the reset-credit count are memory-only; cache schema v2 is unchanged. The
+shortcut uses system hotkey registration and does not record typed text.
+Opt-in notifications use the local macOS notification service, which can retain
+delivered bucket/window/percentage messages in Notification Center. This is an
+explicit new permission and local system data flow, not remote telemetry.
 Codex94 has no analytics, advertising,
 telemetry upload, crash-reporting SDK, update checker, or project-operated
 server.

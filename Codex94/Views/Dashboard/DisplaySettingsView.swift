@@ -9,8 +9,19 @@ struct DisplaySettingsView: View {
     var body: some View {
         SettingsPage(title: "dashboard.display") {
             SettingsRow("display.label") {
-                MenuBarQuotaPicker(store: store)
-                    .frame(maxWidth: 360)
+                if store.preferences.menuBarLayout == .dualWindow {
+                    VStack(alignment: .leading, spacing: 7) {
+                        MenuBarBucketPicker(store: store)
+                            .frame(maxWidth: 360)
+                        Text("display.dualWindow.help")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    MenuBarQuotaPicker(store: store)
+                        .frame(maxWidth: 360)
+                }
             }
 
             SettingsDivider()
@@ -109,6 +120,13 @@ struct DisplaySettingsView: View {
                 .labelsHidden()
                 .frame(width: 220)
             }
+
+            SettingsDivider()
+            SettingsRow("hotkey.settings") {
+                HotKeySettingsView(store: store)
+            }
+            SettingsDivider()
+            NotificationSettingsView(store: store)
         }
     }
 

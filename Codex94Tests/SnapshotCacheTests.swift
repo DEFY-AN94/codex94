@@ -60,7 +60,8 @@ final class SnapshotCacheTests: XCTestCase {
                 executableURL: URL(fileURLWithPath: "/Users/private/bin/codex"),
                 version: "codex-cli 1.0",
                 source: .manual
-            )
+            ),
+            resetCreditsAvailableCount: 4
         )
 
         try cache.save(snapshot)
@@ -74,6 +75,7 @@ final class SnapshotCacheTests: XCTestCase {
         XCTAssertEqual(loaded.bucket(id: "model-special")?.window(.weekly)?.windowMinutes, 10_080)
         XCTAssertNil(loaded.account)
         XCTAssertNil(loaded.codex)
+        XCTAssertNil(loaded.resetCreditsAvailableCount)
 
         let data = try Data(contentsOf: fileURL)
         let object = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -92,7 +94,8 @@ final class SnapshotCacheTests: XCTestCase {
         XCTAssertFalse(text.contains("private@example.com"))
         XCTAssertFalse(text.contains("/Users/private"))
         for forbiddenKey in [
-            "account", "accountId", "email", "executableURL", "token", "auth", "rawResponse"
+            "account", "accountId", "email", "executableURL", "token", "auth", "rawResponse",
+            "resetCreditsAvailableCount", "rateLimitResetCredits", "availableCount", "credits"
         ] {
             XCTAssertFalse(text.contains("\"\(forbiddenKey)\""))
         }
@@ -130,6 +133,7 @@ final class SnapshotCacheTests: XCTestCase {
         XCTAssertNil(snapshot.defaultBucket?.window(.weekly)?.windowMinutes)
         XCTAssertNil(snapshot.account)
         XCTAssertNil(snapshot.codex)
+        XCTAssertNil(snapshot.resetCreditsAvailableCount)
     }
 
     func testMalformedAndUnsupportedFutureCacheReturnNil() throws {

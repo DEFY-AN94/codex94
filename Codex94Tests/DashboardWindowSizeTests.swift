@@ -417,7 +417,7 @@ final class MenuBarAppearanceTests: XCTestCase {
     func testLayoutRawValuesAndCorruptValues() {
         XCTAssertEqual(
             MenuBarLayout.allCases.map(\.rawValue),
-            ["ringAndPercentage", "percentageOnly", "ringOnly"]
+            ["ringAndPercentage", "percentageOnly", "ringOnly", "dualWindow"]
         )
         for layout in MenuBarLayout.allCases {
             XCTAssertEqual(MenuBarLayout(storedValue: layout.rawValue), layout)
@@ -446,7 +446,7 @@ final class MenuBarAppearanceTests: XCTestCase {
                 XCTAssertEqual(metrics.badgeFrame.midY, ringFrame.midY)
                 XCTAssertTrue(ringFrame.contains(metrics.badgeFrame))
                 XCTAssertTrue(contentFrame.contains(ringFrame))
-            } else {
+            } else if layout != .dualWindow {
                 let percentageFrame = try XCTUnwrap(metrics.percentageFrame)
                 XCTAssertEqual(metrics.badgePlacement, .trailing)
                 XCTAssertEqual(metrics.badgeFrame.minX - percentageFrame.maxX, 4)

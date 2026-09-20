@@ -14,6 +14,9 @@ final class PreferencesStore: ObservableObject {
         static let language = "language"
         static let manualCodexPath = "manualCodexPath"
         static let hasChosenIdentityMode = "hasChosenIdentityMode"
+        static let dualWindowBucketSelection = "dualWindowBucketSelection.v1"
+        static let globalHotKey = "globalHotKey.v1"
+        static let notifications = "notifications.v1"
     }
 
     private enum LegacyDisplayMode: String {
@@ -51,6 +54,18 @@ final class PreferencesStore: ObservableObject {
     @Published var hasChosenIdentityMode: Bool {
         didSet { defaults.set(hasChosenIdentityMode, forKey: Key.hasChosenIdentityMode) }
     }
+    @Published var dualWindowBucketSelection: MenuBarBucketSelection {
+        didSet { persist(dualWindowBucketSelection, key: Key.dualWindowBucketSelection) }
+    }
+    @Published var globalHotKey: GlobalHotKey? {
+        didSet {
+            if let globalHotKey { persist(globalHotKey, key: Key.globalHotKey) }
+            else { defaults.removeObject(forKey: Key.globalHotKey) }
+        }
+    }
+    @Published var notifications: NotificationPreferences {
+        didSet { persist(notifications, key: Key.notifications) }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -73,11 +88,25 @@ final class PreferencesStore: ObservableObject {
         ) ?? .system
         manualCodexPath = defaults.string(forKey: Key.manualCodexPath)
         hasChosenIdentityMode = defaults.bool(forKey: Key.hasChosenIdentityMode)
+        dualWindowBucketSelection = Self.decode(MenuBarBucketSelection.self, key: Key.dualWindowBucketSelection, from: defaults) ?? .automatic
+        globalHotKey = Self.decode(GlobalHotKey.self, key: Key.globalHotKey, from: defaults)
+        notifications = Self.decode(NotificationPreferences.self, key: Key.notifications, from: defaults)?.validated
+            ?? NotificationPreferences()
         persistMenuBarQuotaSelection()
     }
 
     func restoreDefaultColors() {
         statusAccentOverrides = StatusAccentOverrides()
+    }
+
+    private func persist<Value: Encodable>(_ value: Value, key: String) {
+        guard let data = try? JSONEncoder().encode(value) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    private static func decode<Value: Decodable>(_ type: Value.Type, key: String, from defaults: UserDefaults) -> Value? {
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
     }
 
     private func persistStatusAccentOverrides() {

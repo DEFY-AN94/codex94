@@ -49,6 +49,21 @@
 		B0000000000000000000010A /* RefreshPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000010A /* RefreshPolicyTests.swift */; };
 		B0000000000000000000010B /* LaunchAtLoginControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000010B /* LaunchAtLoginControllerTests.swift */; };
 		B00000000000000000000301 /* Codex94UITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000301 /* Codex94UITests.swift */; };
+		564F14AB94BAA461AEE482D5 /* NotificationPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = E411A572DC36ED0A026D20ED /* NotificationPreferences.swift */; };
+		E12E7E8E46047A75C2840425 /* MenuBarBucketSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C861170D97EB750D6F734C /* MenuBarBucketSelection.swift */; };
+		CF26432C4E01AF4A977A9C22 /* GlobalHotKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C54940B907800F0DC1F98E4 /* GlobalHotKey.swift */; };
+		F3477D743FC8042584631AEB /* QuotaNotificationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DE42B06E0F834DDD29AF14 /* QuotaNotificationPolicy.swift */; };
+		1CDBF843BB0FA399C9CC369F /* NotificationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2E015F4C15B4C5BD07A7CC /* NotificationController.swift */; };
+		FDAD7B7BC2446DE4C50BE778 /* GlobalHotKeyController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B103D608220114249E746149 /* GlobalHotKeyController.swift */; };
+		CF2F2CC8A20616F77EA1D08B /* ResetCreditsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75237C8F9CA3AB802D924BE1 /* ResetCreditsView.swift */; };
+		9856A44308C3662259C4990A /* MenuBarBucketPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5838B15F6C74909DEAC1CF5 /* MenuBarBucketPicker.swift */; };
+		09ECAEAE785FA3B5DE82B986 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA033E417715950D1A20087F /* NotificationSettingsView.swift */; };
+		012BD7311BDE7E8BC1860D38 /* HotKeySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C6E5AB71DA27F9B59C723CA /* HotKeySettingsView.swift */; };
+		E09B3C7963951653C672D4B0 /* NotificationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71462FE5DE82D714271A5EDA /* NotificationPolicyTests.swift */; };
+		55AA9B9E95CCBA5461382611 /* GlobalHotKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E41E37E9CFA5BACFE4CC72 /* GlobalHotKeyTests.swift */; };
+		AB27C4156D80CE541E1B227D /* DualWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AAD7D06BB283CF1BB70328 /* DualWindowTests.swift */; };
+		962832E28278852018FABC2C /* Version022RenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE275590CAE1F1D2E8EFC421 /* Version022RenderingTests.swift */; };
+		CDEC55903838256C3FACAF6F /* Version022StoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29BEEF39B34857D32FEAE6F8 /* Version022StoreTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -115,6 +130,21 @@
 		F00000000000000000000202 /* Codex94Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Codex94Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F00000000000000000000203 /* Codex94UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Codex94UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F00000000000000000000301 /* Codex94UITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Codex94UITests.swift; sourceTree = "<group>"; };
+		E411A572DC36ED0A026D20ED /* NotificationPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/NotificationPreferences.swift; sourceTree = "<group>"; };
+		E0C861170D97EB750D6F734C /* MenuBarBucketSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/MenuBarBucketSelection.swift; sourceTree = "<group>"; };
+		5C54940B907800F0DC1F98E4 /* GlobalHotKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/GlobalHotKey.swift; sourceTree = "<group>"; };
+		96DE42B06E0F834DDD29AF14 /* QuotaNotificationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/QuotaNotificationPolicy.swift; sourceTree = "<group>"; };
+		2C2E015F4C15B4C5BD07A7CC /* NotificationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/NotificationController.swift; sourceTree = "<group>"; };
+		B103D608220114249E746149 /* GlobalHotKeyController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/GlobalHotKeyController.swift; sourceTree = "<group>"; };
+		75237C8F9CA3AB802D924BE1 /* ResetCreditsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/ResetCreditsView.swift; sourceTree = "<group>"; };
+		E5838B15F6C74909DEAC1CF5 /* MenuBarBucketPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/MenuBarBucketPicker.swift; sourceTree = "<group>"; };
+		EA033E417715950D1A20087F /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/NotificationSettingsView.swift; sourceTree = "<group>"; };
+		6C6E5AB71DA27F9B59C723CA /* HotKeySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/HotKeySettingsView.swift; sourceTree = "<group>"; };
+		71462FE5DE82D714271A5EDA /* NotificationPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPolicyTests.swift; sourceTree = "<group>"; };
+		98E41E37E9CFA5BACFE4CC72 /* GlobalHotKeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKeyTests.swift; sourceTree = "<group>"; };
+		E1AAD7D06BB283CF1BB70328 /* DualWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DualWindowTests.swift; sourceTree = "<group>"; };
+		AE275590CAE1F1D2E8EFC421 /* Version022RenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Version022RenderingTests.swift; sourceTree = "<group>"; };
+		29BEEF39B34857D32FEAE6F8 /* Version022StoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Version022StoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -147,6 +177,16 @@
 		A00000000000000000000004 /* Codex94 */ = {
 			isa = PBXGroup;
 			children = (
+				6C6E5AB71DA27F9B59C723CA /* HotKeySettingsView.swift */,
+				EA033E417715950D1A20087F /* NotificationSettingsView.swift */,
+				E5838B15F6C74909DEAC1CF5 /* MenuBarBucketPicker.swift */,
+				75237C8F9CA3AB802D924BE1 /* ResetCreditsView.swift */,
+				B103D608220114249E746149 /* GlobalHotKeyController.swift */,
+				2C2E015F4C15B4C5BD07A7CC /* NotificationController.swift */,
+				96DE42B06E0F834DDD29AF14 /* QuotaNotificationPolicy.swift */,
+				5C54940B907800F0DC1F98E4 /* GlobalHotKey.swift */,
+				E0C861170D97EB750D6F734C /* MenuBarBucketSelection.swift */,
+				E411A572DC36ED0A026D20ED /* NotificationPreferences.swift */,
 				F00000000000000000000001 /* Codex94App.swift */,
 				F00000000000000000000002 /* AppDelegate.swift */,
 				F00000000000000000000003 /* DashboardWindowController.swift */,
@@ -185,6 +225,11 @@
 		A00000000000000000000005 /* Codex94Tests */ = {
 			isa = PBXGroup;
 			children = (
+				29BEEF39B34857D32FEAE6F8 /* Version022StoreTests.swift */,
+				AE275590CAE1F1D2E8EFC421 /* Version022RenderingTests.swift */,
+				E1AAD7D06BB283CF1BB70328 /* DualWindowTests.swift */,
+				98E41E37E9CFA5BACFE4CC72 /* GlobalHotKeyTests.swift */,
+				71462FE5DE82D714271A5EDA /* NotificationPolicyTests.swift */,
 				F00000000000000000000101 /* QuotaModelsTests.swift */,
 				F00000000000000000000102 /* ExecutableLocatorTests.swift */,
 				F00000000000000000000103 /* DiagnosticsRedactorTests.swift */,
@@ -300,6 +345,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				012BD7311BDE7E8BC1860D38 /* HotKeySettingsView.swift in Sources */,
+				09ECAEAE785FA3B5DE82B986 /* NotificationSettingsView.swift in Sources */,
+				9856A44308C3662259C4990A /* MenuBarBucketPicker.swift in Sources */,
+				CF2F2CC8A20616F77EA1D08B /* ResetCreditsView.swift in Sources */,
+				FDAD7B7BC2446DE4C50BE778 /* GlobalHotKeyController.swift in Sources */,
+				1CDBF843BB0FA399C9CC369F /* NotificationController.swift in Sources */,
+				F3477D743FC8042584631AEB /* QuotaNotificationPolicy.swift in Sources */,
+				CF26432C4E01AF4A977A9C22 /* GlobalHotKey.swift in Sources */,
+				E12E7E8E46047A75C2840425 /* MenuBarBucketSelection.swift in Sources */,
+				564F14AB94BAA461AEE482D5 /* NotificationPreferences.swift in Sources */,
 				B00000000000000000000001 /* Codex94App.swift in Sources */,
 				B00000000000000000000002 /* AppDelegate.swift in Sources */,
 				B00000000000000000000003 /* DashboardWindowController.swift in Sources */,
@@ -335,6 +390,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CDEC55903838256C3FACAF6F /* Version022StoreTests.swift in Sources */,
+				962832E28278852018FABC2C /* Version022RenderingTests.swift in Sources */,
+				AB27C4156D80CE541E1B227D /* DualWindowTests.swift in Sources */,
+				55AA9B9E95CCBA5461382611 /* GlobalHotKeyTests.swift in Sources */,
+				E09B3C7963951653C672D4B0 /* NotificationPolicyTests.swift in Sources */,
 				B00000000000000000000101 /* QuotaModelsTests.swift in Sources */,
 				B00000000000000000000102 /* ExecutableLocatorTests.swift in Sources */,
 				B00000000000000000000103 /* DiagnosticsRedactorTests.swift in Sources */,
@@ -417,7 +477,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -425,7 +485,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.2.1;
+				MARKETING_VERSION = 0.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -443,7 +503,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEAD_CODE_STRIPPING = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				ENABLE_APP_SANDBOX = NO;
@@ -451,7 +511,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 0.2.1;
+				MARKETING_VERSION = 0.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

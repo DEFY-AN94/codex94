@@ -1,3 +1,4 @@
+import CoreFoundation
 import Darwin
 import Foundation
 import OSLog
@@ -380,12 +381,28 @@ enum RateLimitsParser {
             defaultLimitID: defaultLimitID,
             fetchedAt: fetchedAt,
             account: account,
-            codex: executable
+            codex: executable,
+            resetCreditsAvailableCount: resetCreditsAvailableCount(in: limitsResult)
         )
         guard snapshot.displayableBuckets.contains(where: { !$0.windows.isEmpty }) else {
             throw ConnectionIssue.quotaUnavailable
         }
         return snapshot
+    }
+
+    private static func resetCreditsAvailableCount(in result: [String: Any]) -> Int? {
+        guard let credits = result["rateLimitResetCredits"] as? [String: Any],
+              let number = credits["availableCount"] as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID(),
+              ["c", "s", "i", "l", "q", "C", "S", "I", "L", "Q"].contains(
+                  String(cString: number.objCType)
+              ),
+              let count = Int(number.stringValue),
+              count >= 0 else {
+            return nil
+        }
+        // The server's total is authoritative; detail entries may be truncated.
+        return count
     }
 
     static func classifiedWindows(in limits: [String: Any]) -> [QuotaWindowSnapshot] {

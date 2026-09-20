@@ -1,6 +1,582 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "resetCredits.available": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "available"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "次可用"
+        }
+      }
+    }
+  },
+  "resetCredits.detail": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Available for your current account"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "当前账号的可用重置次数"
+        }
+      }
+    }
+  },
+  "resetCredits.cachedDetail": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "From the last successful refresh"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "上次成功获取的可用次数"
+        }
+      }
+    }
+  },
+  "resetCredits.emptyDetail": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "No resets currently available"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "当前暂无可用次数"
+        }
+      }
+    }
+  },
+  "hotkey.invalid": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Choose a supported key with ⌃ or ⌥. Command-only combinations, including ⌘⇧, are reserved for app and system commands."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请选择包含 ⌃ 或 ⌥ 的有效组合。仅含 ⌘（包括 ⌘⇧）的组合保留给应用和系统命令。"
+        }
+      }
+    }
+  },
+  "hotkey.conflict": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "That shortcut is already in use. The previous shortcut is unchanged."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "该快捷键已被占用，原快捷键保持不变。"
+        }
+      }
+    }
+  },
+  "hotkey.unavailable": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The shortcut could not be registered. Try another combination."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法注册此快捷键，请尝试其他组合。"
+        }
+      }
+    }
+  },
+  "display.layout.dualWindow": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "5-hour + weekly"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "5 小时 + 每周"
+        }
+      }
+    }
+  },
+  "display.dualWindow.bucket": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Menu bar quota group"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "菜单栏额度组"
+        }
+      }
+    }
+  },
+  "display.dualWindow.help": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Both windows use one quota group. Automatic follows the lowest remaining quota."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "两个时段来自同一额度组；自动选择跟随剩余额度最低的窗口。"
+        }
+      }
+    }
+  },
+  "display.dualWindow.fiveHourShort": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "5h"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "5h"
+        }
+      }
+    }
+  },
+  "display.dualWindow.weeklyShort": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "W"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "周"
+        }
+      }
+    }
+  },
+  "resetCredits.title": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Manual quota resets"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "手动额度重置"
+        }
+      }
+    }
+  },
+  "resetCredits.notFetched": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Not fetched yet"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "尚未获取"
+        }
+      }
+    }
+  },
+  "resetCredits.unavailable": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Temporarily unavailable"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "暂不可用"
+        }
+      }
+    }
+  },
+  "notifications.title": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Codex94 quota reminder"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Codex94 额度提醒"
+        }
+      }
+    }
+  },
+  "notifications.low %@ %@ %@": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%@ · %@: %@%% remaining."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%@ · %@：剩余 %@%%。"
+        }
+      }
+    }
+  },
+  "notifications.recovered %@ %@ %@": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%@ · %@ recovered: %@%% remaining."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "%@ · %@ 已恢复：剩余 %@%%。"
+        }
+      }
+    }
+  },
+  "notifications.settings": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Quota reminders"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "额度提醒"
+        }
+      }
+    }
+  },
+  "notifications.enable": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Enable notifications"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "启用通知"
+        }
+      }
+    }
+  },
+  "notifications.threshold.first": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "First threshold"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "第一提醒阈值"
+        }
+      }
+    }
+  },
+  "notifications.threshold.second": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Second threshold"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "第二提醒阈值"
+        }
+      }
+    }
+  },
+  "notifications.threshold.off": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Off"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "关闭"
+        }
+      }
+    }
+  },
+  "notifications.recovery": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Notify when quota recovers"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "额度恢复时提醒"
+        }
+      }
+    }
+  },
+  "notifications.defaultBucket": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The default Codex group is monitored. Also include:"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "默认监控 Codex 额度组。还可以加入："
+        }
+      }
+    }
+  },
+  "notifications.allow": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Allow notifications…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "允许通知…"
+        }
+      }
+    }
+  },
+  "notifications.denied": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Notifications are disabled in macOS. Enable Codex94 in System Settings → Notifications."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "macOS 已禁用通知。可在系统设置 → 通知中为 Codex94 开启。"
+        }
+      }
+    }
+  },
+  "notifications.failed": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Could not complete the notification request. Check macOS notification settings."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "通知操作未完成，请检查 macOS 通知设置。"
+        }
+      }
+    }
+  },
+  "notifications.help": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Reminders use fresh quota changes. Opening the panel or changing display settings never sends a reminder."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "提醒只基于新获取的额度变化。打开面板或修改显示设置不会发送提醒。"
+        }
+      }
+    }
+  },
+  "hotkey.settings": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Global shortcut"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "全局快捷键"
+        }
+      }
+    }
+  },
+  "hotkey.recording": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Press a shortcut…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请按下快捷键…"
+        }
+      }
+    }
+  },
+  "hotkey.none": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Not set"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未设置"
+        }
+      }
+    }
+  },
+  "hotkey.cancel": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Cancel"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "取消"
+        }
+      }
+    }
+  },
+  "hotkey.record": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Record shortcut…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "录制快捷键…"
+        }
+      }
+    }
+  },
+  "hotkey.clear": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Clear"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "清除"
+        }
+      }
+    }
+  },
+  "hotkey.help": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Show or hide the quota panel from any app. Use ⌃ or ⌥ with a key; ⌘ and ⇧ may be added. Press Esc to cancel recording."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在任意应用中显示或收起额度面板。组合必须包含 ⌃ 或 ⌥，可另加 ⌘ 和 ⇧；按 Esc 取消录制。"
+        }
+      }
+    }
+  },
     "accessibility.freshness.age.day %@" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ day" } },
