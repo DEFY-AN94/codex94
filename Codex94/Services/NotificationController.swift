@@ -37,16 +37,33 @@ final class SystemQuotaNotificationService: NSObject, QuotaNotificationServing, 
     }
 
     func requestAuthorization() async throws -> Bool {
-        try await center.requestAuthorization(options: [.alert])
+        try await withCheckedThrowingContinuation { continuation in
+            center.requestAuthorization(options: [.alert]) { granted, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: granted)
+                }
+            }
+        }
     }
 
     func deliver(title: String, body: String) async throws {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        try await center.add(UNNotificationRequest(
+        let request = UNNotificationRequest(
             identifier: UUID().uuidString, content: content, trigger: nil
-        ))
+        )
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            center.add(request) { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ())
+                }
+            }
+        }
     }
 
     nonisolated func userNotificationCenter(
