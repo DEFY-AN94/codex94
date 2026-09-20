@@ -52,12 +52,12 @@ activation refreshes its status. Registration failures use localized feedback,
 not raw system errors. Tests inject the narrow service adapter and must not
 read or change real Login Items.
 
-### Unreleased 0.2.2 candidate
+### Version 0.2.2 behavior
 
-The current candidate is `0.2.2 (13)`, while published download and source-clone
-links stay on `v0.2.1`. Keep its changelog under Unreleased until the actual
-release date is confirmed. Candidate documentation is not evidence of completed
-tests, installation, or publication.
+Version `0.2.2 (13)` was published on 2026-09-20. Published download and
+source-clone links point to `v0.2.2`. Retain the release's original source and
+asset provenance when making later documentation changes. Test and acceptance
+evidence remains specific to the revision and artifacts actually checked.
 
 Keep the fourth dual-window layout's bucket preference separate from the
 original three layouts' quota selection. Mouse left-click, mouse right-click,
@@ -138,8 +138,12 @@ test preferences, caches, and output paths separate from daily app data.
   CI or producing a nonempty image is not evidence of GUI correctness.
 
 The `Codex94` scheme retains the unit/release gate. The separate `Codex94UI`
-scheme exercises the unmodified app through an external UI test runner, with
-display and recovery scenarios on separate fresh GitHub-hosted Macs. Its
+scheme uses an external UI test runner. Display exercises the unmodified app;
+Recovery exercises a temporary instrumented App copy with a read-only focus
+probe, marked `instrumentedAUT` and `readOnlyFocusDiagnostic` in the fixture
+manifest. Recovery click success applies to that diagnostic copy and does not
+replace keyboard activation, AXPress, or hosted tooltip acceptance of the
+production binary. The scenarios run on separate fresh GitHub-hosted Macs. The
 fixture preparer refuses existing app data and seeds quota-only preferences
 and an explicit synthetic executable before any app initialization. It must
 not be run on a daily-use desktop; local UI testing needs a separately reviewed

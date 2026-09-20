@@ -8,7 +8,7 @@ Codex94 是一款与 OpenAI Codex 兼容的非官方、独立 macOS 菜单栏额
 它让剩余额度与重置时间随时可见，不占用 Dock。紧凑的弹出面板与 Dashboard 总览
 呈现 Codex 实际返回的额度桶，以及 5 小时或 Weekly 窗口。
 
-`0.2.2 (13)` 候选提供四种菜单栏布局，包括同时显示两个窗口的布局，并支持
+`0.2.2 (13)` 提供四种菜单栏布局，包括同时显示两个窗口的布局，并支持
 可选的低额度／恢复提醒及可配置全局快捷键。鼠标左键或右键都能打开或关闭同一个
 面板。面板和总览中的醒目只读**手动额度重置**卡片展示可用次数，不执行重置兑换。
 
@@ -48,13 +48,11 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 ## 当前分发状态
 
-- 本版本 PR 准备 **0.2.2 (13)**。下方候选安装包与源码安装指令均指向该版本，
-  包括新设计的手动重置次数卡片。
-- 两个候选文件上传到 [0.2.2 草稿 Release](https://github.com/DEFY-AN94/codex94/releases)。
-  草稿需要维护者权限查看，尚未公开为正式稳定版。
-- 最新已发布稳定版仍为
-  [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)；
-  候选验证、PR 审查与最终发布状态分别记录。
+- 已发布的稳定版为
+  [`v0.2.2 (13)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2)，
+  于 **2026-09-20** 发布，提供 Universal 2 DMG 与来自同一个 annotated 标签的源码。
+- 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
+  也不会重新生成已发布的资产。
 - 仓库已公开，无需 GitHub 认证即可 clone；本项目没有自动更新功能。
 - `script/install.sh` 构建本地 Release App，应用 ad-hoc Hardened Runtime
   签名，并安装到 `~/Applications/Codex94.app`。
@@ -78,24 +76,28 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 就不需要额外安装独立 Codex CLI。它也可以检测 Homebrew 与常见 CLI 路径，
 或使用用户手动选择的可执行文件。
 
-## 安装 0.2.2 候选 DMG
+## 安装 Universal DMG
 
-维护者可从 [0.2.2 草稿 Release](https://github.com/DEFY-AN94/codex94/releases) 下载以下两个文件：
+请从 [`v0.2.2` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2)
+下载以下两个正式资产：
 
 - `Codex94-0.2.2-macos-universal-unnotarized.dmg`
 - `Codex94-0.2.2-SHA256SUMS.txt`
 
-候选包支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
+DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
 shasum -a 256 -c Codex94-0.2.2-SHA256SUMS.txt
 ```
 
-此草稿保存的是本地候选构建，不是带 GitHub attestation 的最终发布包。
-SHA-256 用于确认上传文件的字节一致性，不代表 Apple 签名、公证或安全保证。
-在本 PR 与发布流程完成前，公开下载仍可使用
-[v0.2.1](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)。
+如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
+
+```bash
+gh attestation verify Codex94-0.2.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+```
+
+Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
 
 先退出所有正在运行的 Codex94，再打开 DMG，把 `Codex94.app` 拖到其中的
 `Applications` 快捷方式，安装位置是 `/Applications/Codex94.app`。不要同时运行
@@ -109,13 +111,13 @@ SHA-256 用于确认上传文件的字节一致性，不代表 Apple 签名、�
 
 ## 从源码安装
 
-Clone 0.2.2 版本 PR 分支（最终发布标签尚未公开）：
+Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch codex/release-0.2.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.2.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
-然后构建该源码：
+然后构建所选标签：
 
 ```bash
 cd codex94
@@ -141,8 +143,8 @@ sudo xcodebuild -runFirstLaunch
 
 ## 主要行为
 
-以下内容包含尚未发布的 `0.2.2 (13)` 候选行为。上方截图仍为历史版本产物，
-不能证明新增控件已经完成界面验收。
+以下内容描述 `0.2.2 (13)` 的行为。上方截图仍为历史版本产物，
+不展示本版本的新增控件。
 
 - 新建 Dashboard 窗口默认打开**总览**，复用当前连接状态、数据新鲜度文案和菜单栏
   额度选择器，再按既有显示顺序展示所有可显示额度桶，以及服务实际返回的 5 小时或 Weekly
@@ -153,7 +155,7 @@ sudo xcodebuild -runFirstLaunch
   **仅圆环**和新增的**双窗口**。原三种布局保留已有行为。
   正在运行的菜单栏状态项会立即改变布局与宽度，并且不会被删除或
   重建；状态标记位于圆环中央，或在“仅百分比”模式下占用固定尾部位置。
-- `0.2.2` 候选增加第四种**双窗口**布局，同时显示所选额度桶的 5 小时与 Weekly
+- `0.2.2` 增加第四种**双窗口**布局，同时显示所选额度桶的 5 小时与 Weekly
   数值。它的选桶偏好独立于原三种布局的额度选择，切换布局会保留原有选择；
   不伪造缺失窗口，也不合并不同窗口的额度。
 - 鼠标左键或右键点击菜单栏状态项，都会切换同一个 Popover 的开关状态；
@@ -227,7 +229,7 @@ sudo xcodebuild -runFirstLaunch
 - Dashboard → 启动在返回 App 时重新读取登录启动状态，修改失败会显示本地化提示；
   自动测试使用模拟服务，不操作真实登录项。
 - 可执行文件选择面板跟随 App 中选择的语言。
-- Dashboard → 关于显示当前候选源码树的精确版本值 `0.2.2 (13)`，由用户触发的复制结果
+- Dashboard → 关于显示精确版本与 build `0.2.2 (13)`，由用户触发的复制结果
   与之完全一致；
   项目链接指向 `https://github.com/DEFY-AN94/codex94`，不会增加更新器或网络客户端。
 - 支持跟随系统、Terminal Dark、Terminal Light 主题，以及 English 和简体中文。
@@ -264,7 +266,7 @@ OAuth，不接收 access token 或 refresh token，不直接发送额度 HTTP �
 post-reset 调度只使用现有重置时间戳，不新增缓存字段或持久化账本。总览复用现有
 快照，不存储新的身份数据。Popover 中浏览的模型和 Dashboard 当前页面只在本次
 运行中保存；窗口 frame autosave 行为保持不变。
-`0.2.2` 候选增加 `dualWindowBucketSelection.v1`、`globalHotKey.v1` 与
+`0.2.2` 增加 `dualWindowBucketSelection.v1`、`globalHotKey.v1` 与
 `notifications.v1` 偏好，分别保存独立的双窗口选桶、快捷键和通知设置。通知基线、
 去重状态及可用重置次数仅在内存中保存，缓存 schema v2 保持不变。快捷键通过系统
 热键注册实现，不记录键入内容。自愿启用的通知使用 macOS 本地通知服务，系统可以
@@ -338,8 +340,8 @@ payload 验证由打包脚本负责：
 Display/Recovery UI、Actions/Python/Swift CodeQL 与最终 App 人工验收状态的历史
 记录；上方嵌入的合成总览截图已经完成布局与隐私审查。键盘激活、AXPress 与托管
 运行器 tooltip 暴露仍不声明为已通过。
-[`0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)
-已正式发布。每个版本都需要独立的测试结果、已审阅合成 UI 证据、Ready 前的候选
+[`0.2.2 (13)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2)
+已于 2026-09-20 正式发布。每个版本都需要独立的测试结果、已审阅合成 UI 证据、Ready 前的候选
 App 人工验收，以及发布前的最终 CI DMG 验收。旧版本证据不能证明后续候选已通过。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和

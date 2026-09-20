@@ -1,8 +1,8 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1).
-Its tag and DMG remain bound to release commit
-`2eb2319c70c827637e8820066d5c2ba0a532a17c`; later docs-only commits do not move
+The published stable version is [`v0.2.2 (13)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2),
+released on 2026-09-20. Its tag and DMG remain bound to release commit
+`41a27d2877dd1777dec6d055d58bd8fb8f916df1`; later docs-only commits do not move
 that tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -41,16 +41,14 @@ Keep candidate changelog notes under Unreleased without inventing a date.
 Historical release entries and the existing synthetic screenshot provenance
 remain unchanged. Planning and Goal files stay outside the Git repository.
 
-The current development candidate is `0.2.2 (13)` and is not published.
-Its scope is a fourth dual-window layout with independent bucket selection,
-mouse left/right clicks toggling the same popover, a global shortcut unset by
-default,
-opt-in local quota notifications, and read-only available-reset counts. Keep
-all stable download, asset, and source-clone references on `v0.2.1` until a later
-publication is verified. Do not assign a release date or claim test/install
-acceptance from the candidate's presence in this tree.
+Version `0.2.2 (13)` was published on 2026-09-20. It introduced a fourth
+dual-window layout with independent bucket selection, mouse left/right clicks
+toggling the same popover, a global shortcut unset by default, opt-in local
+quota notifications, and a read-only Manual quota resets card. Stable download,
+asset, and source-clone references point to `v0.2.2`. Later documentation commits
+must not move the release tag or regenerate its verified assets.
 
-Candidate checks should cover preservation of the three legacy layouts and
+Regression checks for the `0.2.2` features should cover the three legacy layouts and
 their saved selection, the independent dual-window preference, and both mouse
 buttons using the same popover toggle and normal refresh-on-open path. Check
 hotkey registration/failure through a fake adapter, requiring Control or Option
@@ -65,7 +63,7 @@ system Notification Center retention. Verify reset-credit zero versus null,
 cold versus cached states, unchanged cache v2, and no consume request or credit
 details on disk. The new preference keys are `dualWindowBucketSelection.v1`,
 `globalHotKey.v1`, and `notifications.v1`; history, updater, and multi-account
-features are outside this candidate.
+features were not included in `0.2.2`.
 
 Read version/build from the App target using the shared standard-library
 helper. It requires one App target and matching explicit Debug/Release values:
