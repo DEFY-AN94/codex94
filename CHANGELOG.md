@@ -2,6 +2,31 @@
 
 All notable changes to Codex94 are documented here.
 
+## 3.0.1 - 2026-09-21
+
+Version `3.0.1 (15)`. Release dates use Australia/Melbourne. This maintenance
+release prepares shared parsing and presentation boundaries for later features.
+
+### Fixed and optimized
+
+- Prevent quota responses from an obsolete executable or identity context from
+  changing current state, cache, pinned selection, notifications, or Token
+  statistics. Preserve the existing single-flight queue and refresh priority.
+- Share strict source-date and nonnegative-count validation where field rules
+  match, keeping unknown values distinct from zero and preserving quota's
+  separate percentage handling.
+- Reuse prepared chart data and date-formatting context instead of rebuilding
+  them during chart interaction, without changing source-date gaps, range
+  semantics, bar/line selection, or CSV contents.
+- Move retired Token usage client cleanup off the main actor during reset;
+  retain synchronous shutdown draining and the existing bounded process-group
+  termination algorithm.
+- Reject invalid development-script modes before stopping any Codex94 process
+  or starting a build, and document component ownership and reuse rules.
+
+No new feature, broad timer/store rewrite, cache migration, signing-policy
+change, or automatic installation is part of this maintenance scope.
+
 ## 0.3.0 - 2026-09-21
 
 Version `0.3.0 (14)`. Release dates use the maintainer's Australia/Melbourne

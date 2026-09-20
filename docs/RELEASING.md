@@ -41,6 +41,24 @@ Keep candidate changelog notes under Unreleased without inventing a date.
 Historical release entries and the existing synthetic screenshot provenance
 remain unchanged. Planning and Goal files stay outside the Git repository.
 
+The next maintenance candidate is `3.0.1 (15)`, prepared for publication on
+2026-09-21 (Australia/Melbourne). Published downloads and
+source-clone instructions remain on `v0.3.0` during implementation and review.
+Its scope is quota request-context invalidation, shared strict service-value
+parsing, chart preparation/formatting reuse, retired Token client cleanup, and
+early validation of development-script arguments. This scope does not claim
+completed checks or acceptance; it does not introduce a broad timer rewrite,
+new data source, cache schema, signing policy, or automatic installer. See
+[component ownership and reuse rules](ARCHITECTURE.md).
+
+For this maintenance candidate, regressions must inspect the interval between
+an obsolete response and its queued replacement, not only the final snapshot:
+the old success/error must not change cache, pinned preferences, alert baselines,
+or the new Token context. Also retain malformed-value/date tests, source-date
+gap and chart/CSV equivalence checks, and bounded cleanup/shutdown tests using
+synthetic clients. An invalid build-script mode must exit before process or
+filesystem side effects. Report the actual validation evidence separately.
+
 Version `0.2.2 (13)` was published on 2026-09-20. It introduced a fourth
 dual-window layout with independent bucket selection, mouse left/right clicks
 toggling the same popover, a global shortcut unset by default, opt-in local

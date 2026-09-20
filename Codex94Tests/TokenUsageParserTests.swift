@@ -82,6 +82,38 @@ final class TokenUsageParserTests: XCTestCase {
         XCTAssertEqual(snapshot.dailyUsageBuckets?.first?.tokens, Int.max)
     }
 
+    func testSharedSourceDayRoundTripsBoundaryYearsAndKeepsUTCValueSemantics() throws {
+        for label in ["0001-01-01", "1900-02-28", "2000-02-29", "2024-03-10", "9999-12-31"] {
+            let date = try XCTUnwrap(SourceDay.parse(label))
+            XCTAssertEqual(SourceDay.label(for: date), label)
+            XCTAssertEqual(SourceDay.calendar.component(.era, from: date), 1)
+            XCTAssertEqual(SourceDay.calendar.component(.hour, from: date), 0)
+            XCTAssertEqual(SourceDay.calendar.timeZone.secondsFromGMT(for: date), 0)
+        }
+        for invalid in ["0000-01-01", "1900-02-29", "2000-02-30", "10000-01-01",
+                        "2026-01-01\n", "2026-1-01", "２０２６-01-01"] {
+            XCTAssertNil(SourceDay.parse(invalid), invalid)
+        }
+        var callerCalendar = SourceDay.calendar
+        callerCalendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Australia/Melbourne"))
+        XCTAssertEqual(SourceDay.calendar.timeZone.secondsFromGMT(), 0)
+        XCTAssertNotEqual(callerCalendar.timeZone, SourceDay.calendar.timeZone)
+    }
+
+    func testSharedStrictIntegerUsesJSONTypesWithoutBooleanOrFloatingPointCoercion() throws {
+        let accepted = ["0", "1", String(Int.max - 1), String(Int.max)]
+        for raw in accepted {
+            let decoded = try JSONSerialization.jsonObject(with: Data(raw.utf8), options: [.fragmentsAllowed])
+            XCTAssertEqual(StrictJSONInteger.nonnegative(decoded), Int(raw))
+        }
+        for raw in ["true", "false", "null", "-1", "1.0", "1.5", "1e0",
+                    "18446744073709551615", "\"3\""] {
+            let decoded = try JSONSerialization.jsonObject(with: Data(raw.utf8), options: [.fragmentsAllowed])
+            XCTAssertNil(StrictJSONInteger.nonnegative(decoded), raw)
+        }
+        XCTAssertNil(StrictJSONInteger.nonnegative(nil))
+    }
+
     func testDailyBucketsRequireStrictGregorianDatesAndNonnegativeIntegerCounts() throws {
         for date in ["2000-02-29", "1900-02-28", "2024-03-10", "2024-11-03"] {
             let parsed = try parse([

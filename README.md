@@ -81,6 +81,10 @@ statistics and update UI.
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
   Later documentation commits do not move its tag or regenerate its assets.
+- `3.0.1 (15)` is an **Unreleased maintenance candidate** for request-context
+  correctness and focused reuse of parsing, chart preparation, and cleanup.
+  Implementation, checks, and release acceptance are still being completed;
+  this is not a new stable download or a broad architecture rewrite.
 - This public repository can be cloned without GitHub authentication.
 - Users of `0.2.2`, which has no update-check command, must manually install
   `0.3.0` to gain that command. Update downloads and installation remain manual.
@@ -475,7 +479,8 @@ artifacts remain bound to that release tag. Later documentation changes do not
 replace the recorded evidence, and future versions require their own validation.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
-application appearance, and Dashboard window lifecycle. See
+application appearance, and Dashboard window lifecycle. See the
+[component ownership and reuse rules](docs/ARCHITECTURE.md),
 [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/RELEASING.md](docs/RELEASING.md)
 for contribution and release workflows.
 

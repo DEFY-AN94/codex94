@@ -74,6 +74,9 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
   annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
   也不会重新生成已发布的资产。
+- `3.0.1 (15)` 是 **Unreleased 维护候选版**，范围为请求上下文正确性，以及解析、
+  图表准备和清理逻辑的局部复用。实现、检查和发布验收仍在进行中；目前不是新的
+  稳定下载，也不包含大范围架构重写。
 - 仓库已公开，无需 GitHub 认证即可 clone。
 - `0.2.2` 没有检查更新入口，其用户需手动安装 `0.3.0` 才能获得该入口；
   后续更新的下载与安装仍由用户手动完成。
@@ -395,7 +398,8 @@ Display/Recovery UI、Actions/Python/Swift CodeQL 与最终 App 人工验收状�
 后续文档变更不会替代已记录的验收证据，未来版本仍需独立验证。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
-Dashboard 窗口生命周期。贡献与发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 和
+Dashboard 窗口生命周期。组件职责与复用约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；
+贡献与发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 和
 [docs/RELEASING.md](docs/RELEASING.md)（英文）。
 
 ## 卸载

@@ -33,6 +33,7 @@ BUILD_INPUTS = (
     "Codex94/Services/TokenUsageFetching.swift",
     "Codex94/Services/TokenUsageParser.swift",
     "Codex94/Stores/TokenUsageStore.swift",
+    "Codex94/Support/ServiceValues.swift",
     "Codex94/Support/TokenUsagePresentation.swift",
     "Codex94/Views/Dashboard/TokenUsageView.swift",
     "Codex94/Views/Dashboard/TokenUsageSummaryView.swift",

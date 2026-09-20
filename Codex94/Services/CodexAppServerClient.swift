@@ -1,4 +1,3 @@
-import CoreFoundation
 import Darwin
 import Foundation
 import OSLog
@@ -431,18 +430,9 @@ enum RateLimitsParser {
     }
 
     private static func resetCreditsAvailableCount(in result: [String: Any]) -> Int? {
-        guard let credits = result["rateLimitResetCredits"] as? [String: Any],
-              let number = credits["availableCount"] as? NSNumber,
-              CFGetTypeID(number) != CFBooleanGetTypeID(),
-              ["c", "s", "i", "l", "q", "C", "S", "I", "L", "Q"].contains(
-                  String(cString: number.objCType)
-              ),
-              let count = Int(number.stringValue),
-              count >= 0 else {
-            return nil
-        }
+        guard let credits = result["rateLimitResetCredits"] as? [String: Any] else { return nil }
         // The server's total is authoritative; detail entries may be truncated.
-        return count
+        return StrictJSONInteger.nonnegative(credits["availableCount"])
     }
 
     static func classifiedWindows(in limits: [String: Any]) -> [QuotaWindowSnapshot] {

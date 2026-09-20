@@ -98,7 +98,7 @@ struct TokenUsageChartView: View {
                     }
                 }
                 .chartXScale(domain: domain)
-                .chartYScale(domain: 0...maximumY)
+                .chartYScale(domain: 0...presentation.maximumY)
                 .chartXAxis {
                     AxisMarks(values: presentation.axisPlotDates(
                         maximumCount: presentation.range == .sevenDays ? 7 : 6
@@ -168,10 +168,6 @@ struct TokenUsageChartView: View {
         return date
     }
 
-    private var maximumY: Double {
-        max(1, Double(presentation.visibleDays.map(\.tokens).max() ?? 0) * 1.15)
-    }
-
     private var chartGradient: LinearGradient {
         LinearGradient(colors: [.cyan, .blue], startPoint: .top, endPoint: .bottom)
     }
@@ -215,7 +211,8 @@ struct TokenUsageChartView: View {
     }
 
     private func isActive(_ date: Date) -> Bool {
-        activeDate.map { TokenUsagePresentation.calendar.isDate($0, inSameDayAs: date) } ?? false
+        // Both values are already normalized source-day midnights.
+        activeDate == date
     }
 
     private func date(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) -> Date? {

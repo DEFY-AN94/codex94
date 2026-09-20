@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+}
+
+# Invalid input must not stop a running App or create build output.
+[[ "$#" -le 1 ]] || { usage; exit 2; }
 MODE="${1:-run}"
+case "$MODE" in
+  run|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify) ;;
+  *) usage; exit 2 ;;
+esac
+
 APP_NAME="Codex94"
 BUNDLE_ID="com.defyan94.codex94"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -60,7 +71,7 @@ case "$MODE" in
     echo "Codex94 build, security check, and launch verification passed."
     ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    usage
     exit 2
     ;;
 esac

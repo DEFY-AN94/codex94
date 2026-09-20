@@ -5,6 +5,103 @@ import XCTest
 
 @MainActor
 final class AppStoreTests: XCTestCase {
+    func testChangedExecutableDiscardsOldSuccessBeforeQueuedRequestFinishes() async throws {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let baseline = makeSnapshot(
+            defaultLimitID: "default-v2", defaultUsed: 40, sparkUsed: 60, fetchedAt: now
+        )
+        let obsolete = makeSnapshot(
+            defaultLimitID: "default-v2", defaultUsed: 90, sparkUsed: nil,
+            fetchedAt: now.addingTimeInterval(1)
+        )
+        let pinned = MenuBarQuotaSelection.bucket(limitID: "model-special", kind: .weekly)
+        let fetcher = GatedRecordingFetcher(outcomes: [
+            .success(obsolete), .failure(.requestTimedOut)
+        ])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: pinned, cachedSnapshot: baseline
+        )
+        defer { fixture.store.shutdown() }
+        let originalCache = try Data(contentsOf: fixture.cacheFileURL)
+        let oldPath = try XCTUnwrap(fixture.preferences.manualCodexPath)
+        let newExecutable = fixture.cacheFileURL.deletingLastPathComponent()
+            .appendingPathComponent("codex-next")
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: oldPath), to: newExecutable)
+
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        fixture.store.setManualCodexPath(newExecutable.path)
+        await fetcher.releaseOne()
+        try await waitForRequestCount(2, fetcher: fetcher)
+
+        // The first source must not alter data, cache or pinned choice while
+        // the new source is still being checked, even if the latter fails.
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, baseline.fetchedAt)
+        XCTAssertEqual(fixture.preferences.menuBarQuotaSelection, pinned)
+        XCTAssertEqual(try Data(contentsOf: fixture.cacheFileURL), originalCache)
+        XCTAssertNil(fixture.store.locatedCodex)
+        XCTAssertFalse(fixture.store.hasFetchedLiveSnapshot)
+        XCTAssertNil(fixture.store.lastIssue)
+        let paths = await fetcher.requestedPaths()
+        XCTAssertEqual(paths, [oldPath, newExecutable.path])
+
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        XCTAssertEqual(fixture.store.lastIssue, .requestTimedOut)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, baseline.fetchedAt)
+        XCTAssertEqual(fixture.preferences.menuBarQuotaSelection, pinned)
+        XCTAssertEqual(try Data(contentsOf: fixture.cacheFileURL), originalCache)
+        let maximum = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(maximum, 1)
+    }
+
+    func testChangedIdentityModeDiscardsOldFailureAndAcceptsQueuedSuccess() async throws {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let baseline = makeSnapshot(
+            defaultLimitID: "default-v2", defaultUsed: 40, sparkUsed: nil, fetchedAt: now
+        )
+        let updated = makeSnapshot(
+            defaultLimitID: "default-v2", defaultUsed: 30, sparkUsed: nil,
+            fetchedAt: now.addingTimeInterval(1)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: [
+            .failure(.notLoggedIn), .success(updated)
+        ])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic, cachedSnapshot: baseline,
+            usageFetcher: ImmediateUsageFetcher(snapshot: TokenUsageSnapshot(
+                summary: TokenUsageSummary(lifetimeTokens: 42),
+                dailyUsageBuckets: [], fetchedAt: now
+            ))
+        )
+        defer { fixture.store.shutdown() }
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        fixture.store.setIdentityMode(.quotaAndAccount)
+        fixture.store.usageStore.refresh()
+        let usageDeadline = Date().addingTimeInterval(3)
+        while fixture.store.usageStore.isRefreshing, Date() < usageDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertEqual(fixture.store.usageStore.snapshot?.summary.lifetimeTokens, 42)
+        await fetcher.releaseOne()
+        try await waitForRequestCount(2, fetcher: fetcher)
+
+        XCTAssertNil(fixture.store.lastIssue)
+        XCTAssertEqual(fixture.store.connectionState, .stale(lastSuccess: now, issue: .unknown))
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, baseline.fetchedAt)
+        XCTAssertEqual(fixture.store.usageStore.snapshot?.summary.lifetimeTokens, 42,
+                       "An obsolete logout failure must not reset the new context's Token data")
+        let modes = await fetcher.requestedModes()
+        XCTAssertEqual(modes, [.quotaOnly, .quotaAndAccount])
+
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        XCTAssertEqual(fixture.store.connectionState, .connected)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, updated.fetchedAt)
+        XCTAssertNil(fixture.store.lastIssue)
+    }
+
     func testDisplayPreferencesAndResetFormattingDoNotFetchOrRewriteQuotaCache() async throws {
         let now = Date(timeIntervalSince1970: 1_900_000_000)
         let snapshot = makeSnapshot(
@@ -334,6 +431,7 @@ final class AppStoreTests: XCTestCase {
         )
 
         store.refresh(trigger: .manual)
+        try await waitForIdentityRequest(fetcher)
         store.setIdentityMode(.quotaAndAccount)
 
         let deadline = Date().addingTimeInterval(3)
@@ -383,6 +481,7 @@ final class AppStoreTests: XCTestCase {
         )
 
         store.refresh(trigger: .manual)
+        try await waitForIdentityRequest(fetcher)
         store.setIdentityMode(.quotaOnly)
 
         let deadline = Date().addingTimeInterval(3)
@@ -1395,7 +1494,11 @@ final class AppStoreTests: XCTestCase {
                 try await waitForRefreshToFinish(fixture.store)
                 XCTAssertNil(fixture.store.pendingResetRefreshDate)
                 XCTAssertNil(fixture.store.scheduledResetRefreshDate)
-                XCTAssertEqual(fixture.store.consumedResetRefreshDate, sharesTarget ? target : nil)
+                // A changed context discards the early response, so its removed
+                // window cannot cancel the cached target. The queued request
+                // covers that target and consumes it when accepted.
+                XCTAssertEqual(fixture.store.consumedResetRefreshDate,
+                               sharesTarget || queuesPreference ? target : nil)
                 let requestCount = await fetcher.requestCount()
                 let modes = await fetcher.requestedModes()
                 let maximum = await fetcher.maximumConcurrentRequests()
@@ -2121,7 +2224,8 @@ final class AppStoreTests: XCTestCase {
         fetcher: any QuotaFetching,
         selection: MenuBarQuotaSelection,
         cachedSnapshot: QuotaSnapshot? = nil,
-        hasChosenIdentityMode: Bool = true
+        hasChosenIdentityMode: Bool = true,
+        usageFetcher: (any TokenUsageFetching)? = nil
     ) throws -> StoreFixture {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("Codex94StoreTests-\(UUID().uuidString)", isDirectory: true)
@@ -2148,6 +2252,11 @@ final class AppStoreTests: XCTestCase {
         let cacheFileURL = directory.appendingPathComponent("quota.json")
         let cache = SnapshotCache(fileURL: cacheFileURL)
         if let cachedSnapshot { try cache.save(cachedSnapshot) }
+        let usageStore = usageFetcher.map { usageFetcher in
+            TokenUsageStore(preferences: preferences, fetcherFactory: { usageFetcher }, resolve: { _ in
+                LocatedCodex(executableURL: executable, version: "9.4.0", source: .manual)
+            })
+        }
         let store = AppStore(
             preferences: preferences,
             launchAtLogin: makeFakeLaunchAtLogin(),
@@ -2156,7 +2265,8 @@ final class AppStoreTests: XCTestCase {
                 homeDirectory: directory
             ),
             fetcher: fetcher,
-            cache: cache
+            cache: cache,
+            usageStore: usageStore
         )
         return StoreFixture(
             store: store,
@@ -2199,6 +2309,15 @@ final class AppStoreTests: XCTestCase {
         }
         let actual = await fetcher.requestCount()
         XCTAssertEqual(actual, expected)
+    }
+
+    private func waitForIdentityRequest(_ fetcher: IdentityRecordingFetcher) async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while await fetcher.requestedModes().isEmpty, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let modes = await fetcher.requestedModes()
+        XCTAssertEqual(modes.count, 1, "Change identity only after the old RPC has actually started")
     }
 
     private func makeSnapshot(
@@ -2366,6 +2485,11 @@ private enum FetchOutcome: Sendable {
     case failure(ConnectionIssue)
 }
 
+private struct ImmediateUsageFetcher: TokenUsageFetching {
+    let snapshot: TokenUsageSnapshot
+    func fetchUsage(executable: LocatedCodex) async throws -> TokenUsageSnapshot { snapshot }
+}
+
 private actor GatedRecordingFetcher: QuotaFetching {
     private let outcomes: [FetchOutcome]
     private var continuations: [CheckedContinuation<Void, Never>] = []
@@ -2373,6 +2497,7 @@ private actor GatedRecordingFetcher: QuotaFetching {
     private var activeRequests = 0
     private var maximumActiveRequests = 0
     private var modes: [IdentityMode] = []
+    private var paths: [String] = []
 
     init(outcomes: [FetchOutcome]) {
         self.outcomes = outcomes
@@ -2384,6 +2509,7 @@ private actor GatedRecordingFetcher: QuotaFetching {
         activeRequests += 1
         maximumActiveRequests = max(maximumActiveRequests, activeRequests)
         modes.append(identityMode)
+        paths.append(executable.executableURL.path)
 
         await withCheckedContinuation { continuation in
             continuations.append(continuation)
@@ -2416,6 +2542,10 @@ private actor GatedRecordingFetcher: QuotaFetching {
 
     func requestedModes() -> [IdentityMode] {
         modes
+    }
+
+    func requestedPaths() -> [String] {
+        paths
     }
 }
 
