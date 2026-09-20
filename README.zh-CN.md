@@ -4,16 +4,16 @@
 
 ## 产品简介
 
-Codex94 是一款与 OpenAI Codex 兼容的非官方、独立 macOS 菜单栏额度监控工具。
-它让剩余额度与重置时间随时可见，不占用 Dock。紧凑的弹出面板与 Dashboard 总览
-呈现 Codex 实际返回的额度桶，以及 5 小时或 Weekly 窗口。
+Codex94 是一款与 OpenAI Codex 兼容的非官方、独立 macOS **额度监控与 Token
+统计**工具。菜单栏随时显示剩余额度和重置时间，不占用 Dock；弹出面板和 Dashboard
+提供详细信息。
 
-`0.2.2 (13)` 提供四种菜单栏布局，包括同时显示两个窗口的布局，并支持
-可选的低额度／恢复提醒及可配置全局快捷键。鼠标左键或右键都能打开或关闭同一个
-面板。面板和总览中的醒目只读**手动额度重置**卡片展示可用次数，不执行重置兑换。
+`0.3.0 (14)` 新增服务端汇总卡、可切换的**柱状图／折线图**，以及每日 Token 记录的
+**CSV 导出**。手动检查更新可查看 GitHub 上更新的稳定 Release，下载和安装仍由用户完成。
 
-尚未发布的 `0.3.0 (14)` 候选增加 **Token 统计**页面和用户手动触发的稳定版本检查。
-公开稳定版仍为 `0.2.2`。
+`0.2.2 (13)` 引入的额度功能继续保留：四种菜单栏布局（含双窗口）、可选的低额度／
+恢复提醒和可配置全局快捷键。鼠标左键或右键都切换同一个面板。面板和总览中的只读
+**手动额度重置**卡片展示可用次数，不执行重置兑换。
 
 Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可执行文件，
 并且没有第三方运行时依赖。
@@ -26,8 +26,9 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 ## 界面截图
 
-所有截图均采用隔离的合成数据，不包含真实账号或实时用量。以下展示 `0.3.0 (14)`
-候选的**柱状图**与**折线图**，两者使用相同的七天日记录。这些英文界面截图原样来自
+所有截图均采用隔离的合成数据，不包含真实账号或实时用量。以下**柱状图**与**折线图**
+采集于 `0.3.0 (14)` 候选测试阶段，两者使用相同的七天日记录。原始合成截图保持不变，
+这些英文界面截图来自
 [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558)，
 未编辑媒体内容。统计日期固定在 **2033 年**；5 月 15 日的零是夹具明确返回的数值，
 不是为缺失日期补零。
@@ -46,7 +47,7 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 保留的菜单栏示例来自 `v0.1.7`，Popover 图片来自 `0.1.8`，Dashboard 总览图片来自
 `0.1.9` 的 GitHub-hosted CI。图中固定的未来 Reset 日期均为合成测试值。原文件保持
-不变，只展示各自版本的界面，不代表 `0.2.2` 新增功能或 `0.3.0` 候选的统计与更新界面。
+不变，只展示各自版本的界面，不代表 `0.2.2` 新增功能或 `0.3.0` 的统计与更新界面。
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 菜单栏圆环显示剩余 79%" width="144">
@@ -68,20 +69,20 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 ## 当前分发状态
 
 - 已发布的稳定版为
-  [`v0.2.2 (13)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2)，
-  于 **2026-09-20** 发布，提供 Universal 2 DMG 与来自同一个 annotated 标签的源码。
+  [`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0)，
+  于 **2026-09-21**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
+  annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
   也不会重新生成已发布的资产。
 - 仓库已公开，无需 GitHub 认证即可 clone。
-- 已发布的 `0.2.2` 没有检查更新入口，用户需手动安装首个正式发布的包含该入口的版本。
-- `0.3.0 (14)` 仍是 **Unreleased 候选**，不是新的稳定下载；测试与维护者发布验收
-  和功能实现分别记录。
+- `0.2.2` 没有检查更新入口，其用户需手动安装 `0.3.0` 才能获得该入口；
+  后续更新的下载与安装仍由用户手动完成。
 - `script/install.sh` 构建本地 Release App，应用 ad-hoc Hardened Runtime
   签名，并安装到 `~/Applications/Codex94.app`。
 - 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
-已发布的 `0.2.2` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+已发布的 `0.3.0` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
 attestation 都不会改变这一 Apple 信任状态。
 
@@ -100,23 +101,23 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 
 ## 安装 Universal DMG
 
-请从 [`v0.2.2` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2)
+请从 [`v0.3.0` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0)
 下载以下两个正式资产：
 
-- `Codex94-0.2.2-macos-universal-unnotarized.dmg`
-- `Codex94-0.2.2-SHA256SUMS.txt`
+- `Codex94-0.3.0-macos-universal-unnotarized.dmg`
+- `Codex94-0.3.0-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-0.2.2-SHA256SUMS.txt
+shasum -a 256 -c Codex94-0.3.0-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-0.2.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-0.3.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -136,7 +137,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v0.2.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.3.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
@@ -165,7 +166,7 @@ sudo xcodebuild -runFirstLaunch
 
 ## 主要行为
 
-### 0.3.0 候选：统计与手动检查更新
+### Token 统计与手动检查更新
 
 - Dashboard → **Token 统计**在首次进入或手动刷新统计时，通过
   `account/usage/read` 加载服务端数据，与额度轮询独立。统计读取失败不会让
@@ -278,7 +279,7 @@ Token 统计预览另有独立的来源记录。
 - Dashboard → 关于显示正在运行的 App 精确版本与 build，由用户触发的复制结果
   与之完全一致；
   项目链接指向 `https://github.com/DEFY-AN94/codex94`，通过系统浏览器打开；
-  候选版独立的更新流程见上文。
+  独立的手动检查更新流程见上文。
 - 支持跟随系统、Terminal Dark、Terminal Light 主题，以及 English 和简体中文。
 - 只使用当前 Codex 登录；不管理多账号或其他 `CODEX_HOME` 目录，不收集本地额度历史账本。
 
@@ -319,7 +320,7 @@ post-reset 调度只使用现有重置时间戳，不新增缓存字段或持久
 热键注册实现，不记录键入内容。自愿启用的通知使用 macOS 本地通知服务，系统可以
 在通知中心保存包含额度桶、窗口与百分比的已送达消息；这是明确新增的权限与本地
 系统数据流，不是远程遥测。
-`0.3.0` 候选的统计只在内存保存，用户主动导出的 CSV 除外。独立的更新检查仅在用户
+`0.3.0` 的统计只在内存保存，用户主动导出的 CSV 除外。独立的更新检查仅在用户
 操作后直接请求 GitHub 固定的公开 latest-release API，不发送账号或用量数据；
 检查结果只保存在内存。Codex94 没有分析、广告、遥测上传、崩溃上报 SDK、系统信息
 统计或项目自营服务器。打开 Release 页面时，导航交由系统浏览器处理。
@@ -327,7 +328,7 @@ post-reset 调度只使用现有重置时间戳，不新增缓存字段或持久
 0.2.0 增加了分发打包和第二个稳定安装路径；0.2.1 保持相同的数据与权限边界。
 DMG、checksum 与 CI artifact
 包含 App，不包含账号数据、凭证、偏好、缓存、日志或真实额度。浏览器下载与
-Gatekeeper quarantine 处理属于 macOS 分发流程。`0.3.0` 候选明确新增更新网络路径，
+Gatekeeper quarantine 处理属于 macOS 分发流程。`0.3.0` 明确新增更新网络路径，
 但不改变 Codex 凭证与额度数据的访问方式。
 
 App Sandbox 被有意关闭，因为 Codex 子进程需要访问它自己的登录状态。
@@ -389,9 +390,9 @@ payload 验证由打包脚本负责：
 Display/Recovery UI、Actions/Python/Swift CodeQL 与最终 App 人工验收状态的历史
 记录；上方嵌入的合成总览截图已经完成布局与隐私审查。键盘激活、AXPress 与托管
 运行器 tooltip 暴露仍不声明为已通过。
-[`0.2.2 (13)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2)
-已于 2026-09-20 正式发布。每个版本都需要独立的测试结果、已审阅合成 UI 证据、Ready 前的候选
-App 人工验收，以及发布前的最终 CI DMG 验收。旧版本证据不能证明后续候选已通过。
+[`0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0)
+已于 2026-09-21（Australia/Melbourne）正式发布，其源码与分发资产仍绑定该发布标签。
+后续文档变更不会替代已记录的验收证据，未来版本仍需独立验证。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。贡献与发布流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 和
