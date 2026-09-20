@@ -50,8 +50,8 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 - 本版本 PR 准备 **0.2.2 (13)**。下方候选安装包与源码安装指令均指向该版本，
   包括新设计的手动重置次数卡片。
-- 两个候选文件上传到 [0.2.2 草稿 Release](https://github.com/DEFY-AN94/codex94/releases/tag/untagged-669c6d0353fbb6e37d32)
-  。草稿需要维护者权限查看，尚未公开为正式稳定版。
+- 两个候选文件上传到 [0.2.2 草稿 Release](https://github.com/DEFY-AN94/codex94/releases/tag/untagged-669c6d0353fbb6e37d32)。
+  草稿需要维护者权限查看，尚未公开为正式稳定版。
 - 最新已发布稳定版仍为
   [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)；
   候选验证、PR 审查与最终发布状态分别记录。
@@ -92,7 +92,7 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 shasum -a 256 -c Codex94-0.2.2-SHA256SUMS.txt
 ```
 
-此草稿保存的是维护者已测试的本机构建，不是带 GitHub attestation 的最终发布包。
+此草稿保存的是本地候选构建，不是带 GitHub attestation 的最终发布包。
 SHA-256 用于确认上传文件的字节一致性，不代表 Apple 签名、公证或安全保证。
 在本 PR 与发布流程完成前，公开下载仍可使用
 [v0.2.1](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)。

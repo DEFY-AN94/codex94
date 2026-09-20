@@ -105,7 +105,7 @@ The candidate supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 shasum -a 256 -c Codex94-0.2.2-SHA256SUMS.txt
 ```
 
-This draft contains the maintainer-tested local build, not a GitHub-attested
+This draft contains a locally built release candidate, not a GitHub-attested
 final release. SHA-256 identifies the uploaded bytes; it is not Apple signing,
 notarization or a security verdict. Public downloads remain available from
 [v0.2.1](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1) while this PR
