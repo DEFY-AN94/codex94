@@ -20,7 +20,7 @@ struct AppServerTimeouts: Sendable {
     var maximumLineBytes: Int = 1_048_576
 }
 
-final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
+final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked Sendable {
     private let runtimeDirectory: URL
     private let timeouts: AppServerTimeouts
     private let environment: [String: String]
@@ -58,14 +58,26 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
         }
     }
 
+    func fetchUsage(executable: LocatedCodex) async throws -> TokenUsageSnapshot {
+        try await withCheckedThrowingContinuation { continuation in
+            workerQueue.async { [self] in
+                do {
+                    continuation.resume(returning: try fetchUsageSynchronously(executable: executable))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     func shutdown() {
         processLifecycle.shutdown(gracePeriod: timeouts.terminationGrace)
     }
 
-    private func fetchSynchronously(
+    private func withInitializedServer<Result>(
         executable: LocatedCodex,
-        identityMode: IdentityMode
-    ) throws -> QuotaSnapshot {
+        operation: (FileHandle, JSONLineChannel, Date) throws -> Result
+    ) throws -> Result {
         try FileManager.default.createDirectory(
             at: runtimeDirectory,
             withIntermediateDirectories: true,
@@ -146,44 +158,67 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
 
         try write(["method": "initialized"], to: input.fileHandleForWriting)
 
-        var nextID = 2
-        var accountResult: [String: Any]?
-        if identityMode == .quotaAndAccount {
+        return try operation(input.fileHandleForWriting, channel, totalDeadline)
+    }
+
+    private func fetchSynchronously(
+        executable: LocatedCodex,
+        identityMode: IdentityMode
+    ) throws -> QuotaSnapshot {
+        try withInitializedServer(executable: executable) { input, channel, totalDeadline in
+            var nextID = 2
+            var accountResult: [String: Any]?
+            if identityMode == .quotaAndAccount {
+                try write([
+                    "id": nextID,
+                    "method": "account/read",
+                    "params": ["refreshToken": false]
+                ], to: input)
+                accountResult = try response(
+                    id: nextID,
+                    channel: channel,
+                    deadline: requestDeadline(seconds: timeouts.request, totalDeadline: totalDeadline),
+                    timeoutIssue: .requestTimedOut
+                )
+                if accountResult?["requiresOpenaiAuth"] as? Bool == true,
+                   accountResult?["account"] is NSNull {
+                    throw ConnectionIssue.notLoggedIn
+                }
+                nextID += 1
+            }
+
             try write([
                 "id": nextID,
-                "method": "account/read",
-                "params": ["refreshToken": false]
-            ], to: input.fileHandleForWriting)
-            accountResult = try response(
+                "method": "account/rateLimits/read"
+            ], to: input)
+            let limitsResult = try response(
                 id: nextID,
                 channel: channel,
                 deadline: requestDeadline(seconds: timeouts.request, totalDeadline: totalDeadline),
                 timeoutIssue: .requestTimedOut
             )
-            if accountResult?["requiresOpenaiAuth"] as? Bool == true,
-               accountResult?["account"] is NSNull {
-                throw ConnectionIssue.notLoggedIn
-            }
-            nextID += 1
+
+            return try RateLimitsParser.parse(
+                limitsResult: limitsResult,
+                accountResult: accountResult,
+                executable: executable,
+                fetchedAt: Date()
+            )
         }
+    }
 
-        try write([
-            "id": nextID,
-            "method": "account/rateLimits/read"
-        ], to: input.fileHandleForWriting)
-        let limitsResult = try response(
-            id: nextID,
-            channel: channel,
-            deadline: requestDeadline(seconds: timeouts.request, totalDeadline: totalDeadline),
-            timeoutIssue: .requestTimedOut
-        )
-
-        return try RateLimitsParser.parse(
-            limitsResult: limitsResult,
-            accountResult: accountResult,
-            executable: executable,
-            fetchedAt: Date()
-        )
+    private func fetchUsageSynchronously(executable: LocatedCodex) throws -> TokenUsageSnapshot {
+        try withInitializedServer(executable: executable) { input, channel, totalDeadline in
+            try write(["id": 2, "method": "account/usage/read"], to: input)
+            let result = try response(
+                id: 2,
+                channel: channel,
+                deadline: requestDeadline(seconds: timeouts.request, totalDeadline: totalDeadline),
+                timeoutIssue: .requestTimedOut,
+                tokenUsageRequest: true
+            )
+            return try TokenUsageParser.parse(result: result, fetchedAt: Date())
+        }
     }
 
     private func write(_ object: [String: Any], to handle: FileHandle) throws {
@@ -200,7 +235,8 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
         id: Int,
         channel: JSONLineChannel,
         deadline: Date,
-        timeoutIssue: ConnectionIssue
+        timeoutIssue: ConnectionIssue,
+        tokenUsageRequest: Bool = false
     ) throws -> [String: Any] {
         while true {
             let object = try channel.readObject(deadline: deadline, timeoutIssue: timeoutIssue)
@@ -215,10 +251,14 @@ final class CodexAppServerClient: QuotaFetching, @unchecked Sendable {
                 continue
             }
             if let error = dictionary["error"] as? [String: Any] {
+                if tokenUsageRequest, Self.integer(error["code"]) == -32601 {
+                    throw TokenUsageIssue.unsupported
+                }
                 let message = (error["message"] as? String)?.lowercased() ?? ""
                 if message.contains("not logged in")
                     || message.contains("authentication required")
                     || message.contains("login required") {
+                    if tokenUsageRequest { throw TokenUsageIssue.notLoggedIn }
                     throw ConnectionIssue.notLoggedIn
                 }
                 throw ConnectionIssue.serverError

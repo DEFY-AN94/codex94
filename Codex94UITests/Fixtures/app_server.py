@@ -15,6 +15,7 @@ import time
 REPORTED_EXECUTABLE = Path(__file__).absolute()
 ROOT = Path("/private/tmp") / REPORTED_EXECUTABLE.parent.name
 MODE_NAMES = {"normal", "notLoggedIn", "serverError", "longName", "slow"}
+TOKEN_USAGE_MODES = {"complete", "partial", "missing", "unsupported"}
 mode_name = "normal"
 log_ready = False
 
@@ -109,6 +110,8 @@ def main():
     require(type(default_used) is int and 0 <= default_used <= 100)
     require(type(spark_used) is int and 0 <= spark_used <= 100)
     require(type(include_spark) is bool)
+    token_usage_mode = mode.get("tokenUsageMode", "complete")
+    require(token_usage_mode in TOKEN_USAGE_MODES)
     event("launch")
     atexit.register(best_effort_event, "exit")
     signal.signal(signal.SIGTERM, lambda _signal, _frame: sys.exit(0))
@@ -120,7 +123,24 @@ def main():
     initialized = read_message()
     require(initialized.get("method") == "initialized" and "id" not in initialized)
     limits = read_message()
-    require(limits.get("method") == "account/rateLimits/read" and limits.get("id") == 2)
+    require(limits.get("id") == 2)
+    if limits.get("method") == "account/usage/read":
+        require(manifest["scenario"] == "usage")
+        require(set(limits) == {"id", "method"})
+        event("tokenUsage")
+        if token_usage_mode == "unsupported":
+            reply({"id": 2, "error": {"code": -32601, "message": "Synthetic method not found"}})
+        elif token_usage_mode == "missing":
+            reply({"id": 2, "result": {"summary": None, "dailyUsageBuckets": []}})
+        elif token_usage_mode == "partial":
+            summary = dict(manifest["tokenUsage"]["summary"])
+            summary["peakDailyTokens"] = None
+            summary["currentStreakDays"] = None
+            reply({"id": 2, "result": {"summary": summary, "dailyUsageBuckets": None}})
+        else:
+            reply({"id": 2, "result": manifest["tokenUsage"]})
+        return
+    require(limits.get("method") == "account/rateLimits/read")
     event("rateLimits")
     if mode_name in ("notLoggedIn", "serverError"):
         message = "not logged in" if mode_name == "notLoggedIn" else "synthetic server error"

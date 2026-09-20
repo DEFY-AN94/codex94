@@ -1,17 +1,21 @@
 # Privacy
 
-Codex94 is a local macOS utility. It has no analytics, advertising, telemetry
-upload, crash-reporting SDK, update checker, or Codex94-operated server.
+Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
+crash-reporting SDK, system profiling, or Codex94-operated server. The unreleased
+`0.3.0 (14)` candidate adds a user-triggered public GitHub release check, as
+described below. The published stable release remains `0.2.2`.
 
 ## Data access
 
-Codex94 starts a locally installed Codex executable and sends two documented-by-
-behavior JSON-RPC requests over the child process's standard input/output:
+Codex94 starts a locally installed Codex executable and uses these JSON-RPC
+requests over the child process's standard input/output:
 
 - `account/rateLimits/read` for quota windows and, when returned, the manual
   reset-credit count
 - `account/read` with `refreshToken: false` only when **Quota + account** is
   selected
+- `account/usage/read` on demand from the `0.3.0` candidate's Token usage page,
+  independently of the quota/account-display choice
 
 The Codex child process may contact OpenAI services using the login it already
 owns. Codex94 does not receive, read, export, or persist that login, its cookies,
@@ -35,6 +39,34 @@ and does not retain individual credit identifiers or details. The count is
 held only in memory, including a visibly cached last value after a failure.
 It is not saved in the quota cache and returns to an unfetched state at a cold
 start. Codex94 does not redeem reset credits or send a consume request.
+
+## Token statistics (0.3.0 candidate)
+
+First opening Token usage or pressing its Refresh button requests
+`account/usage/read` through the same local Codex executable. The feature does
+not read session logs, conversation databases or credential files. It does not
+request `account/read`; quota-only mode remains independent of account display.
+Statistics failures do not change the quota connection state.
+
+Only the five documented summary numbers and daily date/token pairs are parsed.
+Other fields, including thread-level details, are ignored and not retained.
+The latest statistics snapshot is kept in memory only, never appended to the
+quota cache or logged. Explicit executable/identity changes and detected
+sign-out invalidate it; there is no cross-account history merge. On a transient failure, retained
+values keep their original fetch time and are shown with an error status.
+
+A user-initiated CSV export writes the displayed daily dates and token counts
+to a location chosen by the user. It contains no identity, task titles, prompts,
+credentials or raw RPC. Exporting is the only statistics persistence feature.
+Dates retain the service's calendar-day labels; the app does not assume its
+undocumented reporting timezone or treat omitted days as zero usage.
+The 7-day and 30-day views end at the latest returned date, not the current
+local day. Filtering dates and inspecting the chart do not make another request.
+`tokenUsageChartStyle.v1` stores only the selected bar/line presentation in
+UserDefaults. Changing chart style reuses the loaded response and makes no
+request or statistics-cache write.
+Summary scope and complete history coverage are unspecified; the app does not
+infer model/project, input/output, cost, hourly, or thread-level statistics.
 
 ## Data stored locally
 
@@ -123,6 +155,30 @@ app policy state does not mean delivered notifications leave no local record.
 This is a local operating-system service and permission, not a Codex94 remote
 telemetry channel or project-operated server.
 
+## Manual release checks (0.3.0 candidate)
+
+Only **About → Check for updates** initiates an update check. It sends an
+unauthenticated HTTPS request to the fixed public endpoint
+[`api.github.com/repos/DEFY-AN94/codex94/releases/latest`](https://api.github.com/repos/DEFY-AN94/codex94/releases/latest).
+There is no startup check, background polling, automatic app download,
+installation, or update-triggered relaunch.
+
+The check does not read cookies, Keychain items, GitHub credentials, or Codex
+authentication data. No account identity, quota values, token statistics,
+conversation content, or system profile is sent. As with any HTTPS request,
+GitHub can receive ordinary network metadata such as the client's IP address
+and request headers; this is not a zero-network feature.
+
+The returned version and release notes are kept in memory only. Codex94 does
+not save update results to its quota cache or preferences. Release notes are
+displayed as plain text. A separate user action opens only the validated
+repository Release page in the system browser. The browser then manages its
+own requests, cookies, history, and any download the user chooses.
+
+The checker adds no update framework, signing key, installation helper, or
+third-party runtime dependency. See [docs/updating.md](docs/updating.md) for the
+user flow and future automatic-installation conditions.
+
 ## Distribution and CI artifacts
 
 Version `0.2.0` adds packaging and stable-path compatibility, not a new runtime
@@ -139,15 +195,15 @@ artifacts continue to use isolated synthetic data.
 
 Downloading a Release in a browser and macOS recording quarantine or presenting
 Gatekeeper/Privacy & Security UI are operating-system distribution behaviors.
-Codex94 does not read browser data, change quarantine, automate Open Anyway, or
-gain a browser, network, analytics, update, or telemetry interface from the DMG
-workflow. Installing at `/Applications/Codex94.app` or
+Codex94 does not read browser data, change quarantine, or automate Open Anyway.
+The candidate's explicit GitHub check is a separate runtime network path, not
+an effect of DMG installation. Installing at `/Applications/Codex94.app` or
 `~/Applications/Codex94.app` does not duplicate the cache schema: both locations
 use the same bundle identifier and local data, which is why users should not run
 both copies at once.
 
-Unified Logging receives only operation stage, duration, byte count, executable
-source category, and normalized error category. Raw RPC payloads, email,
+Quota and statistics logging includes only operation stage, duration, byte
+count, executable source category, and normalized error category. Raw RPC payloads, email,
 credentials, full executable paths, Reset timestamps, quota-bucket identifiers,
 and account data are not logged. The reset trigger name itself is non-sensitive.
 
@@ -159,14 +215,16 @@ to the macOS system clipboard. When the user selects **Copy version** in About,
 it writes the exact displayed version and build. Both writes happen only after a
 user action. Codex94 does not read or upload clipboard contents or diagnostics,
 and users should review copied diagnostics before sharing them. Selecting the
-project link similarly opens the exact repository URL through the system; there
-is no updater or project-operated network client.
+project link similarly opens the exact repository URL through the system.
+The candidate's release-check request is separate and does not upload clipboard
+contents or diagnostics.
 
 ## Permissions
 
 Codex94 does not request browser, Documents, Keychain, Accessibility, contacts,
-camera, microphone, or location access. A standard file picker appears only when
-the user explicitly chooses a Codex executable. Version `0.1.9` added no system
+camera, microphone, or location access. Standard file dialogs appear only when
+the user explicitly chooses a Codex executable or a CSV export destination.
+Version `0.1.9` added no system
 permission or entitlement; versions `0.2.0` and `0.2.1` likewise add none.
 Version `0.2.2` adds only the explicit, optional local-notification
 permission described above. Its global shortcut does not require Accessibility

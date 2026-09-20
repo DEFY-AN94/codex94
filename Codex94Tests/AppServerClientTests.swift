@@ -3,6 +3,133 @@ import XCTest
 @testable import Codex94
 
 final class AppServerClientTests: XCTestCase {
+    func testUsageFetchSendsOnlyReadOnlyUsageMethodWithoutParameters() async throws {
+        let fixture = try makeFixture(script: #"""
+        [ "$#" -eq 6 ] || exit 70
+        [ "$1" = "-s" ] && [ "$2" = "read-only" ] || exit 71
+        [ "$3" = "-a" ] && [ "$4" = "never" ] || exit 72
+        [ "$5" = "app-server" ] && [ "$6" = "--stdio" ] || exit 73
+        IFS= read -r initialize
+        printf '%s\n' "$initialize" >> "__CODEX94_INVOCATION_FILE__"
+        printf '%s\n' '{"id":1,"result":{}}'
+        IFS= read -r initialized
+        printf '%s\n' "$initialized" >> "__CODEX94_INVOCATION_FILE__"
+        IFS= read -r usage
+        printf '%s\n' "$usage" >> "__CODEX94_INVOCATION_FILE__"
+        printf '%s\n' '{"method":"usage/notice","params":{"ignored":true}}'
+        printf '%s\n' '{"id":99,"result":{"ignored":true}}'
+        printf '%s\n' '{"id":2,"result":{"summary":{"lifetimeTokens":123456,"peakDailyTokens":7890,"longestRunningTurnSec":91,"currentStreakDays":0,"longestStreakDays":6},"dailyUsageBuckets":[{"startDate":"2024-02-29","tokens":120},{"startDate":"2024-02-27","tokens":0}],"threadUsage":[{"threadId":"ignored-private-id"}]}}'
+        while IFS= read -r extra; do
+          printf '%s\n' "$extra" >> "__CODEX94_INVOCATION_FILE__"
+        done
+        """#)
+
+        let snapshot = try await fixture.client.fetchUsage(executable: fixture.executable)
+        XCTAssertEqual(snapshot.summary.lifetimeTokens, 123_456)
+        XCTAssertEqual(snapshot.summary.currentStreakDays, 0)
+        XCTAssertEqual(snapshot.dailyUsageBuckets?.map(\.startDate), ["2024-02-27", "2024-02-29"])
+        let requests = try String(contentsOf: fixture.invocationFile, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
+            .map { line in
+                try XCTUnwrap(JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])
+            }
+        XCTAssertEqual(requests.compactMap { $0["method"] as? String }, [
+            "initialize", "initialized", "account/usage/read"
+        ])
+        XCTAssertNil(requests.last?["params"])
+    }
+
+    func testUnsupportedUsageDoesNotDisableSubsequentQuotaReads() async throws {
+        let fixture = try makeFixture(script: #"""
+        IFS= read -r initialize
+        printf '%s\n' '{"id":1,"result":{}}'
+        IFS= read -r initialized
+        IFS= read -r request
+        # Both slash representations are valid JSON strings.
+        case "$request" in
+          *'"method":"account/usage/read"'*|*'"method":"account\/usage\/read"'*)
+            printf '%s\n' '{"id":2,"error":{"code":-32601,"message":"Method not found"}}' ;;
+          *'"method":"account/rateLimits/read"'*|*'"method":"account\/rateLimits\/read"'*)
+            printf '%s\n' '{"id":2,"result":{"rateLimits":{"secondary":{"usedPercent":27,"windowDurationMins":10080}}}}' ;;
+          *) exit 74 ;;
+        esac
+        """#)
+
+        do {
+            _ = try await fixture.client.fetchUsage(executable: fixture.executable)
+            XCTFail("Expected an unsupported usage method")
+        } catch {
+            XCTAssertEqual(error as? TokenUsageIssue, .unsupported)
+        }
+        let quota = try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaOnly)
+        XCTAssertEqual(quota.defaultBucket?.window(.weekly)?.remainingPercent, 73)
+    }
+
+    func testUsageAuthenticationAndInvalidDataAreDistinct() async throws {
+        let responses: [(String, TokenUsageIssue)] = [
+            (#"{"id":2,"error":{"code":-32000,"message":"Authentication required"}}"#, .notLoggedIn),
+            (#"{"id":2,"result":{"summary":null}}"#, .unavailable),
+            (#"{"id":2,"result":{"summary":{"lifetimeTokens":true}}}"#, .invalidData)
+        ]
+        for (response, expected) in responses {
+            let fixture = try makeFixture(script: """
+            IFS= read -r initialize
+            printf '%s\\n' '{"id":1,"result":{}}'
+            IFS= read -r initialized
+            IFS= read -r usage
+            printf '%s\\n' '\(response)'
+            """)
+            do {
+                _ = try await fixture.client.fetchUsage(executable: fixture.executable)
+                XCTFail("Expected \(expected)")
+            } catch {
+                XCTAssertEqual(error as? TokenUsageIssue, expected)
+            }
+        }
+    }
+
+    func testUsageRequestTimeoutStopsTheEntireProcessGroup() async throws {
+        let fixture = try makeFixture(script: #"""
+        IFS= read -r initialize
+        printf '%s\n' '{"id":1,"result":{}}'
+        IFS= read -r initialized
+        IFS= read -r usage
+        printf '%s\n' "$$" > "__CODEX94_PID_FILE__"
+        sleep 30 &
+        printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
+        wait
+        """#)
+
+        do {
+            _ = try await fixture.client.fetchUsage(executable: fixture.executable)
+            XCTFail("Expected a bounded usage timeout")
+        } catch {
+            XCTAssertEqual(error as? ConnectionIssue, .requestTimedOut)
+        }
+        try assertProcessIsGone(at: fixture.pidFile)
+        try assertProcessIsGone(at: fixture.descendantPIDFile)
+    }
+
+    func testUsageResponseUsesExistingOutputSizeLimit() async throws {
+        let oversized = String(repeating: "x", count: 2_048)
+        let fixture = try makeFixture(
+            script: """
+            IFS= read -r initialize
+            printf '%s\\n' '{"id":1,"result":{}}'
+            IFS= read -r initialized
+            IFS= read -r usage
+            printf '%s\\n' '\(oversized)'
+            """,
+            maximumLineBytes: 1_024
+        )
+        do {
+            _ = try await fixture.client.fetchUsage(executable: fixture.executable)
+            XCTFail("Expected a bounded usage response")
+        } catch {
+            XCTAssertEqual(error as? ConnectionIssue, .responseTooLarge)
+        }
+    }
+
     func testResetCreditsAreReadFromQuotaResponseWithoutAdditionalRequests() async throws {
         for (rawCount, expected) in [("0", Optional(0)), ("3", Optional(3)), ("null", nil)] {
             let fixture = try makeFixture(script: """

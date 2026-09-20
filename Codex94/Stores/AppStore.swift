@@ -13,6 +13,8 @@ final class AppStore: ObservableObject {
     @Published private(set) var hasFetchedLiveSnapshot = false
 
     let preferences: PreferencesStore
+    let usageStore: TokenUsageStore
+    let updates = AppUpdateController()
     let launchAtLogin: LaunchAtLoginController
     let hotKeyController: GlobalHotKeyController
     let notificationController: NotificationController
@@ -43,6 +45,7 @@ final class AppStore: ObservableObject {
         notificationController: NotificationController = NotificationController()
     ) {
         self.preferences = preferences
+        self.usageStore = TokenUsageStore(preferences: preferences)
         self.launchAtLogin = launchAtLogin
         self.locator = locator
         self.fetcher = fetcher
@@ -274,10 +277,13 @@ final class AppStore: ObservableObject {
         fetcher.shutdown()
         locator.shutdown()
         notificationController.shutdown()
+        usageStore.shutdown()
+        updates.shutdown()
         notificationPolicy.reset()
     }
 
     func chooseIdentityMode(_ mode: IdentityMode, now: Date = Date()) {
+        usageStore.reset()
         preferences.identityMode = mode
         preferences.hasChosenIdentityMode = true
         if mode == .quotaOnly, let snapshot {
@@ -345,6 +351,7 @@ final class AppStore: ObservableObject {
     }
 
     func setIdentityMode(_ mode: IdentityMode) {
+        usageStore.reset()
         notificationPolicy.reset()
         preferences.identityMode = mode
         if mode == .quotaOnly, let snapshot {
@@ -354,6 +361,7 @@ final class AppStore: ObservableObject {
     }
 
     func setManualCodexPath(_ path: String?) {
+        usageStore.reset()
         notificationPolicy.reset()
         preferences.manualCodexPath = path
         refresh(trigger: .preferenceChange)
@@ -389,6 +397,7 @@ final class AppStore: ObservableObject {
            let currentAccount = visibleSnapshot.account,
            previousAccount != currentAccount {
             notificationPolicy.reset()
+            usageStore.reset()
         }
         snapshot = visibleSnapshot
         hasFetchedLiveSnapshot = true
@@ -419,6 +428,7 @@ final class AppStore: ObservableObject {
     }
 
     private func applyFailure(_ issue: ConnectionIssue) {
+        if issue == .notLoggedIn { usageStore.reset() }
         lastIssue = issue
         if let lastSuccess = snapshot?.fetchedAt {
             connectionState = .stale(lastSuccess: lastSuccess, issue: issue)

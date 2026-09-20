@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_DIR="$ROOT_DIR/Codex94"
-FORBIDDEN='account/rateLimitResetCredit/consume|URLSession|HTTPCookie|backend-api/codex/usage|browser-cookie|auth[.]json|Authorization[^\n]*Bearer|SecItemCopyMatching|kSecClassGenericPassword'
+FORBIDDEN='account/rateLimitResetCredit/consume|HTTPCookie|backend-api/codex/usage|browser-cookie|auth[.]json|Authorization[^\n]*Bearer|SecItemCopyMatching|kSecClassGenericPassword'
 SECRET_PATTERN='-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sk-(proj-|admin-|svcacct-)?[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|glpat-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|xox[baprs]-[A-Za-z0-9-]{20,}|npm_[A-Za-z0-9]{30,}|pypi-[A-Za-z0-9_-]{30,}|hf_[A-Za-z0-9]{30,}|[sr]k_live_[A-Za-z0-9]{20,}|whsec_[A-Za-z0-9]{20,}|SG[.][A-Za-z0-9_-]{16,}[.][A-Za-z0-9_-]{16,}|Bearer[[:space:]]+[A-Za-z0-9._~+/-]{20,}|eyJ[A-Za-z0-9_-]{10,}[.][A-Za-z0-9_-]{10,}[.][A-Za-z0-9_-]{10,}|[A-Za-z][A-Za-z0-9+.-]*://[^[:space:]/:@]+:[^[:space:]/@]+@|(api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|password|passwd)[[:space:]]*[:=][^[:alnum:]]{0,3}[A-Za-z0-9_./+=-]{16,}'
 PII_PATTERN='(/Users/[A-Za-z0-9._/-]+)|(/(private/)?var/folders/[A-Za-z0-9._/-]+)|([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,})'
 ALLOWED_FIXTURE_PII='^(/Users/(example|private|another-person)(/[A-Za-z0-9._/-]+)?|(user|test|private|account)@example[.]com)$'
@@ -99,6 +99,17 @@ append_matches() {
 }
 
 cd "$ROOT_DIR"
+
+# The anonymous, user-triggered GitHub release checker is the only direct
+# network client. Credential/cookie/reset-consumption bans still apply to it.
+network_matches="$(scan_matches "network-client scan could not be completed" \
+  rg -l --glob '*.swift' 'URLSession' "$SOURCE_DIR")"
+while IFS= read -r source_file; do
+  [[ -z "$source_file" || "$source_file" == "$SOURCE_DIR/Services/AppUpdateClient.swift" ]] || {
+    echo "Security check failed: direct networking outside the release checker: $source_file" >&2
+    exit 1
+  }
+done <<< "$network_matches"
 
 forbidden_matches="$(
   scan_matches \
