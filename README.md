@@ -9,7 +9,7 @@ with OpenAI Codex. It keeps remaining quota and reset times close at hand,
 without a Dock icon. Its compact popover and Dashboard Overview show the quota
 buckets and 5-hour or Weekly windows returned by Codex.
 
-The `0.2.2 (13)` candidate offers four menu-bar layouts, including a dual-window
+Version `0.2.2 (13)` offers four menu-bar layouts, including a dual-window
 view, optional low-quota and recovery alerts, and a configurable global shortcut.
 Either mouse button opens or closes the same popover. A prominent, read-only
 **Manual quota resets** card shows the available reset count in both the popover
@@ -54,14 +54,12 @@ Manual quota resets card.
 
 ## Distribution status
 
-- This version PR prepares **0.2.2 (13)**. The candidate package and source
-  instructions below target this version, including the new reset-count card.
-- The two candidate files are available in the
-  [0.2.2 draft Release](https://github.com/DEFY-AN94/codex94/releases). Drafts require
-  maintainer access and are not a public stable release.
-- The latest published stable release remains
-  [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1).
-  Candidate validation, PR review and final publication are recorded separately.
+- The published stable release is
+  [`v0.2.2 (13)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2),
+  released on **2026-09-20** as a Universal 2 DMG and source from the same
+  annotated tag.
+- Download and source-clone instructions below refer to this published release.
+  Later documentation commits do not move its tag or regenerate its assets.
 - This public repository can be cloned without GitHub authentication.
 - There is no automatic updater.
 - `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
@@ -90,26 +88,30 @@ standalone Codex CLI installation is not required when that bundled executable
 is compatible. It can also detect Homebrew and standard CLI locations or use an
 executable selected manually.
 
-## Install the 0.2.2 candidate DMG
+## Install the Universal DMG
 
-Maintainers can download both files from the
-[0.2.2 draft Release](https://github.com/DEFY-AN94/codex94/releases):
+Download both stable assets from the
+[`v0.2.2` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2):
 
 - `Codex94-0.2.2-macos-universal-unnotarized.dmg`
 - `Codex94-0.2.2-SHA256SUMS.txt`
 
-The candidate supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
+The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
 shasum -a 256 -c Codex94-0.2.2-SHA256SUMS.txt
 ```
 
-This draft contains a locally built release candidate, not a GitHub-attested
-final release. SHA-256 identifies the uploaded bytes; it is not Apple signing,
-notarization or a security verdict. Public downloads remain available from
-[v0.2.1](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1) while this PR
-and the release are being reviewed.
+If you have the GitHub CLI, verify that the exact DMG came from this
+repository's GitHub workflow and commit:
+
+```bash
+gh attestation verify Codex94-0.2.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+```
+
+Attestation is build provenance, not an Apple signature, notarization, malware
+review, or Gatekeeper approval.
 
 Quit every running Codex94 copy, open the DMG, and drag `Codex94.app` onto its
 `Applications` shortcut. This installs it at `/Applications/Codex94.app`. Do
@@ -124,13 +126,13 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 
 ## Install from source
 
-Clone the 0.2.2 version-PR branch (the final release tag is not published yet):
+Clone the published stable source tag:
 
 ```bash
-git clone --branch codex/release-0.2.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v0.2.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
-Then build that checkout:
+Then build the selected tag:
 
 ```bash
 cd codex94
@@ -157,8 +159,8 @@ source installer does not migrate or remove a DMG-installed copy.
 
 ## Main behavior
 
-The following includes the unreleased `0.2.2 (13)` candidate. The screenshots
-above remain historical captures and do not demonstrate its new controls.
+The following describes `0.2.2 (13)`. The screenshots above remain historical
+captures and do not demonstrate this version's new controls.
 
 - A new Dashboard window starts on **Overview**, which reuses the current
   connection status, freshness context, and menu-bar quota picker, then shows
@@ -173,7 +175,7 @@ above remain historical captures and do not demonstrate its new controls.
   menu-bar item changes layout and width immediately without being recreated.
   A status badge is centered in
   a visible ring or occupies a fixed trailing slot in Percentage Only.
-- The `0.2.2` candidate adds a fourth dual-window layout, showing the
+- Version `0.2.2` adds a fourth dual-window layout, showing the
   selected bucket's 5-hour and Weekly values together. Its saved bucket choice
   is independent of the original three layouts' quota selection. Switching
   layouts preserves those existing choices; an unavailable window is not
@@ -279,7 +281,7 @@ above remain historical captures and do not demonstrate its new controls.
   the app and shows a localized failure if a requested change fails. Automated
   tests use a fake service and never change real Login Items.
 - The executable picker follows the app's selected language.
-- Dashboard → About shows this candidate tree's exact value `0.2.2 (13)`. A
+- Dashboard → About shows the exact version and build `0.2.2 (13)`. A
   user-triggered copy action preserves that string, and the project link targets
   `https://github.com/DEFY-AN94/codex94`. It adds no updater or network client.
 - Supports system, Terminal Dark, and Terminal Light themes plus English and
@@ -322,7 +324,7 @@ schedule use the existing reset timestamp, with no additional cache fields or
 persistent ledger. Overview uses the existing snapshot without storing new
 identity data. The popover's browsed model and the Dashboard's selected section
 are session-only; Dashboard frame autosave is unchanged.
-The `0.2.2` candidate adds `dualWindowBucketSelection.v1`, `globalHotKey.v1`,
+Version `0.2.2` adds `dualWindowBucketSelection.v1`, `globalHotKey.v1`,
 and `notifications.v1` preferences for the independent dual-window bucket,
 chosen shortcut, and alert settings. Notification baselines, deduplication, and
 the reset-credit count are memory-only; cache schema v2 is unchanged. The
@@ -407,8 +409,8 @@ PR #11 remains the historical record for exact-head test, Display/Recovery UI,
 Actions/Python/Swift CodeQL, and final App acceptance. The synthetic Overview
 capture embedded above has been reviewed for layout and privacy. Keyboard
 activation, AXPress, and hosted tooltip exposure are not claimed as passed.
-Version [`0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1)
-is published. Every release needs its own test results, reviewed synthetic UI
+Version [`0.2.2 (13)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.2)
+was published on 2026-09-20. Every release needs its own test results, reviewed synthetic UI
 evidence, candidate App acceptance before Ready, and final CI DMG acceptance
 before publication. Earlier evidence does not prove a later candidate passed.
 

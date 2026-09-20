@@ -28,7 +28,7 @@ When account information is enabled, the returned email address is held only in
 memory and displayed only in Dashboard. Switching to **Quota only** removes it
 from the in-memory snapshot.
 
-The unreleased `0.2.2 (13)` candidate reads only the authoritative
+Version `0.2.2 (13)` reads only the authoritative
 `rateLimitResetCredits.availableCount` total from that existing quota response.
 It accepts a nonnegative integer, keeps zero distinct from missing/null data,
 and does not retain individual credit identifiers or details. The count is
@@ -63,7 +63,7 @@ their migration without adding another preference:
   for the affected role. **Restore Default Colors** clears only these overrides,
   not quota selection, layout, theme, language, paths, or window settings.
 
-The `0.2.2 (13)` candidate adds three preference keys while retaining cache v2:
+Version `0.2.2 (13)` adds three preference keys while retaining cache v2:
 
 - `dualWindowBucketSelection.v1` stores the fourth layout's bucket selection,
   independently of the original three layouts' existing quota selection.
@@ -105,7 +105,7 @@ picker text add no data collection, persistent field, or permission.
 
 ## Optional local notifications
 
-The `0.2.2` candidate adds local macOS notifications, disabled by default.
+Version `0.2.2` adds local macOS notifications, disabled by default.
 Explicitly enabling the feature requests system notification authorization.
 Default warning thresholds are 20% and 10% remaining, and each can be adjusted
 or disabled. The default bucket is monitored, with optional extra buckets and
@@ -168,7 +168,7 @@ Codex94 does not request browser, Documents, Keychain, Accessibility, contacts,
 camera, microphone, or location access. A standard file picker appears only when
 the user explicitly chooses a Codex executable. Version `0.1.9` added no system
 permission or entitlement; versions `0.2.0` and `0.2.1` likewise add none.
-The `0.2.2` candidate adds only the explicit, optional local-notification
+Version `0.2.2` adds only the explicit, optional local-notification
 permission described above. Its global shortcut does not require Accessibility
 access, and opening the popover through that shortcut uses the existing refresh
 path.
