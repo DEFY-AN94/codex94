@@ -29,6 +29,11 @@ Development candidate: `0.2.2 (13)`. The published stable download remains
   zero, show missing/null data as unavailable, distinguish a cold unfetched
   state, and label retained values after failed refreshes as cached.
 
+### Compatibility
+
+- Keep notification authorization checks compatible with the Xcode 16.4
+  toolchain without transferring system notification objects across actors.
+
 ### Security and privacy
 
 - Keep cache schema v2 and exclude the reset-credit count and individual credit

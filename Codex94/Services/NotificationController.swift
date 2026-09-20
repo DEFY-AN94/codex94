@@ -23,10 +23,16 @@ final class SystemQuotaNotificationService: NSObject, QuotaNotificationServing, 
     }()
 
     func authorization() async -> NotificationAuthorization {
-        switch await center.notificationSettings().authorizationStatus {
-        case .authorized, .provisional, .ephemeral: .authorized
-        case .notDetermined: .notDetermined
-        default: .denied
+        await withCheckedContinuation { continuation in
+            center.getNotificationSettings { settings in
+                let authorization: NotificationAuthorization
+                switch settings.authorizationStatus {
+                case .authorized, .provisional, .ephemeral: authorization = .authorized
+                case .notDetermined: authorization = .notDetermined
+                default: authorization = .denied
+                }
+                continuation.resume(returning: authorization)
+            }
         }
     }
 

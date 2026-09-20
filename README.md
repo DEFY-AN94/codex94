@@ -56,8 +56,8 @@ Manual quota resets card.
 
 - This version PR prepares **0.2.2 (13)**. The candidate package and source
   instructions below target this version, including the new reset-count card.
-- The two candidate files are uploaded to the **0.2.2 draft Release** in
-  [Releases](https://github.com/DEFY-AN94/codex94/releases). Drafts require
+- The two candidate files are available in the
+  [0.2.2 draft Release](https://github.com/DEFY-AN94/codex94/releases/tag/untagged-669c6d0353fbb6e37d32). Drafts require
   maintainer access and are not a public stable release.
 - The latest published stable release remains
   [`v0.2.1 (12)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.2.1).
@@ -92,8 +92,8 @@ executable selected manually.
 
 ## Install the 0.2.2 candidate DMG
 
-Maintainers can download both files from the **0.2.2 draft Release** in
-[Releases](https://github.com/DEFY-AN94/codex94/releases):
+Maintainers can download both files from the
+[0.2.2 draft Release](https://github.com/DEFY-AN94/codex94/releases/tag/untagged-669c6d0353fbb6e37d32):
 
 - `Codex94-0.2.2-macos-universal-unnotarized.dmg`
 - `Codex94-0.2.2-SHA256SUMS.txt`
