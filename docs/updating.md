@@ -1,7 +1,7 @@
 # Update checks
 
 This document describes the published stable release
-[`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0), released
+[`v3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1), released
 on 2026-09-21 (Australia/Melbourne). README download and source instructions
 refer to this release. Update checks are manual; installation remains user-managed.
 
@@ -83,7 +83,7 @@ does not publish a release or change GitHub's Latest designation.
 
 ## Future automatic installation
 
-In-app replacement remains outside `0.3.0`. It needs a separately reviewed
+In-app replacement remains outside the current release. It needs a separately reviewed
 distribution design with appropriate Apple Developer ID signing/notarization,
 authenticated update packages, and an end-to-end upgrade test for both supported
 Applications locations. Nested code, framework loading, install permissions,
@@ -96,7 +96,7 @@ be proposed. This document does not claim that path already exists.
 
 ## 中文使用说明
 
-[`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0) 已于
+[`v3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1) 已于
 2026-09-21（Australia/Melbourne）正式发布，现为稳定下载。“关于 → 检查新版本”只在
 用户点击后查询本仓库最新公开稳定 Release，显示版本和纯文本说明，并可通过系统
 浏览器打开经过验证的发布页面。下载、校验和安装仍由用户完成，不会自动替换或重启
@@ -104,4 +104,4 @@ App。`0.2.2` 用户需先手动安装 `0.3.0` 或之后的正式稳定版本，
 
 检查不发送账号或用量数据，结果不落盘；GitHub 仍能看到普通网络连接信息。检查失败
 不等于“已是最新”。它也不代表安装包已完成签名、公证或安全审查。未来自动安装需在
-Developer ID 分发与完整升级验收准备好后另行设计，不属于 `0.3.0` 的功能范围。
+Developer ID 分发与完整升级验收准备好后另行设计，不属于当前版本的功能范围。

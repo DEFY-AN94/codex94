@@ -76,18 +76,18 @@ statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0),
+  [`v3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1),
   released on **2026-09-21** (Australia/Melbourne) as a Universal 2 DMG and
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
   Later documentation commits do not move its tag or regenerate its assets.
-- `3.0.1 (15)` is an **Unreleased maintenance candidate** for request-context
-  correctness and focused reuse of parsing, chart preparation, and cleanup.
-  Implementation, checks, and release acceptance are still being completed;
-  this is not a new stable download or a broad architecture rewrite.
+- `3.0.1 (15)` is a maintenance release for request-context correctness and
+  focused reuse of parsing, chart preparation, and cleanup. It preserves the
+  features introduced in `0.3.0` without a broad architecture rewrite.
 - This public repository can be cloned without GitHub authentication.
 - Users of `0.2.2`, which has no update-check command, must manually install
-  `0.3.0` to gain that command. Update downloads and installation remain manual.
+  `0.3.0` or a later published release to gain that command. Update downloads
+  and installation remain manual.
 - `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
   Runtime signature, and installs it at `~/Applications/Codex94.app`.
 - The installer requires every Codex94 copy to be quit first. It
@@ -95,7 +95,7 @@ statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `0.3.0` DMG itself is completely unsigned, has no Apple Developer ID
+The published `3.0.1` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -117,23 +117,23 @@ executable selected manually.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v0.3.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0):
+[`v3.0.1` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1):
 
-- `Codex94-0.3.0-macos-universal-unnotarized.dmg`
-- `Codex94-0.3.0-SHA256SUMS.txt`
+- `Codex94-3.0.1-macos-universal-unnotarized.dmg`
+- `Codex94-3.0.1-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-0.3.0-SHA256SUMS.txt
+shasum -a 256 -c Codex94-3.0.1-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-0.3.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-3.0.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -155,7 +155,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v0.3.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v3.0.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
@@ -477,6 +477,14 @@ Version [`0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0)
 was published on 2026-09-21 (Australia/Melbourne). Its source and distribution
 artifacts remain bound to that release tag. Later documentation changes do not
 replace the recorded evidence, and future versions require their own validation.
+
+New validation for [`3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1)
+includes **315 hosted tests**, the Display/Recovery/Token usage CI scenarios,
+Actions/Python/Swift CodeQL, and verification of its final-main Universal App
+and DMG. These are this maintenance release's own results. The unchanged
+`0.3.0` screenshots and maintainer interaction records retain their original
+provenance; they are not relabelled as fresh `3.0.1` manual acceptance. Final
+CI-package acceptance is recorded separately in the `3.0.1` release record.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See the

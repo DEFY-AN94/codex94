@@ -1,8 +1,9 @@
 # Component ownership and reuse
 
-This describes the existing application boundaries and the constraints for the
-`3.0.1 (15)` maintenance candidate. It is not a test report or a release claim.
-The published stable version remains `0.3.0` until a later publication is verified.
+This describes application ownership and reuse constraints maintained in the
+published [`3.0.1 (15)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1).
+Test results and final package acceptance are separate evidence; this document
+defines component responsibilities, not a substitute for those records.
 
 | Owner | Responsibility |
 | --- | --- |

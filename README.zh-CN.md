@@ -69,23 +69,22 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 ## 当前分发状态
 
 - 已发布的稳定版为
-  [`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0)，
+  [`v3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1)，
   于 **2026-09-21**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
   annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
   也不会重新生成已发布的资产。
-- `3.0.1 (15)` 是 **Unreleased 维护候选版**，范围为请求上下文正确性，以及解析、
-  图表准备和清理逻辑的局部复用。实现、检查和发布验收仍在进行中；目前不是新的
-  稳定下载，也不包含大范围架构重写。
+- `3.0.1 (15)` 是维护版本，修正请求上下文处理，并局部复用解析、图表准备和
+  清理逻辑；保留 `0.3.0` 引入的功能，不包含大范围架构重写。
 - 仓库已公开，无需 GitHub 认证即可 clone。
-- `0.2.2` 没有检查更新入口，其用户需手动安装 `0.3.0` 才能获得该入口；
+- `0.2.2` 没有检查更新入口，其用户需手动安装 `0.3.0` 或之后的正式版本才能获得该入口；
   后续更新的下载与安装仍由用户手动完成。
 - `script/install.sh` 构建本地 Release App，应用 ad-hoc Hardened Runtime
   签名，并安装到 `~/Applications/Codex94.app`。
 - 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
-已发布的 `0.3.0` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+已发布的 `3.0.1` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
 attestation 都不会改变这一 Apple 信任状态。
 
@@ -104,23 +103,23 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 
 ## 安装 Universal DMG
 
-请从 [`v0.3.0` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0)
+请从 [`v3.0.1` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1)
 下载以下两个正式资产：
 
-- `Codex94-0.3.0-macos-universal-unnotarized.dmg`
-- `Codex94-0.3.0-SHA256SUMS.txt`
+- `Codex94-3.0.1-macos-universal-unnotarized.dmg`
+- `Codex94-3.0.1-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-0.3.0-SHA256SUMS.txt
+shasum -a 256 -c Codex94-3.0.1-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-0.3.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-3.0.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -140,7 +139,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v0.3.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v3.0.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
@@ -396,6 +395,13 @@ Display/Recovery UI、Actions/Python/Swift CodeQL 与最终 App 人工验收状�
 [`0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0)
 已于 2026-09-21（Australia/Melbourne）正式发布，其源码与分发资产仍绑定该发布标签。
 后续文档变更不会替代已记录的验收证据，未来版本仍需独立验证。
+
+[`3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1) 的新验证包含
+**315 项 hosted tests**、Display／Recovery／Token usage 三个 CI 场景、
+Actions／Python／Swift CodeQL，以及本版最终 main 的 Universal App 与 DMG 核验。
+这些是本维护版本自己的验证结果；未修改的 `0.3.0` 截图与维护者人工交互记录保留
+原始来源，不改称为重新执行的 `3.0.1` 人工验收。最终 CI 安装包验收在本版发布记录中
+单独说明。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。组件职责与复用约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；

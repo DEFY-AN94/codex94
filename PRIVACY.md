@@ -2,7 +2,7 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0),
+stable version is [`v3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1),
 released on 2026-09-21 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
