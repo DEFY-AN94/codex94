@@ -8,6 +8,7 @@ state, reads credentials, changes system settings, or installs an application.
 import hashlib
 import json
 import os
+from datetime import date, timedelta
 from pathlib import Path
 import plistlib
 import re
@@ -24,6 +25,23 @@ METADATA_HELPER = "script/release_metadata.py"
 # Only these tracked build inputs may enter the disposable recovery source copy.
 # No repository metadata, documentation, scripts, local state or directory copy.
 BUILD_INPUTS = (
+    "Codex94/Models/AppUpdateModels.swift",
+    "Codex94/Services/AppUpdateClient.swift",
+    "Codex94/Stores/AppUpdateController.swift",
+    "Codex94/Views/Components/UpdateSettingsView.swift",
+    "Codex94/Models/TokenUsageModels.swift",
+    "Codex94/Services/TokenUsageFetching.swift",
+    "Codex94/Services/TokenUsageParser.swift",
+    "Codex94/Stores/TokenUsageStore.swift",
+    "Codex94/Support/TokenUsagePresentation.swift",
+    "Codex94/Views/Dashboard/TokenUsageView.swift",
+    "Codex94/Views/Dashboard/TokenUsageSummaryView.swift",
+    "Codex94/Views/Dashboard/TokenUsageChartView.swift",
+    "Codex94/Views/Dashboard/TokenUsageDailyTable.swift",
+    "Codex94/Views/Dashboard/TokenUsageCSVDocument.swift",
+    "Codex94Tests/TokenUsageParserTests.swift",
+    "Codex94Tests/TokenUsageStoreTests.swift",
+    "Codex94Tests/TokenUsageRenderingTests.swift",
     "Codex94/Models/NotificationPreferences.swift",
     "Codex94/Models/MenuBarBucketSelection.swift",
     "Codex94/Models/GlobalHotKey.swift",
@@ -255,7 +273,7 @@ def main():
     require(os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted", "A fresh hosted runner is required")
     require(os.environ.get("RUNNER_OS") == "macOS", "A hosted Mac is required")
     scenario = os.environ.get("CODEX94_UI_SCENARIO")
-    require(scenario in ("display", "recovery"), "Unknown UI scenario")
+    require(scenario in ("display", "recovery", "usage"), "Unknown UI scenario")
     require(os.getuid() != 0, "Do not prepare UI fixtures as root")
     source_revision = os.environ.get("GITHUB_SHA", "")
     require(re.fullmatch(r"[0-9a-f]{40}", source_revision) is not None, "A tested source revision is required")
@@ -323,6 +341,7 @@ def main():
     write_new(request_log, b"")
     write_new(mode_path, json_bytes({
         "mode": "normal", "defaultUsedPercent": 68, "sparkUsedPercent": 12, "includeSpark": True,
+        "tokenUsageMode": "complete",
     }))
 
     project = repository / "Codex94.xcodeproj"
@@ -335,7 +354,7 @@ def main():
     initial_preferences = {
         "identityMode": "quotaOnly",
         "hasChosenIdentityMode": True,
-        "manualCodexPath": str(executable if scenario == "display" else invalid_executable),
+        "manualCodexPath": str(invalid_executable if scenario == "recovery" else executable),
         "refreshInterval": 30,
         "theme": "terminalDark",
         "language": "english",
@@ -378,6 +397,20 @@ def main():
         "resetsAt": {"codexWeekly": 2_000_000_000, "sparkFiveHour": 2_000_003_600, "sparkWeekly": 2_000_007_200},
         "sparkName": "GPT-5.3-Codex-Spark",
         "longName": "Synthetic Future Model " * 6,
+        # Fixed aggregate-only data. No account identity, task title, rollout,
+        # credential, or private path may be part of this screenshot source.
+        "tokenUsage": {
+            "summary": {
+                "lifetimeTokens": 1_234_567, "peakDailyTokens": 450_000,
+                "longestRunningTurnSec": 3_671, "currentStreakDays": 7,
+                "longestStreakDays": 21,
+            },
+            "dailyUsageBuckets": [
+                {"startDate": (date(2033, 4, 14) + timedelta(days=index)).isoformat(),
+                 "tokens": 0 if index == 31 else (index + 1) * 1_000}
+                for index in range(35)
+            ],
+        },
         "timeZoneIdentifier": "system",
         "initialPreferences": initial_preferences,
         "runner": {"environment": "github-hosted", "os": "macOS"},
@@ -415,13 +448,31 @@ def main():
     responses = [json.loads(line) for line in probe.stdout.splitlines()]
     require([response["id"] for response in responses] == [1, 2], "Fake protocol self-check failed")
     require("rateLimitsByLimitId" in responses[1]["result"], "Fake buckets missing")
+    self_check_usage = 0
+    if scenario == "usage":
+        transaction = '\n'.join([
+            '{"id":1,"method":"initialize","params":{}}',
+            '{"method":"initialized"}',
+            '{"id":2,"method":"account/usage/read"}',
+        ]) + '\n'
+        usage_probe = subprocess.run(
+            [str(system_alias), "-s", "read-only", "-a", "never", "app-server", "--stdio"],
+            input=transaction.encode("utf-8"), capture_output=True, timeout=3, check=True,
+        )
+        usage_responses = [json.loads(line) for line in usage_probe.stdout.splitlines()]
+        require([response["id"] for response in usage_responses] == [1, 2], "Fake usage self-check failed")
+        require(usage_responses[1]["result"] == manifest["tokenUsage"], "Fake usage aggregate mismatch")
+        self_check_usage = 1
     # The self-check is accounted for explicitly; do not truncate its log.
-    write_new(root / "prepared.json", json_bytes({"schemaVersion": 1, "selfCheckRateLimits": 1}))
+    write_new(root / "prepared.json", json_bytes({
+        "schemaVersion": 1, "selfCheckRateLimits": 1, "selfCheckTokenUsage": self_check_usage,
+    }))
     write_new(artifacts / "isolation.json", json_bytes({
         "schemaVersion": 1, "scenario": scenario,
         "runner": "github-hosted-macos", "preseededBeforeLaunch": True,
         "existingAUTDataRefused": True, "identityMode": "quotaOnly",
         "fakeProtocolSelfCheck": "passed", "selfCheckRateLimits": 1,
+        "selfCheckTokenUsage": self_check_usage,
         "fakeSystemTmpAliasChecked": True,
         "sourceRevision": source_revision,
         "instrumentedAUT": scenario == "recovery",

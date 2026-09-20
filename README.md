@@ -15,6 +15,9 @@ Either mouse button opens or closes the same popover. A prominent, read-only
 **Manual quota resets** card shows the available reset count in both the popover
 and Overview; it does not redeem a reset.
 
+The unreleased `0.3.0 (14)` candidate adds a **Token usage** page and
+user-initiated stable-release checks. The public stable release remains `0.2.2`.
+
 Codex94 is an MIT-licensed source project. It uses the Codex executable already
 installed on the Mac and has no third-party runtime dependencies.
 
@@ -35,7 +38,7 @@ GitHub-hosted CI. Its fixed future Reset dates are test values, not live reset
 schedules. The unchanged default menu-bar sample is retained from `v0.1.7`.
 These images show their original versions' interfaces. They do not show the
 `0.2.2` dual-window layout, notification settings, shortcut control, or new
-Manual quota resets card.
+Manual quota resets card, or the `0.3.0` candidate's statistics and update UI.
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 menu bar ring showing 79 percent remaining" width="144">
@@ -61,7 +64,10 @@ Manual quota resets card.
 - Download and source-clone instructions below refer to this published release.
   Later documentation commits do not move its tag or regenerate its assets.
 - This public repository can be cloned without GitHub authentication.
-- There is no automatic updater.
+- The published `0.2.2` app has no update-check command. Its users must manually
+  install the first released version containing that command.
+- `0.3.0 (14)` is an **Unreleased candidate**, not a new stable download.
+  Tests and maintainer release acceptance remain separate from implementation.
 - `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
   Runtime signature, and installs it at `~/Applications/Codex94.app`.
 - The installer requires every Codex94 copy to be quit first. It
@@ -69,7 +75,7 @@ Manual quota resets card.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The downloadable DMG itself is completely unsigned, has no Apple Developer ID
+The published `0.2.2` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -159,8 +165,36 @@ source installer does not migrate or remove a DMG-installed copy.
 
 ## Main behavior
 
-The following describes `0.2.2 (13)`. The screenshots above remain historical
-captures and do not demonstrate this version's new controls.
+### 0.3.0 candidate: statistics and manual update checks
+
+- Dashboard → **Token usage** loads the service's `account/usage/read` data on
+  first entry or a manual statistics refresh, independently of quota polling.
+  Statistics errors do not turn a working menu-bar quota into a connection error.
+- Summary cards show the returned lifetime tokens, peak daily tokens, current
+  and longest streaks, and longest running turn. Missing values remain unknown.
+  These service-reported summaries may cover a different period from the daily
+  records; the app does not invent model, project, input/output, cost, or hourly
+  breakdowns.
+- The daily bar chart and table offer **7 days / 30 days / All returned**. These
+  ranges end at the latest reported day, not today. The chart preserves actual
+  date gaps; an omitted day is not zero usage. Hover or click to inspect exact
+  values. Reporting time zone and complete historical coverage are unspecified.
+- **Export CSV…** saves only reported daily records in the selected range, with
+  original source dates and exact token counts, to a user-selected file. The app
+  otherwise keeps statistics in memory; refreshes replace the snapshot rather
+  than accumulate another copy of the same usage.
+- Dashboard → **About → Check for updates** requests this repository's latest
+  public stable release from GitHub only when clicked. It displays the version
+  and plain-text release notes, and can open the validated GitHub Release page
+  in the system browser. Downloading and installing remain manual; the app does
+  not poll for updates, download/install an app, or relaunch itself.
+  See [update checks and release maintenance](docs/updating.md) for the fixed
+  endpoint, first-install migration, and future automatic-installation conditions.
+
+### Existing quota behavior
+
+The following behavior is retained from `0.2.2 (13)`. The screenshots above
+remain historical captures, not evidence of the candidate's new controls.
 
 - A new Dashboard window starts on **Overview**, which reuses the current
   connection status, freshness context, and menu-bar quota picker, then shows
@@ -281,13 +315,14 @@ captures and do not demonstrate this version's new controls.
   the app and shows a localized failure if a requested change fails. Automated
   tests use a fake service and never change real Login Items.
 - The executable picker follows the app's selected language.
-- Dashboard → About shows the exact version and build `0.2.2 (13)`. A
+- Dashboard → About shows the running app's exact version and build. A
   user-triggered copy action preserves that string, and the project link targets
-  `https://github.com/DEFY-AN94/codex94`. It adds no updater or network client.
+  `https://github.com/DEFY-AN94/codex94`. Opening that link uses the system browser;
+  the candidate's separate update flow is described above.
 - Supports system, Terminal Dark, and Terminal Light themes plus English and
   Simplified Chinese.
 - Uses only the current Codex login. It does not manage multiple accounts or
-  alternate `CODEX_HOME` directories, collect quota history, or provide an updater.
+  alternate `CODEX_HOME` directories, or collect a local quota-history ledger.
 
 ## Security and privacy
 
@@ -297,6 +332,7 @@ flowchart LR
     B -->|"Codex-owned login"| C["OpenAI account service"]
     A --> D["quota-only local cache"]
     A -->|"opt-in local alerts"| E["macOS Notification Center"]
+    A -->|"0.3.0: user-initiated update check"| F["GitHub public latest-release API"]
 ```
 
 Codex94 starts the validated executable with fixed arguments:
@@ -332,15 +368,19 @@ shortcut uses system hotkey registration and does not record typed text.
 Opt-in notifications use the local macOS notification service, which can retain
 delivered bucket/window/percentage messages in Notification Center. This is an
 explicit new permission and local system data flow, not remote telemetry.
-Codex94 has no analytics, advertising,
-telemetry upload, crash-reporting SDK, update checker, or project-operated
-server.
+The `0.3.0` candidate's statistics remain in memory unless the user exports CSV.
+Its separate update check makes a direct request to GitHub's fixed public
+latest-release API only after user action, without sending account or usage
+data. Update results stay in memory. Codex94 has no analytics, advertising,
+telemetry upload, crash-reporting SDK, system profiling, or project-operated
+server. Opening the Release page hands navigation to the system browser.
 
 Version 0.2.0 added distribution packaging and the second stable installation
 path. Version 0.2.1 retains the same data and permission boundaries. The DMG, checksum, and CI artifact contain the App, not account data,
 credentials, preferences, cache, logs, or real quota. Browser download and
-Gatekeeper quarantine handling are macOS distribution behavior; they do not add
-a Codex94 network client, data collection, entitlement, or permission.
+Gatekeeper quarantine handling are macOS distribution behavior. The `0.3.0`
+candidate deliberately adds an update-network path; it does not change how
+Codex credentials or quota data are accessed.
 
 App Sandbox is intentionally disabled because the Codex child process must
 access its own login state. Hardened Runtime remains enabled; subprocess

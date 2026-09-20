@@ -2,6 +2,39 @@
 
 All notable changes to Codex94 are documented here.
 
+## 0.3.0 - Unreleased
+
+Version `0.3.0 (14)`. The published stable download remains `v0.2.2` until
+this candidate is merged, validated and explicitly released.
+
+### Added
+
+- Add an on-demand **Token usage** Dashboard page using the official
+  `account/usage/read` endpoint: service-reported lifetime and peak daily tokens,
+  streaks, longest turn duration, a daily chart and an exportable daily table.
+- Keep statistics in memory, independently of quota polling and connection
+  status. Missing values and missing dates remain unknown; repeated reads replace
+  the snapshot instead of adding usage again. Unsupported Codex versions display
+  a dedicated message without breaking the menu bar.
+- Add 7-day, 30-day, and all-returned daily views ending at the latest source
+  date, exact values on chart hover/selection, and CSV export of the displayed
+  daily records. Preserve source-date gaps and distinguish unknown data from
+  explicit zero; do not infer an account reporting timezone or complete coverage.
+- Add **Check for updates** in About. A manual click reads this repository's
+  latest public stable GitHub Release, displays its version and plain-text
+  notes, and offers a validated Release-page link in the system browser.
+  Downloading and installing remain user-managed.
+
+### Security and privacy
+
+- Keep Token usage snapshots in memory except for a user-requested CSV export.
+  Ignore thread details and retain the existing Codex authentication boundary,
+  independent quota status, and cache schema v2.
+- Disclose the new direct GitHub metadata request. It sends no Codex account or
+  usage data, uses no cookies or credential-store access, and persists no update
+  results. Add no background update polling, automatic app download/install,
+  system profiling, signing-key storage, or third-party runtime dependency.
+
 ## 0.2.2 - 2026-09-20
 
 Version `0.2.2 (13)`.

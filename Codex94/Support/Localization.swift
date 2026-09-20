@@ -4,6 +4,7 @@ extension DashboardSection {
     var titleKey: LocalizedStringKey {
         switch self {
         case .overview: "dashboard.overview"
+        case .usage: "usage.title"
         case .connection: "dashboard.connection"
         case .display: "dashboard.display"
         case .startup: "dashboard.startup"

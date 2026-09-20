@@ -342,6 +342,171 @@ final class Codex94UITests: XCTestCase {
         ])
     }
 
+    func testTokenUsageSmoke() throws {
+        try prepare(scenario: "usage")
+        try launchPopover(expectedRequestRange: 1...2)
+        XCTAssertEqual(try fixture.tokenUsageRequestCount(), fixture.selfCheckTokenUsage,
+                       "Starting the menu-bar monitor must not load token usage")
+        let quotaRequests = try fixture.requestCount()
+        let quotaCache = try fixture.cacheFingerprint()
+        let originalPID = try ownedApplicationPID()
+        var dashboard = try openDashboard(from: currentPopover())
+
+        let initialUsageRequests = try fixture.tokenUsageRequestCount()
+        try selectPage(.usage, in: dashboard)
+        try waitForTokenUsageCompletion(after: initialUsageRequests, in: dashboard)
+        try assertTokenUsageContent(in: dashboard, visibleDays: 30)
+        try capture(dashboard, named: "usage-complete-en.png")
+
+        for (range, count) in [(UITokenRange.sevenDays, 7), (.thirtyDays, 30), (.all, 35)] {
+            try withoutTokenUsageRequests("Changing the visible token-usage range") {
+                try chooseTokenRange(range, in: dashboard)
+                try assertTokenUsageContent(in: dashboard, visibleDays: count)
+            }
+            if range == .sevenDays {
+                try capture(dashboard, named: "usage-seven-days-en.png")
+            }
+        }
+        try withoutTokenUsageRequests("Inspecting the daily token table") {
+            let export = try uniqueIdentified("token-usage-export", in: dashboard)
+            try reveal(export, in: dashboard)
+            try require(identified("token-usage-day-2033-05-18", in: dashboard).exists,
+                        "The daily table must show the newest fixed source date")
+        }
+        try capture(dashboard, named: "usage-daily-table-en.png")
+
+        // Recreating the page and changing presentation must reuse the loaded
+        // response. Only the page's own refresh button may issue another RPC.
+        try withoutTokenUsageRequests("Changing token-usage language and theme") {
+            try selectPage(.display, in: dashboard)
+            try setLanguage(.simplifiedChinese, in: dashboard)
+            dashboard = try dashboardWindow()
+            try setTheme(.terminalLight, in: dashboard)
+            try selectPage(.usage, in: dashboard)
+            try chooseTokenRange(.all, in: dashboard)
+            try assertTokenUsageContent(in: dashboard, visibleDays: 35)
+        }
+        try capture(dashboard, named: "usage-complete-zh-Hans.png")
+
+        try fixture.setTokenUsageMode("partial")
+        try refreshTokenUsage(in: dashboard)
+        try require(identified("token-usage-partial", in: dashboard).waitForExistence(timeout: 5),
+                    "Missing aggregate fields and missing daily data must expose partial status")
+        try require(identified("token-usage-empty-days", in: dashboard).exists,
+                    "Missing daily buckets must not be represented as a zero-filled chart")
+        try require(identified("token-usage-summary", in: dashboard).exists
+                    && !identified("token-usage-chart", in: dashboard).exists,
+                    "A partial response must retain available summaries and replace old daily data")
+        try assertTokenMetric("token-usage-peak", contains: "—", in: dashboard)
+        try capture(dashboard, named: "usage-partial-zh-Hans.png")
+
+        try fixture.setTokenUsageMode("missing")
+        try refreshTokenUsage(in: dashboard)
+        try require(identified("token-usage-error-unavailable", in: dashboard).waitForExistence(timeout: 5),
+                    "A missing summary must expose unavailable status")
+        try require(identified("token-usage-summary", in: dashboard).exists,
+                    "A temporary failure must retain the previous partial snapshot")
+        try capture(dashboard, named: "usage-unavailable-zh-Hans.png")
+
+        try fixture.setTokenUsageMode("unsupported")
+        try refreshTokenUsage(in: dashboard)
+        try require(identified("token-usage-error-unsupported", in: dashboard).waitForExistence(timeout: 5),
+                    "An older server must expose the dedicated unsupported state")
+        try require(!identified("token-usage-summary", in: dashboard).exists
+                    && !identified("token-usage-chart", in: dashboard).exists,
+                    "Unsupported service data must not masquerade as current token totals")
+        try capture(dashboard, named: "usage-unsupported-zh-Hans.png")
+
+        try fixture.setTokenUsageMode("complete")
+        try refreshTokenUsage(in: dashboard)
+        try assertTokenUsageContent(in: dashboard, visibleDays: 35)
+        XCTAssertEqual(try fixture.requestCount(), quotaRequests,
+                       "Token loading, ranges and retry must not issue quota requests")
+        XCTAssertEqual(try fixture.cacheFingerprint(), quotaCache,
+                       "Token usage must not rewrite the quota cache")
+        XCTAssertEqual(try fixture.tokenUsageRequestCount(), initialUsageRequests + 5,
+                       "One initial load and four explicit refreshes must produce exactly five usage RPCs")
+        XCTAssertEqual(try ownedApplicationPID(), originalPID)
+        try fixture.assertSafePreferences()
+        try quitNormally()
+        try fixture.writeReport("usage-result.json", fields: [
+            "scenario": "usage", "completed": true,
+            "languages": ["en", "zh-Hans"], "themes": ["terminalDark", "terminalLight"],
+            "visibleDayCounts": [7, 30, 35], "returnedDayCount": 35,
+            "partialDataVerified": true, "unavailableDataVerified": true,
+            "unsupportedServiceVerified": true, "successfulRetryVerified": true,
+            "rangeChangesDoNotFetch": true, "quotaRequestCountUnchanged": true,
+            "quotaCacheUnchanged": true, "identityRequestsAllowed": false,
+            "sourceData": "fixed-synthetic-account-aggregates", "rawTestResultsUploaded": false
+        ])
+    }
+
+    private func waitForTokenUsageCompletion(after before: Int, in dashboard: XCUIElement) throws {
+        try waitUntil("The synthetic token-usage request did not finish", timeout: 12) {
+            let refresh = self.identified("token-usage-refresh", in: dashboard)
+            return try self.fixture.tokenUsageRequestCount() == before + 1
+                && self.fixture.requestsHaveExited()
+                && refresh.exists && refresh.isEnabled
+                && !self.identified("token-usage-loading", in: dashboard).exists
+        }
+        try waitForSettledRequests()
+        XCTAssertEqual(try fixture.tokenUsageRequestCount(), before + 1)
+    }
+
+    private func refreshTokenUsage(in dashboard: XCUIElement) throws {
+        let before = try fixture.tokenUsageRequestCount()
+        let refresh = try uniqueIdentified("token-usage-refresh", in: dashboard)
+        try reveal(refresh, in: dashboard)
+        try require(refresh.isEnabled, "The token page refresh action must be available")
+        refresh.click()
+        try waitForTokenUsageCompletion(after: before, in: dashboard)
+    }
+
+    private func withoutTokenUsageRequests(_ action: String, operation: () throws -> Void) throws {
+        let before = try fixture.tokenUsageRequestCount()
+        try withoutRequests(action, operation: operation)
+        XCTAssertEqual(try fixture.tokenUsageRequestCount(), before,
+                       "\(action) must not reload token usage")
+    }
+
+    private func chooseTokenRange(_ range: UITokenRange, in dashboard: XCUIElement) throws {
+        let control = try uniqueIdentified("token-usage-range", in: dashboard)
+        try reveal(control, in: dashboard)
+        let title = language.tokenRange(range)
+        let matches = control.descendants(matching: .any).matching(NSPredicate(
+            format: "label == %@ OR title == %@ OR value == %@", title, title, title
+        )).allElementsBoundByIndex
+        let buttons = matches.filter { $0.elementType == .button || $0.elementType == .radioButton }
+        let candidates = buttons.isEmpty ? matches.filter { $0.isHittable } : buttons
+        try require(candidates.count == 1 && candidates[0].isEnabled && candidates[0].isHittable,
+                    "The token range must be one uniquely identified segmented choice")
+        candidates[0].click()
+    }
+
+    private func assertTokenUsageContent(in dashboard: XCUIElement, visibleDays: Int) throws {
+        for identifier in [
+            "token-usage-summary", "token-usage-lifetime", "token-usage-peak",
+            "token-usage-current-streak", "token-usage-longest-streak", "token-usage-longest-turn",
+            "token-usage-chart", "token-usage-daily-table", "token-usage-coverage"
+        ] {
+            try require(identified(identifier, in: dashboard).waitForExistence(timeout: 5),
+                        "A token summary, chart or daily-table component is missing: \(identifier)")
+        }
+        try waitUntil("The daily table did not reflect the selected local range") {
+            self.identified("token-usage-daily-table", in: dashboard).value as? String == String(visibleDays)
+        }
+        try require(!identified("token-usage-error", in: dashboard).exists
+                    && !identified("token-usage-partial", in: dashboard).exists,
+                    "Complete synthetic usage must not expose an error or partial state")
+        try assertTokenMetric("token-usage-lifetime", contains: "1,234,567", in: dashboard)
+    }
+
+    private func assertTokenMetric(_ identifier: String, contains expected: String, in dashboard: XCUIElement) throws {
+        let element = try uniqueIdentified(identifier, in: dashboard)
+        let text = [element.label, element.title, element.value as? String ?? ""].joined(separator: " ")
+        try require(text.contains(expected), "A synthetic token metric is missing its expected value")
+    }
+
     // MARK: - Guarded application lifecycle and request accounting
 
     private func prepare(scenario: String) throws {
@@ -368,6 +533,7 @@ final class Codex94UITests: XCTestCase {
         }
         language = .english
         XCTAssertEqual(try fixture.requestCount(), fixture.selfCheckRateLimits)
+        XCTAssertEqual(try fixture.tokenUsageRequestCount(), fixture.selfCheckTokenUsage)
     }
 
     private func launchPopover(expectedRequestRange: ClosedRange<Int>) throws {
@@ -736,6 +902,7 @@ final class Codex94UITests: XCTestCase {
             let marker: XCUIElement
             switch page {
             case .overview: marker = identified("overview-page", in: dashboard)
+            case .usage: marker = identified("token-usage-page", in: dashboard)
             case .connection: marker = identified("connection-menu-bar-reset", in: dashboard)
             case .display: marker = identified("menu-bar-layout", in: dashboard)
             case .startup: marker = identified("launch-at-login-toggle", in: dashboard)
@@ -763,6 +930,7 @@ final class Codex94UITests: XCTestCase {
         ]
         switch page {
         case .overview: report["expectedPage"] = "overview"
+        case .usage: report["expectedPage"] = "usage"
         case .connection: report["expectedPage"] = "connection"
         case .display: report["expectedPage"] = "display"
         case .startup: report["expectedPage"] = "startup"
@@ -1286,7 +1454,16 @@ final class Codex94UITests: XCTestCase {
 
     private func capture(_ element: XCUIElement, named filename: String) throws {
         // No desktop screenshots, Connection paths, Diagnostics or clipboard.
-        if filename.hasPrefix("dashboard-") {
+        if filename.hasPrefix("usage-") {
+            try require(fixture.scenario == "usage"
+                        && identified("token-usage-page", in: element).exists
+                        && !identified("overview-page", in: element).exists
+                        && !identified("connection-menu-bar-reset", in: element).exists
+                        && !identified("menu-bar-layout", in: element).exists
+                        && !identified("copy-diagnostics", in: element).exists
+                        && !identified("about-version", in: element).exists,
+                        "Usage artifacts may contain only the fixed synthetic aggregate page")
+        } else if filename.hasPrefix("dashboard-") {
             try require(identified("overview-page", in: element).exists
                         && !identified("connection-menu-bar-reset", in: element).exists
                         && !identified("menu-bar-layout", in: element).exists
@@ -1574,8 +1751,9 @@ private enum ReadOnlyFocusStage: String, CaseIterable {
         "focusedElementIdentityUnknown": true, "focusedElementIsRecoveryButton": false,
     ]
 }
-private enum UIPage { case overview, connection, display, startup, diagnostics, about }
+private enum UIPage { case overview, usage, connection, display, startup, diagnostics, about }
 private enum UITheme: String, CaseIterable { case system, terminalDark, terminalLight }
+private enum UITokenRange { case sevenDays, thirtyDays, all }
 
 private enum UILanguage: String, CaseIterable {
     case english, simplifiedChinese
@@ -1604,11 +1782,19 @@ private enum UILanguage: String, CaseIterable {
     func page(_ page: UIPage) -> String {
         switch page {
         case .overview: chinese ? "总览" : "Overview"
+        case .usage: chinese ? "Token 统计" : "Token usage"
         case .connection: chinese ? "连接" : "Connection"
         case .display: chinese ? "显示" : "Display"
         case .startup: chinese ? "启动" : "Startup"
         case .diagnostics: chinese ? "诊断" : "Diagnostics"
         case .about: chinese ? "关于 Codex94" : "About Codex94"
+        }
+    }
+    func tokenRange(_ range: UITokenRange) -> String {
+        switch range {
+        case .sevenDays: chinese ? "7 天" : "7 days"
+        case .thirtyDays: chinese ? "30 天" : "30 days"
+        case .all: chinese ? "全部返回" : "All returned"
         }
     }
     func theme(_ theme: UITheme) -> String {
@@ -1648,6 +1834,7 @@ private enum UILanguage: String, CaseIterable {
 
 private struct SyntheticFixture {
     let root: URL
+    let scenario: String
     let bundleID: String
     let expectedVersion: String
     let expectedBuild: String
@@ -1668,6 +1855,7 @@ private struct SyntheticFixture {
     let timeZone: TimeZone
     let initialPreferences: [String: Any]
     let selfCheckRateLimits: Int
+    let selfCheckTokenUsage: Int
 
     static func load(expectedScenario: String) throws -> SyntheticFixture {
         let environment = ProcessInfo.processInfo.environment
@@ -1790,6 +1978,7 @@ private struct SyntheticFixture {
         guard actualHash == expectedHash else { throw UITestFailure("The fake executable differs from the prepared fixture") }
         let prepared = try readJSON(root.appendingPathComponent("prepared.json"), maximumBytes: 4_096)
         guard prepared["schemaVersion"] as? Int == 1, prepared["selfCheckRateLimits"] as? Int == 1,
+              prepared["selfCheckTokenUsage"] as? Int == (expectedScenario == "usage" ? 1 : 0),
               Set(rawResets.keys) == Set(["codexWeekly", "sparkFiveHour", "sparkWeekly"]),
               rawResets["codexWeekly"]?.doubleValue == 2_000_000_000,
               rawResets["sparkFiveHour"]?.doubleValue == 2_000_003_600,
@@ -1798,8 +1987,9 @@ private struct SyntheticFixture {
               longName == String(repeating: "Synthetic Future Model ", count: 6) else {
             throw UITestFailure("The fake protocol self-check or fixed synthetic quota data is missing")
         }
+        try validateTokenUsageFixture(manifest["tokenUsage"])
         return SyntheticFixture(
-            root: root, bundleID: "com.defyan94.codex94",
+            root: root, scenario: expectedScenario, bundleID: "com.defyan94.codex94",
             expectedVersion: expectedVersion, expectedBuild: expectedBuild,
             sourceRevision: sourceRevision,
             executable: executable, invalidExecutable: invalidExecutable, modeURL: modeURL,
@@ -1809,8 +1999,38 @@ private struct SyntheticFixture {
             quotaCacheURL: quotaCacheURL,
             sparkName: sparkName, longName: longName,
             resetsAt: rawResets.mapValues(\.doubleValue), timeZone: .autoupdatingCurrent,
-            initialPreferences: initial, selfCheckRateLimits: 1
+            initialPreferences: initial, selfCheckRateLimits: 1,
+            selfCheckTokenUsage: expectedScenario == "usage" ? 1 : 0
         )
+    }
+
+    private static func validateTokenUsageFixture(_ value: Any?) throws {
+        guard let fixture = value as? [String: Any] else {
+            throw UITestFailure("The fixed synthetic usage dataset is missing")
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        guard let first = calendar.date(from: DateComponents(year: 2033, month: 4, day: 14)) else {
+            throw UITestFailure("The fixed synthetic source dates are invalid")
+        }
+        let days: [[String: Any]] = (0..<35).map { index in
+            let date = calendar.date(byAdding: .day, value: index, to: first)!
+            let parts = calendar.dateComponents([.year, .month, .day], from: date)
+            return [
+                "startDate": String(format: "%04d-%02d-%02d", parts.year!, parts.month!, parts.day!),
+                "tokens": index == 31 ? 0 : (index + 1) * 1_000,
+            ]
+        }
+        let expected: [String: Any] = [
+            "summary": [
+                "lifetimeTokens": 1_234_567, "peakDailyTokens": 450_000,
+                "longestRunningTurnSec": 3_671, "currentStreakDays": 7, "longestStreakDays": 21,
+            ],
+            "dailyUsageBuckets": days,
+        ]
+        guard NSDictionary(dictionary: fixture).isEqual(to: expected) else {
+            throw UITestFailure("Usage screenshots require the complete fixed synthetic dataset")
+        }
     }
 
     func assertInitialPreferences() throws {
@@ -1898,6 +2118,21 @@ private struct SyntheticFixture {
 
     func requestCount() throws -> Int { try requestEvents().filter { $0 == "rateLimits" }.count }
 
+    func tokenUsageRequestCount() throws -> Int { try requestEvents().filter { $0 == "tokenUsage" }.count }
+
+    func setTokenUsageMode(_ mode: String) throws {
+        guard scenario == "usage", ["complete", "partial", "missing", "unsupported"].contains(mode) else {
+            throw UITestFailure("Invalid synthetic token-usage mode")
+        }
+        try Self.validate(modeURL, type: .typeRegular)
+        let data = try JSONSerialization.data(withJSONObject: [
+            "mode": "normal", "defaultUsedPercent": 68, "sparkUsedPercent": 12,
+            "includeSpark": true, "tokenUsageMode": mode,
+        ], options: [.sortedKeys])
+        try data.write(to: modeURL, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: modeURL.path)
+    }
+
     func requestsHaveExited() throws -> Bool {
         let events = try requestEvents()
         return events.filter { $0 == "launch" }.count == events.filter { $0 == "exit" }.count
@@ -1921,7 +2156,8 @@ private struct SyntheticFixture {
             guard let value = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
                   Set(value.keys) == Set(["event", "pid", "mode"]),
                   let event = value["event"] as? String,
-                  ["version", "launch", "initialize", "rateLimits", "exit"].contains(event),
+                  (["version", "launch", "initialize", "rateLimits", "exit"]
+                    + (scenario == "usage" ? ["tokenUsage"] : [])).contains(event),
                   value["pid"] is NSNumber,
                   let mode = value["mode"] as? String,
                   ["normal", "notLoggedIn", "serverError", "longName", "slow"].contains(mode) else {
@@ -2062,13 +2298,19 @@ private struct SyntheticFixture {
             "popover-unavailable-zh-Hans.png", "display-result.json", "recovery-click-functional-result.json",
             "status-item-reference.json", "dashboard-sidebar-probe.json"
         ]
+        let usage: Set<String> = scenario == "usage" ? [
+            "usage-complete-en.png", "usage-seven-days-en.png", "usage-complete-zh-Hans.png",
+            "usage-daily-table-en.png",
+            "usage-partial-zh-Hans.png", "usage-unavailable-zh-Hans.png",
+            "usage-unsupported-zh-Hans.png", "usage-result.json"
+        ] : []
         let variants = Set(UILanguage.allCases.flatMap { language in
             UITheme.allCases.map { "popover-long-\(language.artifactName)-\($0.rawValue).png" }
         })
         let keyboardProbe = Set((0...6).map { "popover-keyboard-focus-\($0).png" })
             .union(["keyboard-navigation-probe.json", "keyboard-activation-probe.json"])
         let layoutMeasurements = Set((0..<32).map { "quota-layout-\($0).json" })
-        guard fixed.union(variants).union(keyboardProbe).union(layoutMeasurements).contains(filename) else {
+        guard fixed.union(variants).union(keyboardProbe).union(layoutMeasurements).union(usage).contains(filename) else {
             throw UITestFailure("Artifact filename is outside the explicit allowlist")
         }
         try Self.validate(artifacts, type: .typeDirectory, mode: 0o700)

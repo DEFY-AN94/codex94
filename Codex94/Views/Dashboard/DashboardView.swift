@@ -49,6 +49,8 @@ struct DashboardView: View {
                 switch windowState.resolvedSelection {
                 case .overview:
                     OverviewView(store: store)
+                case .usage:
+                    TokenUsageView(store: store.usageStore, language: store.preferences.language)
                 case .connection:
                     ConnectionSettingsView(
                         store: store,
@@ -62,7 +64,7 @@ struct DashboardView: View {
                 case .diagnostics:
                     DiagnosticsView(store: store)
                 case .about:
-                    AboutView()
+                    AboutView(updates: store.updates)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -81,13 +83,15 @@ struct DashboardView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    store.refresh(trigger: .manual)
-                } label: {
-                    Image(systemName: "arrow.clockwise")
+                if windowState.resolvedSelection != .usage {
+                    Button {
+                        store.refresh(trigger: .manual)
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .help("command.refresh")
+                    .disabled(store.isRefreshing || !store.preferences.hasChosenIdentityMode)
                 }
-                .help("command.refresh")
-                .disabled(store.isRefreshing || !store.preferences.hasChosenIdentityMode)
 
                 Button(action: quit) {
                     Image(systemName: "power")
@@ -373,6 +377,7 @@ private struct DiagnosticsView: View {
 }
 
 private struct AboutView: View {
+    let updates: AppUpdateController
     private let metadata = AppMetadata.current
     private let creatorURL = URL(string: "https://github.com/DEFY-AN94")!
 
@@ -395,6 +400,9 @@ private struct AboutView: View {
                 }
             }
             .padding(.bottom, 28)
+
+            UpdateSettingsView(controller: updates)
+                .padding(.bottom, 24)
 
             Divider()
 

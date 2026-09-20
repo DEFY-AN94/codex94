@@ -1,6 +1,414 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "updates.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "App updates" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "应用更新" } }
+      }
+    },
+    "updates.check" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check for updates" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "检查新版本" } }
+      }
+    },
+    "updates.checking" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Checking GitHub…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在检查 GitHub…" } }
+      }
+    },
+    "updates.manualOnly" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Checks GitHub only when you click. Download and install updates manually from the release page. No background checks or automatic installation." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅在点击时检查 GitHub；请从发布页面手动下载安装，不会后台检查或自动安装。" } }
+      }
+    },
+    "updates.upToDate" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No newer published stable version is available." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目前没有更新的已发布正式版本。" } }
+      }
+    },
+    "updates.available" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "A newer stable version is available" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "有新的正式版本可用" } }
+      }
+    },
+    "updates.openRelease" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open release page" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开发布页面" } }
+      }
+    },
+    "updates.releaseNotes" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Release notes" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "版本说明" } }
+      }
+    },
+    "updates.error.noPublishedRelease" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No published stable release was found." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "尚未找到已发布的正式版本。" } }
+      }
+    },
+    "updates.error.rateLimited" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "GitHub has temporarily limited update checks. Please try again later." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "GitHub 暂时限制了检查请求，请稍后重试。" } }
+      }
+    },
+    "updates.error.offline" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to reach GitHub. Check your connection and try again." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法连接 GitHub，请检查网络后重试。" } }
+      }
+    },
+    "updates.error.timedOut" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The update check timed out. Please try again." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "检查新版本超时，请重试。" } }
+      }
+    },
+    "updates.error.unavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update information is temporarily unavailable. Please try again later." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂时无法获取版本信息，请稍后重试。" } }
+      }
+    },
+    "updates.error.invalidResponse" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The release information could not be verified. No download link will be opened." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法验证发布信息，不会打开下载链接。" } }
+      }
+    },
+    "updates.error.responseTooLarge" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The release response exceeded the size limit. Please try again later." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "发布信息超出大小限制，请稍后重试。" } }
+      }
+    },
+    "updates.error.invalidCurrentVersion" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This build's version cannot be compared with published releases." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前构建的版本格式无法与已发布版本比较。" } }
+      }
+    },
+    "usage.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Token usage" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Token 统计" } }
+      }
+    },
+    "usage.subtitle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your Codex token totals and reported daily activity." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "查看 Codex 返回的 Token 总量与每日记录。" } }
+      }
+    },
+    "usage.refresh" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh statistics" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新统计" } }
+      }
+    },
+    "usage.updated %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Updated %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新于 %@" } }
+      }
+    },
+    "usage.tokens.unit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "tokens" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Token" } }
+      }
+    },
+    "usage.summary.lifetime" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Lifetime tokens" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "累计 Token" } }
+      }
+    },
+    "usage.summary.lifetime.detail" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Service-reported total" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务端累计统计" } }
+      }
+    },
+    "usage.summary.peak" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Peak daily tokens" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最高单日 Token" } }
+      }
+    },
+    "usage.summary.peak.detail" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Service-reported daily maximum" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务端单日峰值" } }
+      }
+    },
+    "usage.summary.currentStreak" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Current streak" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前连续使用" } }
+      }
+    },
+    "usage.summary.longestStreak" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Longest streak" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最长连续使用" } }
+      }
+    },
+    "usage.summary.days" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "days" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "天" } }
+      }
+    },
+    "usage.summary.longestTurn" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Longest running turn" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最长单次运行" } }
+      }
+    },
+    "usage.summary.longestTurn.detail" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Service-reported maximum duration" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务端最长运行时长" } }
+      }
+    },
+    "usage.summary.scope" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Summary metrics use the service's reporting scope, which may differ from the daily records below. A dash means the metric was not provided." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "汇总指标采用服务端统计口径，可能与下方日记录覆盖范围不同。横线表示未提供该指标。" } }
+      }
+    },
+    "usage.chart.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Daily tokens" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每日 Token" } }
+      }
+    },
+    "usage.chart.reportedTotal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reported in this range" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前范围已报告" } }
+      }
+    },
+    "usage.chart.missingNote" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Bars follow actual calendar dates. Blank days were not returned; they are not assumed to be zero." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "柱状图保留真实日期间隔。空白日期未返回数据，不按零用量处理。" } }
+      }
+    },
+    "usage.chart.noRecord" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No record returned" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未返回该日记录" } }
+      }
+    },
+    "usage.chart.inspect" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hover to inspect · click to pin a date" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "悬停查看精确值 · 点击固定日期" } }
+      }
+    },
+    "usage.chart.clearSelection" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear selected date" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除选中日期" } }
+      }
+    },
+    "usage.range.label" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Date range" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "日期范围" } }
+      }
+    },
+    "usage.range.sevenDays" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "7 days" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "7 天" } }
+      }
+    },
+    "usage.range.thirtyDays" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "30 days" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "30 天" } }
+      }
+    },
+    "usage.range.all" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "All returned" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全部返回" } }
+      }
+    },
+    "usage.range.anchor" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ranges end at the latest reported day, not today." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "范围截至最新返回的统计日，不代表截至今天。" } }
+      }
+    },
+    "usage.coverage.range %@ %@ %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ – %@ · %@ reported daily records" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ – %@ · 已返回 %@ 条日记录" } }
+      }
+    },
+    "usage.coverage.missing %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ dates in this range have no returned record." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此范围有 %@ 个日期未返回记录。" } }
+      }
+    },
+    "usage.coverage.source" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dates are the service's reporting days. The reporting time zone and completeness of historical coverage are not provided." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "日期沿用服务端统计日。服务端未提供分日时区及历史覆盖完整性信息。" } }
+      }
+    },
+    "usage.table.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Daily details" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "日明细" } }
+      }
+    },
+    "usage.table.date" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Source date" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务端日期" } }
+      }
+    },
+    "usage.table.tokens" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Tokens" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Token 数" } }
+      }
+    },
+    "usage.export.button" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Export CSV…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导出 CSV…" } }
+      }
+    },
+    "usage.export.scope" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "CSV includes only the reported daily records in this range, with source dates and exact token counts." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "CSV 仅包含当前范围内已返回的日记录，保留服务端日期与精确 Token 数。" } }
+      }
+    },
+    "usage.export.failed.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not export CSV" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法导出 CSV" } }
+      }
+    },
+    "usage.export.failed.detail" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The file could not be saved. Choose a writable location and try again." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件保存失败，请选择可写入的位置后重试。" } }
+      }
+    },
+    "usage.export.dismiss" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "OK" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "好" } }
+      }
+    },
+    "usage.state.partial" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Some statistics were not provided. Available values are shown below." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "部分统计未提供，以下显示当前可用的数据。" } }
+      }
+    },
+    "usage.state.cached" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Showing the last successful statistics. The update time below has not changed." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在显示上次成功获取的统计，原更新时间保持不变。" } }
+      }
+    },
+    "usage.state.loading" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Loading token statistics…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在加载 Token 统计…" } }
+      }
+    },
+    "usage.state.notLoaded" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh to load token statistics." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新以加载 Token 统计。" } }
+      }
+    },
+    "usage.empty.notProvided" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Daily breakdown not provided" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未提供每日明细" } }
+      }
+    },
+    "usage.empty.noRecords" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No daily records returned" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未返回日记录" } }
+      }
+    },
+    "usage.empty.explanation" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This does not mean there was no usage. Summary values may still be available." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这不代表没有使用量；上方汇总指标仍可能可用。" } }
+      }
+    },
+    "usage.error.unsupported" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This Codex executable does not support token statistics. Quota monitoring remains available." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前 Codex 可执行文件不支持 Token 统计，额度监控仍可使用。" } }
+      }
+    },
+    "usage.error.notLoggedIn" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sign in to Codex, then refresh statistics." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请先在 Codex 中登录，再刷新统计。" } }
+      }
+    },
+    "usage.error.unavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Token statistics are temporarily unavailable. Try refreshing again." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Token 统计暂时不可用，请稍后刷新重试。" } }
+      }
+    },
+    "usage.error.invalidData" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The statistics response could not be read. Quota monitoring is unaffected." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法读取统计响应，额度监控不受影响。" } }
+      }
+    },
+    "usage.duration.daysHours %@ %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@d %@h" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 天 %@ 小时" } }
+      }
+    },
+    "usage.duration.hoursMinutes %@ %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@h %@m" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 小时 %@ 分" } }
+      }
+    },
+    "usage.duration.minutesSeconds %@ %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@m %@s" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 分 %@ 秒" } }
+      }
+    },
+    "usage.duration.seconds %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@s" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@ 秒" } }
+      }
+    },
   "resetCredits.available": {
     "localizations": {
       "en": {
