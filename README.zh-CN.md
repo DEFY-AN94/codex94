@@ -26,13 +26,27 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 ## 界面截图
 
-以下数值来自隔离的文档渲染夹具，仅用于展示，不包含真实账号、身份信息或额度。
-当前嵌入的 Popover 图片仍是经过审查的合成 `0.1.8` 产物；Dashboard 图片已经
-替换为从 GitHub-hosted CI 中取得、并完成视觉与隐私审查的合成 `0.1.9` 总览产物。
-图中固定的未来 Reset 日期是测试值，并非实时重置时间。
-未改变的默认菜单栏示例保留自 `v0.1.7`。
-这些图片展示各自原版本的界面，不包含 `0.2.2` 的双窗口布局、通知设置、
-快捷键控件或新的手动额度重置卡片，也不展示 `0.3.0` 候选的统计与更新界面。
+所有截图均采用隔离的合成数据，不包含真实账号或实时用量。以下展示 `0.3.0 (14)`
+候选的**柱状图**与**折线图**，两者使用相同的七天日记录。这些英文界面截图原样来自
+[CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558)，
+未编辑媒体内容。统计日期固定在 **2033 年**；5 月 15 日的零是夹具明确返回的数值，
+不是为缺失日期补零。
+
+<p align="center">
+  <a href="docs/images/readme/token-usage-bar-0.3.0-en.png"><img src="docs/images/readme/token-usage-bar-0.3.0-en.png" alt="Codex94 0.3.0 候选的七天柱状图，使用 2033 年 5 月合成 Token 日记录" width="440"></a>
+  <a href="docs/images/readme/token-usage-line-0.3.0-en.png"><img src="docs/images/readme/token-usage-line-0.3.0-en.png" alt="Codex94 0.3.0 候选将相同七天合成日记录显示为折线图" width="440"></a>
+</p>
+<p align="center"><strong>Token 统计：自由切换柱状图与折线图</strong></p>
+
+[查看简体中文汇总卡截图](docs/images/readme/token-usage-overview-0.3.0-zh-Hans.png)，
+或查看[精确的截图来源记录](docs/images/readme/PROVENANCE.md)。
+
+<details>
+<summary>既有额度界面——历史版本截图</summary>
+
+保留的菜单栏示例来自 `v0.1.7`，Popover 图片来自 `0.1.8`，Dashboard 总览图片来自
+`0.1.9` 的 GitHub-hosted CI。图中固定的未来 Reset 日期均为合成测试值。原文件保持
+不变，只展示各自版本的界面，不代表 `0.2.2` 新增功能或 `0.3.0` 候选的统计与更新界面。
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 菜单栏圆环显示剩余 79%" width="144">
@@ -48,6 +62,8 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
   <img src="docs/images/readme/dashboard-zh-Hans.png" alt="Codex94 Terminal Dark 简体中文总览展示合成额度桶" width="900">
 </p>
 <p align="center"><strong>额度总览</strong></p>
+
+</details>
 
 ## 当前分发状态
 
@@ -173,8 +189,8 @@ sudo xcodebuild -runFirstLaunch
 
 ### 既有额度行为
 
-以下行为继承自 `0.2.2 (13)`。上方截图仍为历史版本产物，不能证明候选新增控件
-已经完成验收。
+以下行为继承自 `0.2.2 (13)`。**既有额度界面**折叠区保留历史截图；上方新增的
+Token 统计预览另有独立的来源记录。
 
 - 新建 Dashboard 窗口默认打开**总览**，复用当前连接状态、数据新鲜度文案和菜单栏
   额度选择器，再按既有显示顺序展示所有可显示额度桶，以及服务实际返回的 5 小时或 Weekly

@@ -30,15 +30,30 @@ and security-scanned before it is tagged.
 
 ## Screenshots
 
-The values below come from an isolated documentation fixture. They are
-illustrative and do not contain a real account, identity, or quota.
-The embedded popover images remain reviewed synthetic `0.1.8` captures. The
-Dashboard image is a reviewed synthetic `0.1.9` Overview capture from
-GitHub-hosted CI. Its fixed future Reset dates are test values, not live reset
-schedules. The unchanged default menu-bar sample is retained from `v0.1.7`.
-These images show their original versions' interfaces. They do not show the
-`0.2.2` dual-window layout, notification settings, shortcut control, or new
-Manual quota resets card, or the `0.3.0` candidate's statistics and update UI.
+All screenshots use isolated synthetic data, not a real account or live usage.
+The chart previews show the `0.3.0 (14)` candidate's **Bar chart** and
+**Line chart** over the same seven reported days. They are unedited captures
+from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
+The usage dates are fixed in **2033**; the zero on May 15 is an explicit fixture
+value, not a filled-in missing day.
+
+<p align="center">
+  <a href="docs/images/readme/token-usage-bar-0.3.0-en.png"><img src="docs/images/readme/token-usage-bar-0.3.0-en.png" alt="Codex94 0.3.0 candidate showing a seven-day bar chart with synthetic May 2033 token records" width="440"></a>
+  <a href="docs/images/readme/token-usage-line-0.3.0-en.png"><img src="docs/images/readme/token-usage-line-0.3.0-en.png" alt="Codex94 0.3.0 candidate showing the same synthetic seven-day records as a line chart" width="440"></a>
+</p>
+<p align="center"><strong>Token usage: switch between bars and lines</strong></p>
+
+[View the Simplified Chinese summary cards](docs/images/readme/token-usage-overview-0.3.0-zh-Hans.png)
+or inspect the [exact screenshot provenance](docs/images/readme/PROVENANCE.md).
+
+<details>
+<summary>Earlier quota interface — historical screenshots</summary>
+
+The retained menu-bar sample is from `v0.1.7`, the popover images from `0.1.8`,
+and the Dashboard Overview images from `0.1.9` GitHub-hosted CI. Their fixed
+future Reset dates are synthetic test values. These files remain unchanged
+and show their original interfaces, not the `0.2.2` additions or the `0.3.0`
+candidate's statistics and update UI.
 
 <p align="center">
   <img src="docs/images/readme/menu-bar.png" alt="Codex94 menu bar ring showing 79 percent remaining" width="144">
@@ -54,6 +69,8 @@ Manual quota resets card, or the `0.3.0` candidate's statistics and update UI.
   <img src="docs/images/readme/dashboard-en.png" alt="Codex94 English Overview showing synthetic quota buckets in Terminal Dark" width="900">
 </p>
 <p align="center"><strong>Quota Overview</strong></p>
+
+</details>
 
 ## Distribution status
 
@@ -196,8 +213,9 @@ source installer does not migrate or remove a DMG-installed copy.
 
 ### Existing quota behavior
 
-The following behavior is retained from `0.2.2 (13)`. The screenshots above
-remain historical captures, not evidence of the candidate's new controls.
+The following behavior is retained from `0.2.2 (13)`. The **Earlier quota
+interface** gallery retains older captures; the new Token usage previews have
+their own provenance above.
 
 - A new Dashboard window starts on **Overview**, which reuses the current
   connection status, freshness context, and menu-bar quota picker, then shows
