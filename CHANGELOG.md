@@ -2,10 +2,9 @@
 
 All notable changes to Codex94 are documented here.
 
-## Unreleased
+## 0.2.2 - 2026-09-20
 
-Development candidate: `0.2.2 (13)`. The published stable download remains
-`v0.2.1 (12)`; no release date or completed validation is claimed here.
+Version `0.2.2 (13)`.
 
 ### Added
 
