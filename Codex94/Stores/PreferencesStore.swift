@@ -17,6 +17,7 @@ final class PreferencesStore: ObservableObject {
         static let dualWindowBucketSelection = "dualWindowBucketSelection.v1"
         static let globalHotKey = "globalHotKey.v1"
         static let notifications = "notifications.v1"
+        static let tokenUsageChartStyle = "tokenUsageChartStyle.v1"
     }
 
     private enum LegacyDisplayMode: String {
@@ -47,6 +48,9 @@ final class PreferencesStore: ObservableObject {
     }
     @Published var language: LanguagePreference {
         didSet { defaults.set(language.rawValue, forKey: Key.language) }
+    }
+    @Published var tokenUsageChartStyle: TokenUsageChartStyle {
+        didSet { defaults.set(tokenUsageChartStyle.rawValue, forKey: Key.tokenUsageChartStyle) }
     }
     @Published var manualCodexPath: String? {
         didSet { defaults.set(manualCodexPath, forKey: Key.manualCodexPath) }
@@ -86,6 +90,9 @@ final class PreferencesStore: ObservableObject {
         language = LanguagePreference(
             rawValue: defaults.string(forKey: Key.language) ?? ""
         ) ?? .system
+        tokenUsageChartStyle = TokenUsageChartStyle(
+            rawValue: defaults.string(forKey: Key.tokenUsageChartStyle) ?? ""
+        ) ?? .bar
         manualCodexPath = defaults.string(forKey: Key.manualCodexPath)
         hasChosenIdentityMode = defaults.bool(forKey: Key.hasChosenIdentityMode)
         dualWindowBucketSelection = Self.decode(MenuBarBucketSelection.self, key: Key.dualWindowBucketSelection, from: defaults) ?? .automatic

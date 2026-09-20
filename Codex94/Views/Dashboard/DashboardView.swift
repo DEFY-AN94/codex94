@@ -50,7 +50,8 @@ struct DashboardView: View {
                 case .overview:
                     OverviewView(store: store)
                 case .usage:
-                    TokenUsageView(store: store.usageStore, language: store.preferences.language)
+                    TokenUsageView(store: store.usageStore, preferences: store.preferences,
+                                   language: store.preferences.language)
                 case .connection:
                     ConnectionSettingsView(
                         store: store,

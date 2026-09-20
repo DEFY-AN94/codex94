@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct TokenUsageView: View {
     @ObservedObject var store: TokenUsageStore
+    @ObservedObject var preferences: PreferencesStore
     let language: LanguagePreference
 
     @State private var range: TokenUsageRange = .thirtyDays
@@ -31,7 +32,11 @@ struct TokenUsageView: View {
                             if presentation.visibleDays.isEmpty {
                                 emptyDailyData(snapshot)
                             } else {
-                                TokenUsageChartView(presentation: presentation, language: language)
+                                TokenUsageChartView(
+                                    presentation: presentation,
+                                    language: language,
+                                    style: preferences.tokenUsageChartStyle
+                                )
                             }
                             coverage(presentation)
                         }
@@ -160,6 +165,21 @@ struct TokenUsageView: View {
                 .frame(maxWidth: 285)
                 .disabled(presentation.allDays.isEmpty)
                 .accessibilityIdentifier("token-usage-range")
+            }
+            HStack(spacing: 10) {
+                Text("usage.chartStyle.label")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("usage.chartStyle.label", selection: $preferences.tokenUsageChartStyle) {
+                    ForEach(TokenUsageChartStyle.allCases) { style in
+                        Text(LocalizedStringKey(style.titleKey)).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 210)
+                .accessibilityIdentifier("token-usage-chart-style")
+                Spacer(minLength: 0)
             }
             Text("usage.range.anchor")
                 .font(.caption)

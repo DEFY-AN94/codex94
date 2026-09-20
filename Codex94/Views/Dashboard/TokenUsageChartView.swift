@@ -4,9 +4,24 @@ import SwiftUI
 struct TokenUsageChartView: View {
     let presentation: TokenUsagePresentation
     let language: LanguagePreference
+    let style: TokenUsageChartStyle
 
     @State private var hoveredDate: Date?
     @State private var pinnedDate: Date?
+
+    init(
+        presentation: TokenUsagePresentation,
+        language: LanguagePreference,
+        style: TokenUsageChartStyle = .bar,
+        initialSelectedDate: Date? = nil
+    ) {
+        self.presentation = presentation
+        self.language = language
+        self.style = style
+        _pinnedDate = State(initialValue: initialSelectedDate.map {
+            TokenUsagePresentation.calendar.startOfDay(for: $0)
+        })
+    }
 
     var body: some View {
         let dateLabel = TokenUsageFormatting.localized("usage.table.date", language: language)
@@ -31,29 +46,52 @@ struct TokenUsageChartView: View {
 
             if let domain = presentation.plotDomain {
                 Chart {
-                    ForEach(presentation.visibleDays) { day in
-                        BarMark(
-                            x: .value(dateLabel, day.plotDate, unit: .day),
-                            y: .value(tokenLabel, day.tokens),
-                            width: .ratio(0.68)
-                        )
-                        .foregroundStyle(LinearGradient(
-                            colors: [Color.cyan, Color.blue], startPoint: .top, endPoint: .bottom
-                        ))
-                        .cornerRadius(3)
-                        .opacity(activeDate == nil || isActive(day.date) ? 1 : 0.40)
-                        .accessibilityLabel(Text(verbatim: TokenUsageFormatting.date(day.date, language: language)))
-                        .accessibilityValue(Text(verbatim: TokenUsageFormatting.number(day.tokens, language: language)))
+                    if style == .bar {
+                        ForEach(presentation.visibleDays) { day in
+                            RectangleMark(
+                                xStart: .value(dateLabel, day.barStartDate),
+                                xEnd: .value(dateLabel, day.barEndDate),
+                                yStart: .value(tokenLabel, 0),
+                                yEnd: .value(tokenLabel, day.tokens)
+                            )
+                            .foregroundStyle(chartGradient)
+                            .cornerRadius(3)
+                            .opacity(activeDate == nil || isActive(day.date) ? 1 : 0.40)
+                            .accessibilityLabel(Text(verbatim: TokenUsageFormatting.date(day.date, language: language)))
+                            .accessibilityValue(Text(verbatim: TokenUsageFormatting.number(day.tokens, language: language)))
 
-                        if day.tokens == 0 {
-                            PointMark(x: .value(dateLabel, day.plotDate), y: .value(tokenLabel, 0))
-                                .symbolSize(16)
-                                .foregroundStyle(Color.blue.opacity(0.7))
+                            if day.tokens == 0 {
+                                PointMark(x: .value(dateLabel, day.plotDate), y: .value(tokenLabel, 0))
+                                    .symbolSize(16)
+                                    .foregroundStyle(Color.blue.opacity(0.7))
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                    } else {
+                        ForEach(presentation.lineSegments) { segment in
+                            ForEach(segment.days) { day in
+                                LineMark(
+                                    x: .value(dateLabel, day.plotDate),
+                                    y: .value(tokenLabel, day.tokens),
+                                    series: .value(dateLabel, segment.id)
+                                )
+                                .interpolationMethod(.linear)
+                                .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                                .foregroundStyle(chartGradient)
                                 .accessibilityHidden(true)
+                            }
+                        }
+                        ForEach(presentation.visibleDays) { day in
+                            PointMark(x: .value(dateLabel, day.plotDate), y: .value(tokenLabel, day.tokens))
+                                .symbolSize(isActive(day.date) ? 56 : 22)
+                                .foregroundStyle(Color.cyan)
+                                .opacity(activeDate == nil || isActive(day.date) ? 1 : 0.55)
+                                .accessibilityLabel(Text(verbatim: TokenUsageFormatting.date(day.date, language: language)))
+                                .accessibilityValue(Text(verbatim: TokenUsageFormatting.number(day.tokens, language: language)))
                         }
                     }
                     if let activeDate {
-                        RuleMark(x: .value(dateLabel, activeDate.addingTimeInterval(43_200)))
+                        RuleMark(x: .value(dateLabel, TokenUsagePresentation.plotDate(for: activeDate)))
                             .foregroundStyle(Color.blue.opacity(0.6))
                             .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                             .accessibilityHidden(true)
@@ -62,9 +100,11 @@ struct TokenUsageChartView: View {
                 .chartXScale(domain: domain)
                 .chartYScale(domain: 0...maximumY)
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: presentation.range == .sevenDays ? 7 : 6)) { value in
-                        AxisTick(length: 4).foregroundStyle(Color.secondary.opacity(0.2))
-                        AxisValueLabel {
+                    AxisMarks(values: presentation.axisPlotDates(
+                        maximumCount: presentation.range == .sevenDays ? 7 : 6
+                    )) { value in
+                        AxisTick(centered: false, length: 4).foregroundStyle(Color.secondary.opacity(0.2))
+                        AxisValueLabel(centered: false, anchor: .top) {
                             if let date = value.as(Date.self) {
                                 Text(verbatim: TokenUsageFormatting.date(date, language: language, includeYear: false))
                                     .font(.system(size: 10))
@@ -107,9 +147,10 @@ struct TokenUsageChartView: View {
                 .frame(height: 245)
                 .accessibilityIdentifier("token-usage-chart")
                 .accessibilityLabel(Text("usage.chart.title"))
+                .accessibilityValue(Text(LocalizedStringKey(style.titleKey)))
             }
 
-            Text("usage.chart.missingNote")
+            Text(LocalizedStringKey(style == .bar ? "usage.chart.missingNote" : "usage.chart.lineMissingNote"))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -129,6 +170,10 @@ struct TokenUsageChartView: View {
 
     private var maximumY: Double {
         max(1, Double(presentation.visibleDays.map(\.tokens).max() ?? 0) * 1.15)
+    }
+
+    private var chartGradient: LinearGradient {
+        LinearGradient(colors: [.cyan, .blue], startPoint: .top, endPoint: .bottom)
     }
 
     private var selectionDetails: some View {

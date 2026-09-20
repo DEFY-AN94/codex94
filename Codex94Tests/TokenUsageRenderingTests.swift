@@ -29,7 +29,7 @@ final class TokenUsageRenderingTests: XCTestCase {
             for theme in [ThemePreference.terminalLight, .terminalDark] {
                 preferences.theme = theme
                 for width: CGFloat in [680, 1_080] {
-                    let view = TokenUsageView(store: store, language: language)
+                    let view = TokenUsageView(store: store, preferences: preferences, language: language)
                         .codex94Environment(preferences)
                         .frame(width: width, height: 940)
                         .background(Color(nsColor: .windowBackgroundColor))
@@ -50,6 +50,49 @@ final class TokenUsageRenderingTests: XCTestCase {
                     attachment.lifetime = .keepAlways
                     add(attachment)
                 }
+            }
+        }
+    }
+
+    func testSelectedBarAndLineWithMissingAndZeroDays() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "Codex94ChartCenters-\(UUID().uuidString)", isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let snapshot = TokenUsageSnapshot(
+            summary: TokenUsageSummary(),
+            dailyUsageBuckets: [(1, 10), (2, 80), (3, 0), (5, 50), (6, 20), (7, 70)].map {
+                TokenUsageDay(startDate: String(format: "2026-06-%02d", $0.0), tokens: $0.1)
+            },
+            fetchedAt: Date(timeIntervalSince1970: 1_782_691_200)
+        )
+        let presentation = TokenUsagePresentation(snapshot: snapshot, range: .all)
+        let selected = try XCTUnwrap(TokenUsagePresentation.sourceDate("2026-06-02"))
+        for theme in [ThemePreference.terminalLight, .terminalDark] {
+            for style in TokenUsageChartStyle.allCases {
+                let content = TokenUsageChartView(
+                    presentation: presentation, language: .english, style: style,
+                    initialSelectedDate: selected
+                )
+                .padding(24)
+                .frame(width: 800, height: 460)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .environment(\.colorScheme, theme == .terminalDark ? .dark : .light)
+                let host = NSHostingController(rootView: content)
+                host.view.appearance = theme.appAppearanceName.flatMap(NSAppearance.init(named:))
+                host.view.frame = NSRect(x: 0, y: 0, width: 800, height: 460)
+                host.view.layoutSubtreeIfNeeded()
+                host.view.displayIfNeeded()
+                let bitmap = try XCTUnwrap(host.view.bitmapImageRepForCachingDisplay(in: host.view.bounds))
+                host.view.cacheDisplay(in: host.view.bounds, to: bitmap)
+                let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+                XCTAssertGreaterThan(png.count, 10_000)
+                let name = "center-\(style.rawValue)-\(theme.rawValue)"
+                try png.write(to: directory.appendingPathComponent(name + ".png"))
+                let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+                attachment.name = name
+                attachment.lifetime = .keepAlways
+                add(attachment)
             }
         }
     }

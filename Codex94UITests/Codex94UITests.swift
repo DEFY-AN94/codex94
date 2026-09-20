@@ -368,6 +368,20 @@ final class Codex94UITests: XCTestCase {
                     try revealTokenChartForCapture(in: dashboard)
                 }
                 try capture(dashboard, named: "usage-seven-days-en.png")
+                try withoutTokenUsageRequests("Switching the seven-day chart to a line") {
+                    try chooseTokenChartStyle(.line, in: dashboard)
+                    try assertTokenUsageContent(in: dashboard, visibleDays: 7, includeSummary: false)
+                }
+                let lineFrame = identified("token-usage-chart", in: dashboard).frame
+                let pageFrame = identified("token-usage-page", in: dashboard).frame
+                try require(lineFrame.width > 0 && lineFrame.height > 0
+                            && pageFrame.intersection(dashboard.frame).contains(lineFrame),
+                            "Changing chart style must preserve the complete visible plot")
+                try capture(dashboard, named: "usage-line-seven-days-en.png")
+                try withoutTokenUsageRequests("Restoring bars without changing the seven-day range") {
+                    try chooseTokenChartStyle(.bar, in: dashboard)
+                    try assertTokenUsageContent(in: dashboard, visibleDays: 7, includeSummary: false)
+                }
             }
         }
         try withoutTokenUsageRequests("Inspecting the daily token table") {
@@ -390,6 +404,12 @@ final class Codex94UITests: XCTestCase {
             try assertTokenUsageContent(in: dashboard, visibleDays: 35)
         }
         try capture(dashboard, named: "usage-complete-zh-Hans.png")
+        try withoutTokenUsageRequests("Switching chart styles in Simplified Chinese") {
+            for style in [UITokenChartStyle.line, .bar] {
+                try chooseTokenChartStyle(style, in: dashboard)
+                try assertTokenUsageContent(in: dashboard, visibleDays: 35, includeSummary: false)
+            }
+        }
 
         try fixture.setTokenUsageMode("partial")
         try refreshTokenUsage(in: dashboard)
@@ -436,6 +456,8 @@ final class Codex94UITests: XCTestCase {
             "scenario": "usage", "completed": true,
             "languages": ["en", "zh-Hans"], "themes": ["terminalDark", "terminalLight"],
             "visibleDayCounts": [7, 30, 35], "returnedDayCount": 35,
+            "chartStyles": ["bar", "line"], "chartStylePreferenceVerified": true,
+            "styleChangesDoNotFetch": true, "styleChangesPreserveRange": true,
             "partialDataVerified": true, "unavailableDataVerified": true,
             "unsupportedServiceVerified": true, "successfulRetryVerified": true,
             "rangeChangesDoNotFetch": true, "quotaRequestCountUnchanged": true,
@@ -473,8 +495,24 @@ final class Codex94UITests: XCTestCase {
     }
 
     private func chooseTokenRange(_ range: UITokenRange, in dashboard: XCUIElement) throws {
-        let control = try uniqueIdentified("token-usage-range", in: dashboard)
-        let title = language.tokenRange(range)
+        try chooseTokenSegment(
+            language.tokenRange(range), identifier: "token-usage-range", in: dashboard
+        )
+    }
+
+    private func chooseTokenChartStyle(_ style: UITokenChartStyle, in dashboard: XCUIElement) throws {
+        try chooseTokenSegment(
+            language.tokenChartStyle(style), identifier: "token-usage-chart-style", in: dashboard
+        )
+        try waitUntil("The selected chart style was not persisted") {
+            try self.fixture.preference("tokenUsageChartStyle.v1") as? String == style.rawValue
+        }
+    }
+
+    private func chooseTokenSegment(
+        _ title: String, identifier: String, in dashboard: XCUIElement
+    ) throws {
+        let control = try uniqueIdentified(identifier, in: dashboard)
         let matches = control.descendants(matching: .any).matching(NSPredicate(
             format: "label == %@ OR title == %@ OR value == %@", title, title, title
         ))
@@ -485,14 +523,14 @@ final class Codex94UITests: XCTestCase {
         }
         let initialCandidates = matchingButtons()
         try require(initialCandidates.count == 1 && initialCandidates[0].isEnabled,
-                    "The token range must expose one enabled radio button or button")
+                    "The token selector must expose one enabled radio button or button")
         // On macOS the segmented Picker is an accessibility RadioGroup, which
         // need not be hittable even when all of its native radio buttons are.
         // Scroll to the actual click target, then re-query and validate it.
         try reveal(initialCandidates[0], in: dashboard)
         let candidates = matchingButtons()
         try require(candidates.count == 1 && candidates[0].isEnabled && candidates[0].isHittable,
-                    "The token range must be one uniquely identified segmented choice")
+                    "The token selector must be one uniquely identified segmented choice")
         candidates[0].click()
     }
 
@@ -1767,7 +1805,7 @@ final class Codex94UITests: XCTestCase {
     private static let colorRoles = ["healthy", "warning", "critical", "error"]
     private static let nonColorPreferenceKeys = [
         "menuBarQuotaSelection.v2", "menuBarLayout.v1", "identityMode", "hasChosenIdentityMode",
-        "manualCodexPath", "refreshInterval", "theme", "language"
+        "manualCodexPath", "refreshInterval", "theme", "language", "tokenUsageChartStyle.v1"
     ]
 }
 
@@ -1800,6 +1838,7 @@ private enum ReadOnlyFocusStage: String, CaseIterable {
 private enum UIPage { case overview, usage, connection, display, startup, diagnostics, about }
 private enum UITheme: String, CaseIterable { case system, terminalDark, terminalLight }
 private enum UITokenRange { case sevenDays, thirtyDays, all }
+private enum UITokenChartStyle: String { case bar, line }
 
 private enum UILanguage: String, CaseIterable {
     case english, simplifiedChinese
@@ -1841,6 +1880,12 @@ private enum UILanguage: String, CaseIterable {
         case .sevenDays: chinese ? "7 天" : "7 days"
         case .thirtyDays: chinese ? "30 天" : "30 days"
         case .all: chinese ? "全部返回" : "All returned"
+        }
+    }
+    func tokenChartStyle(_ style: UITokenChartStyle) -> String {
+        switch style {
+        case .bar: chinese ? "柱状图" : "Bar chart"
+        case .line: chinese ? "折线图" : "Line chart"
         }
     }
     func theme(_ theme: UITheme) -> String {
@@ -2105,12 +2150,17 @@ private struct SyntheticFixture {
               registered else {
             throw UITestFailure("Synthetic quota-only/manual-path/30-minute fixture boundaries changed")
         }
+        guard let style = try preference("tokenUsageChartStyle.v1") as? String,
+              UITokenChartStyle(rawValue: style) != nil else {
+            throw UITestFailure("The synthetic chart style must remain bar or line")
+        }
     }
 
     func preference(_ key: String) throws -> Any? {
         let allowed: Set<String> = [
             "menuBarQuotaSelection.v2", "menuBarLayout.v1", "statusAccentOverrides.v1", "displayMode",
-            "identityMode", "hasChosenIdentityMode", "manualCodexPath", "refreshInterval", "theme", "language"
+            "identityMode", "hasChosenIdentityMode", "manualCodexPath", "refreshInterval", "theme", "language",
+            "tokenUsageChartStyle.v1"
         ]
         guard allowed.contains(key) else { throw UITestFailure("Refuse to read a non-allowlisted preference key") }
         // Exact AUT/current-user/any-host domain only; no runner-container,
@@ -2346,7 +2396,7 @@ private struct SyntheticFixture {
         ]
         let usage: Set<String> = scenario == "usage" ? [
             "usage-complete-en.png", "usage-seven-days-en.png", "usage-complete-zh-Hans.png",
-            "usage-daily-table-en.png",
+            "usage-daily-table-en.png", "usage-line-seven-days-en.png",
             "usage-partial-zh-Hans.png", "usage-unavailable-zh-Hans.png",
             "usage-unsupported-zh-Hans.png", "usage-result.json"
         ] : []

@@ -1,5 +1,19 @@
 import Foundation
 
+enum TokenUsageChartStyle: String, CaseIterable, Identifiable, Sendable {
+    case bar
+    case line
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .bar: "usage.chartStyle.bar"
+        case .line: "usage.chartStyle.line"
+        }
+    }
+}
+
 enum TokenUsageRange: String, CaseIterable, Identifiable {
     case sevenDays
     case thirtyDays
@@ -30,7 +44,14 @@ struct TokenUsagePlotDay: Identifiable, Equatable {
     let tokens: Int
 
     var id: String { startDate }
-    var plotDate: Date { date.addingTimeInterval(12 * 60 * 60) }
+    var plotDate: Date { TokenUsagePresentation.plotDate(for: date) }
+    var barStartDate: Date { date.addingTimeInterval(86_400 * 0.16) }
+    var barEndDate: Date { date.addingTimeInterval(86_400 * 0.84) }
+}
+
+struct TokenUsageLineSegment: Identifiable, Equatable {
+    let days: [TokenUsagePlotDay]
+    var id: String { days.first?.id ?? "" }
 }
 
 /// UTC is a stable plotting coordinate for source date labels, not a claim about
@@ -67,6 +88,10 @@ struct TokenUsagePresentation: Equatable {
         return calendar
     }
 
+    static func plotDate(for sourceDate: Date) -> Date {
+        calendar.startOfDay(for: sourceDate).addingTimeInterval(43_200)
+    }
+
     static func sourceDate(_ raw: String) -> Date? {
         let parts = raw.split(separator: "-", omittingEmptySubsequences: false)
         guard raw.utf8.count == 10, parts.count == 3,
@@ -97,6 +122,34 @@ struct TokenUsagePresentation: Equatable {
         guard let startDate, let endDate,
               let distance = Self.calendar.dateComponents([.day], from: startDate, to: endDate).day else { return 0 }
         return max(0, distance + 1 - visibleDays.count)
+    }
+
+    /// Separate series stop Swift Charts from drawing a line through an unreported day.
+    var lineSegments: [TokenUsageLineSegment] {
+        var segments: [[TokenUsagePlotDay]] = []
+        for day in visibleDays {
+            if let previous = segments.last?.last,
+               Self.calendar.date(byAdding: .day, value: 1, to: previous.date) == day.date {
+                segments[segments.count - 1].append(day)
+            } else {
+                segments.append([day])
+            }
+        }
+        return segments.map { TokenUsageLineSegment(days: $0) }
+    }
+
+    /// Tick labels share the marks' day-center coordinate, including missing calendar days.
+    func axisPlotDates(maximumCount: Int) -> [Date] {
+        guard maximumCount > 0, let startDate, let endDate,
+              let distance = Self.calendar.dateComponents([.day], from: startDate, to: endDate).day else {
+            return []
+        }
+        let count = min(distance + 1, maximumCount)
+        guard count > 1 else { return [Self.plotDate(for: startDate)] }
+        return (0..<count).compactMap { index in
+            let offset = Int((Double(index) * Double(distance) / Double(count - 1)).rounded())
+            return Self.calendar.date(byAdding: .day, value: offset, to: startDate).map(Self.plotDate(for:))
+        }
     }
 
     /// This is the sum of reported rows in the chosen range, never a coverage claim.

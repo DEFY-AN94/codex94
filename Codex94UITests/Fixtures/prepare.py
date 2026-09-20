@@ -360,6 +360,7 @@ def main():
         "language": "english",
         "displayMode": "weekly",
         "menuBarLayout.v1": "ringAndPercentage",
+        "tokenUsageChartStyle.v1": "bar",
         "statusAccentOverrides.v1": {
             "healthy": "27C8FF", "warning": "FF8C42", "critical": "DA70D6", "error": "FF3366",
         },

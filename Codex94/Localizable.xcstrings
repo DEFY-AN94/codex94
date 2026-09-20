@@ -1,6 +1,30 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "usage.chartStyle.label" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Chart style" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图表样式" } }
+      }
+    },
+    "usage.chartStyle.bar" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Bar chart" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "柱状图" } }
+      }
+    },
+    "usage.chartStyle.line" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Line chart" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "折线图" } }
+      }
+    },
+    "usage.chart.lineMissingNote" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Each point is a reported day. Lines connect consecutive dates only; missing days stay empty, not zero." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每个点代表已返回的日记录。仅连接相邻日期，缺失日断开，不补零。" } }
+      }
+    },
     "updates.title" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "App updates" } },

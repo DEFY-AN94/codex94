@@ -20,6 +20,8 @@ this candidate is merged, validated and explicitly released.
   date, exact values on chart hover/selection, and CSV export of the displayed
   daily records. Preserve source-date gaps and distinguish unknown data from
   explicit zero; do not infer an account reporting timezone or complete coverage.
+- Add a remembered bar/line chart choice, with selected-date guides centered
+  on each bar or data point. Line segments stop at missing source dates.
 - Add **Check for updates** in About. A manual click reads this repository's
   latest public stable GitHub Release, displays its version and plain-text
   notes, and offers a validated Release-page link in the system browser.

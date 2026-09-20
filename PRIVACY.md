@@ -62,6 +62,9 @@ Dates retain the service's calendar-day labels; the app does not assume its
 undocumented reporting timezone or treat omitted days as zero usage.
 The 7-day and 30-day views end at the latest returned date, not the current
 local day. Filtering dates and inspecting the chart do not make another request.
+`tokenUsageChartStyle.v1` stores only the selected bar/line presentation in
+UserDefaults. Changing chart style reuses the loaded response and makes no
+request or statistics-cache write.
 Summary scope and complete history coverage are unspecified; the app does not
 infer model/project, input/output, cost, hourly, or thread-level statistics.
 

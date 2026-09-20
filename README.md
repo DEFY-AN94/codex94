@@ -175,7 +175,10 @@ source installer does not migrate or remove a DMG-installed copy.
   These service-reported summaries may cover a different period from the daily
   records; the app does not invent model, project, input/output, cost, or hourly
   breakdowns.
-- The daily bar chart and table offer **7 days / 30 days / All returned**. These
+- Switch freely between **Bar chart / Line chart**; the app remembers the choice.
+  Selection guides line up with bar centers and line points. The line breaks
+  across dates with no returned record.
+- The daily charts and table offer **7 days / 30 days / All returned**. These
   ranges end at the latest reported day, not today. The chart preserves actual
   date gaps; an omitted day is not zero usage. Hover or click to inspect exact
   values. Reporting time zone and complete historical coverage are unspecified.
