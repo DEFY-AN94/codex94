@@ -3,11 +3,15 @@
 ## Boundary
 
 Codex94 launches the user's existing Codex executable with the fixed command
-`codex -s read-only -a never app-server --stdio`, then requests quota data over
-local stdio JSON-RPC. The sandbox remains read-only and the noninteractive child
-cannot request an approval. Codex itself owns authentication. Codex94 does not
-implement OAuth or a usage HTTP client and does not directly inspect
-authentication stores, browser state, session logs, or local usage databases.
+`codex -s read-only -a never app-server --stdio`, then requests quota data through
+`account/rateLimits/read` over local stdio JSON-RPC. The `0.3.0 (14)` candidate
+also requests service-reported aggregate Token usage through the official
+`account/usage/read` method on first entry to the statistics page or an explicit
+statistics refresh. This request is independent of quota polling. The sandbox
+remains read-only and the noninteractive child cannot request an approval.
+Codex itself owns authentication. Codex94 does not implement OAuth or a direct
+HTTP client for quota or Token usage and does not directly inspect authentication
+stores, browser state, session logs, or local usage databases.
 
 The app is intentionally not App Sandboxed because the child Codex process must
 access its own existing login state. Hardened Runtime is enabled for installed
@@ -20,6 +24,22 @@ Codex94 validates that an executable produces a bounded, single-line
 or publisher-identity guarantee. Users must trust the installed or manually
 selected Codex executable. Codex may make network requests using its existing
 login, but Codex94 never receives that credential.
+
+The `0.3.0` candidate adds one separate direct network client for the About
+page's user-initiated **Check for updates** action. It requests only
+`https://api.github.com/repos/DEFY-AN94/codex94/releases/latest`, using a bounded,
+timed HTTPS request and an ephemeral session with cookie, credential, and cache
+storage disabled. Redirects and HTTP authentication challenges are rejected;
+normal system TLS certificate validation remains enabled. No Codex credentials,
+quota, Token usage, prompts, or system profile are sent. GitHub can receive
+ordinary connection metadata such as the IP address and request headers.
+
+Release metadata is untrusted input: the checker validates stable-release
+status, the version, and this repository's HTTPS Release-page URL. Notes are
+plain text. The system browser owns subsequent navigation and downloads after
+the user opens that page. The check does not verify an installation package,
+download or install an App, relaunch it, or run in the background. See
+[docs/updating.md](docs/updating.md) for the user flow and maintenance boundary.
 
 ## Distribution trust boundary
 
@@ -89,6 +109,21 @@ preference; cached data and failed requests cannot trigger that change.
 Launch at Login tests use a fake service, not real registration. The source
 installer requires running copies to be quit, verifies a unique staged App,
 and retains recovery files when rollback cannot safely restore the old App.
+
+The `0.3.0` candidate keeps Token usage summaries and daily date/token pairs in
+memory. It ignores thread-level response fields and does not add statistics to
+cache v2. Each successful read replaces the previous snapshot rather than
+accumulating usage. Missing values and dates remain unknown, not zero. A
+user-requested CSV export writes only the reported daily dates and exact token
+counts in the selected range to the chosen destination. That exported file
+persists independently of the app's memory-only statistics.
+
+`tokenUsageChartStyle.v1` stores only the selected `bar` or `line` presentation
+in `UserDefaults`. Chart style and date-range changes are local presentation
+operations, not additional usage requests. Manual update-check results and
+release notes also stay in memory; the checker adds no stored authentication,
+update feed, signing key, automatic installation, or third-party runtime
+dependency. These additions do not change the distribution signing policy.
 
 ## Supported versions
 

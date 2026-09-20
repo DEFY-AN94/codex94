@@ -2,10 +2,10 @@
 
 All notable changes to Codex94 are documented here.
 
-## 0.3.0 - Unreleased
+## 0.3.0 - 2026-09-21
 
-Version `0.3.0 (14)`. The published stable download remains `v0.2.2` until
-this candidate is merged, validated and explicitly released.
+Version `0.3.0 (14)`. Release dates use the maintainer's Australia/Melbourne
+calendar; GitHub publication timestamps are recorded in UTC.
 
 ### Added
 

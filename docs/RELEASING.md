@@ -65,6 +65,37 @@ details on disk. The new preference keys are `dualWindowBucketSelection.v1`,
 `globalHotKey.v1`, and `notifications.v1`; history, updater, and multi-account
 features were not included in `0.2.2`.
 
+Regression checks for the `0.3.0 (14)` candidate also cover the following:
+
+- Token statistics use only the official `account/usage/read` request, on first
+  page entry or an explicit statistics refresh. Keep requests and error states
+  independent of quota polling and the menu-bar connection state. Verify
+  complete, partial, unavailable, and unsupported responses with synthetic
+  data, and ensure repeated reads replace rather than accumulate usage.
+- Check 7-day, 30-day, and all-returned ranges against the latest returned
+  source date. Verify both bar and line charts, remembered
+  `tokenUsageChartStyle.v1` selection, centered selection guides, and line breaks
+  across missing dates. Missing fields/dates must remain distinct from explicit
+  zero. Range and style changes must not fetch usage or rewrite the quota cache.
+  Do not infer a reporting timezone, complete history, cost, or model/project
+  breakdown from the aggregate response.
+- Verify CSV export contains only the displayed reported dates and exact token
+  counts, preserves missing dates without filling them, and retains explicit
+  zero values. Cancelling export must not report a write failure. Statistics
+  otherwise remain in memory and cache v2 stays unchanged. Published screenshots
+  and test fixtures must remain synthetic.
+- Check the manual About update action with injected responses for newer,
+  equal, and older stable versions, invalid metadata/URLs, offline/timeouts,
+  rate limits, and oversized responses. The only metadata endpoint is
+  `https://api.github.com/repos/DEFY-AN94/codex94/releases/latest`; retain its
+  fixed HTTPS boundary, disabled cookie/credential/cache storage, rejected
+  redirects, and absence of account or usage data in the request. Release notes
+  remain plain text, and only a validated repository Release page may open in
+  the system browser. Automated tests must not browse, download, install, or
+  poll for real updates. Record maintainer-led verification of the About action
+  and Release-page navigation separately; this feature does not automate App
+  replacement or relaunch. See [docs/updating.md](updating.md).
+
 Read version/build from the App target using the shared standard-library
 helper. It requires one App target and matching explicit Debug/Release values:
 
@@ -135,7 +166,8 @@ version/build, checks, risks, rollback, artifact hashes, and both acceptance
 states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
-Wait for CI, both synthetic UI smokes, and CodeQL on the actual tested revision.
+Wait for CI, all three synthetic UI smokes (Display, Recovery, and Token usage),
+and Actions/Python/Swift CodeQL on the actual tested revision.
 Skipped, cancelled, unavailable, pending, or failed is not passed. Review the
 synthetic images themselves for UI and privacy. Retain the existing screenshots
 as historical captures unless separately replacing them with reviewed evidence.
