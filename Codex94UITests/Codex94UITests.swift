@@ -865,8 +865,10 @@ final class Codex94UITests: XCTestCase {
 
             // A SwiftUI List label may be exposed as a row or group. Bound its
             // hit target by the actual divider, not the configured maximum width.
-            // This is a soft deadline; individual XCTest queries may also wait.
-            let deadline = Date().addingTimeInterval(5)
+            // A populated SwiftUI table makes a hosted macOS AX sampling pass
+            // take several seconds. Keep the two-sample stability requirement
+            // and allow both complete passes within a bounded soft deadline.
+            let deadline = Date().addingTimeInterval(20)
             var sidebarLabel: XCUIElement?
             var previousFrame: CGRect?
             var previousType: XCUIElement.ElementType?
