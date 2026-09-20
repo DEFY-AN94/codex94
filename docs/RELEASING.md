@@ -1,8 +1,8 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0),
+The published stable version is [`v3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1),
 released on 2026-09-21 (Australia/Melbourne). Its tag and DMG remain bound to
-release commit `21f2b60097b742a036af0ab9eac0535c7361c77d`; later docs-only commits do not move
+release commit `ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`; later docs-only commits do not move
 that tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -41,17 +41,16 @@ Keep candidate changelog notes under Unreleased without inventing a date.
 Historical release entries and the existing synthetic screenshot provenance
 remain unchanged. Planning and Goal files stay outside the Git repository.
 
-The next maintenance candidate is `3.0.1 (15)`, prepared for publication on
-2026-09-21 (Australia/Melbourne). Published downloads and
-source-clone instructions remain on `v0.3.0` during implementation and review.
-Its scope is quota request-context invalidation, shared strict service-value
-parsing, chart preparation/formatting reuse, retired Token client cleanup, and
-early validation of development-script arguments. This scope does not claim
-completed checks or acceptance; it does not introduce a broad timer rewrite,
-new data source, cache schema, signing policy, or automatic installer. See
+Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
+Published download and source-clone instructions now point to `v3.0.1`.
+This maintenance release isolates quota request contexts, shares strict
+service-value parsing, reuses chart preparation/formatting, retires old Token
+clients outside the main actor, and validates development-script arguments
+before side effects. It does not introduce a broad timer rewrite, new data
+source, cache schema, signing policy, or automatic installer. See
 [component ownership and reuse rules](ARCHITECTURE.md).
 
-For this maintenance candidate, regressions must inspect the interval between
+For the `3.0.1` maintenance changes, regressions must inspect the interval between
 an obsolete response and its queued replacement, not only the final snapshot:
 the old success/error must not change cache, pinned preferences, alert baselines,
 or the new Token context. Also retain malformed-value/date tests, source-date
@@ -68,9 +67,9 @@ features remain available in `0.3.0`.
 Version `0.3.0 (14)` was published on 2026-09-21 (Australia/Melbourne). It adds
 service-reported Token statistics, bar/line daily charts and CSV export, plus
 manual checks of the latest public stable GitHub Release. Downloading and
-installing an App remain user-managed. Stable download, asset, and source-clone
-references point to `v0.3.0`. Later documentation commits must not move the
-release tag or regenerate its verified assets.
+installing an App remain user-managed. The historical `v0.3.0` tag and DMG
+remain bound to `21f2b60097b742a036af0ab9eac0535c7361c77d`; later maintenance
+or documentation releases do not move that tag or replace those asset bytes.
 
 Regression checks for the `0.2.2` features should cover the three legacy layouts and
 their saved selection, the independent dual-window preference, and both mouse
