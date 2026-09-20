@@ -166,6 +166,23 @@ struct QuotaSnapshot: Equatable, Sendable {
     let fetchedAt: Date
     let account: AccountSummary?
     let codex: LocatedCodex?
+    let resetCreditsAvailableCount: Int?
+
+    init(
+        buckets: [QuotaBucketSnapshot],
+        defaultLimitID: String,
+        fetchedAt: Date,
+        account: AccountSummary?,
+        codex: LocatedCodex?,
+        resetCreditsAvailableCount: Int? = nil
+    ) {
+        self.buckets = buckets
+        self.defaultLimitID = defaultLimitID
+        self.fetchedAt = fetchedAt
+        self.account = account
+        self.codex = codex
+        self.resetCreditsAvailableCount = resetCreditsAvailableCount
+    }
 
     var defaultBucket: QuotaBucketSnapshot? {
         bucket(id: defaultLimitID)
@@ -241,7 +258,8 @@ struct QuotaSnapshot: Equatable, Sendable {
             defaultLimitID: defaultLimitID,
             fetchedAt: fetchedAt,
             account: nil,
-            codex: codex
+            codex: codex,
+            resetCreditsAvailableCount: resetCreditsAvailableCount
         )
     }
 

@@ -141,15 +141,25 @@ struct ConnectionSettingsView: View {
 
             SettingsRow("connection.reset") {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
-                    MenuBarResetDetails(
-                        resolvedQuota: store.menuBarQuota,
-                        bucketName: store.menuBarQuota.flatMap {
-                            store.snapshot?.displayName(for: $0.bucket)
-                        },
-                        language: store.preferences.language,
-                        now: referenceDate ?? context.date,
-                        timeZone: resetTimeZone
-                    )
+                    VStack(alignment: .leading, spacing: 10) {
+                        if store.activeMenuBarQuotas.isEmpty {
+                            MenuBarResetDetails(
+                                resolvedQuota: nil, bucketName: nil,
+                                language: store.preferences.language,
+                                now: referenceDate ?? context.date, timeZone: resetTimeZone
+                            )
+                        } else {
+                            ForEach(store.activeMenuBarQuotas, id: \.window.kind) { quota in
+                                MenuBarResetDetails(
+                                    resolvedQuota: quota,
+                                    bucketName: store.snapshot?.displayName(for: quota.bucket),
+                                    language: store.preferences.language,
+                                    now: referenceDate ?? context.date,
+                                    timeZone: resetTimeZone
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

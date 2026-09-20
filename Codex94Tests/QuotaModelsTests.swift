@@ -31,6 +31,73 @@ final class QuotaModelsTests: XCTestCase {
         }
     }
 
+    func testResetCreditsUsesAuthoritativeTopLevelCountAndIgnoresDetails() throws {
+        for count in [0, 1, 3, Int.max] {
+            let parsed = try parse([
+                "rateLimits": [
+                    "secondary": ["usedPercent": 20, "windowDurationMins": 10_080],
+                    "rateLimitResetCredits": ["availableCount": 99]
+                ],
+                "rateLimitResetCredits": [
+                    "availableCount": count,
+                    "credits": [["id": "private-credit-id", "expiresAt": 2_000_000_000]],
+                    "hasMore": true
+                ]
+            ])
+
+            XCTAssertEqual(parsed.resetCreditsAvailableCount, count)
+            XCTAssertEqual(parsed.defaultBucket?.window(.weekly)?.usedPercent, 20)
+        }
+    }
+
+    func testMissingNullOrInvalidResetCreditCountsRemainUnknown() throws {
+        let invalidCredits: [Any] = [
+            NSNull(),
+            "unavailable",
+            ["credits": [["id": "not-a-count"]]],
+            ["availableCount": NSNull()],
+            ["availableCount": true],
+            ["availableCount": false],
+            ["availableCount": -1],
+            ["availableCount": 1.5],
+            ["availableCount": 1.0],
+            ["availableCount": "3"],
+            ["availableCount": NSNumber(value: UInt64.max)]
+        ]
+        let limits: [String: Any] = [
+            "rateLimits": [
+                "secondary": ["usedPercent": 20, "windowDurationMins": 10_080],
+                "rateLimitResetCredits": ["availableCount": 99]
+            ]
+        ]
+        XCTAssertNil(try parse(limits).resetCreditsAvailableCount)
+        for invalid in invalidCredits {
+            var result = limits
+            result["rateLimitResetCredits"] = invalid
+            let parsed = try parse(result)
+            XCTAssertNil(parsed.resetCreditsAvailableCount, "Rejected value: \(invalid)")
+            XCTAssertNotNil(parsed.defaultBucket?.window(.weekly))
+        }
+    }
+
+    func testRemovingAccountPreservesResetCreditsWithoutRequiringIdentity() {
+        let original = QuotaSnapshot(
+            buckets: [bucket("codex", windows: [window(.weekly, used: 20)])],
+            defaultLimitID: "codex",
+            fetchedAt: Date(timeIntervalSince1970: 1_900_000_000),
+            account: AccountSummary(type: "chatgpt", email: "private@example.com", planType: "pro"),
+            codex: codex,
+            resetCreditsAvailableCount: 3
+        )
+
+        let quotaOnly = original.removingAccount()
+        XCTAssertNil(quotaOnly.account)
+        XCTAssertEqual(quotaOnly.resetCreditsAvailableCount, 3)
+        XCTAssertEqual(quotaOnly.buckets, original.buckets)
+        XCTAssertEqual(quotaOnly.codex, original.codex)
+        XCTAssertNil(snapshot(defaultLimitID: "codex", buckets: []).resetCreditsAvailableCount)
+    }
+
     func testFirstAvailableBucketSkipsEmptyDefaultAndHiddenBuckets() {
         let snapshot = snapshot(
             defaultLimitID: "default",

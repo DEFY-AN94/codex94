@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         configureStatusItem()
         configureMenuBarLayoutObservation()
         configurePopover()
+        configureGlobalHotKey()
         store.start()
 
         if !preferences.hasChosenIdentityMode
@@ -53,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         removeWorkspaceWakeObservation()
         removeSystemClockObservation()
+        store.hotKeyController.stop()
         store.shutdown()
         themeObservation?.cancel()
         menuBarLayoutObservation?.cancel()
@@ -81,6 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         guard let button = item.button else { return }
         button.target = self
         button.action = #selector(togglePopover)
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.toolTip = "Codex94"
         button.title = ""
         button.setAccessibilityLabel(MenuBarStatusView.accessibilityLabel(
@@ -123,6 +126,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 self?.store.handleSystemWake()
             }
         }
+    }
+
+    private func configureGlobalHotKey() {
+        guard store.hotKeyController.start(handler: { [weak self] in
+            guard let self else { return }
+            let isOpening = !popover.isShown
+            if isOpening { NSApp.activate(ignoringOtherApps: true) }
+            togglePopover()
+            if isOpening { popover.contentViewController?.view.window?.makeKey() }
+        }) else { return }
+        _ = store.hotKeyController.setHotKey(preferences.globalHotKey)
     }
 
     private func removeWorkspaceWakeObservation() {

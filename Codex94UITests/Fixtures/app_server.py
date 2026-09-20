@@ -145,7 +145,11 @@ def main():
     buckets = {"default-v2": default}
     if include_spark:
         buckets["model-special"] = spark
-    reply({"id": 2, "result": {"rateLimits": default, "rateLimitsByLimitId": buckets}})
+    reply({"id": 2, "result": {
+        "rateLimits": default,
+        "rateLimitsByLimitId": buckets,
+        "rateLimitResetCredits": {"availableCount": 3},
+    }})
 
 
 if __name__ == "__main__":

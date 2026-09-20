@@ -3,6 +3,41 @@ import XCTest
 @testable import Codex94
 
 final class AppServerClientTests: XCTestCase {
+    func testResetCreditsAreReadFromQuotaResponseWithoutAdditionalRequests() async throws {
+        for (rawCount, expected) in [("0", Optional(0)), ("3", Optional(3)), ("null", nil)] {
+            let fixture = try makeFixture(script: """
+            IFS= read -r initialize
+            printf '%s\\n' "$initialize" >> "__CODEX94_INVOCATION_FILE__"
+            printf '%s\\n' '{"id":1,"result":{"serverInfo":{"name":"fake"}}}'
+            IFS= read -r initialized
+            printf '%s\\n' "$initialized" >> "__CODEX94_INVOCATION_FILE__"
+            IFS= read -r limits
+            printf '%s\\n' "$limits" >> "__CODEX94_INVOCATION_FILE__"
+            printf '%s\\n' '{"id":2,"result":{"rateLimits":{"secondary":{"usedPercent":27,"windowDurationMins":10080}},"rateLimitResetCredits":{"availableCount":\(rawCount),"credits":[{"id":"private-credit-id"}],"hasMore":true}}}'
+            while IFS= read -r extra; do
+              printf '%s\\n' "$extra" >> "__CODEX94_INVOCATION_FILE__"
+            done
+            """)
+
+            let snapshot = try await fixture.client.fetch(
+                executable: fixture.executable,
+                identityMode: .quotaOnly
+            )
+            XCTAssertEqual(snapshot.resetCreditsAvailableCount, expected)
+            XCTAssertNil(snapshot.account)
+            let requests = try String(contentsOf: fixture.invocationFile, encoding: .utf8)
+                .split(whereSeparator: \.isNewline)
+                .map { line in
+                    try XCTUnwrap(
+                        JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+                    )
+                }
+            XCTAssertEqual(requests.compactMap { $0["method"] as? String }, [
+                "initialize", "initialized", "account/rateLimits/read"
+            ])
+        }
+    }
+
     func testFetchUsesReadOnlyNeverApprovalArguments() async throws {
         let fixture = try makeFixture(script: #"""
         [ "$#" -eq 6 ] || exit 70

@@ -19,6 +19,7 @@ extension MenuBarLayout {
         case .ringAndPercentage: "display.layout.ringAndPercentage"
         case .percentageOnly: "display.layout.percentageOnly"
         case .ringOnly: "display.layout.ringOnly"
+        case .dualWindow: "display.layout.dualWindow"
         }
     }
 }
@@ -325,7 +326,7 @@ enum StatusAccessibilityString {
         return components.joined(separator: ", ")
     }
 
-    private static func statusContext(
+    static func statusContext(
         _ presentation: StatusPresentation,
         now: Date,
         language: LanguagePreference,

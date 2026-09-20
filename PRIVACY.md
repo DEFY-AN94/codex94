@@ -8,7 +8,8 @@ upload, crash-reporting SDK, update checker, or Codex94-operated server.
 Codex94 starts a locally installed Codex executable and sends two documented-by-
 behavior JSON-RPC requests over the child process's standard input/output:
 
-- `account/rateLimits/read` for quota windows
+- `account/rateLimits/read` for quota windows and, when returned, the manual
+  reset-credit count
 - `account/read` with `refreshToken: false` only when **Quota + account** is
   selected
 
@@ -26,6 +27,14 @@ add a direct network interface, request a token, or enable account data when
 When account information is enabled, the returned email address is held only in
 memory and displayed only in Dashboard. Switching to **Quota only** removes it
 from the in-memory snapshot.
+
+The unreleased `0.2.2 (13)` candidate reads only the authoritative
+`rateLimitResetCredits.availableCount` total from that existing quota response.
+It accepts a nonnegative integer, keeps zero distinct from missing/null data,
+and does not retain individual credit identifiers or details. The count is
+held only in memory, including a visibly cached last value after a failure.
+It is not saved in the quota cache and returns to an unfetched state at a cold
+start. Codex94 does not redeem reset credits or send a consume request.
 
 ## Data stored locally
 
@@ -54,6 +63,18 @@ their migration without adding another preference:
   for the affected role. **Restore Default Colors** clears only these overrides,
   not quota selection, layout, theme, language, paths, or window settings.
 
+The `0.2.2 (13)` candidate adds three preference keys while retaining cache v2:
+
+- `dualWindowBucketSelection.v1` stores the fourth layout's bucket selection,
+  independently of the original three layouts' existing quota selection.
+- `globalHotKey.v1` stores the optional keyboard shortcut's key and modifiers.
+  No shortcut is registered by default. A configured shortcut must include
+  Control or Option, with optional Command and Shift. System hotkey registration
+  does not record typed text or add keyboard-event logs.
+- `notifications.v1` stores the enabled state, warning thresholds, additional
+  bucket choices, and recovery-alert preference. It does not store observed
+  quota values, notification baselines, or per-cycle delivery history.
+
 Codex94 also keeps the selected Dashboard section and the post-reset task state
 only in memory; the existing macOS window-frame autosave behavior is unchanged.
 Overview reads the existing snapshot and does not persist a second model, new
@@ -81,6 +102,26 @@ Launch at Login status and localized failure feedback use the existing system
 service. Tests inject a fake service and never modify real Login Items. Numeric
 input clamping, window fitting, longer menu labels, and localized executable
 picker text add no data collection, persistent field, or permission.
+
+## Optional local notifications
+
+The `0.2.2` candidate adds local macOS notifications, disabled by default.
+Explicitly enabling the feature requests system notification authorization.
+Default warning thresholds are 20% and 10% remaining, and each can be adjusted
+or disabled. The default bucket is monitored, with optional extra buckets and
+optional recovery alerts.
+
+The app evaluates fresh successful snapshots. Its baseline and per-window-cycle
+deduplication state are memory-only and are discarded when the app exits;
+cached snapshots and failed requests are not new alert observations. Messages
+contain the bucket's display name, quota window, and percentage, without email,
+account IDs, credentials, raw RPC, or executable paths.
+
+Delivery uses the local macOS notification service. Notification Center may
+retain delivered messages under the user's system settings, so memory-only
+app policy state does not mean delivered notifications leave no local record.
+This is a local operating-system service and permission, not a Codex94 remote
+telemetry channel or project-operated server.
 
 ## Distribution and CI artifacts
 
@@ -127,6 +168,10 @@ Codex94 does not request browser, Documents, Keychain, Accessibility, contacts,
 camera, microphone, or location access. A standard file picker appears only when
 the user explicitly chooses a Codex executable. Version `0.1.9` added no system
 permission or entitlement; versions `0.2.0` and `0.2.1` likewise add none.
+The `0.2.2` candidate adds only the explicit, optional local-notification
+permission described above. Its global shortcut does not require Accessibility
+access, and opening the popover through that shortcut uses the existing refresh
+path.
 
 See [SECURITY.md](SECURITY.md) for the executable trust boundary and security
 reporting process. Removing either App copy does not automatically remove local

@@ -41,6 +41,32 @@ Keep candidate changelog notes under Unreleased without inventing a date.
 Historical release entries and the existing synthetic screenshot provenance
 remain unchanged. Planning and Goal files stay outside the Git repository.
 
+The current development candidate is `0.2.2 (13)` and is not published.
+Its scope is a fourth dual-window layout with independent bucket selection,
+mouse left/right clicks toggling the same popover, a global shortcut unset by
+default,
+opt-in local quota notifications, and read-only available-reset counts. Keep
+all stable download, asset, and source-clone references on `v0.2.1` until a later
+publication is verified. Do not assign a release date or claim test/install
+acceptance from the candidate's presence in this tree.
+
+Candidate checks should cover preservation of the three legacy layouts and
+their saved selection, the independent dual-window preference, and both mouse
+buttons using the same popover toggle and normal refresh-on-open path. Check
+hotkey registration/failure through a fake adapter, requiring Control or Option
+with optional Command and Shift. Notification tests use a fake system service:
+disabled defaults,
+explicit-enable authorization, adjustment/disabling of the 20% and 10% thresholds,
+default and optional extra buckets, optional recovery, baseline suppression,
+and per-cycle memory-only deduplication. Keep real notification permission and
+shortcut interaction in maintainer-led acceptance rather than automated tests.
+Verify messages exclude email and other identity, while documentation discloses
+system Notification Center retention. Verify reset-credit zero versus null,
+cold versus cached states, unchanged cache v2, and no consume request or credit
+details on disk. The new preference keys are `dualWindowBucketSelection.v1`,
+`globalHotKey.v1`, and `notifications.v1`; history, updater, and multi-account
+features are outside this candidate.
+
 Read version/build from the App target using the shared standard-library
 helper. It requires one App target and matching explicit Debug/Release values:
 
@@ -200,9 +226,8 @@ reviewed before tagging; do not invent a date during candidate implementation.
 
 Release date / 发布日期: CONFIRMED_RELEASE_DATE
 
-Stability fixes: login-start status, quota/Reset edge cases, unavailable
-selection fallback, small UI corrections, and source-install recovery.
-稳定性修补：登录启动状态、额度与 Reset 边界、失效选项回退、小型界面修正及源码安装恢复。
+CHANGE_SUMMARY_EN
+CHANGE_SUMMARY_ZH
 
 Assets / 资产:
 - Codex94-VERSION-macos-universal-unnotarized.dmg

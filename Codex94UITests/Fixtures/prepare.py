@@ -24,6 +24,21 @@ METADATA_HELPER = "script/release_metadata.py"
 # Only these tracked build inputs may enter the disposable recovery source copy.
 # No repository metadata, documentation, scripts, local state or directory copy.
 BUILD_INPUTS = (
+    "Codex94/Models/NotificationPreferences.swift",
+    "Codex94/Models/MenuBarBucketSelection.swift",
+    "Codex94/Models/GlobalHotKey.swift",
+    "Codex94/Support/QuotaNotificationPolicy.swift",
+    "Codex94/Services/NotificationController.swift",
+    "Codex94/Services/GlobalHotKeyController.swift",
+    "Codex94/Views/Components/ResetCreditsView.swift",
+    "Codex94/Views/Components/MenuBarBucketPicker.swift",
+    "Codex94/Views/Components/NotificationSettingsView.swift",
+    "Codex94/Views/Components/HotKeySettingsView.swift",
+    "Codex94Tests/NotificationPolicyTests.swift",
+    "Codex94Tests/GlobalHotKeyTests.swift",
+    "Codex94Tests/DualWindowTests.swift",
+    "Codex94Tests/Version022RenderingTests.swift",
+    "Codex94Tests/Version022StoreTests.swift",
     "Codex94.xcodeproj/project.pbxproj",
     "Codex94.xcodeproj/xcshareddata/xcschemes/Codex94.xcscheme",
     "Codex94.xcodeproj/xcshareddata/xcschemes/Codex94UI.xcscheme",

@@ -50,6 +50,18 @@ final class Codex94UITests: XCTestCase {
         try assertQuotaLayout(in: popover, spark: false)
         try assertColor("FF8C42", in: identified("quota-window-weekly", in: popover))
 
+        try withoutRequests("Right-click closes the same quota popover") {
+            try statusItem().rightClick()
+            try waitUntil("Right-click did not close the popover") { !popover.exists }
+        }
+        let beforeRightOpen = try fixture.requestCount()
+        try statusItem().rightClick()
+        try waitForRequestCompletion(after: beforeRightOpen, delta: 1)
+        popover = try currentPopover()
+        try require(identified("reset-credits", in: popover).exists,
+                    "The account-level reset count must appear in the quota popover")
+        XCTAssertEqual(try ownedApplicationPID(), initialApplicationPID)
+
         let originalSelection = try selectedQuotaPreference()
         try withoutRequests("Browsing Spark") {
             try chooseModel(fixture.sparkName, in: popover)
@@ -215,6 +227,7 @@ final class Codex94UITests: XCTestCase {
         for (layout, newWidth) in [
             ("percentageOnly", CGFloat(50)),
             ("ringOnly", CGFloat(28)),
+            ("dualWindow", CGFloat(132)),
             ("ringAndPercentage", CGFloat(58)),
         ] {
             dashboard = try openDashboard(from: try currentPopover())
@@ -232,7 +245,8 @@ final class Codex94UITests: XCTestCase {
         try fixture.writeReport("display-result.json", fields: [
             "scenario": "display", "completed": true,
             "languages": ["en", "zh-Hans"], "themes": UITheme.allCases.map(\.rawValue),
-            "requestedStatusItemWidths": [58, 50, 28, 58],
+            "requestedStatusItemWidths": [58, 50, 28, 132, 58],
+            "rightClickPopoverToggle": true,
             "sameProcessLayoutTransitions": true,
             "missingBucketSavedAuto": true,
             "returningBucketKeepsAuto": true,
@@ -495,7 +509,7 @@ final class Codex94UITests: XCTestCase {
         if ownItems.count == 1 { return ownItems[0] }
         let menuItems = application.menuBarItems.matching(NSPredicate(
             format: "label CONTAINS 'Codex94' OR title CONTAINS 'Codex94'"
-        )).allElementsBoundByIndex.filter { (20...60).contains($0.frame.width) }
+        )).allElementsBoundByIndex.filter { (20...160).contains($0.frame.width) }
         try require(menuItems.count == 1, "The application must expose exactly one quota status item")
         return menuItems[0]
     }
@@ -531,7 +545,7 @@ final class Codex94UITests: XCTestCase {
         var widths: [Int: CGFloat] = [:]
         var measurements: [[String: Any]] = []
         var referenceFailures: [String] = []
-        for requested in [58, 50, 28] {
+        for requested in [58, 50, 28, 132] {
             reference.length = CGFloat(requested)
             var previous: NSSize?
             var stableSamples = 0
@@ -576,7 +590,8 @@ final class Codex94UITests: XCTestCase {
             "applicationNotLaunched": true, "rawTestResultsUploaded": false,
         ])
         if let combined = widths[58], let percentage = widths[50], let ring = widths[28],
-           combined - percentage > 2, percentage - ring > 2 {
+           let dual = widths[132],
+           dual - combined > 2, combined - percentage > 2, percentage - ring > 2 {
             // Adjacent +/-1pt acceptance ranges must be disjoint. A stale
             // reference that never changed width must not bless a stuck AUT.
         } else {
@@ -1607,6 +1622,7 @@ private enum UILanguage: String, CaseIterable {
         switch rawValue {
         case "percentageOnly": chinese ? "仅百分比" : "Percentage Only"
         case "ringOnly": chinese ? "仅圆环" : "Ring Only"
+        case "dualWindow": chinese ? "5 小时 + 每周" : "5-hour + weekly"
         default: chinese ? "圆环 + 百分比" : "Ring + Percentage"
         }
     }

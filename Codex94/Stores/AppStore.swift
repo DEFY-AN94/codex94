@@ -10,9 +10,13 @@ final class AppStore: ObservableObject {
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastIssue: ConnectionIssue?
     @Published private(set) var viewedBucketID: String?
+    @Published private(set) var hasFetchedLiveSnapshot = false
 
     let preferences: PreferencesStore
     let launchAtLogin: LaunchAtLoginController
+    let hotKeyController: GlobalHotKeyController
+    let notificationController: NotificationController
+    private var notificationPolicy = QuotaNotificationPolicy()
 
     private let locator: CodexExecutableLocator
     private let fetcher: any QuotaFetching
@@ -34,13 +38,17 @@ final class AppStore: ObservableObject {
         launchAtLogin: LaunchAtLoginController = LaunchAtLoginController(),
         locator: CodexExecutableLocator = CodexExecutableLocator(),
         fetcher: any QuotaFetching = CodexAppServerClient(),
-        cache: SnapshotCache = SnapshotCache()
+        cache: SnapshotCache = SnapshotCache(),
+        hotKeyController: GlobalHotKeyController = GlobalHotKeyController(),
+        notificationController: NotificationController = NotificationController()
     ) {
         self.preferences = preferences
         self.launchAtLogin = launchAtLogin
         self.locator = locator
         self.fetcher = fetcher
         self.cache = cache
+        self.hotKeyController = hotKeyController
+        self.notificationController = notificationController
 
         if let cached = cache.load() {
             snapshot = cached
@@ -65,6 +73,21 @@ final class AppStore: ObservableObject {
         preferredMenuBarQuota ?? snapshot?.automaticResolvedWindow
     }
 
+    var dualWindowBucket: QuotaBucketSnapshot? {
+        guard let snapshot else { return nil }
+        return preferences.dualWindowBucketSelection.resolved(in: snapshot)
+            ?? snapshot.automaticResolvedWindow?.bucket
+    }
+
+    var activeMenuBarQuotas: [ResolvedQuotaWindow] {
+        if preferences.menuBarLayout == .dualWindow {
+            guard let bucket = dualWindowBucket else { return [] }
+            return bucket.windows.sorted { $0.kind.sortOrder < $1.kind.sortOrder }
+                .map { ResolvedQuotaWindow(bucket: bucket, window: $0) }
+        }
+        return menuBarQuota.map { [$0] } ?? []
+    }
+
     var menuBarSelectionUsesFallback: Bool {
         preferences.menuBarQuotaSelection != .automatic && preferredMenuBarQuota == nil
     }
@@ -85,7 +108,9 @@ final class AppStore: ObservableObject {
 
     var menuBarStatusPresentation: StatusPresentation {
         StatusPresentation(
-            remainingPercent: menuBarQuota?.window.remainingPercent,
+            remainingPercent: preferences.menuBarLayout == .dualWindow
+                ? dualWindowBucket?.mostConstrainedWindow?.remainingPercent
+                : menuBarQuota?.window.remainingPercent,
             connectionState: connectionState,
             isRefreshing: isRefreshing,
             lastSuccessfulFetch: snapshot?.fetchedAt
@@ -153,6 +178,7 @@ final class AppStore: ObservableObject {
 
     func start() {
         guard !isShuttingDown else { return }
+        notificationController.configure(enabled: preferences.notifications.isEnabled)
         configureBackgroundRefresh()
         guard preferences.hasChosenIdentityMode else { return }
         let now = Date()
@@ -247,6 +273,8 @@ final class AppStore: ObservableObject {
 
         fetcher.shutdown()
         locator.shutdown()
+        notificationController.shutdown()
+        notificationPolicy.reset()
     }
 
     func chooseIdentityMode(_ mode: IdentityMode, now: Date = Date()) {
@@ -266,6 +294,42 @@ final class AppStore: ObservableObject {
         preferences.menuBarQuotaSelection = selection
     }
 
+    func setDualWindowBucketSelection(_ selection: MenuBarBucketSelection) {
+        if selection == .automatic {
+            preferences.dualWindowBucketSelection = selection
+        } else if let snapshot, selection.resolved(in: snapshot) != nil {
+            preferences.dualWindowBucketSelection = selection
+        }
+    }
+
+    @discardableResult
+    func setGlobalHotKey(_ value: GlobalHotKey?) -> Bool {
+        guard hotKeyController.setHotKey(value) else { return false }
+        preferences.globalHotKey = value
+        return true
+    }
+
+    func setNotificationPreferences(_ value: NotificationPreferences) {
+        let previous = preferences.notifications
+        let value = value.validated
+        guard value != previous else { return }
+        preferences.notifications = value
+        notificationPolicy.reset()
+        notificationController.configure(
+            enabled: value.isEnabled,
+            requestPermission: value.isEnabled && !previous.isEnabled
+        )
+    }
+
+    func requestNotificationPermission() {
+        guard preferences.notifications.isEnabled else { return }
+        notificationController.configure(enabled: true, requestPermission: true)
+    }
+
+    func refreshNotificationAuthorization() {
+        notificationController.refreshAuthorization()
+    }
+
     func setViewedBucket(_ limitID: String) {
         guard snapshot?.displayableBuckets.contains(where: {
             $0.limitID == limitID && !$0.windows.isEmpty
@@ -281,6 +345,7 @@ final class AppStore: ObservableObject {
     }
 
     func setIdentityMode(_ mode: IdentityMode) {
+        notificationPolicy.reset()
         preferences.identityMode = mode
         if mode == .quotaOnly, let snapshot {
             self.snapshot = snapshot.removingAccount()
@@ -289,6 +354,7 @@ final class AppStore: ObservableObject {
     }
 
     func setManualCodexPath(_ path: String?) {
+        notificationPolicy.reset()
         preferences.manualCodexPath = path
         refresh(trigger: .preferenceChange)
     }
@@ -319,7 +385,13 @@ final class AppStore: ObservableObject {
         // Account for targets covered by this response before replacing the old
         // windows: a completed reset may disappear from the successful snapshot.
         consumeCoveredQuotaResets(through: visibleSnapshot.fetchedAt)
+        if let previousAccount = snapshot?.account,
+           let currentAccount = visibleSnapshot.account,
+           previousAccount != currentAccount {
+            notificationPolicy.reset()
+        }
         snapshot = visibleSnapshot
+        hasFetchedLiveSnapshot = true
         locatedCodex = located
         lastIssue = nil
         connectionState = .connected
@@ -333,6 +405,11 @@ final class AppStore: ObservableObject {
         if menuBarSelectionUsesFallback {
             preferences.menuBarQuotaSelection = .automatic
         }
+
+        let notificationEvents = notificationPolicy.events(
+            for: visibleSnapshot, preferences: preferences.notifications
+        )
+        notificationController.deliver(notificationEvents, language: preferences.language)
 
         do {
             try cache.save(visibleSnapshot)

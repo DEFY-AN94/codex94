@@ -60,9 +60,19 @@ struct OverviewView: View {
                     Text("display.label")
                         .fontWeight(.medium)
                     Spacer(minLength: 16)
-                    MenuBarQuotaPicker(store: store)
+                    Group {
+                        if store.preferences.menuBarLayout == .dualWindow {
+                            MenuBarBucketPicker(store: store)
+                        } else {
+                            MenuBarQuotaPicker(store: store)
+                        }
+                    }
                         .frame(maxWidth: 360)
                 }
+
+                Divider()
+
+                ResetCreditsView(store: store)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(4)

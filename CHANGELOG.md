@@ -2,6 +2,50 @@
 
 All notable changes to Codex94 are documented here.
 
+## Unreleased
+
+Development candidate: `0.2.2 (13)`. The published stable download remains
+`v0.2.1 (12)`; no release date or completed validation is claimed here.
+
+### Added
+
+- Add a fourth dual-window menu-bar layout that displays one selected bucket's
+  5-hour and Weekly values together. Save its bucket choice independently;
+  preserve the original three layouts and their existing quota-selection rules.
+- Let mouse left-click and right-click on the menu-bar item toggle the same
+  popover, keeping the existing refresh-on-open behavior.
+- Add a configurable global shortcut for the same popover action, unset by
+  default and requiring Control or Option, with optional Command and Shift.
+  Opening the popover keeps normal refresh behavior.
+- Add opt-in local quota notifications, disabled by default. Explicit enabling
+  requests macOS notification permission. Start with 20% and 10% remaining
+  thresholds that can each be adjusted or disabled, the default bucket, optional
+  extra buckets, and optional recovery alerts. Keep observation baselines and per-window-cycle
+  deduplication in memory.
+- Add a prominent, read-only **Manual quota resets** (**手动额度重置**) card to
+  Popover and Overview. The card displays the available count without a reset
+  button, using the existing response's authoritative
+  `rateLimitResetCredits.availableCount`. Preserve
+  zero, show missing/null data as unavailable, distinguish a cold unfetched
+  state, and label retained values after failed refreshes as cached.
+
+### Compatibility
+
+- Keep notification authorization checks compatible with the Xcode 16.4
+  toolchain without transferring system notification objects across actors.
+
+### Security and privacy
+
+- Keep cache schema v2 and exclude the reset-credit count and individual credit
+  details from disk. Add no reset-redemption control or consume RPC.
+- Store only new preferences under `dualWindowBucketSelection.v1`,
+  `globalHotKey.v1`, and `notifications.v1`. Notification messages contain the
+  bucket name, window, and percentage without email; macOS Notification Center
+  can retain delivered messages. This optional local system service is not
+  remote telemetry.
+- Retain the existing Codex subprocess/authentication boundary. Add no session
+  or auth-file readers, history collection, multi-account management, or updater.
+
 ## 0.2.1 - 2026-09-12
 
 ### Fixed

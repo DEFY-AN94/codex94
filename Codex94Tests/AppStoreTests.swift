@@ -82,7 +82,7 @@ final class AppStoreTests: XCTestCase {
         for role in StatusAccentRole.allCases {
             XCTAssertNil(fixture.preferences.statusAccentOverrides[role])
         }
-        XCTAssertEqual(fixture.preferences.menuBarLayout, .ringOnly)
+        XCTAssertEqual(fixture.preferences.menuBarLayout, .dualWindow)
         XCTAssertEqual(fixture.preferences.manualCodexPath, manualPath)
         XCTAssertEqual(fixture.preferences.identityMode, .quotaOnly)
         XCTAssertTrue(fixture.preferences.hasChosenIdentityMode)

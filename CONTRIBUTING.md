@@ -52,6 +52,36 @@ activation refreshes its status. Registration failures use localized feedback,
 not raw system errors. Tests inject the narrow service adapter and must not
 read or change real Login Items.
 
+### Unreleased 0.2.2 candidate
+
+The current candidate is `0.2.2 (13)`, while published download and source-clone
+links stay on `v0.2.1`. Keep its changelog under Unreleased until the actual
+release date is confirmed. Candidate documentation is not evidence of completed
+tests, installation, or publication.
+
+Keep the fourth dual-window layout's bucket preference separate from the
+original three layouts' quota selection. Mouse left-click, mouse right-click,
+and the configured global shortcut toggle the same popover; opening uses the
+existing refresh path. The shortcut is unset by default and must include
+Control or Option; Command and Shift may be added. New persistent preferences
+are limited to
+`dualWindowBucketSelection.v1`, `globalHotKey.v1`, and `notifications.v1`.
+
+Notification policy operates on fresh successful snapshots with an in-memory
+baseline and per-window-cycle deduplication. Notifications default off; only an
+explicit enable action requests permission. Default remaining thresholds are
+20% and 10%, and each can be adjusted or disabled. Extra buckets and recovery
+alerts are optional. Do not include email, account IDs, credentials,
+raw RPC, or paths in messages. Notification Center retention is system-owned
+local storage and must be documented separately from app-owned memory state.
+
+Parse only the authoritative nonnegative integer
+`rateLimitResetCredits.availableCount` from the existing quota response.
+Missing/null is unavailable, not zero; credit-list length is not a substitute.
+Keep the count in memory, preserve it when removing account information, and
+exclude it and credit details from cache v2. Do not add a consume operation,
+auth/session-file access, history collection, updater, or multi-account work.
+
 ## Development and validation
 
 Use synthetic data for automated tests and published screenshots, and keep
@@ -68,6 +98,12 @@ test preferences, caches, and output paths separate from daily app data.
   wake/clock reconciliation, and shutdown.
 - Do not clear or rewrite daily preferences, cache, or authentication data as
   test setup. Fixture cleanup should target only exact test-created resources.
+- Use injected hotkey and notification adapters to cover registration failure,
+  permission denial, threshold/recovery transitions, baseline suppression, and
+  per-cycle deduplication. Automated checks must not register real global
+  shortcuts, request system notification permission, or deliver notifications.
+  Cover cold/unavailable/zero/cached reset-credit states and absence of credit
+  data in saved cache; use only synthetic app-server responses.
 - Understand script side effects before running them: `release_check.sh` runs
   hosted tests, owns the single Universal Release build, verifies both
   architecture slices, and drives DMG packaging; `build_and_run.sh` stops named
@@ -129,7 +165,9 @@ not an App build input and must not broaden the disposable-source allowlist.
 
 Status-item GUI checks distinguish the requested AppKit length from its public
 accessibility bounds. A temporary native reference owned by the test process is
-measured and removed before app launch; it must distinguish all three lengths.
+measured and removed before app launch; it must distinguish all three legacy
+lengths. Validate the additional dual-window layout separately, including
+missing windows, cached state, and independence from the legacy quota choice.
 No constant padding adjustment or widened tolerance is used to pass a failure.
 
 UI jobs do not enable VoiceOver, change system settings, use real Codex
