@@ -29,6 +29,31 @@ and security-scanned before it is tagged.
 > `app-server` is an experimental interface and may change in future Codex
 > releases.
 
+## 3.1.0 candidate
+
+The next version is `3.1.0 (16)`; stable downloads below remain on `3.0.1`.
+
+- A floating quota strip targets **680 × 90 logical points**, with pin, drag,
+  hide, and expand controls. It reuses existing quota data; hovering or focusing
+  the update-time control reveals manual refresh. It adds no polling or credit
+  redemption, and the existing global shortcut still toggles the popover.
+- **Custom** start/end dates join the three existing Token ranges. Dates use
+  source calendar-day labels. Reported average, selected-interval peak, and
+  coverage stay separate from the service summary cards. Comparison includes
+  the preceding equal-length interval's reported total and coverage; a growth
+  percentage requires complete data in both intervals and a nonzero baseline.
+- **Export PNG…** and **Copy chart image** use the current range, bar/line style,
+  language, and theme. The image contains the chart, date range, fetch time,
+  coverage, and any stale-data notice, without identity. Copying writes to the
+  system clipboard only when clicked; CSV export remains available.
+- Only floating pin state and position become new saved preferences. There is
+  no statistics history database, new permission, network endpoint, or change
+  to signing and manual installation.
+
+Validation adds a fourth, synthetic **Floating** UI scenario and new Token
+controls/image checks. Results are pending. Cross-Space and fullscreen behavior
+of the native macOS panel will be described only after testing those cases.
+
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.

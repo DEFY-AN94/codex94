@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private var dashboardController: DashboardWindowController?
+    private var floatingController: FloatingWindowController?
     private var localMouseMonitor: Any?
     private var globalMouseMonitor: Any?
     private var workspaceWakeObserver: NSObjectProtocol?
@@ -42,6 +43,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 self?.openDashboard()
             }
         }
+        if ProcessInfo.processInfo.arguments.contains("--show-floating") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+                self?.toggleFloatingWindow()
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -55,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         removeWorkspaceWakeObservation()
         removeSystemClockObservation()
         store.hotKeyController.stop()
+        floatingController?.shutdown()
         store.shutdown()
         themeObservation?.cancel()
         menuBarLayoutObservation?.cancel()
@@ -200,7 +207,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             rootView: QuotaPopoverView(
                 store: store,
                 openDashboard: { [weak self] section in self?.openDashboard(section: section) },
-                quit: { NSApp.terminate(nil) }
+                quit: { NSApp.terminate(nil) },
+                showFloatingWindow: { [weak self] in self?.toggleFloatingWindow() }
             )
             .codex94Environment(preferences)
         )
@@ -271,11 +279,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 store: store,
                 chooseCodex: { [weak self] in self?.chooseCodexExecutable() },
                 clearManualCodex: { [weak self] in self?.store.setManualCodexPath(nil) },
-                quit: { NSApp.terminate(nil) }
+                quit: { NSApp.terminate(nil) },
+                showFloatingWindow: { [weak self] in self?.toggleFloatingWindow() }
             )
         }
         applyAppearance(preferences.theme)
         dashboardController?.show(section: section)
+    }
+
+    private func toggleFloatingWindow() {
+        popover.performClose(nil)
+        if floatingController == nil {
+            floatingController = FloatingWindowController(
+                store: store,
+                preferences: preferences,
+                openDashboard: { [weak self] in self?.openDashboard() }
+            )
+        }
+        floatingController?.toggle()
     }
 
     private func chooseCodexExecutable() {

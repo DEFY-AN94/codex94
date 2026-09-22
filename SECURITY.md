@@ -125,6 +125,24 @@ release notes also stay in memory; the checker adds no stored authentication,
 update feed, signing key, automatic installation, or third-party runtime
 dependency. These additions do not change the distribution signing policy.
 
+### 3.1.0 candidate additions
+
+The floating panel projects the existing quota snapshot and uses the existing
+manual refresh action. Its only new persisted fields are pin state and screen
+position (`floatingWindowPinned.v1`, `floatingWindowPosition.v1`); visibility
+and expansion are not persisted. It adds no polling, credit consume request,
+authentication access, permission, or entitlement.
+
+Custom Token dates and comparison metrics are local projections of the loaded
+snapshot. Missing days and zero baselines do not produce invented growth
+percentages. PNG export and chart-image copying are explicit user actions;
+images contain only the chart/range, fetch time, coverage, and stale-data
+notice, without identity or raw RPC. PNG files and the system clipboard are
+user-directed outputs, not a statistics cache or history store. Tests use
+synthetic data and isolated named pasteboards, never the general pasteboard.
+The existing subprocess, fixed GitHub endpoint, and distribution-signing
+boundaries remain unchanged.
+
 ## Supported versions
 
 The supported published stable version is [`v3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1),

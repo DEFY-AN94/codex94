@@ -25,6 +25,17 @@ METADATA_HELPER = "script/release_metadata.py"
 # Only these tracked build inputs may enter the disposable recovery source copy.
 # No repository metadata, documentation, scripts, local state or directory copy.
 BUILD_INPUTS = (
+    "Codex94/Views/Dashboard/TokenUsageImageExportControls.swift",
+    "Codex94Tests/TokenUsageImageExportTests.swift",
+    "Codex94Tests/FloatingWindowTests.swift",
+    "Codex94/Views/Dashboard/TokenUsageImageDocument.swift",
+    "Codex94/Views/Dashboard/TokenUsageImageExportView.swift",
+    "Codex94/Views/Dashboard/TokenUsageImageExport.swift",
+    "Codex94/Views/Dashboard/TokenUsageRangeSummaryView.swift",
+    "Codex94/Views/Dashboard/TokenUsageRangeControls.swift",
+    "Codex94/Views/Floating/FloatingQuotaView.swift",
+    "Codex94/App/FloatingWindowController.swift",
+    "Codex94/Models/FloatingWindowState.swift",
     "Codex94/Models/AppUpdateModels.swift",
     "Codex94/Services/AppUpdateClient.swift",
     "Codex94/Stores/AppUpdateController.swift",
@@ -274,7 +285,7 @@ def main():
     require(os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted", "A fresh hosted runner is required")
     require(os.environ.get("RUNNER_OS") == "macOS", "A hosted Mac is required")
     scenario = os.environ.get("CODEX94_UI_SCENARIO")
-    require(scenario in ("display", "recovery", "usage"), "Unknown UI scenario")
+    require(scenario in ("display", "recovery", "usage", "floating"), "Unknown UI scenario")
     require(os.getuid() != 0, "Do not prepare UI fixtures as root")
     source_revision = os.environ.get("GITHUB_SHA", "")
     require(re.fullmatch(r"[0-9a-f]{40}", source_revision) is not None, "A tested source revision is required")
@@ -366,9 +377,12 @@ def main():
             "healthy": "27C8FF", "warning": "FF8C42", "critical": "DA70D6", "error": "FF3366",
         },
     }
+    if scenario == "floating":
+        initial_preferences["floatingWindowPinned.v1"] = True
     manifest = {
         "schemaVersion": 1,
         "scenario": scenario,
+        "initialQuotaMode": "serverError" if scenario == "floating" else "normal",
         "bundleID": BUNDLE_ID,
         "expectedVersion": expected_version,
         "expectedBuild": expected_build,
@@ -465,6 +479,16 @@ def main():
         require([response["id"] for response in usage_responses] == [1, 2], "Fake usage self-check failed")
         require(usage_responses[1]["result"] == manifest["tokenUsage"], "Fake usage aggregate mismatch")
         self_check_usage = 1
+    if scenario == "floating":
+        # The fake self-check remains a successful bounded protocol transaction.
+        # Only this already-created synthetic control file changes before AUT
+        # launch, so a cold floating window must handle a real failed response.
+        descriptor = os.open(mode_path, os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(json_bytes({
+                "mode": "serverError", "defaultUsedPercent": 68,
+                "sparkUsedPercent": 12, "includeSpark": True,
+            }))
     # The self-check is accounted for explicitly; do not truncate its log.
     write_new(root / "prepared.json", json_bytes({
         "schemaVersion": 1, "selfCheckRateLimits": 1, "selfCheckTokenUsage": self_check_usage,

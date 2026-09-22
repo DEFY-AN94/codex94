@@ -5,6 +5,7 @@ struct TokenUsageChartView: View {
     let presentation: TokenUsagePresentation
     let language: LanguagePreference
     let style: TokenUsageChartStyle
+    let isInteractive: Bool
 
     @State private var hoveredDate: Date?
     @State private var pinnedDate: Date?
@@ -13,11 +14,13 @@ struct TokenUsageChartView: View {
         presentation: TokenUsagePresentation,
         language: LanguagePreference,
         style: TokenUsageChartStyle = .bar,
-        initialSelectedDate: Date? = nil
+        initialSelectedDate: Date? = nil,
+        isInteractive: Bool = true
     ) {
         self.presentation = presentation
         self.language = language
         self.style = style
+        self.isInteractive = isInteractive
         _pinnedDate = State(initialValue: initialSelectedDate.map {
             TokenUsagePresentation.calendar.startOfDay(for: $0)
         })
@@ -35,6 +38,7 @@ struct TokenUsageChartView: View {
                     Text(verbatim: TokenUsageFormatting.number(presentation.reportedTotal, language: language))
                         .font(.system(size: 27, weight: .semibold, design: .rounded))
                         .monospacedDigit()
+                        .accessibilityIdentifier("token-usage-range-total")
                 }
                 Spacer(minLength: 8)
                 Text("usage.tokens.unit")
@@ -42,7 +46,7 @@ struct TokenUsageChartView: View {
                     .foregroundStyle(.secondary)
             }
 
-            selectionDetails
+            if isInteractive { selectionDetails }
 
             if let domain = presentation.plotDomain {
                 Chart {
@@ -125,21 +129,23 @@ struct TokenUsageChartView: View {
                     }
                 }
                 .chartOverlay { proxy in
-                    GeometryReader { geometry in
-                        Rectangle()
-                            .fill(.clear)
-                            .contentShape(Rectangle())
-                            .onContinuousHover { phase in
-                                switch phase {
-                                case let .active(location):
-                                    hoveredDate = date(at: location, proxy: proxy, geometry: geometry)
-                                case .ended:
-                                    hoveredDate = nil
+                    if isInteractive {
+                        GeometryReader { geometry in
+                            Rectangle()
+                                .fill(.clear)
+                                .contentShape(Rectangle())
+                                .onContinuousHover { phase in
+                                    switch phase {
+                                    case let .active(location):
+                                        hoveredDate = date(at: location, proxy: proxy, geometry: geometry)
+                                    case .ended:
+                                        hoveredDate = nil
+                                    }
                                 }
-                            }
-                            .gesture(SpatialTapGesture().onEnded { event in
-                                pinnedDate = date(at: event.location, proxy: proxy, geometry: geometry)
-                            })
+                                .gesture(SpatialTapGesture().onEnded { event in
+                                    pinnedDate = date(at: event.location, proxy: proxy, geometry: geometry)
+                                })
+                        }
                     }
                 }
                 .environment(\.calendar, TokenUsagePresentation.calendar)
@@ -159,10 +165,18 @@ struct TokenUsageChartView: View {
             hoveredDate = nil
             pinnedDate = nil
         }
+        .onChange(of: presentation.customRange) { _, _ in
+            hoveredDate = nil
+            pinnedDate = nil
+        }
+        .onChange(of: presentation.customRange) { _, _ in
+            hoveredDate = nil
+            pinnedDate = nil
+        }
     }
 
     private var activeDate: Date? {
-        guard let date = hoveredDate ?? pinnedDate,
+        guard isInteractive, let date = hoveredDate ?? pinnedDate,
               let start = presentation.startDate, let end = presentation.endDate,
               date >= start, date <= end else { return nil }
         return date

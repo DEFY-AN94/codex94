@@ -41,6 +41,34 @@ Keep candidate changelog notes under Unreleased without inventing a date.
 Historical release entries and the existing synthetic screenshot provenance
 remain unchanged. Planning and Goal files stay outside the Git repository.
 
+The current candidate is `3.1.0 (16)`, with its date kept under **Unreleased**
+until release preparation is complete. In addition to the retained regression
+checks below, verify:
+
+- The floating strip's 680 × 90 logical-point target, screen fitting, dragging,
+  pinning, hiding/reopening, expansion, and hover/keyboard-focus refresh control.
+  Showing or changing the strip must not start polling, redeem reset credits,
+  or rewrite quota cache. Explicit refresh uses the existing manual path;
+  the global shortcut still toggles the same popover. Check both themes and
+  languages. Record native macOS 14+ behavior across Spaces/fullscreen apps
+  only after testing it; configured NSPanel flags alone are not acceptance.
+- `floatingWindowPinned.v1` and `floatingWindowPosition.v1` contain only pin
+  state and position. Expansion, visibility, and custom dates stay memory-only.
+- Custom inclusive source-date ranges, reported average/selected-range peak,
+  coverage, and prior equal-length interval totals/coverage. Test gaps, explicit
+  zero, ranges beyond returned data, overflow, and zero/incomplete baselines;
+  percentage change must remain unavailable where it is not defined. Preserve
+  summary cards, bar/line selection, and no-fetch/no-cache-write behavior.
+- CSV retention and user-triggered PNG save/copy. Inspect actual synthetic
+  images in English/Chinese, light/dark, and bar/line styles for chart, date
+  range, fetch time, coverage, and an unclipped stale-data notice. Check PNG
+  format/dimensions, current selection, failure versus cancellation, and absence
+  of identity. Copy tests use named pasteboards, never the general pasteboard.
+
+Candidate validation includes a fourth **Floating** UI scenario and expanded
+Token usage coverage. Report their results only after the exact candidate has
+run; historical test counts and screenshots do not validate these additions.
+
 Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
 Published download and source-clone instructions now point to `v3.0.1`.
 This maintenance release isolates quota request contexts, shares strict
@@ -189,7 +217,8 @@ version/build, checks, risks, rollback, artifact hashes, and both acceptance
 states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
-Wait for CI, all three synthetic UI smokes (Display, Recovery, and Token usage),
+Wait for CI and, for `3.1.0`, all four synthetic UI smokes
+(Display, Recovery, Token usage, and Floating),
 and Actions/Python/Swift CodeQL on the actual tested revision.
 Skipped, cancelled, unavailable, pending, or failed is not passed. Review the
 synthetic images themselves for UI and privacy. Retain the existing screenshots

@@ -7,6 +7,7 @@ struct TokenUsageView: View {
     let language: LanguagePreference
 
     @State private var range: TokenUsageRange = .thirtyDays
+    @State private var customRange: ClosedRange<Date>?
     @State private var isExporting = false
     @State private var exportDocument: TokenUsageCSVDocument?
     @State private var exportFilename = "Codex94-token-usage.csv"
@@ -14,7 +15,7 @@ struct TokenUsageView: View {
     @StateObject private var presentationCache = TokenUsagePresentationCache()
 
     var body: some View {
-        let presentation = presentationCache.resolve(snapshot: store.snapshot, range: range)
+        let presentation = presentationCache.resolve(snapshot: store.snapshot, range: range, customRange: customRange)
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 pageHeader
@@ -39,7 +40,16 @@ struct TokenUsageView: View {
                                     style: preferences.tokenUsageChartStyle
                                 )
                             }
-                            coverage(presentation)
+                            TokenUsageRangeSummaryView(presentation: presentation, language: language)
+                            TokenUsageCoverageView(presentation: presentation, language: language)
+                            if !presentation.visibleDays.isEmpty {
+                                TokenUsageImageExportControls(
+                                    presentation: presentation, language: language,
+                                    style: preferences.tokenUsageChartStyle,
+                                    fetchedAt: snapshot.fetchedAt, isStale: store.issue != nil,
+                                    isRefreshing: store.isRefreshing
+                                )
+                            }
                         }
                     }
 
@@ -89,10 +99,7 @@ struct TokenUsageView: View {
             contentType: .commaSeparatedText,
             defaultFilename: exportFilename
         ) { result in
-            if case let .failure(error) = result,
-               (error as? CocoaError)?.code != .userCancelled {
-                exportFailed = true
-            }
+            exportFailed = TokenUsageExportCompletion(result) == .failed
         }
         .alert("usage.export.failed.title", isPresented: $exportFailed) {
             Button("usage.export.dismiss", role: .cancel) {}
@@ -156,16 +163,21 @@ struct TokenUsageView: View {
             HStack(alignment: .center, spacing: 12) {
                 Text("usage.chart.title").font(.headline)
                 Spacer(minLength: 0)
-                Picker("usage.range.label", selection: $range) {
+                Picker("usage.range.label", selection: rangeSelection(presentation)) {
                     ForEach(TokenUsageRange.allCases) { range in
                         Text(LocalizedStringKey(range.titleKey)).tag(range)
                     }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(maxWidth: 285)
+                .frame(maxWidth: 350)
                 .disabled(presentation.allDays.isEmpty)
                 .accessibilityIdentifier("token-usage-range")
+            }
+            if range == .custom, let customRange {
+                TokenUsageRangeControls(selection: Binding(
+                    get: { self.customRange ?? customRange }, set: { self.customRange = $0 }
+                ))
             }
             HStack(spacing: 10) {
                 Text("usage.chartStyle.label")
@@ -182,38 +194,21 @@ struct TokenUsageView: View {
                 .accessibilityIdentifier("token-usage-chart-style")
                 Spacer(minLength: 0)
             }
-            Text("usage.range.anchor")
+            Text(LocalizedStringKey(range == .custom ? "usage.custom.sourceDates" : "usage.range.anchor"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func coverage(_ presentation: TokenUsagePresentation) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            if let start = presentation.startDate, let end = presentation.endDate {
-                Text(verbatim: TokenUsageFormatting.localized(
-                    "usage.coverage.range %@ %@ %@", language: language,
-                    arguments: [
-                        TokenUsageFormatting.date(start, language: language),
-                        TokenUsageFormatting.date(end, language: language),
-                        TokenUsageFormatting.number(presentation.visibleDays.count, language: language)
-                    ]
-                ))
-                if presentation.missingDayCount > 0 {
-                    Text(verbatim: TokenUsageFormatting.localized(
-                        "usage.coverage.missing %@", language: language,
-                        arguments: [TokenUsageFormatting.number(presentation.missingDayCount, language: language)]
-                    ))
-                }
+    private func rangeSelection(_ presentation: TokenUsagePresentation) -> Binding<TokenUsageRange> {
+        Binding(get: { range }, set: { newRange in
+            if newRange == .custom, customRange == nil,
+               let start = presentation.startDate, let end = presentation.endDate {
+                customRange = start...end
             }
-            Text("usage.coverage.source")
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .font(.system(size: 11))
-        .foregroundStyle(.secondary)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("token-usage-coverage")
+            range = newRange
+        })
     }
 
     private func emptyDailyData(_ snapshot: TokenUsageSnapshot) -> some View {
@@ -221,7 +216,8 @@ struct TokenUsageView: View {
             Image(systemName: "chart.bar.xaxis")
                 .font(.system(size: 30, weight: .light))
                 .foregroundStyle(.blue.opacity(0.65))
-            Text(LocalizedStringKey(snapshot.dailyUsageBuckets == nil ? "usage.empty.notProvided" : "usage.empty.noRecords"))
+            Text(LocalizedStringKey(snapshot.dailyUsageBuckets == nil ? "usage.empty.notProvided" :
+                (snapshot.dailyUsageBuckets?.isEmpty == false ? "usage.empty.range" : "usage.empty.noRecords")))
                 .font(.callout)
             Text("usage.empty.explanation")
                 .font(.caption)

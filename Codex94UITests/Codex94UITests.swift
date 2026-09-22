@@ -342,6 +342,228 @@ final class Codex94UITests: XCTestCase {
         ])
     }
 
+    func testFloatingWindowSmoke() throws {
+        try prepare(scenario: "floating")
+        try require(!fixture.readOnlyFocusProbeEnabled, "Floating smoke must use the unmodified production AUT")
+        try launchPopover(expectedRequestRange: 1...2)
+        let originalPID = try ownedApplicationPID()
+        try require(try fixture.cacheFingerprint()["exists"] as? Bool == false,
+                    "The cold failure must not have a successful quota cache")
+        try withoutRequests("Opening the floating quota window from the popover") {
+            try uniqueIdentified("popover-floating-toggle", in: currentPopover()).click()
+            _ = try floatingWindow()
+        }
+        var floating = try floatingWindow()
+        let originalWindowNumber = try ownedFloatingWindowNumber(floating)
+        try assertFloatingGeometry(floating, expanded: false)
+        try assertFloatingMetric("floating-quota-weekly", contains: "--", in: floating)
+        try assertFloatingMetric("floating-quota-fiveHour", contains: "--", in: floating)
+        try assertFloatingMetric("floating-refresh", contains: "Failed", in: floating)
+        try captureFloating(floating, named: "floating-cold-en.png")
+
+        try fixture.setMode("normal")
+        try refreshFloating(floating)
+        try assertFloatingMetric("floating-quota-weekly", contains: "32%", in: floating)
+        try assertFloatingMetric("floating-quota-fiveHour", contains: "--", in: floating)
+        try captureFloating(floating, named: "floating-compact-en.png")
+
+        try withoutRequests("Unpinning and pinning the same floating window") {
+            try uniqueIdentified("floating-pin", in: floating).click()
+            try waitUntil("The floating window did not persist its unpinned preference") {
+                try self.fixture.preference("floatingWindowPinned.v1") as? Bool == false
+            }
+            try uniqueIdentified("floating-pin", in: floating).click()
+            try waitUntil("The floating window did not persist its pinned preference") {
+                try self.fixture.preference("floatingWindowPinned.v1") as? Bool == true
+            }
+        }
+        let compactOrigin = floating.frame.origin
+        try withoutRequests("Expanding floating quota details") {
+            try uniqueIdentified("floating-expand", in: floating).click()
+            try waitUntil("Floating details did not expand") { floating.frame.height >= 130 }
+            try assertFloatingGeometry(floating, expanded: true)
+            try require(floating.frame.origin.equalToWithinOnePoint(compactOrigin),
+                        "Expanding must preserve the floating window's top-left position")
+            try assertFloatingMetric("floating-reset-credits", contains: "3", in: floating)
+        }
+        try captureFloating(floating, named: "floating-expanded-en.png")
+        try withoutRequests("Collapsing floating quota details") {
+            try uniqueIdentified("floating-expand", in: floating).click()
+            try waitUntil("Floating details did not collapse") { floating.frame.height <= 92 }
+            try assertFloatingGeometry(floating, expanded: false)
+            try require(floating.frame.origin.equalToWithinOnePoint(compactOrigin),
+                        "Collapsing must preserve the floating window's top-left position")
+        }
+
+        let positionBeforeDrag = try fixture.floatingPosition()
+        let frameBeforeDrag = floating.frame
+        try withoutRequests("Dragging only the floating window's identified drag area") {
+            let drag = try uniqueIdentified("floating-drag-area", in: floating)
+            try require(drag.isHittable, "The floating drag area must be an actual visible app-owned target")
+            let screen = try visibleScreenContaining(floating.frame)
+            let dx: CGFloat = floating.frame.minX - 28 >= screen.minX ? -28 : 28
+            let dy: CGFloat = floating.frame.maxY + 24 <= screen.maxY ? 24 : -24
+            let start = drag.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            start.press(forDuration: 0.2, thenDragTo: start.withOffset(CGVector(dx: dx, dy: dy)))
+            try waitUntil("Dragging did not move and persist the synthetic floating window") {
+                let position = try self.fixture.floatingPosition()
+                return position != nil && position != positionBeforeDrag
+                    && !floating.frame.origin.equalToWithinOnePoint(frameBeforeDrag.origin)
+            }
+            try assertFloatingGeometry(floating, expanded: false)
+        }
+        let draggedOrigin = floating.frame.origin
+        let savedPosition = try fixture.floatingPosition()
+
+        try fixture.setMode("serverError")
+        let cacheBeforeFailure = try fixture.cacheFingerprint()
+        try refreshFloating(floating)
+        try assertFloatingMetric("floating-quota-weekly", contains: "32%", in: floating)
+        try assertFloatingMetric("floating-refresh", contains: "Failed", in: floating)
+        try assertFloatingMetric("floating-refresh", contains: "Cached data", in: floating)
+        try require(try fixture.cacheFingerprint() == cacheBeforeFailure,
+                    "A failed floating refresh must retain the successful cache unchanged")
+        try captureFloating(floating, named: "floating-cached-failure-en.png")
+
+        var dashboard: XCUIElement!
+        try withoutRequests("Opening Dashboard from the floating window") {
+            try uniqueIdentified("floating-expand", in: floating).click()
+            try waitUntil("The floating Dashboard action must first be expanded") { floating.frame.height >= 130 }
+            try uniqueIdentified("floating-open-dashboard", in: floating).click()
+            dashboard = try dashboardWindow()
+            try uniqueIdentified("floating-expand", in: floating).click()
+            try waitUntil("The floating window must be collapsed before the reopen check") { floating.frame.height <= 92 }
+        }
+        try withoutRequests("Hiding and reopening the same floating window through Dashboard") {
+            try uniqueIdentified("floating-hide", in: floating).click()
+            try waitUntil("Hide must remove the floating surface from the accessible windows") {
+                !self.identified("floating-quota-content", in: self.application).exists
+            }
+            let toggle = try uniqueIdentified("dashboard-floating-toggle", in: dashboard)
+            try reveal(toggle, in: dashboard)
+            toggle.click()
+            floating = try floatingWindow()
+            try require(try ownedFloatingWindowNumber(floating) == originalWindowNumber,
+                        "Reopening must reuse the same owned floating window")
+            try require(floating.frame.origin.equalToWithinOnePoint(draggedOrigin),
+                        "Reopening must retain the dragged floating position")
+            try require(try fixture.floatingPosition() == savedPosition,
+                        "Reopening must not replace the saved position with a different location")
+            try assertFloatingGeometry(floating, expanded: false)
+        }
+        try require(try ownedApplicationPID() == originalPID,
+                    "Floating interactions must stay in one production application process")
+        XCTAssertEqual(try fixture.tokenUsageRequestCount(), fixture.selfCheckTokenUsage,
+                       "Floating quota interactions must not load token statistics")
+        try fixture.assertSafePreferences()
+        try quitNormally()
+        try fixture.writeReport("floating-result.json", fields: [
+            "scenario": "floating", "completed": true, "language": "en",
+            "popoverEntryVerified": true, "dashboardEntryVerified": true,
+            "coldFailureUnknownValuesVerified": true, "successfulManualRefreshVerified": true,
+            "failedRefreshRetainsQuotaAndCache": true, "explicitManualRefreshCount": 2,
+            "pinPreferenceVerified": true, "expandedResetCountVerified": true,
+            "dragAndSavedPositionVerified": true, "visibleScreenContainmentVerified": true,
+            "sameOwnedWindowReused": true, "sameApplicationProcess": true,
+            "pinExpandDragHideShowDoNotFetch": true, "tokenUsageRequestsUnchanged": true,
+            "compactHeight": 90, "expandedHeight": 132,
+            "fullScreenAndSpacesAcceptance": "not-tested", "keyboardFocusAcceptance": "not-tested",
+            "sourceData": "fixed-synthetic-quota", "screenCoordinatesIncluded": false,
+            "rawTestResultsUploaded": false
+        ])
+    }
+
+    private func floatingWindow() throws -> XCUIElement {
+        let windows = application.windows.matching(identifier: "floating-quota-window")
+        try require(windows.firstMatch.waitForExistence(timeout: 5), "The production floating window did not open")
+        try require(windows.count == 1, "There must be exactly one app-owned floating window")
+        let window = windows.element(boundBy: 0)
+        _ = try uniqueIdentified("floating-quota-content", in: window)
+        return window
+    }
+
+    private func refreshFloating(_ window: XCUIElement) throws {
+        let before = try fixture.requestCount()
+        let refresh = try uniqueIdentified("floating-refresh", in: window)
+        try require(refresh.isEnabled && refresh.isHittable, "Floating refresh must be an enabled visible button")
+        refresh.click()
+        try waitForRequestCompletion(after: before, delta: 1)
+        try waitUntil("The floating refresh control did not settle") { refresh.isEnabled }
+    }
+
+    private func assertFloatingMetric(_ identifier: String, contains expected: String, in window: XCUIElement) throws {
+        try waitUntil("A floating metric did not expose its expected synthetic value") {
+            let element = self.identified(identifier, in: window)
+            let text = [element.label, element.title, element.value as? String ?? ""].joined(separator: " ")
+            return element.exists && text.contains(expected)
+        }
+    }
+
+    private func assertFloatingGeometry(_ window: XCUIElement, expanded: Bool) throws {
+        let frame = window.frame
+        try require([frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
+                    && (320...682).contains(frame.width)
+                    && abs(frame.height - (expanded ? 132 : 90)) <= 2,
+                    "The floating window must preserve its bounded horizontal layout")
+        _ = try visibleScreenContaining(frame)
+        let controls = ["floating-quota-content", "floating-refresh", "floating-pin", "floating-expand", "floating-hide"]
+            + (expanded ? ["floating-open-dashboard"] : [])
+        for identifier in controls {
+            let element = try uniqueIdentified(identifier, in: window)
+            try require(!element.frame.isEmpty && frame.insetBy(dx: -1, dy: -1).contains(element.frame),
+                        "Floating controls must remain within the window rather than be clipped")
+        }
+    }
+
+    private func visibleScreenContaining(_ frame: CGRect) throws -> CGRect {
+        // Screen geometry is evaluated only in memory. Neither these frames nor
+        // any monitor names, identifiers or coordinates enter evidence reports.
+        let screens = NSScreen.screens
+        guard let primaryTop = screens.first?.frame.maxY else {
+            throw UITestFailure("The hosted runner has no usable screen geometry")
+        }
+        let visibleFrames = screens.map { screen in
+            let visible = screen.visibleFrame
+            return CGRect(x: visible.minX, y: primaryTop - visible.maxY, width: visible.width, height: visible.height)
+        }
+        guard let visible = visibleFrames.first(where: { $0.insetBy(dx: -1, dy: -1).contains(frame) }) else {
+            throw UITestFailure("The complete floating window must be within an available screen work area")
+        }
+        return visible
+    }
+
+    private func ownedFloatingWindowNumber(_ window: XCUIElement) throws -> Int {
+        let pid = try ownedApplicationPID()
+        guard let values = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else {
+            throw UITestFailure("Could not inspect the owned floating window identity")
+        }
+        // Immediately filter to the validated AUT process. Never persist or
+        // include another process's window metadata in a failure or report.
+        let owned = values.filter { ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid }
+        let matches = owned.compactMap { value -> Int? in
+            guard let bounds = value[kCGWindowBounds as String] as? [String: Any],
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary),
+                  frame.origin.equalToWithinOnePoint(window.frame.origin),
+                  abs(frame.width - window.frame.width) <= 1, abs(frame.height - window.frame.height) <= 1,
+                  let number = value[kCGWindowNumber as String] as? NSNumber else { return nil }
+            return number.intValue
+        }
+        try require(matches.count == 1, "The identified floating surface must match one owned system window")
+        return matches[0]
+    }
+
+    private func captureFloating(_ window: XCUIElement, named filename: String) throws {
+        try require(fixture.scenario == "floating" && !fixture.readOnlyFocusProbeEnabled
+                    && window.identifier == "floating-quota-window",
+                    "Floating evidence must use only the normal production floating surface")
+        let content = try uniqueIdentified("floating-quota-content", in: window)
+        try require(!identified("quota-popover-header", in: content).exists
+                    && !identified("token-usage-page", in: content).exists
+                    && !identified("copy-diagnostics", in: content).exists,
+                    "Floating screenshots must not include other application pages")
+        try fixture.writeArtifact(content.screenshot().pngRepresentation, named: filename)
+    }
+
     func testTokenUsageSmoke() throws {
         try prepare(scenario: "usage")
         try launchPopover(expectedRequestRange: 1...2)
@@ -384,6 +606,49 @@ final class Codex94UITests: XCTestCase {
                 }
             }
         }
+        try withoutTokenUsageRequests("Selecting a custom range and inspecting local interval statistics") {
+            try chooseTokenRange(.sevenDays, in: dashboard)
+            try chooseTokenRange(.custom, in: dashboard)
+            try assertTokenUsageContent(in: dashboard, visibleDays: 7, includeSummary: false)
+            for identifier in ["token-usage-custom-dates", "token-usage-custom-start", "token-usage-custom-end"] {
+                _ = try uniqueIdentified(identifier, in: dashboard)
+            }
+            let summary = try uniqueIdentified("token-usage-range-summary", in: dashboard)
+            try revealTokenElementForCapture(summary, in: dashboard)
+            try assertTokenMetric("token-usage-range-average", contains: "27,428.6", in: dashboard)
+            try assertTokenMetric("token-usage-range-peak", contains: "35,000", in: dashboard)
+            try assertTokenMetric("token-usage-range-coverage", contains: "100%", in: dashboard)
+            try assertTokenMetric("token-usage-comparison-change", contains: "+9.7%", in: dashboard)
+            try require(!identified("token-usage-comparison-unavailable", in: dashboard).exists,
+                        "The two fully reported synthetic seven-day periods permit a comparison")
+            try revealTokenElementForCapture(try uniqueIdentified("token-usage-daily-table", in: dashboard), in: dashboard)
+            try require(identified("token-usage-day-2033-05-12", in: dashboard).exists
+                        && identified("token-usage-day-2033-05-18", in: dashboard).exists
+                        && !identified("token-usage-day-2033-05-11", in: dashboard).exists,
+                        "Selecting Custom must inherit the chosen source-date interval")
+            try revealTokenElementForCapture(summary, in: dashboard)
+        }
+        try capture(dashboard, named: "usage-custom-seven-days-en.png")
+        try withoutTokenUsageRequests("Inspecting image controls without using the clipboard") {
+            for identifier in ["token-usage-export-png", "token-usage-copy-image"] {
+                let button = try uniqueIdentified(identifier, in: dashboard)
+                try reveal(button, in: dashboard)
+                try require(button.isEnabled && button.isHittable,
+                            "A reported custom range must expose an enabled image export action")
+            }
+            try assertTokenMetric("token-usage-range-total", contains: "192,000", in: dashboard)
+        }
+        // Exercise both fileExporter presentations from the current custom
+        // range. Never save a file, inspect the destination, or capture a sheet.
+        try openAndCancelTokenExport("token-usage-export-png", in: dashboard)
+        try openAndCancelTokenExport("token-usage-export", in: dashboard)
+        try withoutTokenUsageRequests("Returning to all reported history after cancelling both exports") {
+            try chooseTokenRange(.all, in: dashboard)
+            try assertTokenUsageContent(in: dashboard, visibleDays: 35, includeSummary: false)
+            try require(identified("token-usage-comparison-unavailable", in: dashboard).exists
+                        && !identified("token-usage-comparison-change", in: dashboard).exists,
+                        "All returned history has no complete preceding interval and must not invent a comparison")
+        }
         try withoutTokenUsageRequests("Inspecting the daily token table") {
             let export = try uniqueIdentified("token-usage-export", in: dashboard)
             try reveal(export, in: dashboard)
@@ -391,6 +656,7 @@ final class Codex94UITests: XCTestCase {
                         "The daily table must show the newest fixed source date")
         }
         try capture(dashboard, named: "usage-daily-table-en.png")
+        try exerciseTokenRetryExportAvailability(in: dashboard)
 
         // Recreating the page and changing presentation must reuse the loaded
         // response. Only the page's own refresh button may issue another RPC.
@@ -447,8 +713,8 @@ final class Codex94UITests: XCTestCase {
                        "Token loading, ranges and retry must not issue quota requests")
         XCTAssertEqual(try fixture.cacheFingerprint(), quotaCache,
                        "Token usage must not rewrite the quota cache")
-        XCTAssertEqual(try fixture.tokenUsageRequestCount(), initialUsageRequests + 5,
-                       "One initial load and four explicit refreshes must produce exactly five usage RPCs")
+        XCTAssertEqual(try fixture.tokenUsageRequestCount(), initialUsageRequests + 7,
+                       "One initial load and six explicit refreshes must produce exactly seven usage RPCs")
         XCTAssertEqual(try ownedApplicationPID(), originalPID)
         try fixture.assertSafePreferences()
         try quitNormally()
@@ -457,6 +723,18 @@ final class Codex94UITests: XCTestCase {
             "languages": ["en", "zh-Hans"], "themes": ["terminalDark", "terminalLight"],
             "visibleDayCounts": [7, 30, 35], "returnedDayCount": 35,
             "chartStyles": ["bar", "line"], "chartStylePreferenceVerified": true,
+            "customRangeSelectionVerified": true, "customDateControlsPresent": true,
+            "customInheritsSevenDaySourceRange": true, "customDateFieldEditingAcceptance": "not-tested",
+            "reportedIntervalMetricsVerified": true, "completePeriodComparisonVerified": true,
+            "incompletePeriodComparisonSuppressed": true, "imageExportButtonsPresent": true,
+            "pngSaveSheetOpenedAndCancelled": true, "csvSaveSheetOpenedAndCancelled": true,
+            "exportCancellationPreservesRangeAndData": true, "exportCancellationShowsNoError": true,
+            "exportCancellationDoesNotFetchOrWriteQuotaCache": true,
+            "exportSaveNotInvoked": true, "saveSheetsNotCaptured": true,
+            "copyImageNotInvoked": true, "generalPasteboardNotAccessed": true,
+            "pendingRetryObservedViaLiveRequest": true, "slowTokenUsageDelaySeconds": 3,
+            "previousSummaryRetainedDuringPendingRetry": true,
+            "imageActionsDisabledDuringPendingRetry": true, "imageActionsReenabledAfterRetry": true,
             "styleChangesDoNotFetch": true, "styleChangesPreserveRange": true,
             "partialDataVerified": true, "unavailableDataVerified": true,
             "unsupportedServiceVerified": true, "successfulRetryVerified": true,
@@ -476,6 +754,102 @@ final class Codex94UITests: XCTestCase {
         }
         try waitForSettledRequests()
         XCTAssertEqual(try fixture.tokenUsageRequestCount(), before + 1)
+    }
+
+    private func exerciseTokenRetryExportAvailability(in dashboard: XCUIElement) throws {
+        // Begin with the actual successful page, then produce an unavailable
+        // response. No store state or SwiftUI environment is injected here.
+        try fixture.setTokenUsageMode("missing")
+        try refreshTokenUsage(in: dashboard)
+        try require(identified("token-usage-error-unavailable", in: dashboard).waitForExistence(timeout: 5),
+                    "The retry precondition must be a real failed usage response")
+        try assertTokenMetric("token-usage-lifetime", contains: "1,234,567", in: dashboard)
+        try require(identified("token-usage-daily-table", in: dashboard).value as? String == "35",
+                    "The failed response must retain the successfully loaded daily rows")
+        let png = try uniqueIdentified("token-usage-export-png", in: dashboard)
+        let copy = try uniqueIdentified("token-usage-copy-image", in: dashboard)
+        try require(png.isEnabled && copy.isEnabled,
+                    "Retained data may be exported when no retry is in progress")
+        let summary = try uniqueIdentified("token-usage-summary", in: dashboard)
+        let lifetime = try uniqueIdentified("token-usage-lifetime", in: dashboard)
+        let refresh = try uniqueIdentified("token-usage-refresh", in: dashboard)
+        try reveal(refresh, in: dashboard)
+        let before = try fixture.tokenUsageRequestCount()
+        try fixture.setTokenUsageMode("slow")
+        refresh.click()
+        try waitUntil("A live pending retry must retain its old summary and disable both image actions", timeout: 2.5) {
+            guard try self.fixture.tokenUsageRequestCount() == before + 1,
+                  !(try self.fixture.requestsHaveExited()) else { return false }
+            let disabled = !png.isEnabled && !copy.isEnabled
+            let text = [lifetime.label, lifetime.title, lifetime.value as? String ?? ""].joined(separator: " ")
+            return try disabled && summary.exists && lifetime.exists && text.contains("1,234,567")
+                && !refresh.isEnabled && !self.fixture.requestsHaveExited()
+        }
+        // The positive assertion above is bracketed by live process checks;
+        // completing the response first cannot satisfy this pending-state test.
+        try waitForTokenUsageCompletion(after: before, in: dashboard)
+        try waitUntil("Image actions must be enabled again after the retry finishes") {
+            png.isEnabled && copy.isEnabled
+        }
+        try assertTokenUsageContent(in: dashboard, visibleDays: 35)
+        try fixture.setTokenUsageMode("complete")
+    }
+
+    private func openAndCancelTokenExport(_ identifier: String, in dashboard: XCUIElement) throws {
+        try require(fixture.scenario == "usage" && language == .english
+                    && ["token-usage-export-png", "token-usage-export"].contains(identifier),
+                    "Only the two explicit English synthetic export actions may open a save sheet")
+        try withoutTokenUsageRequests("Opening and cancelling a native token export save sheet") {
+            try require(application.sheets.count == 0 && application.alerts.count == 0,
+                        "An export check must start without another sheet or alert")
+            let before = try tokenCustomRangeSignature(in: dashboard)
+            let button = try uniqueIdentified(identifier, in: dashboard)
+            try reveal(button, in: dashboard)
+            try require(button.isEnabled && button.isHittable,
+                        "The chosen token export action must be enabled and visible")
+            button.click()
+
+            let sheets = dashboard.sheets
+            try require(sheets.firstMatch.waitForExistence(timeout: 10),
+                        "The selected fileExporter must present a native save sheet on Dashboard")
+            try require(sheets.count == 1 && application.alerts.count == 0,
+                        "A token export must present exactly one save sheet without an error alert")
+            let sheet = sheets.element(boundBy: 0)
+            let cancel = sheet.buttons.matching(NSPredicate(format: "label == 'Cancel' OR title == 'Cancel'"))
+            try require(cancel.count == 1 && cancel.element(boundBy: 0).isEnabled
+                        && cancel.element(boundBy: 0).isHittable,
+                        "The native save sheet must expose one standard enabled Cancel action")
+            // Do not query path fields, browse folders, use keyboard shortcuts,
+            // click Save, or capture this system surface in any artifact.
+            cancel.element(boundBy: 0).click()
+            try waitUntil("Cancelling the token export did not dismiss its save sheet") {
+                self.application.sheets.count == 0
+            }
+            let deadline = Date().addingTimeInterval(0.6)
+            repeat {
+                try require(application.alerts.count == 0 && application.sheets.count == 0,
+                            "Cancelling an export must not present a delayed error alert or another sheet")
+                RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            } while Date() < deadline
+            try require(button.isEnabled,
+                        "Cancelling must restore the export action for another attempt")
+            try require(try tokenCustomRangeSignature(in: dashboard) == before,
+                        "Cancelling an export must preserve the selected source range and displayed data")
+            try require(!identified("token-usage-image-feedback", in: dashboard).exists,
+                        "Cancelling must not claim that an image was saved or copied")
+            try assertTokenUsageContent(in: dashboard, visibleDays: 7, includeSummary: false)
+        }
+    }
+
+    private func tokenCustomRangeSignature(in dashboard: XCUIElement) throws -> [String: String] {
+        var result: [String: String] = [:]
+        for identifier in ["token-usage-custom-start", "token-usage-custom-end", "token-usage-daily-table",
+                           "token-usage-range-total", "token-usage-range-average", "token-usage-range-peak",
+                           "token-usage-range-coverage", "token-usage-comparison-change"] {
+            let element = try uniqueIdentified(identifier, in: dashboard)
+            result[identifier] = [element.label, element.title, element.value as? String ?? ""].joined(separator: " ")
+        }
+        return result
     }
 
     private func refreshTokenUsage(in dashboard: XCUIElement) throws {
@@ -535,26 +909,36 @@ final class Codex94UITests: XCTestCase {
     }
 
     private func revealTokenChartForCapture(in dashboard: XCUIElement) throws {
-        let page = try uniqueIdentified("token-usage-page", in: dashboard)
         let chart = try uniqueIdentified("token-usage-chart", in: dashboard)
+        try revealTokenElementForCapture(chart, in: dashboard)
+    }
+
+    private func revealTokenElementForCapture(_ element: XCUIElement, in dashboard: XCUIElement) throws {
+        let page = try uniqueIdentified("token-usage-page", in: dashboard)
         try require(page.elementType == .scrollView,
-                    "Chart evidence must scroll only the identified token page")
-        func chartIsFullyVisible() -> Bool {
-            let frame = chart.frame
+                    "Token evidence must scroll only the identified token page")
+        func elementIsFullyVisible() -> Bool {
+            let frame = element.frame
             let viewport = page.frame.intersection(dashboard.frame)
             return [frame.minX, frame.minY, frame.width, frame.height,
                     viewport.minX, viewport.minY, viewport.width, viewport.height].allSatisfy(\.isFinite)
                 && frame.width > 0 && frame.height > 0 && viewport.contains(frame)
         }
-        if !chartIsFullyVisible() {
-            // At this point the range control has just been clicked above the
-            // chart. One bounded outer-page scroll exposes the whole plot; no
-            // click or hittability assertion is made against the chart itself.
-            page.scroll(byDeltaX: 0, deltaY: -360)
+        for _ in 0..<8 {
+            if elementIsFullyVisible() { return }
+            let frame = element.frame
+            let viewport = page.frame.intersection(dashboard.frame)
+            try require(frame.height <= viewport.height && frame.width <= viewport.width,
+                        "The targeted token component must fit its page viewport")
+            // Scroll by geometry: read-only charts/groups need not be hittable.
+            // Keep this confined to the token page, not a nested daily table.
+            let delta = frame.maxY > viewport.maxY
+                ? -min(360, frame.maxY - viewport.maxY + 12)
+                : min(360, viewport.minY - frame.minY + 12)
+            page.scroll(byDeltaX: 0, deltaY: delta)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         }
-        try waitUntil("The complete seven-day chart must be inside its page viewport") {
-            chartIsFullyVisible()
-        }
+        try require(elementIsFullyVisible(), "The complete token component must be inside its page viewport")
     }
 
     private func assertTokenUsageContent(
@@ -1818,6 +2202,12 @@ private struct UITestFailure: Error, CustomStringConvertible {
     init(_ description: String) { self.description = description }
 }
 
+private extension CGPoint {
+    func equalToWithinOnePoint(_ other: CGPoint) -> Bool {
+        abs(x - other.x) <= 1 && abs(y - other.y) <= 1
+    }
+}
+
 private enum ReadOnlyFocusStage: String, CaseIterable {
     case beforeHeader = "before-header"
     case afterTabs = "after-tabs"
@@ -1839,7 +2229,7 @@ private enum ReadOnlyFocusStage: String, CaseIterable {
 }
 private enum UIPage { case overview, usage, connection, display, startup, diagnostics, about }
 private enum UITheme: String, CaseIterable { case system, terminalDark, terminalLight }
-private enum UITokenRange { case sevenDays, thirtyDays, all }
+private enum UITokenRange { case sevenDays, thirtyDays, all, custom }
 private enum UITokenChartStyle: String { case bar, line }
 
 private enum UILanguage: String, CaseIterable {
@@ -1882,6 +2272,7 @@ private enum UILanguage: String, CaseIterable {
         case .sevenDays: chinese ? "7 天" : "7 days"
         case .thirtyDays: chinese ? "30 天" : "30 days"
         case .all: chinese ? "全部返回" : "All returned"
+        case .custom: chinese ? "自选日期" : "Custom"
         }
     }
     func tokenChartStyle(_ style: UITokenChartStyle) -> String {
@@ -1981,6 +2372,8 @@ private struct SyntheticFixture {
         let manifest = try readJSON(manifestURL, maximumBytes: 131_072)
         guard manifest["schemaVersion"] as? Int == 1,
               manifest["scenario"] as? String == expectedScenario,
+              ["display", "recovery", "usage", "floating"].contains(expectedScenario),
+              manifest["initialQuotaMode"] as? String == (expectedScenario == "floating" ? "serverError" : "normal"),
               manifest["fixtureRoot"] as? String == root.path,
               manifest["bundleID"] as? String == "com.defyan94.codex94",
               let runner = manifest["runner"] as? [String: String],
@@ -2136,6 +2529,12 @@ private struct SyntheticFixture {
         guard try preference("menuBarQuotaSelection.v2") == nil else {
             throw UITestFailure("Fresh legacy preference migration requires a new, unreused app domain")
         }
+        if scenario == "floating" {
+            guard try preference("floatingWindowPinned.v1") as? Bool == true,
+                  try preference("floatingWindowPosition.v1") == nil else {
+                throw UITestFailure("Floating smoke requires the default pinned state and no prior saved position")
+            }
+        }
         try assertSafePreferences()
     }
 
@@ -2159,11 +2558,14 @@ private struct SyntheticFixture {
     }
 
     func preference(_ key: String) throws -> Any? {
-        let allowed: Set<String> = [
+        var allowed: Set<String> = [
             "menuBarQuotaSelection.v2", "menuBarLayout.v1", "statusAccentOverrides.v1", "displayMode",
             "identityMode", "hasChosenIdentityMode", "manualCodexPath", "refreshInterval", "theme", "language",
             "tokenUsageChartStyle.v1"
         ]
+        if scenario == "floating" {
+            allowed.formUnion(["floatingWindowPinned.v1", "floatingWindowPosition.v1"])
+        }
         guard allowed.contains(key) else { throw UITestFailure("Refuse to read a non-allowlisted preference key") }
         // Exact AUT/current-user/any-host domain only; no runner-container,
         // global-default or ByHost fallback. The UI runner needs the matching
@@ -2180,6 +2582,18 @@ private struct SyntheticFixture {
         var values: [String: Any] = [:]
         for key in keys { values[key] = try preference(key) ?? NSNull() }
         return NSDictionary(dictionary: values)
+    }
+
+    func floatingPosition() throws -> [String: Double]? {
+        guard scenario == "floating" else { throw UITestFailure("Saved floating position is scenario-scoped") }
+        guard let value = try preference("floatingWindowPosition.v1") else { return nil }
+        guard let bytes = value as? Data, bytes.count <= 1_024,
+              let position = try JSONSerialization.jsonObject(with: bytes) as? [String: NSNumber],
+              Set(position.keys) == Set(["x", "y"]),
+              position.values.allSatisfy({ CFGetTypeID($0) != CFBooleanGetTypeID() && $0.doubleValue.isFinite }) else {
+            throw UITestFailure("Floating position must contain only the two finite saved coordinates")
+        }
+        return position.mapValues(\.doubleValue)
     }
 
     func cacheFingerprint() throws -> NSDictionary {
@@ -2219,7 +2633,7 @@ private struct SyntheticFixture {
     func tokenUsageRequestCount() throws -> Int { try requestEvents().filter { $0 == "tokenUsage" }.count }
 
     func setTokenUsageMode(_ mode: String) throws {
-        guard scenario == "usage", ["complete", "partial", "missing", "unsupported"].contains(mode) else {
+        guard scenario == "usage", ["complete", "partial", "missing", "unsupported", "slow"].contains(mode) else {
             throw UITestFailure("Invalid synthetic token-usage mode")
         }
         try Self.validate(modeURL, type: .typeRegular)
@@ -2398,9 +2812,13 @@ private struct SyntheticFixture {
         ]
         let usage: Set<String> = scenario == "usage" ? [
             "usage-complete-en.png", "usage-seven-days-en.png", "usage-complete-zh-Hans.png",
-            "usage-daily-table-en.png", "usage-line-seven-days-en.png",
+            "usage-daily-table-en.png", "usage-line-seven-days-en.png", "usage-custom-seven-days-en.png",
             "usage-partial-zh-Hans.png", "usage-unavailable-zh-Hans.png",
             "usage-unsupported-zh-Hans.png", "usage-result.json"
+        ] : []
+        let floating: Set<String> = scenario == "floating" ? [
+            "floating-cold-en.png", "floating-compact-en.png", "floating-expanded-en.png",
+            "floating-cached-failure-en.png", "floating-result.json"
         ] : []
         let variants = Set(UILanguage.allCases.flatMap { language in
             UITheme.allCases.map { "popover-long-\(language.artifactName)-\($0.rawValue).png" }
@@ -2408,7 +2826,8 @@ private struct SyntheticFixture {
         let keyboardProbe = Set((0...6).map { "popover-keyboard-focus-\($0).png" })
             .union(["keyboard-navigation-probe.json", "keyboard-activation-probe.json"])
         let layoutMeasurements = Set((0..<32).map { "quota-layout-\($0).json" })
-        guard fixed.union(variants).union(keyboardProbe).union(layoutMeasurements).union(usage).contains(filename) else {
+        guard fixed.union(variants).union(keyboardProbe).union(layoutMeasurements).union(usage).union(floating)
+            .contains(filename) else {
             throw UITestFailure("Artifact filename is outside the explicit allowlist")
         }
         try Self.validate(artifacts, type: .typeDirectory, mode: 0o700)
