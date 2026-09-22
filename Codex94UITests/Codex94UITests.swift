@@ -359,7 +359,7 @@ final class Codex94UITests: XCTestCase {
         try assertFloatingGeometry(floating, expanded: false)
         try assertFloatingMetric("floating-quota-weekly", contains: "--", in: floating)
         try assertFloatingMetric("floating-quota-fiveHour", contains: "--", in: floating)
-        try assertFloatingMetric("floating-refresh", contains: "Failed", in: floating)
+        try assertFloatingMetric("floating-refresh", contains: "Refresh failed", in: floating)
         try captureFloating(floating, named: "floating-cold-en.png")
 
         try fixture.setMode("normal")
@@ -475,31 +475,22 @@ final class Codex94UITests: XCTestCase {
     }
 
     private func floatingWindow() throws -> XCUIElement {
-        let byIdentifier = application.windows.matching(identifier: "floating-quota-window")
-        let byContent = application.windows.containing(.any, identifier: "floating-quota-content")
-        let deadline = Date().addingTimeInterval(5)
-        repeat {
-            // NSPanel's AX window identifier need not be propagated by every
-            // XCTest host. Its unique production content still binds this to
-            // one actual AUT window, never an arbitrary window or process.
-            if byIdentifier.count == 1 {
-                let window = byIdentifier.element(boundBy: 0)
-                if window.descendants(matching: .any).matching(identifier: "floating-quota-content").count == 1 {
-                    return window
-                }
-            } else if byIdentifier.count == 0 && byContent.count == 1 {
-                let window = byContent.element(boundBy: 0)
-                if application.descendants(matching: .any).matching(identifier: "floating-quota-content").count == 1,
-                   window.descendants(matching: .any).matching(identifier: "floating-refresh").count == 1 {
-                    try writeFloatingQueryDiagnostic(resolution: "unique-window-containing-known-content")
-                    return window
-                }
-            }
-            if byIdentifier.count > 1 || byContent.count > 1 { break }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-        } while Date() < deadline
-        try writeFloatingQueryDiagnostic(resolution: "unresolved-or-ambiguous")
-        throw UITestFailure("The production floating surface did not resolve to one known app-owned window")
+        // A nonactivating NSPanel is exposed as a dialog on macOS 15. Resolve
+        // its exact production ID, then validate the native role and contents.
+        let panels = application.descendants(matching: .any).matching(identifier: "floating-quota-window")
+        guard panels.firstMatch.waitForExistence(timeout: 5), panels.count == 1 else {
+            try writeFloatingQueryDiagnostic(resolution: "unresolved-or-ambiguous")
+            throw UITestFailure("The floating surface must resolve to one known app-owned native panel")
+        }
+        let panel = panels.element(boundBy: 0)
+        try require(panel.elementType == .window || panel.elementType == .dialog,
+                    "The floating identifier must belong to a native window or panel dialog")
+        _ = try uniqueIdentified("floating-quota-content", in: panel)
+        _ = try uniqueIdentified("floating-refresh", in: panel)
+        try require(application.descendants(matching: .any).matching(identifier: "floating-quota-content").count == 1,
+                    "The app must expose exactly one floating content surface")
+        try writeFloatingQueryDiagnostic(resolution: panel.elementType == .dialog ? "known-panel-dialog" : "known-panel-window")
+        return panel
     }
 
     private func refreshFloating(_ window: XCUIElement) throws {
@@ -574,8 +565,9 @@ final class Codex94UITests: XCTestCase {
 
     private func captureFloating(_ window: XCUIElement, named filename: String) throws {
         try require(fixture.scenario == "floating" && !fixture.readOnlyFocusProbeEnabled
-                    && window.elementType == .window
-                    && application.windows.containing(.any, identifier: "floating-quota-content").count == 1,
+                    && window.identifier == "floating-quota-window"
+                    && (window.elementType == .window || window.elementType == .dialog)
+                    && application.descendants(matching: .any).matching(identifier: "floating-quota-content").count == 1,
                     "Floating evidence must use only the normal production floating surface")
         let content = try uniqueIdentified("floating-quota-content", in: window)
         try require(!identified("quota-popover-header", in: content).exists
@@ -588,7 +580,7 @@ final class Codex94UITests: XCTestCase {
     private func writeFloatingQueryDiagnostic(resolution: String) throws {
         guard !floatingQueryDiagnosticWritten else { return }
         try require(fixture.scenario == "floating"
-                    && ["unique-window-containing-known-content", "unresolved-or-ambiguous"].contains(resolution),
+                    && ["known-panel-window", "known-panel-dialog", "unresolved-or-ambiguous"].contains(resolution),
                     "Floating query diagnostics must stay within their fixed synthetic scope")
         let pid = try ownedApplicationPID()
         let windowInfo = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]]

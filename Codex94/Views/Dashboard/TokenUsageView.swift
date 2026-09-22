@@ -69,6 +69,19 @@ struct TokenUsageView: View {
                                     }
                                     .controlSize(.small)
                                     .accessibilityIdentifier("token-usage-export")
+                                    .fileExporter(
+                                        isPresented: $isExporting,
+                                        document: exportDocument,
+                                        contentType: .commaSeparatedText,
+                                        defaultFilename: exportFilename
+                                    ) { result in
+                                        exportFailed = TokenUsageExportCompletion(result) == .failed
+                                    }
+                                    .alert("usage.export.failed.title", isPresented: $exportFailed) {
+                                        Button("usage.export.dismiss", role: .cancel) {}
+                                    } message: {
+                                        Text("usage.export.failed.detail")
+                                    }
                                 }
                                 TokenUsageDailyTable(days: presentation.visibleDays, language: language)
                                 Text("usage.export.scope")
@@ -93,19 +106,6 @@ struct TokenUsageView: View {
         .environment(\.locale, language.locale)
         .accessibilityIdentifier("token-usage-page")
         .task { store.loadIfNeeded() }
-        .fileExporter(
-            isPresented: $isExporting,
-            document: exportDocument,
-            contentType: .commaSeparatedText,
-            defaultFilename: exportFilename
-        ) { result in
-            exportFailed = TokenUsageExportCompletion(result) == .failed
-        }
-        .alert("usage.export.failed.title", isPresented: $exportFailed) {
-            Button("usage.export.dismiss", role: .cancel) {}
-        } message: {
-            Text("usage.export.failed.detail")
-        }
     }
 
     private var pageHeader: some View {
