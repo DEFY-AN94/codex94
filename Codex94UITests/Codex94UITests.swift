@@ -440,14 +440,7 @@ final class Codex94UITests: XCTestCase {
             try waitUntil("Hide must remove the floating surface from the accessible windows") {
                 !self.identified("floating-quota-content", in: self.application).exists
             }
-            // A toolbar item may repeat its child's identifier on a container.
-            // The actionable button itself must remain unique.
-            let toggles = dashboard.buttons.matching(identifier: "dashboard-floating-toggle")
-            let toggleAppeared = toggles.firstMatch.waitForExistence(timeout: 5)
-            let toggleCount = toggles.count
-            try require(toggleAppeared && toggleCount == 1,
-                        "Dashboard must expose exactly one identified floating toggle button (count: \(toggleCount))")
-            let toggle = toggles.element(boundBy: 0)
+            let toggle = try dashboardFloatingToggle(in: dashboard)
             try reveal(toggle, in: dashboard)
             try require(toggle.isEnabled && toggle.isHittable,
                         "The Dashboard floating toggle must be enabled and visible")
@@ -481,6 +474,89 @@ final class Codex94UITests: XCTestCase {
             "sourceData": "fixed-synthetic-quota", "screenCoordinatesIncluded": false,
             "rawTestResultsUploaded": false
         ])
+    }
+
+    private func dashboardFloatingToggle(in dashboard: XCUIElement) throws -> XCUIElement {
+        try require(fixture.scenario == "floating" && !fixture.readOnlyFocusProbeEnabled,
+                    "Floating toolbar resolution is restricted to the production floating scenario")
+        let identifier = "dashboard-floating-toggle"
+        let expectedLabel = language == .english ? "Show / hide floating window" : "显示／隐藏悬浮窗"
+        let query = dashboard.buttons.matching(identifier: identifier)
+        let appeared = query.firstMatch.waitForExistence(timeout: 5)
+        let totalCount = query.count
+        let candidates = query.allElementsBoundByIndex.prefix(8).map { $0 }
+        let dashboardFrame = dashboard.frame
+        func valid(_ frame: CGRect) -> Bool {
+            [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite) && !frame.isEmpty
+        }
+        func sameFrame(_ left: CGRect, _ right: CGRect) -> Bool {
+            valid(left) && valid(right) && left.origin.equalToWithinOnePoint(right.origin)
+                && abs(left.width - right.width) <= 1 && abs(left.height - right.height) <= 1
+        }
+        let toolbarFrames = dashboard.toolbars.allElementsBoundByIndex.map(\.frame).filter(valid)
+        let frames = candidates.map(\.frame)
+        var leafIndices: [Int] = []
+        var eligibleIndices: [Int] = []
+        var diagnostics: [[String: Any]] = []
+        for (index, candidate) in candidates.enumerated() {
+            let frame = frames[index]
+            let hasSameIDDescendant = candidate.descendants(matching: .button).matching(identifier: identifier).count > 0
+            let isLeaf = !hasSameIDDescendant
+            let matchesIdentifier = candidate.identifier == identifier
+            let matchesLabel = candidate.label == expectedLabel || candidate.title == expectedLabel
+            let enabled = candidate.isEnabled
+            let hittable = candidate.isHittable
+            let insideDashboard = valid(frame) && valid(dashboardFrame)
+                && dashboardFrame.insetBy(dx: -1, dy: -1).contains(frame)
+            let insideToolbar = valid(frame) && toolbarFrames.contains { $0.insetBy(dx: -1, dy: -1).contains(frame) }
+            let eligible = isLeaf && matchesIdentifier && matchesLabel && enabled && hittable
+                && insideDashboard && (toolbarFrames.isEmpty || insideToolbar)
+            if isLeaf { leafIndices.append(index) }
+            if eligible { eligibleIndices.append(index) }
+            diagnostics.append([
+                "index": index, "role": diagnosticRole(candidate.elementType),
+                "identifierMatches": matchesIdentifier, "expectedLabelMatches": matchesLabel,
+                "enabled": enabled, "hittable": hittable, "hasSameIdentifierButtonDescendant": hasSameIDDescendant,
+                "leaf": isLeaf, "eligible": eligible, "validFrame": valid(frame),
+                "insideDashboard": insideDashboard, "insideToolbar": insideToolbar
+            ])
+        }
+        var pairwise: [[String: Any]] = []
+        var eligibleFramesIdentical = true
+        for left in candidates.indices {
+            for right in candidates.indices where right > left {
+                let equal = sameFrame(frames[left], frames[right])
+                if eligibleIndices.contains(left) && eligibleIndices.contains(right) && !equal {
+                    eligibleFramesIdentical = false
+                }
+                pairwise.append([
+                    "left": left, "right": right, "sameFrame": equal,
+                    "leftContainsRight": valid(frames[left]) && valid(frames[right])
+                        && frames[left].insetBy(dx: -1, dy: -1).contains(frames[right]),
+                    "rightContainsLeft": valid(frames[left]) && valid(frames[right])
+                        && frames[right].insetBy(dx: -1, dy: -1).contains(frames[left])
+                ])
+            }
+        }
+        let bounded = appeared && totalCount > 0 && totalCount <= 8 && candidates.count == totalCount
+        let resolved = bounded && !eligibleIndices.isEmpty && eligibleFramesIdentical
+        let resolution = resolved ? (eligibleIndices.count == 1 ? "unique-actionable-leaf" : "same-frame-actionable-aliases")
+            : "unresolved-or-ambiguous"
+        try fixture.writeReport("floating-dashboard-toggle-diagnostic.json", fields: [
+            "scenario": "floating", "diagnosticOnly": true, "acceptanceVerified": false,
+            "resolution": resolution, "totalCount": totalCount, "leafCount": leafIndices.count,
+            "eligibleCount": eligibleIndices.count, "sampleTruncated": totalCount > 8,
+            "toolbarRegionAvailable": !toolbarFrames.isEmpty,
+            "candidates": diagnostics, "pairwise": pairwise,
+            "eligibleCandidatesHaveSameFrame": eligibleFramesIdentical,
+            "titlesPathsCoordinatesOrScreenshotsIncluded": false
+        ])
+        try require(resolved,
+                    "Dashboard floating toggle must resolve to one actionable leaf or proven same-frame aliases")
+        // The only multiple-node case accepted here has the exact ID/known
+        // localized label and identical physical click bounds on every leaf.
+        let selectedIndex = try XCTUnwrap(eligibleIndices.first)
+        return candidates[selectedIndex]
     }
 
     private func floatingWindow() throws -> XCUIElement {
@@ -586,7 +662,7 @@ final class Codex94UITests: XCTestCase {
         // Move to a passive, tooltip-free part of this same panel before taking
         // synthetic evidence, so the previous button's tooltip is not clipped.
         try uniqueIdentified("floating-drag-area", in: window).hover()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        RunLoop.current.run(until: Date().addingTimeInterval(1.2))
         try fixture.writeArtifact(content.screenshot().pngRepresentation, named: filename)
     }
 
@@ -858,20 +934,71 @@ final class Codex94UITests: XCTestCase {
         let copy = try uniqueIdentified("token-usage-copy-image", in: dashboard)
         try require(png.isEnabled && copy.isEnabled,
                     "Retained data may be exported when no retry is in progress")
-        let summary = try uniqueIdentified("token-usage-summary", in: dashboard)
-        let lifetime = try uniqueIdentified("token-usage-lifetime", in: dashboard)
+        // SwiftUI may repeat a non-actionable container identifier across its
+        // layout nodes. Retention is proven by the unique lifetime metric.
+        let summaries = dashboard.descendants(matching: .any).matching(identifier: "token-usage-summary")
+        try require(summaries.count > 0, "The retained summary must still be present")
+        _ = try uniqueIdentified("token-usage-lifetime", in: dashboard)
         let refresh = try uniqueIdentified("token-usage-refresh", in: dashboard)
         try revealTokenElementForCapture(refresh, in: dashboard)
         let before = try fixture.tokenUsageRequestCount()
         try fixture.setTokenUsageMode("slow")
         refresh.click()
-        try waitUntil("A live pending retry must retain its old summary and disable both image actions", timeout: 2.5) {
-            guard try self.fixture.tokenUsageRequestCount() == before + 1,
-                  !(try self.fixture.requestsHaveExited()) else { return false }
-            let disabled = !png.isEnabled && !copy.isEnabled
-            let text = [lifetime.label, lifetime.title, lifetime.value as? String ?? ""].joined(separator: " ")
-            return try disabled && summary.exists && lifetime.exists && text.contains("1,234,567")
-                && !refresh.isEnabled && !self.fixture.requestsHaveExited()
+        let identifiers = ["token-usage-export-png", "token-usage-copy-image", "token-usage-refresh", "token-usage-lifetime"]
+        var lastObservation: [String: Any] = [
+            "requestDelta": 0, "pendingBefore": false, "pendingAfter": false,
+            "snapshotObserved": false, "knownNodes": [String: Any](),
+            "oldLifetimeValueMatches": false, "summaryExists": false
+        ]
+        do {
+            try waitUntil("A live pending retry must retain its old summary and disable both image actions", timeout: 2.5) {
+                let delta = try self.fixture.tokenUsageRequestCount() - before
+                let pendingBefore = try delta == 1 && !self.fixture.requestsHaveExited()
+                lastObservation["requestDelta"] = delta
+                lastObservation["pendingBefore"] = pendingBefore
+                lastObservation["pendingAfter"] = false
+                // Retain the last captured node facts even if a later polling
+                // attempt finds that the short request has already completed.
+                guard pendingBefore else { return false }
+                // One AX round-trip. All properties below come from this same
+                // immutable tree, never later live reads or a saved raw snapshot.
+                let nodes = try self.boundedSnapshotNodes(
+                    dashboard.snapshot(), overflowMessage: "The token page snapshot exceeded its bounded node limit"
+                )
+                let matches = Dictionary(uniqueKeysWithValues: identifiers.map { identifier in
+                    (identifier, nodes.filter { $0.identifier == identifier })
+                })
+                var facts: [String: Any] = [:]
+                for identifier in identifiers {
+                    let found = matches[identifier] ?? []
+                    facts[identifier] = ["count": found.count, "enabled": found.count == 1 && found[0].isEnabled]
+                }
+                func unique(_ identifier: String) -> (any XCUIElementSnapshot)? {
+                    let found = matches[identifier] ?? []
+                    return found.count == 1 ? found.first : nil
+                }
+                let disabled = unique("token-usage-export-png")?.isEnabled == false
+                    && unique("token-usage-copy-image")?.isEnabled == false
+                    && unique("token-usage-refresh")?.isEnabled == false
+                let lifetimeMatches = unique("token-usage-lifetime").map {
+                    [$0.label, $0.title, $0.value as? String ?? ""].joined(separator: " ").contains("1,234,567")
+                } ?? false
+                let summaryExists = nodes.contains { $0.identifier == "token-usage-summary" }
+                let pendingAfter = try self.fixture.tokenUsageRequestCount() == before + 1
+                    && !self.fixture.requestsHaveExited()
+                lastObservation["snapshotObserved"] = true
+                lastObservation["knownNodes"] = facts
+                lastObservation["oldLifetimeValueMatches"] = lifetimeMatches
+                lastObservation["summaryExists"] = summaryExists
+                lastObservation["pendingAfter"] = pendingAfter
+                return disabled && lifetimeMatches && summaryExists && pendingAfter
+            }
+        } catch {
+            lastObservation["scenario"] = "usage"
+            lastObservation["diagnosticOnly"] = true
+            lastObservation["acceptanceVerified"] = false
+            try fixture.writeReport("usage-pending-retry-diagnostic.json", fields: lastObservation)
+            throw error
         }
         // The positive assertion above is bracketed by live process checks;
         // completing the response first cannot satisfy this pending-state test.
@@ -1855,6 +1982,22 @@ final class Codex94UITests: XCTestCase {
 
     // MARK: - Real layout, complete Reset labels and color controls
 
+    private func boundedSnapshotNodes(
+        _ snapshot: any XCUIElementSnapshot, overflowMessage: String
+    ) throws -> [any XCUIElementSnapshot] {
+        var pending: [any XCUIElementSnapshot] = [snapshot]
+        var nodes: [any XCUIElementSnapshot] = []
+        while let node = pending.popLast() {
+            let children = node.children
+            guard nodes.count + pending.count + children.count + 1 <= 1_024 else {
+                throw UITestFailure(overflowMessage)
+            }
+            nodes.append(node)
+            pending.append(contentsOf: children)
+        }
+        return nodes
+    }
+
     private func assertNoRecoveryAction(in popover: XCUIElement) throws {
         let header = try uniqueIdentified("quota-popover-header", in: popover)
         try require(!header.label.isEmpty && header.frame.width > 0,
@@ -1874,16 +2017,9 @@ final class Codex94UITests: XCTestCase {
             _ = try uniqueIdentified("quota-window-" + kind, in: popover)
         }
         let snapshot = try popover.snapshot()
-        var pending: [any XCUIElementSnapshot] = [snapshot]
-        var nodes: [any XCUIElementSnapshot] = []
-        while let node = pending.popLast() {
-            let children = node.children
-            guard nodes.count + pending.count + children.count + 1 <= 1_024 else {
-                throw UITestFailure("The quota popover snapshot exceeded its bounded node limit")
-            }
-            nodes.append(node)
-            pending.append(contentsOf: children)
-        }
+        let nodes = try boundedSnapshotNodes(
+            snapshot, overflowMessage: "The quota popover snapshot exceeded its bounded node limit"
+        )
         func uniqueSnapshot(_ identifier: String) throws -> any XCUIElementSnapshot {
             let matches = nodes.filter { $0.identifier == identifier }
             guard matches.count == 1, let match = matches.first else {
@@ -3040,11 +3176,12 @@ private struct SyntheticFixture {
             "usage-partial-zh-Hans.png", "usage-unavailable-zh-Hans.png",
             "usage-unsupported-zh-Hans.png", "usage-result.json",
             "usage-png-export-query-diagnostic.json", "usage-csv-export-query-diagnostic.json",
-            "usage-token-selection-diagnostic.json"
+            "usage-token-selection-diagnostic.json", "usage-pending-retry-diagnostic.json"
         ] : []
         let floating: Set<String> = scenario == "floating" ? [
             "floating-cold-en.png", "floating-compact-en.png", "floating-expanded-en.png",
-            "floating-cached-failure-en.png", "floating-result.json", "floating-window-query-diagnostic.json"
+            "floating-cached-failure-en.png", "floating-result.json", "floating-window-query-diagnostic.json",
+            "floating-dashboard-toggle-diagnostic.json"
         ] : []
         let variants = Set(UILanguage.allCases.flatMap { language in
             UITheme.allCases.map { "popover-long-\(language.artifactName)-\($0.rawValue).png" }

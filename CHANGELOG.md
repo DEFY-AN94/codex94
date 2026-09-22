@@ -2,7 +2,7 @@
 
 All notable changes to Codex94 are documented here.
 
-## 3.1.0 - 2026-09-22
+## 3.1.0 - 2026-09-23
 
 Version `3.1.0 (16)`. Release dates use Australia/Melbourne.
 
