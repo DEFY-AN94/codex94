@@ -29,23 +29,22 @@ and security-scanned before it is tagged.
 > `app-server` is an experimental interface and may change in future Codex
 > releases.
 
-## 3.1.1 candidate
+## Version 3.1.1
 
-Version `3.1.1 (17)` adapts the floating strip to the selected quota data:
+`3.1.1 (17)` is the published stable release, dated **2026-09-23**
+(Australia/Melbourne). It adapts the floating strip to the selected quota data:
 weekly-only data uses **480 × 90 logical points**, while a reported 5-hour
 window keeps the **680 × 90** dual layout. The unavailable 5-hour column is
 removed. Both layouts keep normal text sizes and expand to 132 points high.
 Refreshes, cached data and quota-group changes update the same panel without
-an extra request; screen fitting still applies. Stable downloads below remain
-on published `3.1.0` until this patch is released.
+an extra request; screen fitting still applies. Download and source instructions
+below refer to this release.
 
-## Version 3.1.0
+## Features
 
-`3.1.0 (16)` is the published stable release, dated **2026-09-23**
-(Australia/Melbourne).
-
-- A floating quota strip targets **680 × 90 logical points**, with pin, drag,
-  hide, and expand controls. It reuses existing quota data; hovering or focusing
+- The floating quota strip targets **480 × 90 logical points** for weekly-only
+  or cold data and **680 × 90** when a 5-hour window is reported. It supports
+  pin, drag, hide, and expand controls. It reuses existing quota data; hovering or focusing
   the update-time control reveals manual refresh. It adds no polling or credit
   redemption, and the existing global shortcut still toggles the popover.
 - **Custom** start/end dates join the three existing Token ranges. Dates use
@@ -57,9 +56,10 @@ on published `3.1.0` until this patch is released.
   language, and theme. The image contains the chart, date range, fetch time,
   coverage, and any stale-data notice, without identity. Copying writes to the
   system clipboard only when clicked; CSV export remains available.
-- Only floating pin state and position become new saved preferences. There is
-  no statistics history database, new permission, network endpoint, or change
-  to signing and manual installation.
+- Floating preferences save only pin state and position. Adaptive width is
+  derived from quota data and adds no saved field. There is no statistics
+  history database, new permission, network endpoint, or change to signing and
+  manual installation.
 
 Validation includes a fourth synthetic **Floating** UI scenario and Token
 controls/image checks. Evidence is listed below; native keyboard-focus,
@@ -113,7 +113,7 @@ statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v3.1.0 (16)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.0),
+  [`v3.1.1 (17)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.1),
   released on **2026-09-23** (Australia/Melbourne) as a Universal 2 DMG and
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
@@ -132,7 +132,7 @@ statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `3.1.0` DMG itself is completely unsigned, has no Apple Developer ID
+The published `3.1.1` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -154,23 +154,23 @@ executable selected manually.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v3.1.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.0):
+[`v3.1.1` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.1):
 
-- `Codex94-3.1.0-macos-universal-unnotarized.dmg`
-- `Codex94-3.1.0-SHA256SUMS.txt`
+- `Codex94-3.1.1-macos-universal-unnotarized.dmg`
+- `Codex94-3.1.1-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-3.1.0-SHA256SUMS.txt
+shasum -a 256 -c Codex94-3.1.1-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-3.1.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-3.1.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -192,7 +192,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v3.1.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v3.1.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
@@ -532,6 +532,11 @@ pasteboard verification. The `3.1.0` release record separately identifies the
 four external UI scenarios (Display, Recovery, Token usage, Floating),
 Actions/Python/Swift CodeQL, and final source/artifact acceptance. Prior release
 screenshots and interaction records retain their original provenance.
+
+Local validation for `3.1.1 (17)` recorded **345 tests executed, 1 skipped,
+0 failures**. The hosted focus skip is not a pass. External UI, security,
+final-main packaging and installed-artifact results need their own records for
+this version; the preceding `3.1.0` evidence does not stand in for those checks.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See the

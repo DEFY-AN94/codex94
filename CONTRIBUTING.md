@@ -260,7 +260,7 @@ Do not open a public issue for a suspected vulnerability. Follow
 [SECURITY.md](SECURITY.md).
 
 
-For the `3.1.1` candidate, keep the 5-hour column conditional on actual window
+For `3.1.1` behavior, keep the 5-hour column conditional on actual window
 availability, not account-plan strings or whether its percentage is zero.
 Weekly-only/cold layouts target 480 points, reported dual layouts 680 points;
 normal typography, 90/132 heights and screen fitting remain intact. Test cache,
