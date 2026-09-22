@@ -2,8 +2,8 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1),
-released on 2026-09-21 (Australia/Melbourne). It includes the user-triggered
+stable version is [`v3.1.0 (16)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.0),
+released on 2026-09-23 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
 ## Data access
@@ -70,7 +70,7 @@ request or statistics-cache write.
 Summary scope and complete history coverage are unspecified; the app does not
 infer model/project, input/output, cost, hourly, or thread-level statistics.
 
-### 3.1.0 candidate: custom ranges and chart images
+### 3.1.0: custom ranges and chart images
 
 Custom start/end dates are view-local state. The app uses UTC calendar
 coordinates to preserve source date labels, not to infer the service's
@@ -126,7 +126,7 @@ Version `0.2.2 (13)` adds three preference keys while retaining cache v2:
   bucket choices, and recovery-alert preference. It does not store observed
   quota values, notification baselines, or per-cycle delivery history.
 
-The `3.1.0 (16)` candidate adds `floatingWindowPinned.v1` for pin state and
+Version `3.1.0 (16)` adds `floatingWindowPinned.v1` for pin state and
 `floatingWindowPosition.v1` for screen coordinates only. Floating visibility
 and expansion are memory-only. The strip reads the same quota snapshot;
 showing, dragging, pinning, or expanding it adds no quota request, reset-credit
@@ -239,7 +239,8 @@ When the user selects **Copy redacted diagnostics**, Codex94 normalizes the
 detected executable path and version, then writes the structured diagnostic text
 to the macOS system clipboard. When the user selects **Copy version** in About,
 it writes the exact displayed version and build. These text writes and the
-`3.1.0` candidate’s chart-image copy happen only after a user action. Codex94 does not read or upload clipboard contents or diagnostics,
+`3.1.0` chart-image copy happen only after a user action. Codex94 does not read
+or upload clipboard contents or diagnostics,
 and users should review copied diagnostics before sharing them. Selecting the
 project link similarly opens the exact repository URL through the system.
 The release-check request is separate and does not upload clipboard
@@ -250,7 +251,7 @@ contents or diagnostics.
 Codex94 does not request browser, Documents, Keychain, Accessibility, contacts,
 camera, microphone, or location access. Standard file dialogs appear only when
 the user explicitly chooses a Codex executable or an export destination
-(CSV, or PNG in the `3.1.0` candidate). The floating panel and image export add
+(CSV or PNG). The floating panel and image export add
 no system permission or entitlement.
 Version `0.1.9` added no system
 permission or entitlement; versions `0.2.0` and `0.2.1` likewise add none.

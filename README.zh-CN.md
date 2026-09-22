@@ -24,9 +24,10 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 > Codex94 与 OpenAI 没有隶属关系，也未获得 OpenAI 的认可、背书或赞助。Codex
 > `app-server` 是实验性接口，未来 Codex 版本可能会改变它。
 
-## 3.1.0 候选版
+## 3.1.0 版本
 
-下一版为 `3.1.0 (16)`；下方正式下载仍指向 `3.0.1`。
+`3.1.0 (16)` 已于 **2026-09-23**（Australia/Melbourne）正式发布，
+下方下载与源码指令均指向本版。
 
 - 新增目标尺寸为 **680 × 90 逻辑点**的额度横浮条，支持置顶、拖动、隐藏和展开。
   复用已有额度数据；悬停或聚焦更新时间控件时显示手动刷新。不会新增轮询或兑换
@@ -40,8 +41,8 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 - 新增持久化偏好仅保存浮条置顶状态与位置；不增加统计历史库、系统权限、网络
   接口，也不改变签名和手动安装方式。
 
-验证将增加第四个合成 **Floating** UI 场景及统计控件／图片检查，目前结果待确认。
-macOS 原生面板的跨 Spaces、全屏应用行为将在对应实测完成后说明。
+验证包含第四个合成 **Floating** UI 场景及统计控件／图片检查，证据分类见下文。
+原生键盘焦点、跨 Spaces 与全屏应用行为须单独实测，不能仅凭图片或面板配置认定。
 
 ## 界面截图
 
@@ -88,8 +89,8 @@ macOS 原生面板的跨 Spaces、全屏应用行为将在对应实测完成后�
 ## 当前分发状态
 
 - 已发布的稳定版为
-  [`v3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1)，
-  于 **2026-09-21**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
+  [`v3.1.0 (16)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.0)，
+  于 **2026-09-23**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
   annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
   也不会重新生成已发布的资产。
@@ -103,7 +104,7 @@ macOS 原生面板的跨 Spaces、全屏应用行为将在对应实测完成后�
 - 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
-已发布的 `3.0.1` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+已发布的 `3.1.0` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
 attestation 都不会改变这一 Apple 信任状态。
 
@@ -122,23 +123,23 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 
 ## 安装 Universal DMG
 
-请从 [`v3.0.1` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1)
+请从 [`v3.1.0` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.0)
 下载以下两个正式资产：
 
-- `Codex94-3.0.1-macos-universal-unnotarized.dmg`
-- `Codex94-3.0.1-SHA256SUMS.txt`
+- `Codex94-3.1.0-macos-universal-unnotarized.dmg`
+- `Codex94-3.1.0-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-3.0.1-SHA256SUMS.txt
+shasum -a 256 -c Codex94-3.1.0-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-3.0.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-3.1.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -158,7 +159,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v3.0.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v3.1.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
@@ -197,12 +198,13 @@ sudo xcodebuild -runFirstLaunch
   不推测按模型、项目、输入／输出、费用或小时划分的数据。
 - 可自由切换**柱状图／折线图**并记住选择；选中日期的虚线对齐柱体中心或折线数据点，
   折线在未返回数据的日期处断开。
-- 每日图表与明细表提供 **7 天／30 天／全部返回**。范围截至最新返回统计日，
-  不代表截至今天；图中保留真实日期缺口，缺失日期不按零用量处理。悬停或点击可
+- 每日图表与明细表提供 **7 天／30 天／全部返回／自选日期**。三个预设范围截至最新
+  返回统计日，不代表截至今天；自选范围包含所选起止日。图中保留真实日期缺口，
+  缺失日期不按零用量处理。悬停或点击可
   查看精确数值。服务端分日时区与完整历史覆盖范围尚无说明。
 - **导出 CSV…**仅把当前范围内已返回的日记录保存到用户选择的文件，保留原始
-  服务端日期和精确 Token 数。除此以外，统计只存在于内存；刷新替换原快照，
-  不会重复累加同一份使用量。
+  服务端日期和精确 Token 数。除主动导出 CSV／PNG 或复制图表外，统计只存在于
+  内存；刷新替换原快照，不会重复累加同一份使用量。
 - Dashboard → **关于 → 检查新版本**仅在点击后请求 GitHub 上本仓库最新的公开稳定
   Release，显示版本和纯文本发布说明，并可通过系统浏览器打开已验证的 GitHub
   Release 页面。下载与安装仍由用户手动完成；App 不轮询更新、不下载或安装 App，
@@ -421,6 +423,13 @@ Actions／Python／Swift CodeQL，以及本版最终 main 的 Universal App 与 
 这些是本维护版本自己的验证结果；未修改的 `0.3.0` 截图与维护者人工交互记录保留
 原始来源，不改称为重新执行的 `3.0.1` 人工验收。最终 CI 安装包验收在本版发布记录中
 单独说明。
+
+`3.1.0 (16)` 的本地单元测试套件记录为 **340 项执行、1 项跳过、0 项失败**。
+被跳过的是 hosted 键盘焦点检查，原因是测试进程无法建立 key window，不计作通过。
+PNG 检查包含实际图片的新鲜／旧数据文本识别与隔离剪贴板验证。本版发布记录另行
+列出 Display／Recovery／Token usage／Floating 四个外部 UI 场景、
+Actions／Python／Swift CodeQL，以及最终源码和安装包验收。历史截图与人工交互
+记录保留原始来源，不转作本版的新证据。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。组件职责与复用约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；

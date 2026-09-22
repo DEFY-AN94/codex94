@@ -1,8 +1,7 @@
 # Component ownership and reuse
 
-This describes current ownership and reuse constraints, including the
-`3.1.0 (16)` candidate. The published stable release remains
-[`3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1).
+This describes ownership and reuse constraints in the published stable
+[`3.1.0 (16)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.0).
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
@@ -54,9 +53,10 @@ defines component responsibilities, not a substitute for those records.
 coordination, and shutdown. `TokenUsageStoreTests` covers request generations
 and retired clients. Parser and presentation tests cover strict values, dates,
 gaps, chart projections, and CSV. External synthetic UI tests cover actual
-window/navigation interactions separately from these model tests. Candidate
+window/navigation interactions separately from these model tests. Version
 `3.1.0` adds Floating interactions and Token custom-range controls. Image tests
-inspect PNG dimensions/format and use named pasteboards; actual synthetic
+inspect PNG dimensions/format and cached/fresh image text, and use named
+pasteboards; actual synthetic
 images still need visual review for clipping, labels, theme, and stale status.
 Cross-Space/fullscreen behavior needs native-panel acceptance, not a conclusion
 from the collection-behavior flags alone.

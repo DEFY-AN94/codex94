@@ -29,9 +29,10 @@ and security-scanned before it is tagged.
 > `app-server` is an experimental interface and may change in future Codex
 > releases.
 
-## 3.1.0 candidate
+## Version 3.1.0
 
-The next version is `3.1.0 (16)`; stable downloads below remain on `3.0.1`.
+`3.1.0 (16)` is the published stable release, dated **2026-09-23**
+(Australia/Melbourne).
 
 - A floating quota strip targets **680 × 90 logical points**, with pin, drag,
   hide, and expand controls. It reuses existing quota data; hovering or focusing
@@ -50,9 +51,10 @@ The next version is `3.1.0 (16)`; stable downloads below remain on `3.0.1`.
   no statistics history database, new permission, network endpoint, or change
   to signing and manual installation.
 
-Validation adds a fourth, synthetic **Floating** UI scenario and new Token
-controls/image checks. Results are pending. Cross-Space and fullscreen behavior
-of the native macOS panel will be described only after testing those cases.
+Validation includes a fourth synthetic **Floating** UI scenario and Token
+controls/image checks. Evidence is listed below; native keyboard-focus,
+cross-Space, and fullscreen behavior must be assessed separately from rendered
+images and configured panel flags.
 
 ## Screenshots
 
@@ -101,8 +103,8 @@ statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1),
-  released on **2026-09-21** (Australia/Melbourne) as a Universal 2 DMG and
+  [`v3.1.0 (16)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.0),
+  released on **2026-09-23** (Australia/Melbourne) as a Universal 2 DMG and
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
   Later documentation commits do not move its tag or regenerate its assets.
@@ -120,7 +122,7 @@ statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `3.0.1` DMG itself is completely unsigned, has no Apple Developer ID
+The published `3.1.0` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -142,23 +144,23 @@ executable selected manually.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v3.0.1` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1):
+[`v3.1.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.0):
 
-- `Codex94-3.0.1-macos-universal-unnotarized.dmg`
-- `Codex94-3.0.1-SHA256SUMS.txt`
+- `Codex94-3.1.0-macos-universal-unnotarized.dmg`
+- `Codex94-3.1.0-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-3.0.1-SHA256SUMS.txt
+shasum -a 256 -c Codex94-3.1.0-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-3.0.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-3.1.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -180,7 +182,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v3.0.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v3.1.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
@@ -223,14 +225,15 @@ source installer does not migrate or remove a DMG-installed copy.
 - Switch freely between **Bar chart / Line chart**; the app remembers the choice.
   Selection guides line up with bar centers and line points. The line breaks
   across dates with no returned record.
-- The daily charts and table offer **7 days / 30 days / All returned**. These
-  ranges end at the latest reported day, not today. The chart preserves actual
+- The daily charts and table offer **7 days / 30 days / All returned / Custom**.
+  The three preset ranges end at the latest reported day, not today; Custom uses
+  the chosen inclusive dates. The chart preserves actual
   date gaps; an omitted day is not zero usage. Hover or click to inspect exact
   values. Reporting time zone and complete historical coverage are unspecified.
 - **Export CSV…** saves only reported daily records in the selected range, with
   original source dates and exact token counts, to a user-selected file. The app
-  otherwise keeps statistics in memory; refreshes replace the snapshot rather
-  than accumulate another copy of the same usage.
+  keeps statistics in memory apart from explicit CSV/PNG exports and chart-image
+  copying; refreshes replace the snapshot rather than accumulate the same usage.
 - Dashboard → **About → Check for updates** requests this repository's latest
   public stable release from GitHub only when clicked. It displays the version
   and plain-text release notes, and can open the validated GitHub Release page
@@ -503,13 +506,22 @@ was published on 2026-09-21 (Australia/Melbourne). Its source and distribution
 artifacts remain bound to that release tag. Later documentation changes do not
 replace the recorded evidence, and future versions require their own validation.
 
-New validation for [`3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1)
+Historical validation for [`3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1)
 includes **315 hosted tests**, the Display/Recovery/Token usage CI scenarios,
 Actions/Python/Swift CodeQL, and verification of its final-main Universal App
 and DMG. These are this maintenance release's own results. The unchanged
 `0.3.0` screenshots and maintainer interaction records retain their original
 provenance; they are not relabelled as fresh `3.0.1` manual acceptance. Final
 CI-package acceptance is recorded separately in the `3.0.1` release record.
+
+The local `3.1.0 (16)` unit suite recorded **340 tests executed, 1 skipped,
+0 failures**. The hosted keyboard-focus check was skipped because its test
+process could not establish a key window; it is not counted as a pass. PNG
+checks include actual-image stale/fresh text recognition and isolated
+pasteboard verification. The `3.1.0` release record separately identifies the
+four external UI scenarios (Display, Recovery, Token usage, Floating),
+Actions/Python/Swift CodeQL, and final source/artifact acceptance. Prior release
+screenshots and interaction records retain their original provenance.
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See the
