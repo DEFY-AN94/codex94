@@ -1,8 +1,8 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v3.1.0 (16)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.0),
+The published stable version is [`v3.1.1 (17)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.1),
 released on 2026-09-23 (Australia/Melbourne). Its tag and DMG remain bound to
-release commit `e580729dc81fd8db295c965119cdbcee87b7a157`; later docs-only commits do not move
+release commit `370e3800de1f54b94efe2e4d4761d671a2710fd4`; later docs-only commits do not move
 that tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -64,12 +64,17 @@ exports. Retain the following regression checks for those features:
   format/dimensions, current selection, failure versus cancellation, and absence
   of identity. Copy tests use named pasteboards, never the general pasteboard.
 
-For the `3.1.1 (17)` candidate, additionally verify 480-point weekly-only/cold
+For `3.1.1 (17)`, additionally verify 480-point weekly-only/cold
 layouts have no 5-hour accessibility node, reported dual layouts remain 680,
 and live quota-group changes reuse the same panel and preserve the top-left
 where available screen space permits. Keep ordinary typography in the
 480-point layout. Check explicit zero, cached/failed responses, no extra
 requests or cache writes, hidden updates and post-shutdown notifications.
+
+Local validation for `3.1.1 (17)` recorded 345 tests executed, 1 skipped, and
+0 failures. The hosted focus skip is not a pass. Record external UI, CodeQL,
+final-main packaging and installed-artifact acceptance from the actual final
+revision and assets; this local count does not establish those outcomes.
 
 Validation for `3.1.0` includes a fourth **Floating** UI scenario and expanded
 Token usage coverage. Its local unit suite recorded 340 tests executed, 1 skipped,
@@ -80,7 +85,7 @@ separate and tied to the revision actually tested.
 Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
 Its historical tag and DMG remain bound to
 `ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`. Current download and clone
-instructions point to `v3.1.0`. This maintenance release isolates quota request contexts, shares strict
+instructions point to `v3.1.1`. This maintenance release isolates quota request contexts, shares strict
 service-value parsing, reuses chart preparation/formatting, retires old Token
 clients outside the main actor, and validates development-script arguments
 before side effects. It does not introduce a broad timer rewrite, new data
@@ -441,3 +446,44 @@ The maintainer authorized implementation, installation and the PR-to-release
 workflow. This record distinguishes delegated automated checks from a new
 human manual test. Later documentation commits update stable links and this
 record without moving the release tag or replacing either asset.
+
+
+### 3.1.1 final acceptance — 2026-09-23
+
+- [PR #28](https://github.com/DEFY-AN94/codex94/pull/28) passed its checks, was
+  marked Ready and merged. The release is frozen at
+  `370e3800de1f54b94efe2e4d4761d671a2710fd4`; annotated tag `v3.1.1` has object
+  `55e1041e14baae6c376a379e1a955927bfcc8d53` and peels to that commit.
+- The exact final-main [CI](https://github.com/DEFY-AN94/codex94/actions/runs/35749196911)
+  passed its test/package gate, four external UI scenarios and DMG attestation.
+  The suite recorded **345 executed, 1 skipped, 0 failures**. The separate
+  [Actions/Python/Swift CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/35749196810)
+  run passed for the same source. The optional hosted key-window test remains
+  a skip; mandatory panel lifecycle and adaptive-layout coverage passed.
+- New main-sourced floating evidence verifies **480 → 680 → 480**, absence of
+  the unreported 5-hour accessibility node, normal single-column typography,
+  the same window and position, and no additional request or quota-cache write
+  from quota selection/layout changes. Six actual synthetic screenshots were
+  reviewed. Pin, drag, expand/hide/reopen and cached failure behavior also passed.
+  Existing native focus/Spaces/fullscreen and Recovery instrumented-click
+  limitations remain; older releases' screenshots are not substituted for this
+  run's adaptive-layout evidence.
+- Both public assets were downloaded anonymously and matched CI bytes and API
+  digests. Public source ZIP/TAR inventories matched all **144** frozen Git
+  blobs and executable modes. The production anonymous update client returned
+  `v3.1.1` and the exact DMG URL.
+- DMG SHA-256:
+  `364285015fa44a652b8370c8d4399660bd51e2a5c41e7f671b82aa4e3ca1b14a`.
+  SHA256SUMS-file SHA-256:
+  `0ace064685e9ccfb1fa81b14578143d90708b351aa7ea472d67ee7fdd269cfa0`.
+  Attestation was checked against this repository's CI workflow, main ref,
+  exact source digest and GitHub-hosted runner provenance.
+- The installed `/Applications/Codex94.app` matched the complete CI file/mode
+  manifest and both-architecture signature, and launched from that exact path.
+  Its main-binary SHA-256 is
+  `6165a756f72e22469b02b1ec6b335775cc60b14e5c9a63f0bdcbbb1f9cce9364`.
+  The previous 3.1.0 App was retained for rollback. The desktop inspection
+  connection remained unavailable; no additional local visual/manual test is
+  claimed. Quarantine and Gatekeeper were unchanged, and fresh-account
+  first-launch acceptance remains unverified. Distribution signing limitations
+  are unchanged. Documentation follow-ups do not move this tag or replace assets.

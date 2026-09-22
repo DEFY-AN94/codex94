@@ -1,7 +1,7 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints in the published stable
-[`3.1.0 (16)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.0).
+[`3.1.1 (17)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.1).
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
@@ -68,7 +68,7 @@ than duplicating those ownership boundaries. See [CONTRIBUTING.md](../CONTRIBUTI
 and [the release workflow](RELEASING.md) for required evidence and distribution rules.
 
 
-## 3.1.1 candidate: floating quota availability
+## 3.1.1: floating quota availability
 
 `FloatingQuotaLayout` derives the strip's 480/680-point preferred width and
 compact metrics from the actual selected bucket's optional 5-hour window.
