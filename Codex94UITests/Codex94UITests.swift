@@ -440,8 +440,17 @@ final class Codex94UITests: XCTestCase {
             try waitUntil("Hide must remove the floating surface from the accessible windows") {
                 !self.identified("floating-quota-content", in: self.application).exists
             }
-            let toggle = try uniqueIdentified("dashboard-floating-toggle", in: dashboard)
+            // A toolbar item may repeat its child's identifier on a container.
+            // The actionable button itself must remain unique.
+            let toggles = dashboard.buttons.matching(identifier: "dashboard-floating-toggle")
+            let toggleAppeared = toggles.firstMatch.waitForExistence(timeout: 5)
+            let toggleCount = toggles.count
+            try require(toggleAppeared && toggleCount == 1,
+                        "Dashboard must expose exactly one identified floating toggle button (count: \(toggleCount))")
+            let toggle = toggles.element(boundBy: 0)
             try reveal(toggle, in: dashboard)
+            try require(toggle.isEnabled && toggle.isHittable,
+                        "The Dashboard floating toggle must be enabled and visible")
             toggle.click()
             floating = try floatingWindow()
             try require(try ownedFloatingWindowNumber(floating) == originalWindowNumber,
@@ -574,6 +583,10 @@ final class Codex94UITests: XCTestCase {
                     && !identified("token-usage-page", in: content).exists
                     && !identified("copy-diagnostics", in: content).exists,
                     "Floating screenshots must not include other application pages")
+        // Move to a passive, tooltip-free part of this same panel before taking
+        // synthetic evidence, so the previous button's tooltip is not clipped.
+        try uniqueIdentified("floating-drag-area", in: window).hover()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         try fixture.writeArtifact(content.screenshot().pngRepresentation, named: filename)
     }
 
@@ -632,6 +645,7 @@ final class Codex94UITests: XCTestCase {
         case .dialog: "dialog"
         case .alert: "alert"
         case .button: "button"
+        case .radioButton: "radioButton"
         case .group: "group"
         case .staticText: "staticText"
         default: "other"
@@ -847,7 +861,7 @@ final class Codex94UITests: XCTestCase {
         let summary = try uniqueIdentified("token-usage-summary", in: dashboard)
         let lifetime = try uniqueIdentified("token-usage-lifetime", in: dashboard)
         let refresh = try uniqueIdentified("token-usage-refresh", in: dashboard)
-        try reveal(refresh, in: dashboard)
+        try revealTokenElementForCapture(refresh, in: dashboard)
         let before = try fixture.tokenUsageRequestCount()
         try fixture.setTokenUsageMode("slow")
         refresh.click()
@@ -970,7 +984,7 @@ final class Codex94UITests: XCTestCase {
     private func refreshTokenUsage(in dashboard: XCUIElement) throws {
         let before = try fixture.tokenUsageRequestCount()
         let refresh = try uniqueIdentified("token-usage-refresh", in: dashboard)
-        try reveal(refresh, in: dashboard)
+        try revealTokenElementForCapture(refresh, in: dashboard)
         try require(refresh.isEnabled, "The token page refresh action must be available")
         refresh.click()
         try waitForTokenUsageCompletion(after: before, in: dashboard)
@@ -1016,11 +1030,74 @@ final class Codex94UITests: XCTestCase {
         // On macOS the segmented Picker is an accessibility RadioGroup, which
         // need not be hittable even when all of its native radio buttons are.
         // Scroll to the actual click target, then re-query and validate it.
-        try reveal(initialCandidates[0], in: dashboard)
+        try revealTokenElementForCapture(initialCandidates[0], in: dashboard)
         let candidates = matchingButtons()
-        try require(candidates.count == 1 && candidates[0].isEnabled && candidates[0].isHittable,
+        try require(candidates.count == 1 && candidates[0].isEnabled && candidates[0].isHittable
+                    && tokenElementIsFullyVisible(candidates[0], in: dashboard),
                     "The token selector must be one uniquely identified segmented choice")
         candidates[0].click()
+        if candidates[0].elementType == .radioButton {
+            do {
+                try waitUntil("The clicked token radio button did not become selected") {
+                    let current = matchingButtons()
+                    return current.count == 1 && (current[0].isSelected || self.nativeSelectionIsOne(current[0]))
+                }
+            } catch {
+                try writeTokenSelectionDiagnostic(identifier: identifier, expectedTitle: title,
+                                                  candidates: matchingButtons(), in: dashboard)
+                throw error
+            }
+        }
+    }
+
+    private func nativeSelectionIsOne(_ element: XCUIElement) -> Bool {
+        let value = element.value
+        return value as? String == "1" || (value as? NSNumber)?.doubleValue == 1
+    }
+
+    private func writeTokenSelectionDiagnostic(
+        identifier: String, expectedTitle: String, candidates: [XCUIElement], in dashboard: XCUIElement
+    ) throws {
+        let allowed: [String: [String]] = [
+            "token-usage-range": [UITokenRange.sevenDays, .thirtyDays, .all, .custom].map(language.tokenRange),
+            "token-usage-chart-style": [UITokenChartStyle.bar, .line].map(language.tokenChartStyle)
+        ]
+        try require(fixture.scenario == "usage" && allowed[identifier]?.contains(expectedTitle) == true,
+                    "Token selection diagnostics require a known selector and fixed localized choice")
+        let candidate = candidates.count == 1 ? candidates[0] : nil
+        let value = identified("token-usage-daily-table", in: dashboard).value
+        let rowCount: Any
+        if let text = value as? String, let count = Int(text), String(count) == text, (0...35).contains(count) {
+            rowCount = count
+        } else if let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+                  (0...35).contains(number.doubleValue), number.doubleValue.rounded(.towardZero) == number.doubleValue {
+            rowCount = number.intValue
+        } else {
+            rowCount = "unknown"
+        }
+        try fixture.writeReport("usage-token-selection-diagnostic.json", fields: [
+            "scenario": "usage", "diagnosticOnly": true, "acceptanceVerified": false,
+            "selectorIdentifier": identifier, "expectedFixedChoice": expectedTitle, "candidateCount": candidates.count,
+            "role": candidate.map { diagnosticRole($0.elementType) } ?? "unknown",
+            "selected": candidate?.isSelected ?? false,
+            "nativeValueIsOne": candidate.map { nativeSelectionIsOne($0) } ?? false,
+            "hittable": candidate?.isHittable ?? false,
+            "fullyVisible": candidate.map { tokenElementIsFullyVisible($0, in: dashboard) } ?? false,
+            "syntheticTableRowCount": rowCount, "clickAttemptCount": 1,
+            "customDateControlsPresent": identified("token-usage-custom-start", in: dashboard).exists
+                || identified("token-usage-custom-end", in: dashboard).exists,
+            "dynamicLabelsPathsOrCoordinatesIncluded": false
+        ])
+    }
+
+    private func tokenElementIsFullyVisible(_ element: XCUIElement, in dashboard: XCUIElement) -> Bool {
+        let page = identified("token-usage-page", in: dashboard)
+        guard page.exists else { return false }
+        let frame = element.frame
+        let viewport = page.frame.intersection(dashboard.frame)
+        return [frame.minX, frame.minY, frame.width, frame.height,
+                viewport.minX, viewport.minY, viewport.width, viewport.height].allSatisfy(\.isFinite)
+            && frame.width > 0 && frame.height > 0 && viewport.contains(frame)
     }
 
     private func revealTokenChartForCapture(in dashboard: XCUIElement) throws {
@@ -1787,9 +1864,41 @@ final class Codex94UITests: XCTestCase {
     }
 
     private func assertQuotaLayout(in popover: XCUIElement, spark: Bool, longName: Bool = false) throws {
-        let header = try uniqueIdentified("quota-popover-header", in: popover)
-        let quit = try commandButton(language.quit, in: popover)
-        let candidates = ([popover] + popover.groups.allElementsBoundByIndex).filter { element in
+        // Wait using the existing unique live queries, then measure only one
+        // immutable popover snapshot. Mixing cached content bounds with later
+        // live row frames can mistake a translated popover for changed padding.
+        _ = try uniqueIdentified("quota-popover-header", in: popover)
+        _ = try commandButton(language.quit, in: popover)
+        let kinds = spark ? ["fiveHour", "weekly"] : ["weekly"]
+        for kind in kinds {
+            _ = try uniqueIdentified("quota-window-" + kind, in: popover)
+        }
+        let snapshot = try popover.snapshot()
+        var pending: [any XCUIElementSnapshot] = [snapshot]
+        var nodes: [any XCUIElementSnapshot] = []
+        while let node = pending.popLast() {
+            let children = node.children
+            guard nodes.count + pending.count + children.count + 1 <= 1_024 else {
+                throw UITestFailure("The quota popover snapshot exceeded its bounded node limit")
+            }
+            nodes.append(node)
+            pending.append(contentsOf: children)
+        }
+        func uniqueSnapshot(_ identifier: String) throws -> any XCUIElementSnapshot {
+            let matches = nodes.filter { $0.identifier == identifier }
+            guard matches.count == 1, let match = matches.first else {
+                throw UITestFailure("The quota snapshot must contain exactly one known element: " + identifier)
+            }
+            return match
+        }
+        let header = try uniqueSnapshot("quota-popover-header")
+        let quitMatches = nodes.filter {
+            $0.elementType == .button && ($0.label.contains(language.quit) || $0.title.contains(language.quit))
+        }
+        guard quitMatches.count == 1, let quit = quitMatches.first else {
+            throw UITestFailure("The quota snapshot must contain exactly one known Quit button")
+        }
+        let candidates = ([snapshot] + nodes.dropFirst().filter { $0.elementType == .group }).filter { element in
             let frame = element.frame
             return abs(frame.width - 500) <= 1 && frame.height > 0
                 && frame.insetBy(dx: -1, dy: -1).contains(header.frame)
@@ -1811,11 +1920,12 @@ final class Codex94UITests: XCTestCase {
         // alone could hide the original fixed-height blank-space regression.
         // Measure native chrome from its horizontal inset, rather than treating
         // an arbitrary vertical gap below the content as harmless window chrome.
-        let outer = popover.frame
+        let outer = snapshot.frame
         let horizontalChrome = max(max(bounds.minX - outer.minX, outer.maxX - bounds.maxX), 0)
         let outerBottomGap = topToBottom ? outer.maxY - quit.frame.maxY : quit.frame.minY - outer.minY
         try fixture.writeReport("quota-layout-\(layoutMeasurementIndex).json", fields: [
-            "method": "stroke-aware-accessibility-bounds", "language": language.rawValue,
+            "method": "single-snapshot-stroke-aware-accessibility-bounds", "language": language.rawValue,
+            "snapshotNodeCount": nodes.count,
             "bucket": longName ? "long-name" : (spark ? "spark" : "codex"),
             "contentWidth": bounds.width, "contentHeight": bounds.height,
             "headerWidth": header.frame.width, "headerHeight": header.frame.height,
@@ -1841,11 +1951,10 @@ final class Codex94UITests: XCTestCase {
             XCTAssertTrue(header.label.contains(longName ? fixture.longName.trimmingCharacters(in: .whitespaces) : fixture.sparkName),
                           "A shortened visual title must keep the full accessible bucket name")
         }
-        let kinds = spark ? ["fiveHour", "weekly"] : ["weekly"]
-        if !spark { XCTAssertFalse(identified("quota-window-fiveHour", in: popover).exists) }
+        if !spark { XCTAssertFalse(nodes.contains { $0.identifier == "quota-window-fiveHour" }) }
         var rowFrames: [CGRect] = []
         for kind in kinds {
-            let row = try uniqueIdentified("quota-window-" + kind, in: popover)
+            let row = try uniqueSnapshot("quota-window-" + kind)
             let resetKey = spark ? (kind == "fiveHour" ? "sparkFiveHour" : "sparkWeekly") : "codexWeekly"
             let absolute = try fixture.absoluteReset(resetKey, language: language)
             XCTAssertTrue(row.label.contains(absolute), "The actual quota row must contain the complete localized Reset")
@@ -2930,7 +3039,8 @@ private struct SyntheticFixture {
             "usage-daily-table-en.png", "usage-line-seven-days-en.png", "usage-custom-seven-days-en.png",
             "usage-partial-zh-Hans.png", "usage-unavailable-zh-Hans.png",
             "usage-unsupported-zh-Hans.png", "usage-result.json",
-            "usage-png-export-query-diagnostic.json", "usage-csv-export-query-diagnostic.json"
+            "usage-png-export-query-diagnostic.json", "usage-csv-export-query-diagnostic.json",
+            "usage-token-selection-diagnostic.json"
         ] : []
         let floating: Set<String> = scenario == "floating" ? [
             "floating-cold-en.png", "floating-compact-en.png", "floating-expanded-en.png",
