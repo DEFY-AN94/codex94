@@ -61,7 +61,7 @@ struct FloatingQuotaContent: View {
     let now: Date
     let isPinned: Bool
     let isExpanded: Bool
-    var width: CGFloat = FloatingWindowSizing.preferredWidth
+    var width: CGFloat? = nil
     var isActive = true
     var reduceMotion = false
     var reduceTransparency = false
@@ -78,9 +78,11 @@ struct FloatingQuotaContent: View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 brand
-                    .frame(width: width < 600 ? 132 : 156, alignment: .leading)
-                separator
-                quotaColumn(.fiveHour, window: fiveHour)
+                    .frame(width: isCompact ? 132 : 156, alignment: .leading)
+                if let fiveHour {
+                    separator
+                    quotaColumn(.fiveHour, window: fiveHour)
+                }
                 separator
                 quotaColumn(.weekly, window: weekly)
                 separator
@@ -97,7 +99,7 @@ struct FloatingQuotaContent: View {
                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
             }
         }
-        .frame(width: width)
+        .frame(width: resolvedWidth)
         .background {
             if reduceTransparency {
                 RoundedRectangle(cornerRadius: 22).fill(isDark
@@ -135,6 +137,10 @@ struct FloatingQuotaContent: View {
     }
 
     private var isDark: Bool { theme == .terminalDark || (theme == .system && colorScheme == .dark) }
+
+    private var layout: FloatingQuotaLayout { FloatingQuotaLayout(fiveHour: fiveHour) }
+    private var resolvedWidth: CGFloat { width ?? layout.preferredWidth }
+    private var isCompact: Bool { layout.usesCompactMetrics(at: resolvedWidth) }
 
     private var palette: Codex94Palette {
         .resolve(theme, scheme: colorScheme, overrides: accentOverrides)
@@ -184,9 +190,9 @@ struct FloatingQuotaContent: View {
         let reset = QuotaResetPresentation(resetsAt: window?.resetsAt, now: now, language: language)
         return FloatingQuotaColumn(
             kind: kind, window: window, reset: reset, color: quotaColor(kind: kind, window: window),
-            compact: width < 600, isActive: isActive, reduceMotion: reduceMotion
+            compact: isCompact, isActive: isActive, reduceMotion: reduceMotion
         )
-        .padding(.horizontal, width < 600 ? 10 : 18)
+        .padding(.horizontal, isCompact ? 10 : 18)
         .frame(maxWidth: .infinity)
         .overlay { FloatingDragRegion(onDragEnded: finishDrag) }
     }

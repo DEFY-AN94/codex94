@@ -2,6 +2,22 @@
 
 All notable changes to Codex94 are documented here.
 
+## 3.1.1 - 2026-09-23
+
+Version `3.1.1 (17)`. Release dates use Australia/Melbourne.
+
+### Fixed
+
+- Hide the floating strip's 5-hour column when the selected quota bucket does
+  not provide that window. Weekly-only accounts use a 480-point strip; buckets
+  with both windows keep the 680-point layout. Screen fitting still applies.
+- Resize the same floating panel when its quota windows change, preserving its
+  top-left position where screen space allows, normal typography, pin/expanded
+  state, and manual-refresh behavior. Layout changes reuse the existing
+  snapshot and make no request.
+- Allow local security checks in linked Git worktrees by excluding only the
+  Git administration entry; source and history scanning remain enabled.
+
 ## 3.1.0 - 2026-09-23
 
 Version `3.1.0 (16)`. Release dates use Australia/Melbourne.

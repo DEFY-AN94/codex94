@@ -32,8 +32,22 @@ struct FloatingWindowPosition: Codable, Equatable, Sendable {
     }
 }
 
+enum FloatingQuotaLayout: Equatable, Sendable {
+    case weeklyOnly
+    case bothWindows
+
+    init(fiveHour: QuotaWindowSnapshot?) {
+        self = fiveHour == nil ? .weeklyOnly : .bothWindows
+    }
+
+    var preferredWidth: CGFloat { self == .weeklyOnly ? 480 : 680 }
+
+    func usesCompactMetrics(at width: CGFloat) -> Bool {
+        width < (self == .weeklyOnly ? 400 : 600)
+    }
+}
+
 enum FloatingWindowSizing {
-    static let preferredWidth: CGFloat = 680
     static let collapsedHeight: CGFloat = 90
     static let expandedHeight: CGFloat = 132
     static let screenInset: CGFloat = 12
@@ -41,8 +55,10 @@ enum FloatingWindowSizing {
     static func fittedFrame(
         position: FloatingWindowPosition?,
         expanded: Bool,
+        layout: FloatingQuotaLayout = .bothWindows,
         visibleFrame: CGRect
     ) -> CGRect {
+        let preferredWidth = layout.preferredWidth
         guard isUsable(visibleFrame) else {
             return CGRect(x: 0, y: 0, width: preferredWidth,
                           height: expanded ? expandedHeight : collapsedHeight)
@@ -64,14 +80,15 @@ enum FloatingWindowSizing {
     static func preferredScreen(
         for position: FloatingWindowPosition?,
         visibleFrames: [CGRect],
-        fallback: CGRect?
+        fallback: CGRect?,
+        width: CGFloat = FloatingQuotaLayout.bothWindows.preferredWidth
     ) -> CGRect? {
         let frames = visibleFrames.filter(isUsable)
         guard let position, position.isFinite else {
             return fallback.flatMap { isUsable($0) ? $0 : nil } ?? frames.first
         }
         let footprint = CGRect(x: CGFloat(position.x), y: CGFloat(position.y) - collapsedHeight,
-                               width: preferredWidth, height: collapsedHeight)
+                               width: width, height: collapsedHeight)
         if let match = frames.max(by: { overlap($0, footprint) < overlap($1, footprint) }),
            overlap(match, footprint) > 0 {
             return match
@@ -94,9 +111,11 @@ enum FloatingWindowSizing {
 final class FloatingWindowState: ObservableObject {
     @Published private(set) var isVisible = false
     @Published private(set) var isExpanded = false
-    @Published private(set) var contentWidth = FloatingWindowSizing.preferredWidth
+    @Published private(set) var contentWidth = FloatingQuotaLayout.weeklyOnly.preferredWidth
 
     func setVisible(_ value: Bool) { isVisible = value }
     func setExpanded(_ value: Bool) { isExpanded = value }
-    func setContentWidth(_ value: CGFloat) { contentWidth = value }
+    func setContentWidth(_ value: CGFloat) {
+        if contentWidth != value { contentWidth = value }
+    }
 }

@@ -16,6 +16,7 @@ final class FloatingWindowController: NSObject, NSWindowDelegate {
     private var savePositionTask: Task<Void, Never>?
     private var isApplyingFrame = false
     private var isShutDown = false
+    private var appliedLayout: FloatingQuotaLayout?
 
     init(store: AppStore, preferences: PreferencesStore, openDashboard: @escaping () -> Void) {
         self.store = store
@@ -32,6 +33,12 @@ final class FloatingWindowController: NSObject, NSWindowDelegate {
             .sink { [weak self] theme, language in
                 self?.applyAppearance(theme: theme, language: language)
             }
+            .store(in: &observations)
+        // AppStore forwards preference changes before values are committed.
+        // Defer to the next main-run-loop turn to resolve the actual new bucket.
+        store.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.synchronizeQuotaLayout() }
             .store(in: &observations)
         screenObservation = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
@@ -94,7 +101,7 @@ final class FloatingWindowController: NSObject, NSWindowDelegate {
 
     private func makePanel() {
         let panel = FloatingQuotaPanel(
-            contentRect: CGRect(x: 0, y: 0, width: FloatingWindowSizing.preferredWidth,
+            contentRect: CGRect(x: 0, y: 0, width: quotaLayout.preferredWidth,
                                 height: FloatingWindowSizing.collapsedHeight),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false
         )
@@ -151,14 +158,31 @@ final class FloatingWindowController: NSObject, NSWindowDelegate {
         persistPosition()
     }
 
+    private var quotaLayout: FloatingQuotaLayout {
+        FloatingQuotaLayout(fiveHour: store.activeMenuBarQuotas.first?.bucket.window(.fiveHour))
+    }
+
+    private func synchronizeQuotaLayout() {
+        guard !isShutDown, let window, appliedLayout != quotaLayout else { return }
+        let animated = state.isVisible && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        applyFrame(position: FloatingWindowPosition(frame: window.frame),
+                   expanded: state.isExpanded, animated: animated)
+    }
+
     private func applyFrame(position: FloatingWindowPosition?, expanded: Bool, animated: Bool) {
         guard let window,
               let screen = FloatingWindowSizing.preferredScreen(
                 for: position, visibleFrames: NSScreen.screens.map(\.visibleFrame),
-                fallback: NSScreen.main?.visibleFrame
+                fallback: NSScreen.main?.visibleFrame, width: window.frame.width
               ) else { return }
-        let frame = FloatingWindowSizing.fittedFrame(position: position, expanded: expanded, visibleFrame: screen)
-        state.setContentWidth(frame.width)
+        let layout = quotaLayout
+        let frame = FloatingWindowSizing.fittedFrame(position: position, expanded: expanded,
+                                                    layout: layout, visibleFrame: screen)
+        appliedLayout = layout
+        guard frame != window.frame || frame.width != state.contentWidth else { return }
+        withAnimation(animated ? .easeInOut(duration: 0.26) : nil) {
+            state.setContentWidth(frame.width)
+        }
         isApplyingFrame = true
         if animated {
             NSAnimationContext.runAnimationGroup { context in

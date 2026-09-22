@@ -29,6 +29,16 @@ and security-scanned before it is tagged.
 > `app-server` is an experimental interface and may change in future Codex
 > releases.
 
+## 3.1.1 candidate
+
+Version `3.1.1 (17)` adapts the floating strip to the selected quota data:
+weekly-only data uses **480 × 90 logical points**, while a reported 5-hour
+window keeps the **680 × 90** dual layout. The unavailable 5-hour column is
+removed. Both layouts keep normal text sizes and expand to 132 points high.
+Refreshes, cached data and quota-group changes update the same panel without
+an extra request; screen fitting still applies. Stable downloads below remain
+on published `3.1.0` until this patch is released.
+
 ## Version 3.1.0
 
 `3.1.0 (16)` is the published stable release, dated **2026-09-23**
