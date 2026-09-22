@@ -66,3 +66,19 @@ complete payload and signing boundary. The source installer owns its lock,
 staging, and rollback. Share small validation helpers where appropriate rather
 than duplicating those ownership boundaries. See [CONTRIBUTING.md](../CONTRIBUTING.md)
 and [the release workflow](RELEASING.md) for required evidence and distribution rules.
+
+
+## 3.1.1 candidate: floating quota availability
+
+`FloatingQuotaLayout` derives the strip's 480/680-point preferred width and
+compact metrics from the actual selected bucket's optional 5-hour window.
+Plan labels do not override real quota data, and a reported 0% remains a real
+window. The cold placeholder uses the weekly-only layout.
+
+The controller observes `AppStore.objectWillChange` on the next main-run-loop
+turn, after forwarded preference and snapshot values have committed. It reads
+the selected menu-bar bucket rather than the independently browsed popover
+bucket, and resizes only when the quota layout changes. Fitting uses the
+current panel position so a pending drag save cannot restore an older position.
+Existing screen clamping, motion preferences, pin state and teardown remain
+owned by the controller; layout changes do not request or cache quota data.

@@ -64,6 +64,13 @@ exports. Retain the following regression checks for those features:
   format/dimensions, current selection, failure versus cancellation, and absence
   of identity. Copy tests use named pasteboards, never the general pasteboard.
 
+For the `3.1.1 (17)` candidate, additionally verify 480-point weekly-only/cold
+layouts have no 5-hour accessibility node, reported dual layouts remain 680,
+and live quota-group changes reuse the same panel and preserve the top-left
+where available screen space permits. Keep ordinary typography in the
+480-point layout. Check explicit zero, cached/failed responses, no extra
+requests or cache writes, hidden updates and post-shutdown notifications.
+
 Validation for `3.1.0` includes a fourth **Floating** UI scenario and expanded
 Token usage coverage. Its local unit suite recorded 340 tests executed, 1 skipped,
 and 0 failures; the skipped hosted key-window focus check is not a pass.
@@ -219,7 +226,7 @@ version/build, checks, risks, rollback, artifact hashes, and both acceptance
 states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
-Wait for CI and, for `3.1.0`, all four synthetic UI smokes
+Wait for CI and, for `3.1.0` and later, all four synthetic UI smokes
 (Display, Recovery, Token usage, and Floating),
 and Actions/Python/Swift CodeQL on the actual tested revision.
 Skipped, cancelled, unavailable, pending, or failed is not passed. Review the

@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import SwiftUI
 import XCTest
 @testable import Codex94
@@ -47,6 +48,136 @@ final class FloatingWindowTests: XCTestCase {
             FloatingWindowSizing.fittedFrame(position: invalid, expanded: false, visibleFrame: primary),
             FloatingWindowSizing.fittedFrame(position: nil, expanded: false, visibleFrame: primary)
         )
+    }
+
+    func testReportedFiveHourControlsShapeWithoutReducingNormalSingleColumnMetrics() {
+        let single = FloatingQuotaLayout(fiveHour: nil)
+        let dual = FloatingQuotaLayout(fiveHour: window(.fiveHour, remaining: 0))
+        XCTAssertEqual(single, .weeklyOnly)
+        XCTAssertEqual(single.preferredWidth, 480)
+        XCTAssertFalse(single.usesCompactMetrics(at: 480))
+        XCTAssertTrue(single.usesCompactMetrics(at: 376))
+        XCTAssertEqual(dual, .bothWindows, "A real 0% five-hour window must remain visible")
+        XCTAssertEqual(dual.preferredWidth, 680)
+        XCTAssertFalse(dual.usesCompactMetrics(at: 680))
+        XCTAssertTrue(dual.usesCompactMetrics(at: 536))
+    }
+
+    func testAdaptiveWidthsKeepTopLeftWhenTheyFitAndClampOnlyAtScreenEdge() {
+        let screen = CGRect(x: -1_440, y: 24, width: 1_440, height: 870)
+        let position = FloatingWindowPosition(x: -1_300, y: 750)
+        for expanded in [false, true] {
+            let single = FloatingWindowSizing.fittedFrame(position: position, expanded: expanded,
+                                                          layout: .weeklyOnly, visibleFrame: screen)
+            let dual = FloatingWindowSizing.fittedFrame(position: FloatingWindowPosition(frame: single),
+                                                        expanded: expanded, layout: .bothWindows, visibleFrame: screen)
+            XCTAssertEqual(single.width, 480)
+            XCTAssertEqual(dual.width, 680)
+            XCTAssertEqual(single.minX, dual.minX)
+            XCTAssertEqual(single.maxY, dual.maxY)
+            XCTAssertEqual(single.height, expanded ? 132 : 90)
+            XCTAssertEqual(dual.height, single.height)
+        }
+        let rightAligned = FloatingWindowSizing.fittedFrame(position: nil, expanded: false,
+                                                            layout: .weeklyOnly, visibleFrame: screen)
+        let expandedWidth = FloatingWindowSizing.fittedFrame(position: FloatingWindowPosition(frame: rightAligned),
+                                                            expanded: false, layout: .bothWindows, visibleFrame: screen)
+        XCTAssertLessThan(expandedWidth.minX, rightAligned.minX)
+        XCTAssertEqual(expandedWidth.maxY, rightAligned.maxY)
+        XCTAssertTrue(screen.contains(expandedWidth))
+        let narrow = CGRect(x: 0, y: 0, width: 400, height: 600)
+        XCTAssertEqual(FloatingWindowSizing.fittedFrame(position: nil, expanded: false,
+            layout: .weeklyOnly, visibleFrame: narrow).width, 376)
+    }
+
+    func testCachedBucketAndMenuBarLayoutChangesResizeTheSamePanelWithoutFetching() async throws {
+        let snapshot = quotaSnapshot(fiveHour: nil, weekly: 42, extraFiveHour: 80, extraWeekly: 21)
+        let fixture = try controllerFixture(cachedSnapshot: snapshot)
+        defer { fixture.cleanUp() }
+        fixture.preferences.menuBarQuotaSelection = .defaultBucket(.weekly)
+        fixture.preferences.dualWindowBucketSelection = .bucket(limitID: "extra")
+        fixture.controller.show()
+        let panel = try XCTUnwrap(fixture.controller.window)
+        XCTAssertFalse(fixture.store.hasFetchedLiveSnapshot)
+        XCTAssertEqual(panel.frame.width, 480)
+        let topLeft = FloatingWindowPosition(frame: panel.frame)
+        let cacheBytes = try Data(contentsOf: fixture.cache.fileURL)
+        fixture.store.setViewedBucket("extra")
+        try await Task.sleep(for: .milliseconds(80))
+        XCTAssertEqual(panel.frame.width, 480, "Browsing another bucket must not change the floating selection")
+        fixture.preferences.menuBarLayout = .dualWindow
+        try await waitForWidth(680, in: fixture)
+        XCTAssertEqual(FloatingWindowPosition(frame: panel.frame), topLeft)
+        fixture.preferences.menuBarLayout = .percentageOnly
+        try await waitForWidth(480, in: fixture)
+        XCTAssertEqual(FloatingWindowPosition(frame: panel.frame), topLeft)
+        XCTAssertEqual(fixture.preferences.menuBarQuotaSelection, .defaultBucket(.weekly))
+        XCTAssertEqual(fixture.preferences.dualWindowBucketSelection, .bucket(limitID: "extra"))
+        fixture.store.setMenuBarQuotaSelection(.bucket(limitID: "extra", kind: .weekly))
+        try await waitForWidth(680, in: fixture)
+        XCTAssertEqual(FloatingWindowPosition(frame: panel.frame), topLeft,
+                       "Selecting Weekly from a real dual-window bucket keeps both columns")
+        fixture.controller.hide()
+        fixture.store.setMenuBarQuotaSelection(.defaultBucket(.weekly))
+        try await waitForWidth(480, in: fixture)
+        XCTAssertFalse(panel.isVisible, "A queued layout update must not reopen a hidden panel")
+        fixture.controller.show()
+        XCTAssertTrue(fixture.controller.window === panel)
+        XCTAssertEqual(panel.frame.width, 480)
+        XCTAssertEqual(try Data(contentsOf: fixture.cache.fileURL), cacheBytes)
+        let calls = await fixture.fetcher.calls
+        XCTAssertEqual(calls, 0)
+        fixture.controller.shutdown()
+        fixture.store.setMenuBarQuotaSelection(.bucket(limitID: "extra", kind: .weekly))
+        try await Task.sleep(for: .milliseconds(80))
+        XCTAssertNil(fixture.controller.window)
+    }
+
+    func testRefreshOfTheSameBucketAddsAndRemovesOnlyReportedFiveHourWindows() async throws {
+        let initial = quotaSnapshot(fiveHour: 80, weekly: 42)
+        let single = quotaSnapshot(fiveHour: nil, weekly: 32, offset: 10)
+        let restored = quotaSnapshot(fiveHour: 60, weekly: 30, offset: 20)
+        let fixture = try controllerFixture(cachedSnapshot: initial,
+            outcomes: [.success(single), .failure(.requestTimedOut), .success(restored)])
+        defer { fixture.cleanUp() }
+        fixture.controller.show()
+        let panel = try XCTUnwrap(fixture.controller.window)
+        XCTAssertEqual(panel.frame.width, 680, "Cached data already determines the first shown width")
+        let topLeft = FloatingWindowPosition(frame: panel.frame)
+        fixture.store.refresh(trigger: .manual)
+        XCTAssertEqual(panel.frame.width, 680, "Refreshing keeps the existing reported window")
+        try await waitForRefresh(fixture.store)
+        try await waitForWidth(480, in: fixture)
+        XCTAssertEqual(FloatingWindowPosition(frame: panel.frame), topLeft)
+        let cacheBytes = try Data(contentsOf: fixture.cache.fileURL)
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRefresh(fixture.store)
+        XCTAssertEqual(panel.frame.width, 480)
+        XCTAssertTrue(fixture.store.menuBarStatusPresentation.usesCachedData)
+        XCTAssertEqual(try Data(contentsOf: fixture.cache.fileURL), cacheBytes)
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRefresh(fixture.store)
+        try await waitForWidth(680, in: fixture)
+        XCTAssertEqual(FloatingWindowPosition(frame: panel.frame), topLeft)
+        XCTAssertTrue(fixture.controller.window === panel)
+        let calls = await fixture.fetcher.calls
+        XCTAssertEqual(calls, 3, "Only the three explicit refreshes may fetch")
+    }
+
+    func testAutomaticBucketChangeResizesFromNewSnapshotWithoutChangingPreferences() async throws {
+        let initial = quotaSnapshot(fiveHour: nil, weekly: 10, extraFiveHour: 80, extraWeekly: 70)
+        let latest = quotaSnapshot(fiveHour: nil, weekly: 90, extraFiveHour: 20, extraWeekly: 70, offset: 10)
+        let fixture = try controllerFixture(cachedSnapshot: initial, outcomes: [.success(latest)])
+        defer { fixture.cleanUp() }
+        fixture.controller.show()
+        XCTAssertEqual(fixture.controller.window?.frame.width, 480)
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRefresh(fixture.store)
+        try await waitForWidth(680, in: fixture)
+        XCTAssertEqual(fixture.preferences.menuBarQuotaSelection, .automatic)
+        XCTAssertEqual(fixture.store.activeMenuBarQuotas.first?.bucket.limitID, "extra")
+        let calls = await fixture.fetcher.calls
+        XCTAssertEqual(calls, 1)
     }
 
     func testPositionEncodingRejectsNonFiniteValues() throws {
@@ -117,7 +248,7 @@ final class FloatingWindowTests: XCTestCase {
         XCTAssertTrue(controller.state.isVisible)
         XCTAssertTrue(panel.isVisible, "Showing must create a visible native panel")
         XCTAssertTrue(NSApp.windows.contains { $0 === panel })
-        XCTAssertEqual(panel.frame.width, 680, accuracy: 0.5)
+        XCTAssertEqual(panel.frame.width, 480, accuracy: 0.5)
         XCTAssertEqual(panel.frame.height, 90, accuracy: 0.5)
         XCTAssertEqual(panel.accessibilityIdentifier(), "floating-quota-window")
         XCTAssertEqual(panel.accessibilityRole(), .window)
@@ -201,12 +332,16 @@ final class FloatingWindowTests: XCTestCase {
         let output = try outputDirectory()
         for language in [LanguagePreference.english, .simplifiedChinese] {
             for theme in [ThemePreference.terminalDark, .terminalLight] {
-                for expanded in [false, true] {
-                    let content = fixture(language: language, theme: theme, expanded: expanded)
-                    let name = "floating-\(expanded ? "expanded" : "compact")-\(language.rawValue)-\(theme.rawValue)"
-                    let size = try render(content, named: name, theme: theme, output: output)
-                    XCTAssertEqual(size.width, 680, accuracy: 0.5)
-                    XCTAssertEqual(size.height, expanded ? 132 : 90, accuracy: 0.5)
+                for fiveHour in [Int?.some(82), nil] {
+                    for expanded in [false, true] {
+                        let content = fixture(language: language, theme: theme, expanded: expanded, fiveHour: fiveHour)
+                        let shape = fiveHour == nil ? "weekly" : "dual"
+                        let name = "floating-\(shape)-\(expanded ? "expanded" : "compact")-\(language.rawValue)-\(theme.rawValue)"
+                        let width: CGFloat = fiveHour == nil ? 480 : 680
+                        let size = try render(content, named: name, theme: theme, output: output, width: width)
+                        XCTAssertEqual(size.width, width, accuracy: 0.5)
+                        XCTAssertEqual(size.height, expanded ? 132 : 90, accuracy: 0.5)
+                    }
                 }
             }
         }
@@ -234,7 +369,7 @@ final class FloatingWindowTests: XCTestCase {
     private func fixture(
         language: LanguagePreference, theme: ThemePreference, expanded: Bool,
         state: ConnectionState = .connected, fiveHour: Int? = 82, weekly: Int? = 64,
-        credits: Int? = 3, width: CGFloat = 680, reduceTransparency: Bool = false
+        credits: Int? = 3, width: CGFloat? = nil, reduceTransparency: Bool = false
     ) -> some View {
         let hasData = fiveHour != nil || weekly != nil
         return FloatingQuotaContent(
@@ -261,20 +396,69 @@ final class FloatingWindowTests: XCTestCase {
                            isRefreshing: false, lastSuccessfulFetch: referenceDate)
     }
 
-    private func controllerFixture() throws -> FloatingControllerFixture {
+    private func quotaSnapshot(
+        fiveHour: Int?, weekly: Int, extraFiveHour: Int? = nil, extraWeekly: Int? = nil, offset: TimeInterval = 0
+    ) -> QuotaSnapshot {
+        var windows = [window(.weekly, remaining: weekly)]
+        if let fiveHour { windows.append(window(.fiveHour, remaining: fiveHour)) }
+        var buckets = [QuotaBucketSnapshot(limitID: "codex", limitName: nil, planType: "pro", windows: windows)]
+        if let extraWeekly {
+            var extraWindows = [window(.weekly, remaining: extraWeekly)]
+            if let extraFiveHour { extraWindows.append(window(.fiveHour, remaining: extraFiveHour)) }
+            buckets.append(QuotaBucketSnapshot(limitID: "extra", limitName: "Synthetic extra quota", planType: "pro",
+                                               windows: extraWindows))
+        }
+        return QuotaSnapshot(buckets: buckets, defaultLimitID: "codex",
+                             fetchedAt: referenceDate.addingTimeInterval(offset), account: nil, codex: nil)
+    }
+
+    private func waitForWidth(_ width: CGFloat, in fixture: FloatingControllerFixture) async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            if let frame = fixture.controller.window?.frame,
+               abs(frame.width - width) < 0.5, abs(fixture.controller.state.contentWidth - width) < 0.5 {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTFail("The existing native floating panel did not reach the expected width")
+    }
+
+    private func waitForRefresh(_ store: AppStore) async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while store.isRefreshing, Date() < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        XCTAssertFalse(store.isRefreshing)
+    }
+
+    private func controllerFixture(
+        cachedSnapshot: QuotaSnapshot? = nil, outcomes: [Result<QuotaSnapshot, ConnectionIssue>] = []
+    ) throws -> FloatingControllerFixture {
         let preferences = PreferencesStore(defaults: try isolatedDefaults())
         let directory = try outputDirectory()
-        let fetcher = FloatingTestFetcher()
+        let fetcher = FloatingTestFetcher(outcomes: outcomes)
+        let cache = SnapshotCache(fileURL: directory.appendingPathComponent("synthetic-quota.json"))
+        if let cachedSnapshot { try cache.save(cachedSnapshot) }
+        if !outcomes.isEmpty {
+            let executable = directory.appendingPathComponent("codex")
+            try "#!/bin/sh\necho 'codex-cli 9.4.0'\n".write(to: executable, atomically: true, encoding: .utf8)
+            XCTAssertEqual(chmod(executable.path, 0o700), 0)
+            preferences.manualCodexPath = executable.path
+            preferences.hasChosenIdentityMode = true
+            preferences.identityMode = .quotaOnly
+        }
+        if let screen = NSScreen.main?.visibleFrame {
+            preferences.floatingWindowPosition = FloatingWindowPosition(x: screen.minX + 24, y: screen.maxY - 24)
+        }
         let store = AppStore(
             preferences: preferences,
             launchAtLogin: LaunchAtLoginController(readStatus: { .notRegistered }, register: {},
                                                    unregister: {}, stableInstall: { false }),
-            fetcher: fetcher, cache: SnapshotCache(fileURL: directory.appendingPathComponent("unused.json")),
+            fetcher: fetcher, cache: cache,
             hotKeyController: GlobalHotKeyController(service: FloatingTestHotKeyService()),
             notificationController: NotificationController(service: FloatingTestNotificationService())
         )
         return FloatingControllerFixture(
-            preferences: preferences, store: store, fetcher: fetcher,
+            preferences: preferences, store: store, fetcher: fetcher, cache: cache,
             controller: FloatingWindowController(store: store, preferences: preferences, openDashboard: {}),
             directory: directory
         )
@@ -343,6 +527,7 @@ private struct FloatingControllerFixture {
     let preferences: PreferencesStore
     let store: AppStore
     let fetcher: FloatingTestFetcher
+    let cache: SnapshotCache
     let controller: FloatingWindowController
     let directory: URL
 
@@ -355,10 +540,17 @@ private struct FloatingControllerFixture {
 
 private actor FloatingTestFetcher: QuotaFetching {
     private(set) var calls = 0
+    private var outcomes: [Result<QuotaSnapshot, ConnectionIssue>]
+    init(outcomes: [Result<QuotaSnapshot, ConnectionIssue>] = []) { self.outcomes = outcomes }
+
     func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot {
         calls += 1
-        XCTFail("Floating-window tests must not fetch account data")
-        throw ConnectionIssue.serverError
+        guard !outcomes.isEmpty else {
+            XCTFail("Only explicitly requested synthetic refreshes may fetch")
+            throw ConnectionIssue.serverError
+        }
+        try await Task.sleep(for: .milliseconds(40))
+        return try outcomes.removeFirst().get()
     }
 }
 

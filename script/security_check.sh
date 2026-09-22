@@ -122,10 +122,13 @@ if [[ -n "$forbidden_matches" ]]; then
   exit 1
 fi
 
+# Git administration is a directory in a checkout and a pointer file in a
+# linked worktree. Neither form is source content.
 current_secret_matches="$(
   scan_matches \
     "current-tree credential scan could not be completed" \
     rg -n -I --hidden \
+      --glob '!.git' \
       --glob '!.git/**' \
       --glob '!.build/**' \
       --glob '!script/security_check.sh' \
@@ -168,6 +171,7 @@ current_pii_raw_matches="$(
   scan_matches \
     "current-tree privacy scan could not be completed" \
   rg -n -o -I -i --hidden \
+    --glob '!.git' \
     --glob '!.git/**' \
     --glob '!.build/**' \
     --glob '!Codex94Tests/**' \

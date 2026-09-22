@@ -358,15 +358,84 @@ final class Codex94UITests: XCTestCase {
         let originalWindowNumber = try ownedFloatingWindowNumber(floating)
         try assertFloatingGeometry(floating, expanded: false)
         try assertFloatingMetric("floating-quota-weekly", contains: "--", in: floating)
-        try assertFloatingMetric("floating-quota-fiveHour", contains: "--", in: floating)
         try assertFloatingMetric("floating-refresh", contains: "Refresh failed", in: floating)
         try captureFloating(floating, named: "floating-cold-en.png")
 
         try fixture.setMode("normal")
         try refreshFloating(floating)
+        try assertFloatingGeometry(floating, expanded: false)
         try assertFloatingMetric("floating-quota-weekly", contains: "32%", in: floating)
-        try assertFloatingMetric("floating-quota-fiveHour", contains: "--", in: floating)
         try captureFloating(floating, named: "floating-compact-en.png")
+
+        // Leave room for a real 680pt panel and keep the popover's menu away
+        // from the floating controls. Screen coordinates remain in memory.
+        try withoutRequests("Positioning the floating window before changing its quota shape") {
+            let frame = floating.frame
+            let screen = try visibleScreenContaining(frame)
+            try require(screen.width >= 704 && screen.height >= 156,
+                        "The hosted work area must accommodate both floating quota shapes")
+            let target = CGPoint(x: screen.minX + 12, y: screen.maxY - 132 - 12)
+            let drag = try uniqueIdentified("floating-drag-area", in: floating)
+            try require(drag.isHittable, "The shape test must use the actual floating drag area")
+            let start = drag.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            start.press(forDuration: 0.2, thenDragTo: start.withOffset(
+                CGVector(dx: target.x - frame.minX, dy: target.y - frame.minY)
+            ))
+            try waitUntil("The floating window did not reach its safe shape-test position") {
+                floating.frame.origin.equalToWithinOnePoint(target)
+            }
+            try assertFloatingGeometry(floating, expanded: false)
+        }
+        let shapeOrigin = floating.frame.origin
+        let originalSelection = try selectedQuotaPreference()
+        // Opening the popover intentionally uses the existing one-request
+        // refresh path; only the subsequent bucket choices must be fetch-free.
+        let popoverBaseline = try fixture.requestCount()
+        let quotaPopover = try openPopover(expectedRequestDelta: 1)
+        try require(try fixture.requestCount() == popoverBaseline + 1,
+                    "Opening the quota selector must account for exactly one existing refresh")
+        try withoutRequests("Selecting a real dual-window bucket for the floating quota") {
+            try chooseQuota("\(fixture.sparkName) · \(language.weekly)", in: quotaPopover)
+            try waitUntil("A bucket with a reported 5-hour window must produce the dual-width panel") {
+                abs(floating.frame.width - 680) <= 1
+                    && self.identified("floating-quota-fiveHour", in: floating).exists
+            }
+            try require(try selectedQuotaPreference() != originalSelection,
+                        "The native quota picker must persist the different synthetic bucket")
+            try assertFloatingGeometry(floating, expanded: false, dualWindow: true)
+            try assertFloatingMetric("floating-quota-fiveHour", contains: "88%", in: floating)
+            try assertFloatingMetric("floating-quota-weekly", contains: "80%", in: floating)
+            try require(floating.frame.origin.equalToWithinOnePoint(shapeOrigin),
+                        "Growing within available space must preserve the floating top-left position")
+            try require(try ownedFloatingWindowNumber(floating) == originalWindowNumber,
+                        "A quota shape change must reuse the original floating window")
+        }
+        try captureFloating(floating, named: "floating-dual-window-en.png")
+        let dualSelection = try selectedQuotaPreference()
+        try withoutRequests("Returning the floating quota to the weekly-only bucket") {
+            try chooseQuota("Codex · \(language.weekly)", in: quotaPopover)
+            try waitUntil("A weekly-only bucket must remove the 5-hour node and use the compact width") {
+                abs(floating.frame.width - 480) <= 1
+                    && !self.identified("floating-quota-fiveHour", in: floating).exists
+            }
+            try require(try selectedQuotaPreference() != dualSelection,
+                        "The native picker must persist the return to the Codex quota bucket")
+            try assertFloatingGeometry(floating, expanded: false)
+            try assertFloatingMetric("floating-quota-weekly", contains: "32%", in: floating)
+            try require(floating.frame.origin.equalToWithinOnePoint(shapeOrigin),
+                        "Returning to one column must preserve the floating top-left position")
+            try require(try ownedFloatingWindowNumber(floating) == originalWindowNumber,
+                        "Returning to one column must reuse the same floating window")
+        }
+        try captureFloating(floating, named: "floating-single-window-en.png")
+        try withoutRequests("Closing the quota selector after the shape round trip") {
+            try require(identified("quota-popover-header", in: application).exists,
+                        "The known quota selector must still be open before its close-only action")
+            try statusItem().click()
+            try waitUntil("The quota selector must close before further floating interactions") {
+                !self.identified("quota-popover-header", in: self.application).exists
+            }
+        }
 
         try withoutRequests("Unpinning and pinning the same floating window") {
             try uniqueIdentified("floating-pin", in: floating).click()
@@ -419,6 +488,7 @@ final class Codex94UITests: XCTestCase {
         try fixture.setMode("serverError")
         let cacheBeforeFailure = try fixture.cacheFingerprint()
         try refreshFloating(floating)
+        try assertFloatingGeometry(floating, expanded: false)
         try assertFloatingMetric("floating-quota-weekly", contains: "32%", in: floating)
         try assertFloatingMetric("floating-refresh", contains: "Failed", in: floating)
         try assertFloatingMetric("floating-refresh", contains: "Cached data", in: floating)
@@ -469,6 +539,11 @@ final class Codex94UITests: XCTestCase {
             "dragAndSavedPositionVerified": true, "visibleScreenContainmentVerified": true,
             "sameOwnedWindowReused": true, "sameApplicationProcess": true,
             "pinExpandDragHideShowDoNotFetch": true, "tokenUsageRequestsUnchanged": true,
+            "weeklyOnlyWidth": 480, "dualWindowWidth": 680,
+            "coldStateUsesWeeklyOnlyShape": true, "unreportedFiveHourNodeAbsent": true,
+            "menuBarQuotaShapeRoundTripVerified": true, "quotaSelectionsDoNotFetchOrWriteCache": true,
+            "quotaShapeChangesPreserveTopLeft": true, "quotaShapeChangesReuseWindow": true,
+            "quotaSelectorPopoverRefreshCount": 1,
             "compactHeight": 90, "expandedHeight": 132,
             "fullScreenAndSpacesAcceptance": "not-tested", "keyboardFocusAcceptance": "not-tested",
             "sourceData": "fixed-synthetic-quota", "screenCoordinatesIncluded": false,
@@ -595,13 +670,19 @@ final class Codex94UITests: XCTestCase {
         }
     }
 
-    private func assertFloatingGeometry(_ window: XCUIElement, expanded: Bool) throws {
+    private func assertFloatingGeometry(_ window: XCUIElement, expanded: Bool, dualWindow: Bool = false) throws {
         let frame = window.frame
+        let expectedWidth: CGFloat = dualWindow ? 680 : 480
         try require([frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
-                    && (320...682).contains(frame.width)
+                    && abs(frame.width - expectedWidth) <= 2
                     && abs(frame.height - (expanded ? 132 : 90)) <= 2,
                     "The floating window must preserve its bounded horizontal layout")
         _ = try visibleScreenContaining(frame)
+        let fiveHour = window.descendants(matching: .any).matching(identifier: "floating-quota-fiveHour")
+        try require(dualWindow ? fiveHour.count > 0 : fiveHour.count == 0,
+                    "Only a bucket with reported 5-hour data may expose a floating 5-hour accessibility node")
+        try require(identified("floating-quota-weekly", in: window).exists,
+                    "Both floating shapes must retain their weekly quota column")
         let controls = ["floating-quota-content", "floating-refresh", "floating-pin", "floating-expand", "floating-hide"]
             + (expanded ? ["floating-open-dashboard"] : [])
         for identifier in controls {
@@ -679,7 +760,8 @@ final class Codex94UITests: XCTestCase {
         let targetSizeMatches = owned.filter { value in
             guard let bounds = value[kCGWindowBounds as String] as? [String: Any],
                   let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
-            return frame.width.isFinite && frame.height.isFinite && (320...682).contains(frame.width)
+            return frame.width.isFinite && frame.height.isFinite
+                && (abs(frame.width - 480) <= 2 || abs(frame.width - 680) <= 2)
                 && (abs(frame.height - 90) <= 2 || abs(frame.height - 132) <= 2)
         }.count
         try fixture.writeReport("floating-window-query-diagnostic.json", fields: [
@@ -3180,6 +3262,7 @@ private struct SyntheticFixture {
         ] : []
         let floating: Set<String> = scenario == "floating" ? [
             "floating-cold-en.png", "floating-compact-en.png", "floating-expanded-en.png",
+            "floating-single-window-en.png", "floating-dual-window-en.png",
             "floating-cached-failure-en.png", "floating-result.json", "floating-window-query-diagnostic.json",
             "floating-dashboard-toggle-diagnostic.json"
         ] : []
