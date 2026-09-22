@@ -5,6 +5,11 @@ This document describes the published stable release
 on 2026-09-21 (Australia/Melbourne). README download and source instructions
 refer to this release. Update checks are manual; installation remains user-managed.
 
+The `3.1.0 (16)` candidate retains this manual-only update design. Floating
+quota and local Token analysis/image exports add no update polling, download,
+installation, relaunch, endpoint, or signing-policy change. Stable discovery
+continues to follow the latest published GitHub Release.
+
 ## User flow
 
 1. Open Dashboard → About and select **Check for updates**.

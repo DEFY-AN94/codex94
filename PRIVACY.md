@@ -58,7 +58,8 @@ values keep their original fetch time and are shown with an error status.
 
 A user-initiated CSV export writes the displayed daily dates and token counts
 to a location chosen by the user. It contains no identity, task titles, prompts,
-credentials or raw RPC. Exporting is the only statistics persistence feature.
+credentials or raw RPC. User-initiated exports are separate from the app’s
+memory-only statistics store.
 Dates retain the service's calendar-day labels; the app does not assume its
 undocumented reporting timezone or treat omitted days as zero usage.
 The 7-day and 30-day views end at the latest returned date, not the current
@@ -68,6 +69,23 @@ UserDefaults. Changing chart style reuses the loaded response and makes no
 request or statistics-cache write.
 Summary scope and complete history coverage are unspecified; the app does not
 infer model/project, input/output, cost, hourly, or thread-level statistics.
+
+### 3.1.0 candidate: custom ranges and chart images
+
+Custom start/end dates are view-local state. The app uses UTC calendar
+coordinates to preserve source date labels, not to infer the service's
+reporting timezone. Date filtering, reported averages/peaks, coverage, and
+previous-interval comparison derive only from the loaded snapshot. They do not
+request new data, fill missing days with zero, or create a history database.
+
+An explicit PNG export writes the selected chart to a user-chosen file.
+**Copy chart image** writes that PNG to the macOS general pasteboard only after
+its button is clicked. Images follow the selected range/style/language/theme
+and include date range, fetch time, coverage, and stale-data status when
+applicable. They contain no account identity, service-summary cards, task
+content, credentials, paths, or raw RPC. Exported files and clipboard contents
+exist independently of the in-memory snapshot; the app does not read or upload
+the clipboard. Automated copy tests use isolated named pasteboards.
 
 ## Data stored locally
 
@@ -107,6 +125,13 @@ Version `0.2.2 (13)` adds three preference keys while retaining cache v2:
 - `notifications.v1` stores the enabled state, warning thresholds, additional
   bucket choices, and recovery-alert preference. It does not store observed
   quota values, notification baselines, or per-cycle delivery history.
+
+The `3.1.0 (16)` candidate adds `floatingWindowPinned.v1` for pin state and
+`floatingWindowPosition.v1` for screen coordinates only. Floating visibility
+and expansion are memory-only. The strip reads the same quota snapshot;
+showing, dragging, pinning, or expanding it adds no quota request, reset-credit
+consumption, cache field, or polling cadence. Its explicit refresh action uses
+the existing manual refresh path.
 
 Codex94 also keeps the selected Dashboard section and the post-reset task state
 only in memory; the existing macOS window-frame autosave behavior is unchanged.
@@ -213,8 +238,8 @@ and account data are not logged. The reset trigger name itself is non-sensitive.
 When the user selects **Copy redacted diagnostics**, Codex94 normalizes the
 detected executable path and version, then writes the structured diagnostic text
 to the macOS system clipboard. When the user selects **Copy version** in About,
-it writes the exact displayed version and build. Both writes happen only after a
-user action. Codex94 does not read or upload clipboard contents or diagnostics,
+it writes the exact displayed version and build. These text writes and the
+`3.1.0` candidate’s chart-image copy happen only after a user action. Codex94 does not read or upload clipboard contents or diagnostics,
 and users should review copied diagnostics before sharing them. Selecting the
 project link similarly opens the exact repository URL through the system.
 The release-check request is separate and does not upload clipboard
@@ -224,7 +249,9 @@ contents or diagnostics.
 
 Codex94 does not request browser, Documents, Keychain, Accessibility, contacts,
 camera, microphone, or location access. Standard file dialogs appear only when
-the user explicitly chooses a Codex executable or a CSV export destination.
+the user explicitly chooses a Codex executable or an export destination
+(CSV, or PNG in the `3.1.0` candidate). The floating panel and image export add
+no system permission or entitlement.
 Version `0.1.9` added no system
 permission or entitlement; versions `0.2.0` and `0.2.1` likewise add none.
 Version `0.2.2` adds only the explicit, optional local-notification

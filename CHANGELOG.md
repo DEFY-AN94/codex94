@@ -2,6 +2,37 @@
 
 All notable changes to Codex94 are documented here.
 
+## 3.1.0 - 2026-09-23
+
+Version `3.1.0 (16)`. Release dates use Australia/Melbourne.
+
+### Added
+
+- Add a compact floating quota strip, targeting 680 × 90 logical points, with
+  pin, drag, hide, and expand controls. It reads the existing quota snapshot;
+  the refresh action appears on freshness hover or keyboard focus and uses
+  the existing manual refresh path. The popover shortcut remains unchanged.
+- Add custom inclusive source-date ranges alongside 7-day, 30-day, and
+  all-returned views. Show reported daily average, selected-interval peak,
+  coverage, and the preceding equal-length interval's reported total/coverage.
+  Show percentage change only when both intervals are complete and the prior
+  total is nonzero; missing days remain unreported.
+- Export the selected chart as PNG or copy its image after a user action.
+  Images follow the selected range, bar/line style, language, and appearance,
+  with fetch time, coverage, and any stale-data notice. CSV export remains.
+
+### Privacy and validation
+
+- Store only floating pin state and position in two new preferences;
+  visibility, expansion, custom dates, and Token snapshots remain memory-only.
+  Add no polling cadence, reset-credit consumption, history database, network
+  endpoint, system permission, or signing-policy change.
+- Add synthetic Floating UI coverage alongside Display, Recovery, and Token
+  usage; extend usage checks for custom ranges and image-export controls.
+  Validate PNG rendering and copying with synthetic data and named test
+  pasteboards. Native
+  NSPanel behavior across Spaces and fullscreen apps needs separate validation.
+
 ## 3.0.1 - 2026-09-21
 
 Version `3.0.1 (15)`. Release dates use Australia/Melbourne. This maintenance

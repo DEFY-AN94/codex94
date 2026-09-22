@@ -7,6 +7,7 @@ struct DashboardView: View {
     let chooseCodex: () -> Void
     let clearManualCodex: () -> Void
     let quit: () -> Void
+    var showFloatingWindow: (() -> Void)? = nil
 
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
@@ -84,6 +85,14 @@ struct DashboardView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
+                if let showFloatingWindow {
+                    Button(action: showFloatingWindow) {
+                        Image(systemName: "rectangle.on.rectangle")
+                    }
+                    .help("floating.toggle")
+                    .accessibilityLabel(Text("floating.toggle"))
+                    .accessibilityIdentifier("dashboard-floating-toggle")
+                }
                 if windowState.resolvedSelection != .usage {
                     Button {
                         store.refresh(trigger: .manual)

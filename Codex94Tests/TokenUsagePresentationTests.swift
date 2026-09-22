@@ -119,6 +119,258 @@ final class TokenUsagePresentationTests: XCTestCase {
         XCTAssertEqual(all.visibleDays.first?.startDate, "2033-04-14")
     }
 
+    func testCustomRangeFiltersChartExportAndMetricsWithoutChangingSummary() throws {
+        let source = TokenUsageSnapshot(
+            summary: TokenUsageSummary(lifetimeTokens: 999_999, peakDailyTokens: 8_000),
+            dailyUsageBuckets: [
+                TokenUsageDay(startDate: "2033-05-01", tokens: 10),
+                TokenUsageDay(startDate: "2033-05-02", tokens: 10),
+                TokenUsageDay(startDate: "2033-05-03", tokens: 10),
+                TokenUsageDay(startDate: "2033-05-04", tokens: 20),
+                TokenUsageDay(startDate: "2033-06-01", tokens: 8_000)
+            ], fetchedAt: Date(timeIntervalSince1970: 1_900_000_000)
+        )
+        let requested = try sourceRange("2033-05-03", "2033-05-04")
+        let value = TokenUsagePresentation(snapshot: source, range: .custom, customRange: requested)
+
+        XCTAssertEqual(value.customRange, requested)
+        XCTAssertEqual(value.startDate, requested.lowerBound)
+        XCTAssertEqual(value.endDate, requested.upperBound)
+        XCTAssertEqual(value.visibleDays.map(\.tokens), [10, 20])
+        XCTAssertEqual(value.lineSegments.flatMap(\.days), value.visibleDays)
+        XCTAssertEqual(value.expectedDayCount, 2)
+        XCTAssertEqual(value.reportedDayCount, 2)
+        XCTAssertTrue(value.hasCompleteCoverage)
+        XCTAssertEqual(value.reportedTotal, 30)
+        XCTAssertEqual(value.reportedDailyAverage, 15)
+        XCTAssertEqual(value.reportedPeak, 20)
+        XCTAssertEqual(value.csv, "source_date,tokens\r\n2033-05-03,10\r\n2033-05-04,20\r\n")
+        XCTAssertEqual(value.exportFilename, "Codex94-token-usage-2033-05-03-2033-05-04.csv")
+        XCTAssertEqual(value.comparison.startDate, TokenUsagePresentation.sourceDate("2033-05-01"))
+        XCTAssertEqual(value.comparison.endDate, TokenUsagePresentation.sourceDate("2033-05-02"))
+        XCTAssertEqual(value.comparison.expectedDayCount, 2)
+        XCTAssertEqual(value.comparison.reportedDayCount, 2)
+        XCTAssertEqual(value.comparison.reportedTotal, 20)
+        XCTAssertEqual(value.comparison.percentChange, 50)
+        XCTAssertNil(value.comparison.unavailableReason)
+        XCTAssertEqual(source.summary.peakDailyTokens, 8_000)
+        XCTAssertEqual(source.summary.lifetimeTokens, 999_999)
+    }
+
+    func testCustomRangeNormalizesSourceDaysAcrossDSTAndLeapDay() throws {
+        let leapRange = try sourceRange("2024-02-28", "2024-03-01")
+        let intraday = leapRange.lowerBound.addingTimeInterval(43_200)...leapRange.upperBound.addingTimeInterval(80_000)
+        let value = TokenUsagePresentation(snapshot: snapshot([
+            TokenUsageDay(startDate: "2024-02-28", tokens: 1),
+            TokenUsageDay(startDate: "2024-02-29", tokens: 2),
+            TokenUsageDay(startDate: "2024-03-01", tokens: 3)
+        ]), range: .custom, customRange: intraday)
+        XCTAssertEqual(value.customRange, leapRange)
+        XCTAssertEqual(value.expectedDayCount, 3)
+        XCTAssertEqual(value.missingDayCount, 0)
+        XCTAssertEqual(value.reportedDailyAverage, 2)
+        XCTAssertEqual(value.comparison.startDate, TokenUsagePresentation.sourceDate("2024-02-25"))
+        XCTAssertEqual(value.comparison.endDate, TokenUsagePresentation.sourceDate("2024-02-27"))
+
+        let dstRange = try sourceRange("2026-10-03", "2026-10-05")
+        let dst = TokenUsagePresentation(snapshot: snapshot([]), range: .custom, customRange: dstRange)
+        XCTAssertEqual(dst.expectedDayCount, 3)
+        XCTAssertEqual(try XCTUnwrap(dst.plotDomain).upperBound.timeIntervalSince(dstRange.lowerBound), 3 * 86_400)
+    }
+
+    func testReportedAverageIncludesExplicitZeroButNeverFillsUnreportedDays() throws {
+        let value = TokenUsagePresentation(snapshot: snapshot([
+            TokenUsageDay(startDate: "2033-05-03", tokens: 0),
+            TokenUsageDay(startDate: "2033-05-05", tokens: 30)
+        ]), range: .custom, customRange: try sourceRange("2033-05-03", "2033-05-05"))
+        XCTAssertEqual(value.expectedDayCount, 3)
+        XCTAssertEqual(value.reportedDayCount, 2)
+        XCTAssertEqual(value.missingDayCount, 1)
+        XCTAssertFalse(value.hasCompleteCoverage)
+        XCTAssertEqual(value.reportedTotal, 30)
+        XCTAssertEqual(value.reportedDailyAverage, 15)
+        XCTAssertEqual(value.reportedPeak, 30)
+        XCTAssertNil(value.comparison.percentChange)
+        XCTAssertEqual(value.comparison.unavailableReason, .incompleteCurrentRange)
+        XCTAssertEqual(value.lineSegments.count, 2)
+        XCTAssertFalse(value.csv.contains("2033-05-04"))
+    }
+
+    func testCustomDatesOutsideReturnedCoverageRemainRequestedAndUnknown() throws {
+        let requested = try sourceRange("2033-05-01", "2033-05-07")
+        let value = TokenUsagePresentation(snapshot: snapshot([
+            TokenUsageDay(startDate: "2033-05-03", tokens: 10),
+            TokenUsageDay(startDate: "2033-05-04", tokens: 20)
+        ]), range: .custom, customRange: requested)
+        XCTAssertEqual(value.startDate, requested.lowerBound)
+        XCTAssertEqual(value.endDate, requested.upperBound)
+        XCTAssertEqual(value.expectedDayCount, 7)
+        XCTAssertEqual(value.missingDayCount, 5)
+        XCTAssertEqual(value.reportedTotal, 30)
+
+        for source in [snapshot(nil), snapshot([])] {
+            let empty = TokenUsagePresentation(snapshot: source, range: .custom, customRange: requested)
+            XCTAssertEqual(empty.expectedDayCount, 7)
+            XCTAssertEqual(empty.missingDayCount, 7)
+            XCTAssertNil(empty.reportedTotal)
+            XCTAssertNil(empty.reportedDailyAverage)
+            XCTAssertNil(empty.reportedPeak)
+            XCTAssertFalse(empty.hasCompleteCoverage)
+            XCTAssertEqual(empty.comparison.unavailableReason, .incompleteCurrentRange)
+            XCTAssertEqual(empty.csv, "source_date,tokens\r\n")
+        }
+    }
+
+    func testComparisonDistinguishesMissingPreviousDaysFromAZeroBaseline() throws {
+        let current = [
+            TokenUsageDay(startDate: "2033-05-03", tokens: 10),
+            TokenUsageDay(startDate: "2033-05-04", tokens: 20)
+        ]
+        let requested = try sourceRange("2033-05-03", "2033-05-04")
+        let missing = TokenUsagePresentation(snapshot: snapshot([
+            TokenUsageDay(startDate: "2033-05-02", tokens: 0)
+        ] + current), range: .custom, customRange: requested)
+        XCTAssertTrue(missing.hasCompleteCoverage)
+        XCTAssertEqual(missing.comparison.reportedDayCount, 1)
+        XCTAssertEqual(missing.comparison.reportedTotal, 0)
+        XCTAssertEqual(missing.comparison.unavailableReason, .incompletePreviousRange)
+        XCTAssertNil(missing.comparison.percentChange)
+
+        let zero = TokenUsagePresentation(snapshot: snapshot([
+            TokenUsageDay(startDate: "2033-05-01", tokens: 0),
+            TokenUsageDay(startDate: "2033-05-02", tokens: 0)
+        ] + current), range: .custom, customRange: requested)
+        XCTAssertEqual(zero.comparison.reportedDayCount, 2)
+        XCTAssertEqual(zero.comparison.reportedTotal, 0)
+        XCTAssertEqual(zero.comparison.unavailableReason, .zeroBaseline)
+        XCTAssertNil(zero.comparison.percentChange)
+    }
+
+    func testSingleDayComparisonPreservesDecreaseZeroAndLargeIntegers() throws {
+        let requested = try sourceRange("2033-05-02", "2033-05-02")
+        for (previous, current, percent): (Int, Int, Double) in [
+            (20, 10, -50), (20, 0, -100), (20, 20, 0), (Int.max, 0, -100), (1, Int.max, Double(Int.max - 1) * 100)
+        ] {
+            let value = TokenUsagePresentation(snapshot: snapshot([
+                TokenUsageDay(startDate: "2033-05-01", tokens: previous),
+                TokenUsageDay(startDate: "2033-05-02", tokens: current)
+            ]), range: .custom, customRange: requested)
+            XCTAssertEqual(value.expectedDayCount, 1)
+            XCTAssertEqual(value.reportedPeak, current)
+            XCTAssertEqual(value.reportedDailyAverage, Double(current))
+            XCTAssertEqual(value.comparison.percentChange, percent)
+            XCTAssertNil(value.comparison.unavailableReason)
+            XCTAssertEqual(try XCTUnwrap(value.plotDomain).upperBound.timeIntervalSince(requested.lowerBound), 86_400)
+        }
+    }
+
+    func testComparisonSuppressesPercentageWhenEitherCompleteTotalOverflows() throws {
+        let requested = try sourceRange("2033-05-03", "2033-05-04")
+        for tokens in [[1, 1, Int.max, 1], [Int.max, 1, 1, 1]] {
+            let days = zip(["2033-05-01", "2033-05-02", "2033-05-03", "2033-05-04"], tokens).map {
+                TokenUsageDay(startDate: $0.0, tokens: $0.1)
+            }
+            let value = TokenUsagePresentation(snapshot: snapshot(days), range: .custom, customRange: requested)
+            XCTAssertTrue(value.hasCompleteCoverage)
+            XCTAssertEqual(value.comparison.unavailableReason, .totalOverflow)
+            XCTAssertNil(value.comparison.percentChange)
+            if tokens[2] == Int.max {
+                XCTAssertNil(value.reportedTotal)
+                XCTAssertNil(value.reportedDailyAverage)
+                XCTAssertEqual(value.reportedPeak, Int.max)
+            } else {
+                XCTAssertEqual(value.reportedTotal, 2)
+                XCTAssertEqual(value.reportedDailyAverage, 1)
+                XCTAssertNil(value.comparison.reportedTotal)
+            }
+        }
+    }
+
+    func testCustomRangeSafelyHandlesMissingNonfiniteAndBoundaryDates() throws {
+        let first = try XCTUnwrap(TokenUsagePresentation.sourceDate("0001-01-01"))
+        let last = try XCTUnwrap(TokenUsagePresentation.sourceDate("9999-12-31"))
+        let invalidRanges: [ClosedRange<Date>?] = [
+            nil, Date(timeIntervalSinceReferenceDate: -.infinity)...last,
+            first...Date(timeIntervalSinceReferenceDate: .infinity),
+            first.addingTimeInterval(-86_400)...first,
+            last...last.addingTimeInterval(86_400)
+        ]
+        for requested in invalidRanges {
+            let value = TokenUsagePresentation(snapshot: snapshot([
+                TokenUsageDay(startDate: "2033-05-01", tokens: 1)
+            ]), range: .custom, customRange: requested)
+            XCTAssertNil(value.customRange)
+            XCTAssertNil(value.startDate)
+            XCTAssertNil(value.endDate)
+            XCTAssertNil(value.plotDomain)
+            XCTAssertEqual(value.expectedDayCount, 0)
+            XCTAssertTrue(value.visibleDays.isEmpty)
+            XCTAssertEqual(value.comparison.unavailableReason, .invalidRange)
+        }
+        let earliest = TokenUsagePresentation(snapshot: snapshot([
+            TokenUsageDay(startDate: "0001-01-01", tokens: 1)
+        ]), range: .custom, customRange: first...first)
+        XCTAssertTrue(earliest.hasCompleteCoverage)
+        XCTAssertEqual(earliest.reportedTotal, 1)
+        XCTAssertEqual(earliest.comparison.unavailableReason, .invalidRange)
+        XCTAssertNil(earliest.comparison.percentChange)
+
+        let entire = TokenUsagePresentation(snapshot: snapshot([
+            TokenUsageDay(startDate: "0001-01-01", tokens: 1),
+            TokenUsageDay(startDate: "9999-12-31", tokens: 2)
+        ]), range: .custom, customRange: first...last)
+        XCTAssertGreaterThan(entire.expectedDayCount, 3_000_000)
+        XCTAssertEqual(entire.visibleDays.count, 2)
+        XCTAssertEqual(entire.reportedTotal, 3)
+        XCTAssertEqual(entire.axisPlotDates(maximumCount: 6).count, 6)
+        XCTAssertNotNil(entire.plotDomain)
+        XCTAssertEqual(entire.exportFilename, "Codex94-token-usage-0001-01-01-9999-12-31.csv")
+    }
+
+    func testCustomMemoTracksChangedDatesCorrectionsAndClearWithoutPublishing() throws {
+        let cache = TokenUsagePresentationCache()
+        var publications = 0
+        let observation = cache.objectWillChange.sink { publications += 1 }
+        let source = snapshot([
+            TokenUsageDay(startDate: "2033-05-01", tokens: 10),
+            TokenUsageDay(startDate: "2033-05-02", tokens: 20),
+            TokenUsageDay(startDate: "2033-05-03", tokens: 30)
+        ])
+        let firstRange = try sourceRange("2033-05-01", "2033-05-02")
+        let first = cache.resolve(snapshot: source, range: .custom, customRange: firstRange)
+        let secondRange = try sourceRange("2033-05-02", "2033-05-03")
+        let second = cache.resolve(snapshot: source, range: .custom, customRange: secondRange)
+        XCTAssertEqual(first.reportedTotal, 30)
+        XCTAssertEqual(second.reportedTotal, 50)
+        XCTAssertEqual(first.allDays, second.allDays)
+        XCTAssertEqual(second.visibleDays.map(\.startDate), ["2033-05-02", "2033-05-03"])
+        XCTAssertNil(second.day(on: firstRange.lowerBound))
+        let intraday = secondRange.lowerBound.addingTimeInterval(1)...secondRange.upperBound.addingTimeInterval(1)
+        XCTAssertEqual(cache.resolve(snapshot: source, range: .custom, customRange: intraday), second)
+
+        let corrected = snapshot([
+            TokenUsageDay(startDate: "2033-05-01", tokens: 10),
+            TokenUsageDay(startDate: "2033-05-02", tokens: 20),
+            TokenUsageDay(startDate: "2033-05-03", tokens: 70)
+        ])
+        let next = cache.resolve(snapshot: corrected, range: .custom, customRange: secondRange)
+        XCTAssertEqual(next.reportedTotal, 90)
+        XCTAssertEqual(next.reportedPeak, 70)
+        XCTAssertEqual(next.reportedDailyAverage, 45)
+        let preset = cache.resolve(snapshot: corrected, range: .all, customRange: firstRange)
+        XCTAssertNil(preset.customRange)
+        XCTAssertEqual(preset.reportedTotal, 100)
+        let cleared = cache.resolve(snapshot: nil, range: .custom, customRange: secondRange)
+        XCTAssertTrue(cleared.allDays.isEmpty)
+        XCTAssertTrue(cleared.visibleDays.isEmpty)
+        XCTAssertNil(cleared.reportedTotal)
+        XCTAssertNil(cleared.reportedDailyAverage)
+        XCTAssertNil(cleared.reportedPeak)
+        XCTAssertEqual(cleared.expectedDayCount, 2)
+        XCTAssertEqual(publications, 0)
+        withExtendedLifetime(observation) {}
+    }
+
     func testMissingDatesRemainMissingAndExplicitZeroRemainsPresent() {
         let value = TokenUsagePresentation(snapshot: snapshot([
             TokenUsageDay(startDate: "2033-05-07", tokens: 30),
@@ -311,6 +563,10 @@ final class TokenUsagePresentationTests: XCTestCase {
             summary: TokenUsageSummary(lifetimeTokens: 999_999), dailyUsageBuckets: days,
             fetchedAt: Date(timeIntervalSince1970: 1_900_000_000)
         )
+    }
+
+    private func sourceRange(_ first: String, _ last: String) throws -> ClosedRange<Date> {
+        try XCTUnwrap(TokenUsagePresentation.sourceDate(first))...XCTUnwrap(TokenUsagePresentation.sourceDate(last))
     }
 
     private func legacyDate(_ date: Date, locale: Locale, includeYear: Bool) -> String {

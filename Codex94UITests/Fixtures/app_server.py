@@ -15,7 +15,7 @@ import time
 REPORTED_EXECUTABLE = Path(__file__).absolute()
 ROOT = Path("/private/tmp") / REPORTED_EXECUTABLE.parent.name
 MODE_NAMES = {"normal", "notLoggedIn", "serverError", "longName", "slow"}
-TOKEN_USAGE_MODES = {"complete", "partial", "missing", "unsupported"}
+TOKEN_USAGE_MODES = {"complete", "partial", "missing", "unsupported", "slow"}
 mode_name = "normal"
 log_ready = False
 
@@ -128,6 +128,10 @@ def main():
         require(manifest["scenario"] == "usage")
         require(set(limits) == {"id", "method"})
         event("tokenUsage")
+        if token_usage_mode == "slow":
+            # Keep the real read-only RPC pending long enough for external UI
+            # assertions, while staying below the production request timeout.
+            time.sleep(3)
         if token_usage_mode == "unsupported":
             reply({"id": 2, "error": {"code": -32601, "message": "Synthetic method not found"}})
         elif token_usage_mode == "missing":

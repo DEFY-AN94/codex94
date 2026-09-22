@@ -54,8 +54,9 @@ read or change real Login Items.
 
 ### Version 0.2.2 behavior
 
-Version `0.2.2 (13)` was published on 2026-09-20. Published download and
-source-clone links point to `v0.2.2`. Retain the release's original source and
+Version `0.2.2 (13)` was published on 2026-09-20. Its historical download and
+source references identify `v0.2.2`; current stable instructions point to the
+latest published release. Retain each release's original source and
 asset provenance when making later documentation changes. Test and acceptance
 evidence remains specific to the revision and artifacts actually checked.
 
@@ -81,6 +82,29 @@ Missing/null is unavailable, not zero; credit-list length is not a substitute.
 Keep the count in memory, preserve it when removing account information, and
 exclude it and credit details from cache v2. Do not add a consume operation,
 auth/session-file access, history collection, updater, or multi-account work.
+
+### Version 3.1.0 candidate
+
+Keep the floating panel under AppKit ownership with the existing `AppStore`.
+Showing, dragging, pinning, hiding, and expanding must not fetch quota or write
+its cache; explicit refresh uses the existing manual path. Only pin state and
+position receive new preferences. Preserve the existing popover shortcut and
+read-only reset-credit behavior. Do not claim cross-Space/fullscreen behavior
+from NSPanel flags without native testing.
+
+Custom Token ranges, reported averages/peaks, coverage, and prior-interval
+comparison reuse the same prepared snapshot as the chart, table, and exports.
+Keep source-day coordinates explicit, missing days distinct from zero, and
+percentage comparison unavailable for incomplete intervals or zero baselines.
+PNG exports use a dedicated noninteractive chart surface with no identity.
+Save/copy actions are user-triggered; tests use only synthetic data and isolated
+named pasteboards and must never touch the user's general pasteboard. Check
+actual image contents and clipping, not only nonempty data or dimensions.
+
+The candidate adds **Floating** as a fourth external UI scenario alongside
+Display, Recovery, and Token usage; usage also covers the new date/export
+controls without additional RPCs. New runs and visual acceptance are required
+before reporting these features as verified. See [architecture rules](docs/ARCHITECTURE.md).
 
 ## Development and validation
 
@@ -138,7 +162,8 @@ test preferences, caches, and output paths separate from daily app data.
   CI or producing a nonempty image is not evidence of GUI correctness.
 
 The `Codex94` scheme retains the unit/release gate. The separate `Codex94UI`
-scheme uses an external UI test runner. Display exercises the unmodified app;
+scheme uses an external UI test runner. Display, Token usage, and Floating
+exercise the unmodified app;
 Recovery exercises a temporary instrumented App copy with a read-only focus
 probe, marked `instrumentedAUT` and `readOnlyFocusDiagnostic` in the fixture
 manifest. Recovery click success applies to that diagnostic copy and does not
@@ -184,7 +209,7 @@ documentation screenshots.
 Cover fixed and live layout metrics, independent color roles and restoration,
 Reset locale/calendar/time-zone behavior and scheduling, all recovery routes,
 Overview routing/rendering, button accessibility, and no-fetch/no-cache-write
-behavior. About copy tests must use an isolated named pasteboard and must not
+behavior. About and chart-image copy tests must use isolated named pasteboards and must not
 read, clear, or overwrite the user's general pasteboard. Preserve the existing
 multi-bucket, freshness, wake, and subprocess regressions. Shared Reset labels
 must include the countdown and absolute time; public test data and screenshots

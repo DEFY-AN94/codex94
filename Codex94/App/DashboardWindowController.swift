@@ -11,7 +11,8 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
         store: AppStore,
         chooseCodex: @escaping () -> Void,
         clearManualCodex: @escaping () -> Void,
-        quit: @escaping () -> Void
+        quit: @escaping () -> Void,
+        showFloatingWindow: (() -> Void)? = nil
     ) {
         let windowState = DashboardWindowState()
         self.windowState = windowState
@@ -33,7 +34,8 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
             windowState: windowState,
             chooseCodex: chooseCodex,
             clearManualCodex: clearManualCodex,
-            quit: quit
+            quit: quit,
+            showFloatingWindow: showFloatingWindow
         )
         window.contentView = NSHostingView(rootView: rootView)
 

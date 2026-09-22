@@ -19,6 +19,7 @@ enum TokenUsageRange: String, CaseIterable, Identifiable {
     case sevenDays
     case thirtyDays
     case all
+    case custom
 
     var id: String { rawValue }
 
@@ -26,7 +27,7 @@ enum TokenUsageRange: String, CaseIterable, Identifiable {
         switch self {
         case .sevenDays: 7
         case .thirtyDays: 30
-        case .all: nil
+        case .all, .custom: nil
         }
     }
 
@@ -35,6 +36,7 @@ enum TokenUsageRange: String, CaseIterable, Identifiable {
         case .sevenDays: "usage.range.sevenDays"
         case .thirtyDays: "usage.range.thirtyDays"
         case .all: "usage.range.all"
+        case .custom: "usage.range.custom"
         }
     }
 }
@@ -64,10 +66,32 @@ struct TokenUsageLineSegment: Identifiable, Equatable {
     var id: String { days.first?.id ?? "" }
 }
 
+enum TokenUsageComparisonUnavailableReason: Equatable {
+    case invalidRange
+    case incompleteCurrentRange
+    case incompletePreviousRange
+    case zeroBaseline
+    case totalOverflow
+}
+
+/// The immediately preceding interval has the same number of source calendar days.
+/// Totals remain reported-row totals; only complete intervals receive a percentage.
+struct TokenUsageComparison: Equatable {
+    let startDate: Date?
+    let endDate: Date?
+    let expectedDayCount: Int
+    let reportedDayCount: Int
+    let reportedTotal: Int?
+    /// Percentage change: 20 means an increase of 20%, not a multiplier of 20.
+    let percentChange: Double?
+    let unavailableReason: TokenUsageComparisonUnavailableReason?
+}
+
 /// UTC is a stable plotting coordinate for source date labels, not a claim about
 /// the account's reporting time zone. Missing source dates are never filled.
 struct TokenUsagePresentation: Equatable {
     let range: TokenUsageRange
+    let customRange: ClosedRange<Date>?
     let allDays: [TokenUsagePlotDay]
     let visibleDays: [TokenUsagePlotDay]
     let startDate: Date?
@@ -76,26 +100,43 @@ struct TokenUsagePresentation: Equatable {
     let lineSegments: [TokenUsageLineSegment]
     /// Sum of reported rows only, not a claim of complete coverage.
     let reportedTotal: Int?
+    let expectedDayCount: Int
+    /// Explicit zero rows count toward this average; unreported days do not.
+    let reportedDailyAverage: Double?
+    /// Peak among selected reported rows, independent of the service summary peak.
+    let reportedPeak: Int?
+    let comparison: TokenUsageComparison
     let maximumY: Double
     private let daysByDate: [Date: TokenUsagePlotDay]
 
-    init(snapshot: TokenUsageSnapshot?, range: TokenUsageRange) {
+    init(snapshot: TokenUsageSnapshot?, range: TokenUsageRange, customRange: ClosedRange<Date>? = nil) {
         let days: [TokenUsagePlotDay] = (snapshot?.dailyUsageBuckets ?? []).compactMap { day in
             guard let date = Self.sourceDate(day.startDate) else { return nil }
             return TokenUsagePlotDay(startDate: day.startDate, date: date, tokens: day.tokens)
         }.sorted { $0.date < $1.date }
-        self.init(sortedDays: days, range: range)
+        self.init(sortedDays: days, range: range, customRange: customRange)
     }
 
-    fileprivate init(sortedDays: [TokenUsagePlotDay], range: TokenUsageRange) {
+    fileprivate init(
+        sortedDays: [TokenUsagePlotDay], range: TokenUsageRange, customRange: ClosedRange<Date>? = nil
+    ) {
         self.range = range
+        self.customRange = range == .custom ? Self.normalized(customRange) : nil
         allDays = sortedDays
-        endDate = allDays.last?.date
-        if let endDate, let count = range.dayCount {
-            startDate = Self.calendar.date(byAdding: .day, value: 1 - count, to: endDate)
+        let requestedRange: ClosedRange<Date>?
+        if range == .custom {
+            requestedRange = self.customRange
+        } else if let latest = allDays.last?.date {
+            let first = range.dayCount.flatMap {
+                Self.calendar.date(byAdding: .day, value: 1 - $0, to: latest)
+            } ?? allDays.first?.date
+            requestedRange = first.flatMap { Self.normalized($0...latest) }
         } else {
-            startDate = allDays.first?.date
+            requestedRange = nil
         }
+        startDate = requestedRange?.lowerBound
+        endDate = requestedRange?.upperBound
+        expectedDayCount = Self.dayCount(in: requestedRange)
         if let startDate, let endDate {
             visibleDays = allDays.filter { $0.date >= startDate && $0.date <= endDate }
         } else {
@@ -105,18 +146,11 @@ struct TokenUsagePresentation: Equatable {
         var segments: [[TokenUsagePlotDay]] = []
         var lookup: [Date: TokenUsagePlotDay] = [:]
         lookup.reserveCapacity(visibleDays.count)
-        var total = 0
-        var totalOverflowed = false
         var maximum = 0
         let calendar = Self.calendar
         for day in visibleDays {
             lookup[day.date] = day
             maximum = max(maximum, day.tokens)
-            if !totalOverflowed {
-                let result = total.addingReportingOverflow(day.tokens)
-                totalOverflowed = result.overflow
-                total = result.partialValue
-            }
             if let previous = segments.last?.last,
                calendar.date(byAdding: .day, value: 1, to: previous.date) == day.date {
                 segments[segments.count - 1].append(day)
@@ -126,11 +160,104 @@ struct TokenUsagePresentation: Equatable {
         }
         lineSegments = segments.map { TokenUsageLineSegment(days: $0) }
         daysByDate = lookup
-        reportedTotal = visibleDays.isEmpty || totalOverflowed ? nil : total
+        reportedTotal = Self.total(of: visibleDays)
+        if let reportedTotal {
+            reportedDailyAverage = Double(reportedTotal) / Double(visibleDays.count)
+        } else {
+            reportedDailyAverage = nil
+        }
+        reportedPeak = visibleDays.isEmpty ? nil : maximum
         maximumY = max(1, Double(maximum) * 1.15)
+        comparison = Self.previousComparison(
+            allDays: allDays, currentRange: requestedRange,
+            expectedDayCount: expectedDayCount, reportedDayCount: visibleDays.count,
+            reportedTotal: reportedTotal
+        )
     }
 
     static var calendar: Calendar { SourceDay.calendar }
+
+    var reportedDayCount: Int { visibleDays.count }
+
+    var hasCompleteCoverage: Bool { expectedDayCount > 0 && reportedDayCount == expectedDayCount }
+
+    /// Bound dates before asking Calendar to normalize them, including nonfinite Dates.
+    /// These are the same representable source-label limits enforced by the parser.
+    private static let firstSourceDay = SourceDay.parse("0001-01-01")!
+    private static let lastSourceDay = SourceDay.parse("9999-12-31")!
+
+    fileprivate static func normalized(_ range: ClosedRange<Date>?) -> ClosedRange<Date>? {
+        guard let range,
+              range.lowerBound.timeIntervalSinceReferenceDate.isFinite,
+              range.upperBound.timeIntervalSinceReferenceDate.isFinite,
+              range.lowerBound >= firstSourceDay,
+              range.upperBound < lastSourceDay.addingTimeInterval(86_400) else { return nil }
+        let start = calendar.startOfDay(for: range.lowerBound)
+        let end = calendar.startOfDay(for: range.upperBound)
+        guard start <= end else { return nil }
+        return start...end
+    }
+
+    private static func dayCount(in range: ClosedRange<Date>?) -> Int {
+        guard let range,
+              let distance = calendar.dateComponents([.day], from: range.lowerBound, to: range.upperBound).day
+        else { return 0 }
+        return distance + 1
+    }
+
+    private static func total(of days: [TokenUsagePlotDay]) -> Int? {
+        guard !days.isEmpty else { return nil }
+        var total = 0
+        for day in days {
+            let result = total.addingReportingOverflow(day.tokens)
+            guard !result.overflow else { return nil }
+            total = result.partialValue
+        }
+        return total
+    }
+
+    private static func previousComparison(
+        allDays: [TokenUsagePlotDay], currentRange: ClosedRange<Date>?,
+        expectedDayCount: Int, reportedDayCount: Int, reportedTotal: Int?
+    ) -> TokenUsageComparison {
+        guard let currentRange, expectedDayCount > 0,
+              let previousEnd = calendar.date(byAdding: .day, value: -1, to: currentRange.lowerBound),
+              let previousStart = calendar.date(
+                byAdding: .day, value: -expectedDayCount, to: currentRange.lowerBound
+              ),
+              let previousRange = normalized(previousStart...previousEnd) else {
+            return TokenUsageComparison(
+                startDate: nil, endDate: nil, expectedDayCount: expectedDayCount,
+                reportedDayCount: 0, reportedTotal: nil, percentChange: nil, unavailableReason: .invalidRange
+            )
+        }
+        let previousDays = allDays.filter { previousRange.contains($0.date) }
+        let previousTotal = total(of: previousDays)
+        let reason: TokenUsageComparisonUnavailableReason?
+        if reportedDayCount != expectedDayCount {
+            reason = .incompleteCurrentRange
+        } else if previousDays.count != expectedDayCount {
+            reason = .incompletePreviousRange
+        } else if reportedTotal == nil || previousTotal == nil {
+            reason = .totalOverflow
+        } else if previousTotal == 0 {
+            reason = .zeroBaseline
+        } else {
+            reason = nil
+        }
+        let percentChange: Double?
+        if reason == nil, let current = reportedTotal, let previous = previousTotal {
+            // Both are nonnegative Int values, so their difference cannot overflow.
+            percentChange = Double(current - previous) / Double(previous) * 100
+        } else {
+            percentChange = nil
+        }
+        return TokenUsageComparison(
+            startDate: previousRange.lowerBound, endDate: previousRange.upperBound,
+            expectedDayCount: expectedDayCount, reportedDayCount: previousDays.count,
+            reportedTotal: previousTotal, percentChange: percentChange, unavailableReason: reason
+        )
+    }
 
     static func plotDate(for sourceDate: Date) -> Date {
         calendar.startOfDay(for: sourceDate).addingTimeInterval(43_200)
@@ -151,9 +278,7 @@ struct TokenUsagePresentation: Equatable {
     }
 
     var missingDayCount: Int {
-        guard let startDate, let endDate,
-              let distance = Self.calendar.dateComponents([.day], from: startDate, to: endDate).day else { return 0 }
-        return max(0, distance + 1 - visibleDays.count)
+        max(0, expectedDayCount - reportedDayCount)
     }
 
     /// Tick labels share the marks' day-center coordinate, including missing calendar days.
@@ -191,14 +316,17 @@ final class TokenUsagePresentationCache: ObservableObject {
     private var sourceDays: [TokenUsageDay]?
     private var cached: TokenUsagePresentation?
 
-    func resolve(snapshot: TokenUsageSnapshot?, range: TokenUsageRange) -> TokenUsagePresentation {
+    func resolve(
+        snapshot: TokenUsageSnapshot?, range: TokenUsageRange, customRange: ClosedRange<Date>? = nil
+    ) -> TokenUsagePresentation {
         let days = snapshot?.dailyUsageBuckets
+        let normalizedRange = range == .custom ? TokenUsagePresentation.normalized(customRange) : nil
         let result: TokenUsagePresentation
         if let cached, sourceDays == days {
-            if cached.range == range { return cached }
-            result = TokenUsagePresentation(sortedDays: cached.allDays, range: range)
+            if cached.range == range, cached.customRange == normalizedRange { return cached }
+            result = TokenUsagePresentation(sortedDays: cached.allDays, range: range, customRange: normalizedRange)
         } else {
-            result = TokenUsagePresentation(snapshot: snapshot, range: range)
+            result = TokenUsagePresentation(snapshot: snapshot, range: range, customRange: normalizedRange)
         }
         sourceDays = days
         cached = result

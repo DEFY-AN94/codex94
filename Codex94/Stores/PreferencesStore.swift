@@ -18,6 +18,8 @@ final class PreferencesStore: ObservableObject {
         static let globalHotKey = "globalHotKey.v1"
         static let notifications = "notifications.v1"
         static let tokenUsageChartStyle = "tokenUsageChartStyle.v1"
+        static let floatingWindowPinned = "floatingWindowPinned.v1"
+        static let floatingWindowPosition = "floatingWindowPosition.v1"
     }
 
     private enum LegacyDisplayMode: String {
@@ -51,6 +53,18 @@ final class PreferencesStore: ObservableObject {
     }
     @Published var tokenUsageChartStyle: TokenUsageChartStyle {
         didSet { defaults.set(tokenUsageChartStyle.rawValue, forKey: Key.tokenUsageChartStyle) }
+    }
+    @Published var floatingWindowPinned: Bool {
+        didSet { defaults.set(floatingWindowPinned, forKey: Key.floatingWindowPinned) }
+    }
+    @Published var floatingWindowPosition: FloatingWindowPosition? {
+        didSet {
+            if let floatingWindowPosition {
+                persist(floatingWindowPosition, key: Key.floatingWindowPosition)
+            } else {
+                defaults.removeObject(forKey: Key.floatingWindowPosition)
+            }
+        }
     }
     @Published var manualCodexPath: String? {
         didSet { defaults.set(manualCodexPath, forKey: Key.manualCodexPath) }
@@ -93,6 +107,10 @@ final class PreferencesStore: ObservableObject {
         tokenUsageChartStyle = TokenUsageChartStyle(
             rawValue: defaults.string(forKey: Key.tokenUsageChartStyle) ?? ""
         ) ?? .bar
+        floatingWindowPinned = defaults.object(forKey: Key.floatingWindowPinned) as? Bool ?? true
+        floatingWindowPosition = Self.decode(
+            FloatingWindowPosition.self, key: Key.floatingWindowPosition, from: defaults
+        ).flatMap { $0.x.isFinite && $0.y.isFinite ? $0 : nil }
         manualCodexPath = defaults.string(forKey: Key.manualCodexPath)
         hasChosenIdentityMode = defaults.bool(forKey: Key.hasChosenIdentityMode)
         dualWindowBucketSelection = Self.decode(MenuBarBucketSelection.self, key: Key.dualWindowBucketSelection, from: defaults) ?? .automatic

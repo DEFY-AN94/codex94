@@ -66,6 +66,7 @@ struct QuotaPopoverView: View {
     let quit: () -> Void
     var referenceDate: Date? = nil
     var resetTimeZone: TimeZone = .autoupdatingCurrent
+    var showFloatingWindow: (() -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -336,6 +337,16 @@ struct QuotaPopoverView: View {
                 action: { openDashboard(nil) }
             )
             .keyboardShortcut(",", modifiers: .command)
+
+            if let showFloatingWindow {
+                CommandRow(
+                    title: Text("floating.toggle"),
+                    systemImage: "rectangle.on.rectangle",
+                    shortcut: "",
+                    action: showFloatingWindow
+                )
+                .accessibilityIdentifier("popover-floating-toggle")
+            }
 
             Divider().padding(.vertical, 5)
 
