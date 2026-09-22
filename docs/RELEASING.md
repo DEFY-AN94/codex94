@@ -1,8 +1,8 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1),
-released on 2026-09-21 (Australia/Melbourne). Its tag and DMG remain bound to
-release commit `ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`; later docs-only commits do not move
+The published stable version is [`v3.1.0 (16)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.0),
+released on 2026-09-23 (Australia/Melbourne). Its tag and DMG remain bound to
+release commit `e580729dc81fd8db295c965119cdbcee87b7a157`; later docs-only commits do not move
 that tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -41,9 +41,8 @@ Keep candidate changelog notes under Unreleased without inventing a date.
 Historical release entries and the existing synthetic screenshot provenance
 remain unchanged. Planning and Goal files stay outside the Git repository.
 
-The current candidate is `3.1.0 (16)`, with its date kept under **Unreleased**
-until release preparation is complete. In addition to the retained regression
-checks below, verify:
+Version `3.1.0 (16)` adds the floating strip, custom Token ranges, and image
+exports. Retain the following regression checks for those features:
 
 - The floating strip's 680 × 90 logical-point target, screen fitting, dragging,
   pinning, hiding/reopening, expansion, and hover/keyboard-focus refresh control.
@@ -65,13 +64,16 @@ checks below, verify:
   format/dimensions, current selection, failure versus cancellation, and absence
   of identity. Copy tests use named pasteboards, never the general pasteboard.
 
-Candidate validation includes a fourth **Floating** UI scenario and expanded
-Token usage coverage. Report their results only after the exact candidate has
-run; historical test counts and screenshots do not validate these additions.
+Validation for `3.1.0` includes a fourth **Floating** UI scenario and expanded
+Token usage coverage. Its local unit suite recorded 340 tests executed, 1 skipped,
+and 0 failures; the skipped hosted key-window focus check is not a pass.
+Keep local, external UI, CodeQL, native interaction, and final-package evidence
+separate and tied to the revision actually tested.
 
 Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
-Published download and source-clone instructions now point to `v3.0.1`.
-This maintenance release isolates quota request contexts, shares strict
+Its historical tag and DMG remain bound to
+`ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`. Current download and clone
+instructions point to `v3.1.0`. This maintenance release isolates quota request contexts, shares strict
 service-value parsing, reuses chart preparation/formatting, retires old Token
 clients outside the main actor, and validates development-script arguments
 before side effects. It does not introduce a broad timer rewrite, new data
@@ -386,3 +388,49 @@ commit, and the documentation follow-up does not move the tag or regenerate
 assets. Published assets follow a manual no-replacement policy; Immutable
 Releases is not enabled. If App or DMG bytes need repair, publish a new patch
 version through these gates.
+
+
+### 3.1.0 final acceptance — 2026-09-23
+
+- [PR #26](https://github.com/DEFY-AN94/codex94/pull/26) was marked Ready after
+  its checks passed and then merged. The release commit is
+  `e580729dc81fd8db295c965119cdbcee87b7a157`; annotated tag `v3.1.0` has object
+  `7250e3a2a272a6f5b973d0844211d508ba04727e` and peels to that commit.
+- The exact final-main [CI run](https://github.com/DEFY-AN94/codex94/actions/runs/35736572657)
+  passed the test/package gate, all four external UI scenarios, and DMG
+  attestation. The hosted suite executed **340 tests: 1 skipped, 0 failures**.
+  The separate [Actions/Python/Swift CodeQL run](https://github.com/DEFY-AN94/codex94/actions/runs/35736572351)
+  passed. The skipped key-window focus test is not counted as a pass; mandatory
+  panel lifecycle/no-fetch coverage ran separately.
+- Floating evidence verifies both entry points, the same owned window after
+  hide/reopen, drag/position, pin/expand, cold and cached failures, and manual
+  refresh. Token evidence verifies custom-range entry, interval metrics,
+  comparison, PNG/CSV native save-panel cancellation, and image actions being
+  disabled during a live retry. Direct date-field editing, native cross-app
+  focus, Spaces and fullscreen remain outside that automated acceptance.
+  Recovery retains its instrumented click-only acceptance and pending keyboard,
+  AXPress and hosted-tooltip limitations.
+- The published DMG and checksum were re-downloaded anonymously; their names,
+  sizes and GitHub digests matched the verified CI files. Public ZIP and TAR
+  archives matched all **144** frozen Git blobs and executable modes. The
+  production anonymous update client discovered `v3.1.0` and its exact DMG URL.
+- DMG SHA-256:
+  `7a6f3dec5cc8e2a06697fea79992a2951fb3908a828fe14c977e64cf93347464`.
+  SHA256SUMS-file SHA-256:
+  `2dff0c90e28959bfebdf8683a4ca7785ac9eb5d5b342e94fbbba6e06e68dee21`.
+  Build provenance was verified against this repository's CI workflow,
+  `refs/heads/main`, the exact source digest, and GitHub-hosted runners.
+- `/Applications/Codex94.app` was backed up, replaced, and verified against the
+  complete CI-App file/mode manifest, both-architecture signature and installed
+  process path. The installed main-binary SHA-256 is
+  `75df87d444fa33afefbde83d6c0f1a2c8cbc97dd3232dae5392b759f39c2714a`.
+  The old 3.0.1 App was retained for rollback. The local desktop inspection
+  connection was unavailable, so no new local visual/manual acceptance is
+  claimed. Quarantine and Gatekeeper were unchanged; fresh-account first-launch
+  Gatekeeper acceptance remains unverified. The unsigned/unnotarized DMG and
+  ad-hoc-signed App retain the distribution limitations above.
+
+The maintainer authorized implementation, installation and the PR-to-release
+workflow. This record distinguishes delegated automated checks from a new
+human manual test. Later documentation commits update stable links and this
+record without moving the release tag or replacing either asset.

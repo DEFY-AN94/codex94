@@ -83,7 +83,7 @@ Keep the count in memory, preserve it when removing account information, and
 exclude it and credit details from cache v2. Do not add a consume operation,
 auth/session-file access, history collection, updater, or multi-account work.
 
-### Version 3.1.0 candidate
+### Version 3.1.0 behavior
 
 Keep the floating panel under AppKit ownership with the existing `AppStore`.
 Showing, dragging, pinning, hiding, and expanding must not fetch quota or write
@@ -101,7 +101,7 @@ Save/copy actions are user-triggered; tests use only synthetic data and isolated
 named pasteboards and must never touch the user's general pasteboard. Check
 actual image contents and clipping, not only nonempty data or dimensions.
 
-The candidate adds **Floating** as a fourth external UI scenario alongside
+Version `3.1.0` adds **Floating** as a fourth external UI scenario alongside
 Display, Recovery, and Token usage; usage also covers the new date/export
 controls without additional RPCs. New runs and visual acceptance are required
 before reporting these features as verified. See [architecture rules](docs/ARCHITECTURE.md).
