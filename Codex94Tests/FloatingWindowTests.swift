@@ -91,65 +91,84 @@ final class FloatingWindowTests: XCTestCase {
         }
     }
 
-    func testShowingPanelPreservesKnownKeyWindowAndReusesPanelWithoutFetching() async throws {
-        let defaults = try isolatedDefaults()
-        let preferences = PreferencesStore(defaults: defaults)
-        let directory = try outputDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let fetcher = FloatingTestFetcher()
-        let store = AppStore(
-            preferences: preferences,
-            launchAtLogin: LaunchAtLoginController(readStatus: { .notRegistered }, register: {},
-                                                   unregister: {}, stableInstall: { false }),
-            fetcher: fetcher, cache: SnapshotCache(fileURL: directory.appendingPathComponent("unused.json")),
-            hotKeyController: GlobalHotKeyController(service: FloatingTestHotKeyService()),
-            notificationController: NotificationController(service: FloatingTestNotificationService())
-        )
-        let controller = FloatingWindowController(store: store, preferences: preferences, openDashboard: {})
-        let knownWindow = NSWindow(contentRect: CGRect(x: 20, y: 20, width: 180, height: 100),
-                                   styleMask: [.titled], backing: .buffered, defer: false)
-        knownWindow.isReleasedWhenClosed = false
-        knownWindow.title = "Synthetic floating-window focus test"
-        defer {
-            controller.shutdown()
-            store.shutdown()
-            knownWindow.close()
-        }
+    func testShowingPanelCreatesVisibleAccessibleWindowAndReusesItWithoutFetching() async throws {
+        let fixture = try controllerFixture()
+        defer { fixture.cleanUp() }
+        let controller = fixture.controller
         XCTAssertNil(controller.window, "Construction must not create or display a panel")
         XCTAssertFalse(controller.state.isVisible)
         XCTAssertFalse(controller.state.isExpanded)
-        knownWindow.makeKeyAndOrderFront(nil)
-        for _ in 0..<20 where NSApp.keyWindow !== knownWindow {
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        guard NSApp.keyWindow === knownWindow else {
-            throw XCTSkip("The hosted test process could not establish its own key window")
-        }
-        let activeBefore = NSApp.isActive
         controller.show()
         let panel = try XCTUnwrap(controller.window)
-        XCTAssertTrue(NSApp.keyWindow === knownWindow)
-        XCTAssertEqual(NSApp.isActive, activeBefore)
+        for _ in 0..<25 where !floatingAccessibilityFlags(in: panel).containsContent {
+            panel.contentView?.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let accessibility = floatingAccessibilityFlags(in: panel)
+        let applicationPublishesPanel = NSApp.accessibilityWindows()?.contains { ($0 as AnyObject) === panel } == true
+        // Only test-owned window facts are logged, never screen positions or arbitrary AX labels.
+        print("CODEX94_FLOATING_PANEL_DIAGNOSTIC " +
+              "visible=\(panel.isVisible) registered=\(NSApp.windows.contains { $0 === panel }) " +
+              "role=\(panel.accessibilityRole()?.rawValue ?? "missing") " +
+              "isElement=\(panel.isAccessibilityElement()) " +
+              "windowID=\(panel.accessibilityIdentifier() == "floating-quota-window") " +
+              "appPublishesPanel=\(applicationPublishesPanel) " +
+              "contentID=\(accessibility.containsContent) refreshID=\(accessibility.containsRefresh)")
+        XCTAssertTrue(controller.state.isVisible)
+        XCTAssertTrue(panel.isVisible, "Showing must create a visible native panel")
+        XCTAssertTrue(NSApp.windows.contains { $0 === panel })
+        XCTAssertEqual(panel.frame.width, 680, accuracy: 0.5)
+        XCTAssertEqual(panel.frame.height, 90, accuracy: 0.5)
+        XCTAssertEqual(panel.accessibilityIdentifier(), "floating-quota-window")
+        XCTAssertEqual(panel.accessibilityRole(), .window)
+        XCTAssertTrue(panel.isAccessibilityElement())
+        // SwiftUI's virtual AX subtree depends on the hosted accessibility session.
+        // Record it separately; the mandatory lifecycle assertions must always execute.
         XCTAssertTrue(panel.styleMask.contains(.nonactivatingPanel))
         XCTAssertTrue(panel.canBecomeKey, "Explicit interaction must permit keyboard focus")
         XCTAssertFalse(panel.canBecomeMain)
         XCTAssertTrue(panel.becomesKeyOnlyIfNeeded)
         XCTAssertEqual(panel.contentView?.needsPanelToBecomeKey, true,
                        "The interactive SwiftUI host must be able to request key focus")
-        XCTAssertTrue(controller.state.isVisible)
-        XCTAssertEqual(panel.frame.height, 90, accuracy: 0.5)
         controller.hide()
         XCTAssertFalse(controller.state.isVisible)
         XCTAssertFalse(panel.isVisible)
         controller.show()
         XCTAssertTrue(controller.window === panel)
-        XCTAssertTrue(NSApp.keyWindow === knownWindow)
-        XCTAssertNotNil(preferences.floatingWindowPosition)
+        XCTAssertTrue(panel.isVisible)
+        XCTAssertNotNil(fixture.preferences.floatingWindowPosition)
         controller.shutdown()
         controller.show()
         XCTAssertNil(controller.window)
-        let fetchCalls = await fetcher.calls
+        let fetchCalls = await fixture.fetcher.calls
         XCTAssertEqual(fetchCalls, 0, "Showing, hiding and reopening must never fetch")
+    }
+
+    func testShowingPanelPreservesKnownKeyWindow() async throws {
+        let fixture = try controllerFixture()
+        let knownWindow = NSWindow(contentRect: CGRect(x: 20, y: 20, width: 180, height: 100),
+                                   styleMask: [.titled], backing: .buffered, defer: false)
+        knownWindow.isReleasedWhenClosed = false
+        knownWindow.title = "Synthetic floating-window focus test"
+        defer {
+            fixture.cleanUp()
+            knownWindow.close()
+        }
+        knownWindow.makeKeyAndOrderFront(nil)
+        for _ in 0..<20 where NSApp.keyWindow !== knownWindow {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        guard NSApp.keyWindow === knownWindow else {
+            throw XCTSkip("The hosted test process could not establish its own key window; lifecycle is tested separately")
+        }
+        let activeBefore = NSApp.isActive
+        fixture.controller.show()
+        XCTAssertTrue(NSApp.keyWindow === knownWindow)
+        XCTAssertEqual(NSApp.isActive, activeBefore)
+        fixture.controller.hide()
+        fixture.controller.show()
+        XCTAssertTrue(NSApp.keyWindow === knownWindow)
+        XCTAssertEqual(NSApp.isActive, activeBefore)
     }
 
     func testRefreshTextPreservesLastSuccessAndDistinguishesColdAndCachedData() {
@@ -242,6 +261,41 @@ final class FloatingWindowTests: XCTestCase {
                            isRefreshing: false, lastSuccessfulFetch: referenceDate)
     }
 
+    private func controllerFixture() throws -> FloatingControllerFixture {
+        let preferences = PreferencesStore(defaults: try isolatedDefaults())
+        let directory = try outputDirectory()
+        let fetcher = FloatingTestFetcher()
+        let store = AppStore(
+            preferences: preferences,
+            launchAtLogin: LaunchAtLoginController(readStatus: { .notRegistered }, register: {},
+                                                   unregister: {}, stableInstall: { false }),
+            fetcher: fetcher, cache: SnapshotCache(fileURL: directory.appendingPathComponent("unused.json")),
+            hotKeyController: GlobalHotKeyController(service: FloatingTestHotKeyService()),
+            notificationController: NotificationController(service: FloatingTestNotificationService())
+        )
+        return FloatingControllerFixture(
+            preferences: preferences, store: store, fetcher: fetcher,
+            controller: FloatingWindowController(store: store, preferences: preferences, openDashboard: {}),
+            directory: directory
+        )
+    }
+
+    private func floatingAccessibilityFlags(in panel: NSPanel) -> (containsContent: Bool, containsRefresh: Bool) {
+        var pending: [Any] = panel.accessibilityChildren() ?? []
+        var visited = Set<ObjectIdentifier>()
+        var containsContent = false
+        var containsRefresh = false
+        while let candidate = pending.popLast(), visited.count < 256 {
+            guard let element = candidate as? any NSAccessibilityProtocol,
+                  visited.insert(ObjectIdentifier(element as AnyObject)).inserted else { continue }
+            let identifier = element.accessibilityIdentifier()
+            containsContent = containsContent || identifier == "floating-quota-content"
+            containsRefresh = containsRefresh || identifier == "floating-refresh"
+            pending.append(contentsOf: element.accessibilityChildren() ?? [])
+        }
+        return (containsContent, containsRefresh)
+    }
+
     private func isolatedDefaults() throws -> UserDefaults {
         let name = "Codex94FloatingTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
@@ -281,6 +335,21 @@ final class FloatingWindowTests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
         return fitted
+    }
+}
+
+@MainActor
+private struct FloatingControllerFixture {
+    let preferences: PreferencesStore
+    let store: AppStore
+    let fetcher: FloatingTestFetcher
+    let controller: FloatingWindowController
+    let directory: URL
+
+    func cleanUp() {
+        controller.shutdown()
+        store.shutdown()
+        try? FileManager.default.removeItem(at: directory)
     }
 }
 

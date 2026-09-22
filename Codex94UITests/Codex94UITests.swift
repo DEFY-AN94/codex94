@@ -22,6 +22,7 @@ final class Codex94UITests: XCTestCase {
     private var nativeStatusWidths: [Int: CGFloat] = [:]
     private var observedStatusWidths: [String: CGFloat] = [:]
     private var layoutMeasurementIndex = 0
+    private var floatingQueryDiagnosticWritten = false
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -474,12 +475,31 @@ final class Codex94UITests: XCTestCase {
     }
 
     private func floatingWindow() throws -> XCUIElement {
-        let windows = application.windows.matching(identifier: "floating-quota-window")
-        try require(windows.firstMatch.waitForExistence(timeout: 5), "The production floating window did not open")
-        try require(windows.count == 1, "There must be exactly one app-owned floating window")
-        let window = windows.element(boundBy: 0)
-        _ = try uniqueIdentified("floating-quota-content", in: window)
-        return window
+        let byIdentifier = application.windows.matching(identifier: "floating-quota-window")
+        let byContent = application.windows.containing(.any, identifier: "floating-quota-content")
+        let deadline = Date().addingTimeInterval(5)
+        repeat {
+            // NSPanel's AX window identifier need not be propagated by every
+            // XCTest host. Its unique production content still binds this to
+            // one actual AUT window, never an arbitrary window or process.
+            if byIdentifier.count == 1 {
+                let window = byIdentifier.element(boundBy: 0)
+                if window.descendants(matching: .any).matching(identifier: "floating-quota-content").count == 1 {
+                    return window
+                }
+            } else if byIdentifier.count == 0 && byContent.count == 1 {
+                let window = byContent.element(boundBy: 0)
+                if application.descendants(matching: .any).matching(identifier: "floating-quota-content").count == 1,
+                   window.descendants(matching: .any).matching(identifier: "floating-refresh").count == 1 {
+                    try writeFloatingQueryDiagnostic(resolution: "unique-window-containing-known-content")
+                    return window
+                }
+            }
+            if byIdentifier.count > 1 || byContent.count > 1 { break }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        } while Date() < deadline
+        try writeFloatingQueryDiagnostic(resolution: "unresolved-or-ambiguous")
+        throw UITestFailure("The production floating surface did not resolve to one known app-owned window")
     }
 
     private func refreshFloating(_ window: XCUIElement) throws {
@@ -554,7 +574,8 @@ final class Codex94UITests: XCTestCase {
 
     private func captureFloating(_ window: XCUIElement, named filename: String) throws {
         try require(fixture.scenario == "floating" && !fixture.readOnlyFocusProbeEnabled
-                    && window.identifier == "floating-quota-window",
+                    && window.elementType == .window
+                    && application.windows.containing(.any, identifier: "floating-quota-content").count == 1,
                     "Floating evidence must use only the normal production floating surface")
         let content = try uniqueIdentified("floating-quota-content", in: window)
         try require(!identified("quota-popover-header", in: content).exists
@@ -562,6 +583,67 @@ final class Codex94UITests: XCTestCase {
                     && !identified("copy-diagnostics", in: content).exists,
                     "Floating screenshots must not include other application pages")
         try fixture.writeArtifact(content.screenshot().pngRepresentation, named: filename)
+    }
+
+    private func writeFloatingQueryDiagnostic(resolution: String) throws {
+        guard !floatingQueryDiagnosticWritten else { return }
+        try require(fixture.scenario == "floating"
+                    && ["unique-window-containing-known-content", "unresolved-or-ambiguous"].contains(resolution),
+                    "Floating query diagnostics must stay within their fixed synthetic scope")
+        let pid = try ownedApplicationPID()
+        let windowInfo = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]]
+        // Filter by the validated AUT PID before examining bounds. Only a
+        // target-size match count leaves this function, not IDs or geometry.
+        let owned = windowInfo?.filter { ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid } ?? []
+        let targetSizeMatches = owned.filter { value in
+            guard let bounds = value[kCGWindowBounds as String] as? [String: Any],
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
+            return frame.width.isFinite && frame.height.isFinite && (320...682).contains(frame.width)
+                && (abs(frame.height - 90) <= 2 || abs(frame.height - 132) <= 2)
+        }.count
+        try fixture.writeReport("floating-window-query-diagnostic.json", fields: [
+            "scenario": "floating", "diagnosticOnly": true, "acceptanceVerified": false,
+            "resolution": resolution,
+            "savedPositionPreferenceExists": try fixture.preference("floatingWindowPosition.v1") != nil,
+            "windowIdentifierMatchCount": application.windows.matching(identifier: "floating-quota-window").count,
+            "windowsContainingKnownContentCount": application.windows.containing(.any, identifier: "floating-quota-content").count,
+            "knownNodes": knownNodeDiagnostics([
+                "floating-quota-window", "floating-quota-content", "floating-refresh", "floating-pin",
+                "floating-expand", "floating-hide", "floating-drag-area", "quota-popover-header",
+                "popover-floating-toggle"
+            ]),
+            "ownedCGWindowQueryAvailable": windowInfo != nil,
+            "ownedTargetSizeMatchCount": targetSizeMatches,
+            "titlesPathsCoordinatesOrScreenshotsIncluded": false
+        ])
+        floatingQueryDiagnosticWritten = true
+    }
+
+    private func knownNodeDiagnostics(_ identifiers: [String]) -> [String: Any] {
+        var result: [String: Any] = [:]
+        for identifier in identifiers {
+            let query = application.descendants(matching: .any).matching(identifier: identifier)
+            let count = query.count
+            var roles: [String: Int] = [:]
+            for element in query.allElementsBoundByIndex.prefix(8) {
+                roles[diagnosticRole(element.elementType), default: 0] += 1
+            }
+            result[identifier] = ["exists": count > 0, "count": count, "sampledRoles": roles, "sampleTruncated": count > 8]
+        }
+        return result
+    }
+
+    private func diagnosticRole(_ type: XCUIElement.ElementType) -> String {
+        switch type {
+        case .window: "window"
+        case .sheet: "sheet"
+        case .dialog: "dialog"
+        case .alert: "alert"
+        case .button: "button"
+        case .group: "group"
+        case .staticText: "staticText"
+        default: "other"
+        }
     }
 
     func testTokenUsageSmoke() throws {
@@ -810,8 +892,10 @@ final class Codex94UITests: XCTestCase {
             button.click()
 
             let sheets = dashboard.sheets
-            try require(sheets.firstMatch.waitForExistence(timeout: 10),
-                        "The selected fileExporter must present a native save sheet on Dashboard")
+            guard sheets.firstMatch.waitForExistence(timeout: 10) else {
+                try writeTokenExportQueryDiagnostic(identifier, in: dashboard)
+                throw UITestFailure("The selected fileExporter must present a native save sheet on Dashboard")
+            }
             try require(sheets.count == 1 && application.alerts.count == 0,
                         "A token export must present exactly one save sheet without an error alert")
             let sheet = sheets.element(boundBy: 0)
@@ -839,6 +923,45 @@ final class Codex94UITests: XCTestCase {
                         "Cancelling must not claim that an image was saved or copied")
             try assertTokenUsageContent(in: dashboard, visibleDays: 7, includeSummary: false)
         }
+    }
+
+    private func writeTokenExportQueryDiagnostic(_ identifier: String, in dashboard: XCUIElement) throws {
+        try require(fixture.scenario == "usage" && language == .english
+                    && ["token-usage-export-png", "token-usage-export"].contains(identifier),
+                    "Export diagnostics must describe only a known synthetic export action")
+        let format = identifier == "token-usage-export-png" ? "png" : "csv"
+        let action = application.descendants(matching: .any).matching(identifier: identifier)
+        func knownFailureCount(_ title: String) -> Int {
+            application.descendants(matching: .any).matching(
+                NSPredicate(format: "label == %@ OR title == %@", title, title)
+            ).count
+        }
+        func surfaces(_ type: XCUIElement.ElementType) -> [String: Int] {
+            let query = application.descendants(matching: type)
+            return [
+                "count": query.count,
+                "containingCancel": query.containing(.button, identifier: "Cancel").count,
+                "containingSave": query.containing(.button, identifier: "Save").count,
+                "containingExport": query.containing(.button, identifier: "Export").count
+            ]
+        }
+        // Count only known controls under the validated AUT. Never read window
+        // titles, filenames, destination fields, clipboard data or raw AX trees.
+        try fixture.writeReport("usage-\(format)-export-query-diagnostic.json", fields: [
+            "scenario": "usage", "diagnosticOnly": true, "acceptanceVerified": false,
+            "requestedExportFormat": format, "dashboardSheetCount": dashboard.sheets.count,
+            "actionExistsAfterClick": action.count == 1,
+            "actionEnabledAfterClick": action.count == 1 && action.element(boundBy: 0).isEnabled,
+            "knownNodes": knownNodeDiagnostics([
+                "token-usage-export-png", "token-usage-copy-image", "token-usage-export",
+                "token-usage-page", "token-usage-image-feedback"
+            ]),
+            "applicationSheets": surfaces(.sheet), "applicationDialogs": surfaces(.dialog),
+            "applicationWindows": surfaces(.window), "applicationAlerts": surfaces(.alert),
+            "knownImageExportFailureMatchCount": knownFailureCount("Could not export the chart image"),
+            "knownCSVExportFailureMatchCount": knownFailureCount("Could not export CSV"),
+            "titlesPathsCoordinatesOrScreenshotsIncluded": false
+        ])
     }
 
     private func tokenCustomRangeSignature(in dashboard: XCUIElement) throws -> [String: String] {
@@ -2814,11 +2937,12 @@ private struct SyntheticFixture {
             "usage-complete-en.png", "usage-seven-days-en.png", "usage-complete-zh-Hans.png",
             "usage-daily-table-en.png", "usage-line-seven-days-en.png", "usage-custom-seven-days-en.png",
             "usage-partial-zh-Hans.png", "usage-unavailable-zh-Hans.png",
-            "usage-unsupported-zh-Hans.png", "usage-result.json"
+            "usage-unsupported-zh-Hans.png", "usage-result.json",
+            "usage-png-export-query-diagnostic.json", "usage-csv-export-query-diagnostic.json"
         ] : []
         let floating: Set<String> = scenario == "floating" ? [
             "floating-cold-en.png", "floating-compact-en.png", "floating-expanded-en.png",
-            "floating-cached-failure-en.png", "floating-result.json"
+            "floating-cached-failure-en.png", "floating-result.json", "floating-window-query-diagnostic.json"
         ] : []
         let variants = Set(UILanguage.allCases.flatMap { language in
             UITheme.allCases.map { "popover-long-\(language.artifactName)-\($0.rawValue).png" }
