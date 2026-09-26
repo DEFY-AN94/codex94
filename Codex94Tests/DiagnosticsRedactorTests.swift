@@ -12,10 +12,6 @@ final class DiagnosticsRedactorTests: XCTestCase {
 
     func testStandardCodexSourcesUseCanonicalDiagnosticPaths() {
         XCTAssertEqual(
-            DiagnosticsRedactor.codexPath(for: located(source: .chatGPTApp)),
-            "/Applications/ChatGPT.app/Contents/Resources/codex"
-        )
-        XCTAssertEqual(
             DiagnosticsRedactor.codexPath(for: located(source: .homebrew)),
             "/opt/homebrew/bin/codex"
         )
@@ -27,6 +23,34 @@ final class DiagnosticsRedactorTests: XCTestCase {
             DiagnosticsRedactor.codexPath(for: located(source: .localBin)),
             "~/.local/bin/codex"
         )
+    }
+
+    func testBundledSourcesReportOnlyTheirExactKnownPath() {
+        let paths = [
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "/Applications/Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "/Applications/ChatGPT.app/Contents/Resources/codex",
+            "/Applications/Codex.app/Contents/Resources/codex"
+        ]
+        for path in paths {
+            XCTAssertEqual(DiagnosticsRedactor.codexPath(for: located(path: path, source: .chatGPTApp)), path)
+            for source in [LocatedCodex.Source.manual, .path] {
+                XCTAssertEqual(DiagnosticsRedactor.codexPath(for: located(path: path, source: source)),
+                               "<redacted-path>/codex", "Manual/PATH sources stay redacted even at a known location")
+            }
+        }
+    }
+
+    func testInjectedOrNonstandardBundlePathsStayRedacted() {
+        for path in [
+            "/tmp/codex94-home/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "/Users/private/Applications/codex",
+            "/Applications/ChatGPT.app/Contents/Resources/private/codex",
+            "/Applications/Codex.app/Contents/Resources/codex-other"
+        ] {
+            XCTAssertEqual(DiagnosticsRedactor.codexPath(for: located(path: path, source: .chatGPTApp)),
+                           "<redacted-path>/codex")
+        }
     }
 
     func testManualAndPathSourcesNeverExposeDirectoryComponents() {

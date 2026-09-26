@@ -128,6 +128,11 @@ Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内�
 就不需要额外安装独立 Codex CLI。它也可以检测 Homebrew 与常见 CLI 路径，
 或使用用户手动选择的可执行文件。
 
+`3.1.2 (18)` 兼容性候选版增加对已知 `ChatGPT.app` 与 `Codex.app` 中新版内置路径
+`Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex` 的自动发现。
+先检查这些新版路径，再回退到旧内置路径；手动指定路径仍具有最高优先级。正式发布确认前，
+下方稳定下载与源码标签继续指向 `3.1.1`。
+
 ## 安装 Universal DMG
 
 请从 [`v3.1.1` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.1)

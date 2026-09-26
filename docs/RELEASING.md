@@ -41,6 +41,13 @@ Keep candidate changelog notes under Unreleased without inventing a date.
 Historical release entries and the existing synthetic screenshot provenance
 remain unchanged. Planning and Goal files stay outside the Git repository.
 
+The current `3.1.2 (18)` compatibility candidate is dated **2026-09-27**
+(Australia/Melbourne). It restores discovery of the newer nested bundled Codex
+CLI layout while retaining the legacy fallback and explicit manual selection.
+Check new-layout discovery, fallback ordering and manual-path behavior using
+synthetic executables, and record any maintainer-led live RPC check separately.
+Keep public stable links on `3.1.1` until publication is confirmed.
+
 Version `3.1.0 (16)` adds the floating strip, custom Token ranges, and image
 exports. Retain the following regression checks for those features:
 

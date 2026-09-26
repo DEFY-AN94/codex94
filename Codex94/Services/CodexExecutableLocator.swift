@@ -2,17 +2,26 @@ import Darwin
 import Foundation
 
 struct CodexExecutableLocator: Sendable {
+    static let defaultBundledAppRoots = [
+        URL(fileURLWithPath: "/Applications/ChatGPT.app", isDirectory: true),
+        URL(fileURLWithPath: "/Applications/Codex.app", isDirectory: true)
+    ]
+    static let defaultBundledExecutableURLs = bundledExecutableURLs(in: defaultBundledAppRoots)
+
     private let environment: [String: String]
     private let homeDirectory: URL
+    private let bundledAppRoots: [URL]
     private let processLifecycle: ManagedSubprocessLifecycle
 
     init(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        bundledAppRoots: [URL] = CodexExecutableLocator.defaultBundledAppRoots,
         processLifecycle: ManagedSubprocessLifecycle = ManagedSubprocessLifecycle()
     ) {
         self.environment = environment
         self.homeDirectory = homeDirectory
+        self.bundledAppRoots = bundledAppRoots
         self.processLifecycle = processLifecycle
     }
 
@@ -90,10 +99,7 @@ struct CodexExecutableLocator: Sendable {
             candidates.append((URL(fileURLWithPath: expanded), .manual))
         }
 
-        candidates.append((
-            URL(fileURLWithPath: "/Applications/ChatGPT.app/Contents/Resources/codex"),
-            .chatGPTApp
-        ))
+        candidates.append(contentsOf: Self.bundledExecutableURLs(in: bundledAppRoots).map { ($0, .chatGPTApp) })
         candidates.append((URL(fileURLWithPath: "/opt/homebrew/bin/codex"), .homebrew))
         candidates.append((URL(fileURLWithPath: "/usr/local/bin/codex"), .usrLocal))
         candidates.append((homeDirectory.appendingPathComponent(".local/bin/codex"), .localBin))
@@ -109,6 +115,18 @@ struct CodexExecutableLocator: Sendable {
 
         var seen = Set<String>()
         return candidates.filter { seen.insert($0.0.standardizedFileURL.path).inserted }
+    }
+
+    private static func bundledExecutableURLs(in appRoots: [URL]) -> [URL] {
+        // Prefer the current nested CLI bundle at the two known App locations,
+        // then retain the previous flat-resource layout. No directory search.
+        let relativePaths = [
+            "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "Contents/Resources/codex"
+        ]
+        return relativePaths.flatMap { relativePath in
+            appRoots.map { $0.appendingPathComponent(relativePath) }
+        }
     }
 
     private func validatedVersion(at executableURL: URL) throws -> String {
