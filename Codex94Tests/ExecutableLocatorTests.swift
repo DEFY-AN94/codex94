@@ -12,10 +12,135 @@ final class ExecutableLocatorTests: XCTestCase {
         let candidates = locator.candidateURLs(manualPath: "/manual/codex")
 
         XCTAssertEqual(candidates.map(\.source), [
-            .manual, .chatGPTApp, .homebrew, .usrLocal, .localBin, .path, .path
+            .manual, .chatGPTApp, .chatGPTApp, .chatGPTApp, .chatGPTApp,
+            .homebrew, .usrLocal, .localBin, .path, .path
         ])
         XCTAssertEqual(candidates.first?.url.path, "/manual/codex")
+        XCTAssertEqual(Array(candidates.dropFirst().prefix(4)).map(\.url.path), [
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "/Applications/Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "/Applications/ChatGPT.app/Contents/Resources/codex",
+            "/Applications/Codex.app/Contents/Resources/codex"
+        ])
         XCTAssertEqual(candidates.last?.url.path, "/custom/two/codex")
+    }
+
+    func testNestedDesktopCLIIsDiscoveredWithStandardGUIPath() throws {
+        for appName in ["ChatGPT.app", "Codex.app"] {
+            let directory = try makeTemporaryDirectory()
+            let app = directory.appendingPathComponent("Desktop Apps/" + appName)
+            let executable = app.appendingPathComponent(nestedCLIPath)
+            try writeVersionExecutable(at: executable, output: "codex-cli 0.158.0-alpha.2.1")
+            let locator = bundledLocator(roots: [app], home: directory)
+            defer { locator.shutdown() }
+
+            let result = try locator.locate(manualPath: nil)
+            XCTAssertEqual(result.executableURL, executable.resolvingSymlinksInPath())
+            XCTAssertEqual(result.source, .chatGPTApp)
+            XCTAssertEqual(result.version, "codex-cli 0.158.0-alpha.2.1")
+            XCTAssertEqual(try probeCount(executable), 1)
+        }
+    }
+
+    func testNestedLayoutPrecedesLegacyAcrossKnownAppRoots() throws {
+        let directory = try makeTemporaryDirectory()
+        let chatGPT = directory.appendingPathComponent("ChatGPT.app")
+        let codexApp = directory.appendingPathComponent("Codex.app")
+        let legacy = chatGPT.appendingPathComponent("Contents/Resources/codex")
+        let nested = codexApp.appendingPathComponent(nestedCLIPath)
+        try writeVersionExecutable(at: legacy, output: "codex-cli 9.4.0")
+        try writeVersionExecutable(at: nested, output: "codex-cli 9.5.0")
+        let locator = bundledLocator(roots: [chatGPT, codexApp], home: directory)
+        defer { locator.shutdown() }
+
+        let result = try locator.locate(manualPath: nil)
+        XCTAssertEqual(result.executableURL, nested.resolvingSymlinksInPath())
+        XCTAssertEqual(result.version, "codex-cli 9.5.0")
+        XCTAssertEqual(try probeCount(nested), 1)
+        XCTAssertEqual(try probeCount(legacy), 0, "Do not invoke a lower-priority legacy executable")
+    }
+
+    func testMissingNestedLayoutFallsBackToLegacy() throws {
+        let directory = try makeTemporaryDirectory()
+        let app = directory.appendingPathComponent("ChatGPT.app")
+        let executable = app.appendingPathComponent("Contents/Resources/codex")
+        try writeVersionExecutable(at: executable, output: "codex-cli 9.4.0")
+        let locator = bundledLocator(roots: [app], home: directory)
+        defer { locator.shutdown() }
+
+        let result = try locator.locate(manualPath: nil)
+        XCTAssertEqual(result.executableURL, executable.resolvingSymlinksInPath())
+        XCTAssertEqual(result.source, .chatGPTApp)
+        XCTAssertEqual(try probeCount(executable), 1)
+    }
+
+    func testInvalidNestedExecutableFallsBackToValidatedLegacy() throws {
+        let cases: [(String, Int, mode_t, Int)] = [
+            ("not-codex 1.0", 0, 0o700, 1),
+            ("codex-cli 9.5.0", 1, 0o700, 1),
+            ("codex-cli 9.5.0", 0, 0o600, 0)
+        ]
+        for (output, status, mode, expectedProbes) in cases {
+            let directory = try makeTemporaryDirectory()
+            let app = directory.appendingPathComponent("Codex.app")
+            let nested = app.appendingPathComponent(nestedCLIPath)
+            let legacy = app.appendingPathComponent("Contents/Resources/codex")
+            try writeVersionExecutable(at: nested, output: output, exitStatus: status)
+            XCTAssertEqual(chmod(nested.path, mode), 0)
+            try writeVersionExecutable(at: legacy, output: "codex-cli 9.4.0")
+            let locator = bundledLocator(roots: [app], home: directory)
+            defer { locator.shutdown() }
+
+            let result = try locator.locate(manualPath: nil)
+            XCTAssertEqual(result.executableURL, legacy.resolvingSymlinksInPath())
+            XCTAssertEqual(result.version, "codex-cli 9.4.0")
+            XCTAssertEqual(try probeCount(nested), expectedProbes)
+            XCTAssertEqual(try probeCount(legacy), 1)
+        }
+    }
+
+    func testManualOverridePrecedesAValidNestedBundle() throws {
+        let directory = try makeTemporaryDirectory()
+        let app = directory.appendingPathComponent("ChatGPT.app")
+        let nested = app.appendingPathComponent(nestedCLIPath)
+        let manual = directory.appendingPathComponent("manual/codex")
+        try writeVersionExecutable(at: nested, output: "codex-cli 9.5.0")
+        try writeVersionExecutable(at: manual, output: "codex-cli 9.6.0")
+        let locator = bundledLocator(roots: [app], home: directory)
+        defer { locator.shutdown() }
+
+        let result = try locator.locate(manualPath: manual.path)
+        XCTAssertEqual(result.source, .manual)
+        XCTAssertEqual(result.executableURL, manual.resolvingSymlinksInPath())
+        XCTAssertEqual(result.version, "codex-cli 9.6.0")
+        XCTAssertEqual(try probeCount(manual), 1)
+        XCTAssertEqual(try probeCount(nested), 0)
+    }
+
+    func testBadManualOverridesNeverFallBackToAvailableNestedBundle() throws {
+        let directory = try makeTemporaryDirectory()
+        let app = directory.appendingPathComponent("ChatGPT.app")
+        let nested = app.appendingPathComponent(nestedCLIPath)
+        let missing = directory.appendingPathComponent("missing/codex")
+        let notExecutable = directory.appendingPathComponent("not-executable/codex")
+        let invalid = directory.appendingPathComponent("invalid/codex")
+        try writeVersionExecutable(at: nested, output: "codex-cli 9.5.0")
+        try writeVersionExecutable(at: notExecutable, output: "codex-cli 9.5.0")
+        XCTAssertEqual(chmod(notExecutable.path, 0o600), 0)
+        try writeVersionExecutable(at: invalid, output: "not-codex 1.0")
+        let locator = bundledLocator(roots: [app], home: directory)
+        defer { locator.shutdown() }
+        let cases: [(URL, ConnectionIssue)] = [
+            (missing, .codexNotFound), (notExecutable, .codexNotExecutable), (invalid, .invalidCodexVersion)
+        ]
+        for (manual, expected) in cases {
+            XCTAssertThrowsError(try locator.locate(manualPath: manual.path)) {
+                XCTAssertEqual($0 as? ConnectionIssue, expected)
+            }
+        }
+        XCTAssertEqual(try probeCount(nested), 0, "An invalid override must not silently select another Codex")
+        XCTAssertEqual(try probeCount(notExecutable), 0)
+        XCTAssertEqual(try probeCount(invalid), 1)
     }
 
     func testRelativePathComponentsAreIgnored() {
@@ -204,6 +329,38 @@ final class ExecutableLocatorTests: XCTestCase {
         let launches = try String(contentsOf: invocationFile, encoding: .utf8)
             .split(whereSeparator: \.isNewline)
         XCTAssertEqual(launches.count, 1)
+    }
+
+    private var nestedCLIPath: String {
+        "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+    }
+
+    private func bundledLocator(roots: [URL], home: URL) -> CodexExecutableLocator {
+        CodexExecutableLocator(
+            environment: ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": home.path],
+            homeDirectory: home, bundledAppRoots: roots
+        )
+    }
+
+    private func writeVersionExecutable(at url: URL, output: String, exitStatus: Int = 0) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // All output values are fixed synthetic literals; no host paths are embedded
+        // into shell source. The marker proves which fixture was actually launched.
+        let script = """
+        #!/bin/sh
+        [ "$#" -eq 1 ] && [ "$1" = "--version" ] || exit 91
+        printf 'probe\\n' >> "$0.invocations"
+        printf '%s\\n' '\(output)'
+        exit \(exitStatus)
+        """
+        try script.write(to: url, atomically: true, encoding: .utf8)
+        XCTAssertEqual(chmod(url.path, 0o700), 0)
+    }
+
+    private func probeCount(_ executable: URL) throws -> Int {
+        let marker = executable.appendingPathExtension("invocations")
+        guard FileManager.default.fileExists(atPath: marker.path) else { return 0 }
+        return try String(contentsOf: marker, encoding: .utf8).split(whereSeparator: \.isNewline).count
     }
 
     private func waitForPID(at fileURL: URL) async throws -> pid_t {

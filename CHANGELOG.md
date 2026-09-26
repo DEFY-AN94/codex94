@@ -2,6 +2,20 @@
 
 All notable changes to Codex94 are documented here.
 
+## 3.1.2 - 2026-09-27
+
+Version `3.1.2 (18)`. Release dates use Australia/Melbourne.
+
+### Fixed
+
+- Restore automatic Codex CLI discovery for the newer nested executable in
+  the known `ChatGPT.app` and `Codex.app` bundles at
+  `Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex`, instead of
+  leaving quota views on the last successful cached snapshot after discovery
+  fails.
+- Retain the legacy bundled executable as a fallback and preserve explicit
+  manual-path precedence and the existing Homebrew and standard CLI fallbacks.
+
 ## 3.1.1 - 2026-09-23
 
 Version `3.1.1 (17)`. Release dates use Australia/Melbourne.

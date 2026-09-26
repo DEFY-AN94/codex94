@@ -14,7 +14,8 @@ enum DiagnosticsRedactor {
 
         return switch locatedCodex.source {
         case .chatGPTApp:
-            "/Applications/ChatGPT.app/Contents/Resources/codex"
+            CodexExecutableLocator.defaultBundledExecutableURLs.contains(locatedCodex.executableURL)
+                ? locatedCodex.executableURL.path : "<redacted-path>/codex"
         case .homebrew:
             "/opt/homebrew/bin/codex"
         case .usrLocal:

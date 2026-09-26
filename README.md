@@ -151,6 +151,13 @@ standalone Codex CLI installation is not required when that bundled executable
 is compatible. It can also detect Homebrew and standard CLI locations or use an
 executable selected manually.
 
+The `3.1.2 (18)` compatibility candidate adds discovery of the newer bundled
+`Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex` layout in the
+known `ChatGPT.app` and `Codex.app` bundles. These nested locations are checked
+before legacy bundled paths; explicit manual-path selection keeps its
+precedence. Published downloads and source tags below remain on `3.1.1` until
+the new release is confirmed.
+
 ## Install the Universal DMG
 
 Download both stable assets from the
