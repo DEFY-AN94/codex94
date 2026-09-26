@@ -51,9 +51,9 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-3.1.1-SHA256SUMS.txt` before opening the DMG. The optional
+Verify `Codex94-3.1.2-SHA256SUMS.txt` before opening the DMG. The optional
 GitHub command
-`gh attestation verify Codex94-3.1.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
+`gh attestation verify Codex94-3.1.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
 can prove repository/workflow/commit provenance for the exact DMG. A matching
 checksum or attestation is not notarization, malware review, a security audit,
 or Gatekeeper approval. If the exact release is trusted, use only Apple's
@@ -145,13 +145,13 @@ boundaries remain unchanged.
 
 ## Supported versions
 
-The supported published stable version is [`v3.1.1 (17)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.1),
-released on 2026-09-23 (Australia/Melbourne).
+The supported published stable version is [`v3.1.2 (18)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2),
+released on 2026-09-27 (Australia/Melbourne).
 Feature branches and `main` may contain development work that has not passed
 release acceptance. Current stable-version links identify the published release.
-Version `3.1.1` retains the authentication, network, permission, and distribution
-trust boundaries above, with the explicit local outputs and two UI preferences
-described in its stored-data section.
+Version `3.1.2` updates discovery of known bundled Codex CLI locations. It
+retains the authentication, network, permission, stored-data, and distribution
+trust boundaries above; it adds no new output or permission.
 
 Version `0.1.8 (9)` passed the full GitHub test/release job, synthetic Display
 and click-functional Recovery UI jobs, Actions/Swift CodeQL, and separate

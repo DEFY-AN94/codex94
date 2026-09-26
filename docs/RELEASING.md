@@ -1,8 +1,8 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v3.1.1 (17)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.1),
-released on 2026-09-23 (Australia/Melbourne). Its tag and DMG remain bound to
-release commit `370e3800de1f54b94efe2e4d4761d671a2710fd4`; later docs-only commits do not move
+The published stable version is [`v3.1.2 (18)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2),
+released on 2026-09-27 (Australia/Melbourne). Its tag and DMG remain bound to
+release commit `8df7f920316b05f7065053d86203f66e6cf6e846`; later docs-only commits do not move
 that tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -41,12 +41,11 @@ Keep candidate changelog notes under Unreleased without inventing a date.
 Historical release entries and the existing synthetic screenshot provenance
 remain unchanged. Planning and Goal files stay outside the Git repository.
 
-The current `3.1.2 (18)` compatibility candidate is dated **2026-09-27**
-(Australia/Melbourne). It restores discovery of the newer nested bundled Codex
-CLI layout while retaining the legacy fallback and explicit manual selection.
-Check new-layout discovery, fallback ordering and manual-path behavior using
-synthetic executables, and record any maintainer-led live RPC check separately.
-Keep public stable links on `3.1.1` until publication is confirmed.
+Version `3.1.2 (18)`, dated **2026-09-27** (Australia/Melbourne), restores
+discovery of the newer nested bundled Codex CLI layout while retaining legacy
+fallbacks and explicit manual selection. Retain synthetic new-layout,
+fallback-ordering and manual-path regression checks; record live RPC acceptance
+separately from automated tests.
 
 Version `3.1.0 (16)` adds the floating strip, custom Token ranges, and image
 exports. Retain the following regression checks for those features:
@@ -92,7 +91,7 @@ separate and tied to the revision actually tested.
 Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
 Its historical tag and DMG remain bound to
 `ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`. Current download and clone
-instructions point to `v3.1.1`. This maintenance release isolates quota request contexts, shares strict
+instructions point to `v3.1.2`. This maintenance release isolates quota request contexts, shares strict
 service-value parsing, reuses chart preparation/formatting, retires old Token
 clients outside the main actor, and validates development-script arguments
 before side effects. It does not introduce a broad timer rewrite, new data
@@ -494,3 +493,30 @@ record without moving the release tag or replacing either asset.
   claimed. Quarantine and Gatekeeper were unchanged, and fresh-account
   first-launch acceptance remains unverified. Distribution signing limitations
   are unchanged. Documentation follow-ups do not move this tag or replace assets.
+
+### 3.1.2 compatibility release — 2026-09-27
+
+[PR #31](https://github.com/DEFY-AN94/codex94/pull/31) fixes
+[issue #30](https://github.com/DEFY-AN94/codex94/issues/30). The release source is
+`8df7f920316b05f7065053d86203f66e6cf6e846`. Local validation recorded **353 tests
+executed, 1 skipped, 0 failures**; the skip is not a pass. Final
+[main CI](https://github.com/DEFY-AN94/codex94/actions/runs/36274627725):
+passed, including packaging, all four external UI scenarios and DMG attestation; [CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/36274626869):
+passed for Actions, Python and Swift.
+
+- Publication/Latest verification: public Latest, non-prerelease, published on 2026-09-27 (Australia/Melbourne).
+- Annotated tag object: `0bb89d58004e9c601f98e94fc37dbea625ff662e`; frozen-source binding: `v3.1.2` peels to the release commit above.
+- DMG SHA-256: `1a450a19b21f436089b0a04ed161a0f15f68ba5e12f088a178be0006faec80bd`; checksum-file SHA-256: `7fda028de93ddcbaaba309e6e4830544e3119963ffd15282913bdac8d1f80638`.
+- Public assets/attestation/source archives: both public assets matched the final CI bytes
+  and GitHub API digests; attestation matched the exact main source. ZIP and TAR
+  each matched all 144 tracked files. The production update client found `v3.1.2`.
+- Installed App binary SHA-256: `a5ac3b39cdf2c88fc3a53c4eabddd963166fee814e2b00f7320e32ec8ee2352e`.
+  Installation, retained 3.1.1 backup, and final live-quota check: the exact
+  `/Applications/Codex94.app` matched the complete file/mode manifest, signature
+  and all attributes, and ran as the only instance. The previous 3.1.1 App was
+  retained for rollback. With no manual CLI override, the cache fetch time
+  advanced after launch and no refresh errors were observed.
+
+Quarantine was unchanged. The local desktop inspection connector was unavailable,
+so no new local visual/manual UI acceptance is claimed. Previously documented
+signing, first-launch Gatekeeper and untested native-interaction limits remain.

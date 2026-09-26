@@ -1,7 +1,7 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints in the published stable
-[`3.1.1 (17)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.1).
+[`3.1.2 (18)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2).
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
@@ -14,6 +14,7 @@ defines component responsibilities, not a substitute for those records.
 | `TokenUsageStore` | Own on-demand aggregate statistics and their request lifetime. Replace snapshots, reject obsolete results, and manage retired clients without coupling statistics failures to quota status. |
 | `AppUpdateController` | Own the explicit GitHub metadata check and its UI state. It does not poll, download, install, or share quota authentication. |
 | Token image export views/helpers | Render the current prepared chart without interaction controls or identity; own explicit PNG save/copy actions. Pass the pasteboard explicitly so tests can isolate it. |
+| `CodexExecutableLocator` | Own explicit-path precedence, known bundled/standard CLI candidates, and bounded `--version` compatibility checks. Tests inject App roots and synthetic executables. |
 | Platform and transport services | Own Codex subprocesses, notification delivery, hotkey registration, and the fixed update HTTP request. Keep bounded process-group termination in its existing service. |
 | Pure models and support types | Own parsing, date/count rules, selection projections, chart preparation, formatting inputs, and scheduling decisions without starting I/O. |
 
@@ -82,3 +83,12 @@ bucket, and resizes only when the quota layout changes. Fitting uses the
 current panel position so a pending drag save cannot restore an older position.
 Existing screen clamping, motion preferences, pin state and teardown remain
 owned by the controller; layout changes do not request or cache quota data.
+
+## 3.1.2: bundled executable discovery
+
+`CodexExecutableLocator` checks the nested `CodexCLI.app` executable in the two
+known `/Applications/ChatGPT.app` and `/Applications/Codex.app` roots before
+legacy flat-resource paths. Homebrew and standard CLI fallbacks remain, while
+an explicit manual choice is authoritative and is not bypassed on failure.
+Discovery does not recursively search directories or read authentication data;
+transport and quota-decoding responsibilities remain separate.

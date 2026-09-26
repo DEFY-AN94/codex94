@@ -24,14 +24,14 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 > Codex94 与 OpenAI 没有隶属关系，也未获得 OpenAI 的认可、背书或赞助。Codex
 > `app-server` 是实验性接口，未来 Codex 版本可能会改变它。
 
-## 3.1.1 版本
+## 3.1.2 版本
 
-`3.1.1 (17)` 已于 **2026-09-23**（Australia/Melbourne）正式发布。
-本版根据当前额度数据调整悬浮栏：只有周额度时为
-**480 × 90 逻辑点**，有真实 5 小时窗口时保留 **680 × 90** 双列布局。
-不再显示缺失的 5h 栏，单列保留正常字号；两种布局展开后均为 132 点高。
-刷新、缓存及额度组切换会自动更新同一个窗口，适应屏幕空间，不额外请求数据。
-下方稳定下载与源码指令均指向本版。
+`3.1.2 (18)` 已于 **2026-09-27**（Australia/Melbourne）正式发布。
+本版恢复对已知 ChatGPT/Codex App 中新版嵌套 Codex CLI 的自动发现，修复因找不到
+可执行文件而无法刷新额度、继续显示上次缓存的问题。保留旧内置路径回退和显式手动
+路径优先级；既有自适应浮条、Token 功能与隐私边界保持不变。
+对应 [issue #30](https://github.com/DEFY-AN94/codex94/issues/30) 和
+[修复 PR #31](https://github.com/DEFY-AN94/codex94/pull/31)。
 
 ## 主要功能
 
@@ -96,8 +96,8 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 ## 当前分发状态
 
 - 已发布的稳定版为
-  [`v3.1.1 (17)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.1)，
-  于 **2026-09-23**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
+  [`v3.1.2 (18)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2)，
+  于 **2026-09-27**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
   annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
   也不会重新生成已发布的资产。
@@ -111,7 +111,7 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 - 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
-已发布的 `3.1.1` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+已发布的 `3.1.2` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
 attestation 都不会改变这一 Apple 信任状态。
 
@@ -124,34 +124,31 @@ attestation 都不会改变这一 Apple 信任状态。
 （仅有 Command Line Tools 不够），以及安装脚本静态安全检查使用的
 `ripgrep`（`rg`）。
 
-Codex94 可以使用 ChatGPT App 内置的 Codex 可执行文件；只要该内置版本兼容，
-就不需要额外安装独立 Codex CLI。它也可以检测 Homebrew 与常见 CLI 路径，
-或使用用户手动选择的可执行文件。
-
-`3.1.2 (18)` 兼容性候选版增加对已知 `ChatGPT.app` 与 `Codex.app` 中新版内置路径
-`Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex` 的自动发现。
-先检查这些新版路径，再回退到旧内置路径；手动指定路径仍具有最高优先级。正式发布确认前，
-下方稳定下载与源码标签继续指向 `3.1.1`。
+Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
+中的兼容 Codex CLI，无需另装独立 CLI。它先检查新版
+`Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex` 路径，再检查旧
+`Contents/Resources/codex` 路径，并保留 Homebrew 与常见 CLI 位置回退。显式手动
+路径仍有最高优先级；无效的手动选择不会被悄悄绕过。
 
 ## 安装 Universal DMG
 
-请从 [`v3.1.1` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.1)
+请从 [`v3.1.2` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2)
 下载以下两个正式资产：
 
-- `Codex94-3.1.1-macos-universal-unnotarized.dmg`
-- `Codex94-3.1.1-SHA256SUMS.txt`
+- `Codex94-3.1.2-macos-universal-unnotarized.dmg`
+- `Codex94-3.1.2-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-3.1.1-SHA256SUMS.txt
+shasum -a 256 -c Codex94-3.1.2-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-3.1.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-3.1.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -171,7 +168,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v3.1.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v3.1.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
@@ -446,6 +443,10 @@ Actions／Python／Swift CodeQL，以及最终源码和安装包验收。历史�
 `3.1.1 (17)` 已确认的本地测试记录为 **345 项执行、1 项跳过、0 项失败**；
 hosted 焦点跳过项不计作通过。外部 UI、安全分析、最终 main 打包及安装后验证须按
 本版实际提交与资产分别记录，不能用上述 `3.1.0` 证据替代。
+
+`3.1.2 (18)` 的本地验证记录为 **353 项执行、1 项跳过、0 项失败**，跳过不计作通过。
+最终 main 检查、公开资产与安装后的 App 验收单独记录在
+[发布记录](docs/RELEASING.md)中。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。组件职责与复用约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；
