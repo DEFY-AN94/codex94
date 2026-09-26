@@ -11,7 +11,7 @@ body:
     id: app-version
     attributes:
       label: Codex94 version
-      placeholder: 0.2.1 (12), copied from About
+      placeholder: 3.1.2 (18), copied from About
     validations:
       required: true
   - type: input
@@ -33,7 +33,7 @@ body:
     id: codex-source
     attributes:
       label: Codex source and version
-      description: For example, ChatGPT bundle and codex-cli version. Do not include a private path.
+      description: For example, ChatGPT.app or Codex.app bundle, Homebrew, or a manually selected codex-cli version. Do not include a private path.
     validations:
       required: true
   - type: textarea
