@@ -5,7 +5,7 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private lazy var preferences = PreferencesStore()
-    private lazy var store = AppStore(preferences: preferences)
+    private lazy var store = makeStore()
     private var statusItem: NSStatusItem?
     private var statusRenderer: MenuBarStatusRenderer?
     private let popover = NSPopover()
@@ -16,6 +16,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var workspaceWakeObserver: NSObjectProtocol?
     private var systemClockObserver: NSObjectProtocol?
     private var themeObservation: AnyCancellable?
+
+    // Keep default-argument lowering out of the synthesized lazy getter on
+    // Xcode 16.4, while preserving deferred store creation in test hosts.
+    private func makeStore() -> AppStore {
+        AppStore(preferences: preferences)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {

@@ -50,7 +50,7 @@ final class AppStore: ObservableObject {
         hotKeyController: GlobalHotKeyController = GlobalHotKeyController(),
         notificationController: NotificationController = NotificationController(),
         usageStore: TokenUsageStore? = nil,
-        retrySleep: @escaping @Sendable (TimeInterval) async throws -> Void = RefreshPolicy.sleepBeforeRetry
+        retrySleep: (@Sendable (TimeInterval) async throws -> Void)? = nil
     ) {
         self.preferences = preferences
         self.usageStore = usageStore ?? TokenUsageStore(preferences: preferences)
@@ -58,7 +58,7 @@ final class AppStore: ObservableObject {
         self.locator = locator
         self.fetcher = fetcher
         self.cache = cache
-        self.retrySleep = retrySleep
+        self.retrySleep = retrySleep ?? RefreshPolicy.sleepBeforeRetry
         self.hotKeyController = hotKeyController
         self.notificationController = notificationController
 
