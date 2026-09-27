@@ -5,6 +5,12 @@ enum RefreshPolicy {
     static let quotaResetDelay: TimeInterval = 5
     static let popoverMinimumAge: TimeInterval = 60
 
+    // Keep the async implementation out of default-argument closure lowering
+    // at MainActor lazy call sites on the supported Xcode 16.4 toolchain.
+    nonisolated static func sleepBeforeRetry(_ delay: TimeInterval) async throws {
+        try await Task.sleep(for: .seconds(delay))
+    }
+
     static func automaticRetryDelay(for issue: ConnectionIssue, completedRetries: Int) -> TimeInterval? {
         let delays: [TimeInterval] = [2, 6]
         guard delays.indices.contains(completedRetries) else { return nil }
