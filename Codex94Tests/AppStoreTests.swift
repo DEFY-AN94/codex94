@@ -5,6 +5,289 @@ import XCTest
 
 @MainActor
 final class AppStoreTests: XCTestCase {
+    func testTransientFailureRetriesTwiceAndCoalescedManualKeepsRemainingBudget() async throws {
+        let sleeper = ControlledRetrySleeper()
+        let fetcher = GatedRecordingFetcher(outcomes: Array(repeating: .failure(.requestTimedOut), count: 3))
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic, retrySleep: { try await sleeper.sleep($0) }
+        )
+        defer { fixture.store.shutdown() }
+        addTeardownBlock { await sleeper.releaseAll() }
+
+        fixture.store.refresh(trigger: .manual)
+        for request in 1...3 {
+            try await waitForRequestCount(request, fetcher: fetcher)
+            fixture.store.refresh(trigger: .manual)
+            fixture.store.refresh(trigger: .background)
+            await fetcher.releaseOne()
+            try await waitForRefreshToFinish(fixture.store)
+            XCTAssertEqual(fixture.store.lastIssue, .requestTimedOut)
+            if request < 3 {
+                try await waitForRetrySleeps(request, sleeper: sleeper)
+                XCTAssertFalse(fixture.store.isRefreshing, "Backoff is not an active refresh")
+                await sleeper.releaseOne()
+            }
+        }
+        try await Task.sleep(for: .milliseconds(75))
+        let delays = await sleeper.delays()
+        let count = await fetcher.requestCount()
+        let concurrent = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(delays, [2, 6])
+        XCTAssertEqual(count, 3)
+        XCTAssertEqual(concurrent, 1)
+    }
+
+    func testRetrySuccessEndsCycleAndPublishesFreshQuota() async throws {
+        let sleeper = ControlledRetrySleeper()
+        let fresh = makeSnapshot(defaultLimitID: "default", defaultUsed: 20, sparkUsed: nil, fetchedAt: Date())
+        let fetcher = GatedRecordingFetcher(outcomes: [.failure(.serverExited), .success(fresh)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic, retrySleep: { try await sleeper.sleep($0) }
+        )
+        defer { fixture.store.shutdown() }
+        addTeardownBlock { await sleeper.releaseAll() }
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await waitForRetrySleeps(1, sleeper: sleeper)
+        await sleeper.releaseOne()
+        try await waitForRequestCount(2, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, fresh.fetchedAt)
+        XCTAssertEqual(fixture.store.connectionState, .connected)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.connectionBadge, .none)
+        XCTAssertNil(fixture.store.lastIssue)
+        try await Task.sleep(for: .milliseconds(75))
+        let delays = await sleeper.delays()
+        let count = await fetcher.requestCount()
+        XCTAssertEqual(delays, [2])
+        XCTAssertEqual(count, 2)
+    }
+
+    func testAcceptedManualSupersedesPendingRetryAndStartsFreshBudget() async throws {
+        let sleeper = ControlledRetrySleeper()
+        let fresh = makeSnapshot(defaultLimitID: "default", defaultUsed: 20, sparkUsed: nil, fetchedAt: Date())
+        let fetcher = GatedRecordingFetcher(outcomes: [
+            .failure(.requestTimedOut), .failure(.requestTimedOut), .success(fresh)
+        ])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic, retrySleep: { try await sleeper.sleep($0) }
+        )
+        defer { fixture.store.shutdown() }
+        addTeardownBlock { await sleeper.releaseAll() }
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await waitForRetrySleeps(1, sleeper: sleeper)
+
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRequestCount(2, fetcher: fetcher)
+        // A cancelled sleeper is deliberately resumed, exercising the generation guard.
+        await sleeper.releaseOne()
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await waitForRetrySleeps(2, sleeper: sleeper)
+        let delays = await sleeper.delays()
+        XCTAssertEqual(delays, [2, 2])
+        await sleeper.releaseOne()
+        try await waitForRequestCount(3, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        let concurrent = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(concurrent, 1)
+        XCTAssertEqual(fixture.store.connectionState, .connected)
+    }
+
+    func testPendingRetryCannotRunAfterShutdownOrConnectionPreferenceChange() async throws {
+        for change in ["shutdown", "identity", "path"] {
+            let sleeper = ControlledRetrySleeper()
+            let fresh = makeSnapshot(defaultLimitID: "default", defaultUsed: 20, sparkUsed: nil, fetchedAt: Date())
+            let fetcher = GatedRecordingFetcher(outcomes: [.failure(.requestTimedOut), .success(fresh)])
+            let fixture = try makeStoreFixture(
+                fetcher: fetcher, selection: .automatic, retrySleep: { try await sleeper.sleep($0) }
+            )
+            defer { fixture.store.shutdown() }
+            addTeardownBlock { await sleeper.releaseAll() }
+            fixture.store.refresh(trigger: .manual)
+            try await waitForRequestCount(1, fetcher: fetcher)
+            await fetcher.releaseOne()
+            try await waitForRefreshToFinish(fixture.store)
+            try await waitForRetrySleeps(1, sleeper: sleeper)
+
+            switch change {
+            case "shutdown": fixture.store.shutdown()
+            case "identity": fixture.store.setIdentityMode(.quotaAndAccount)
+            default:
+                let oldPath = try XCTUnwrap(fixture.preferences.manualCodexPath)
+                let newURL = fixture.cacheFileURL.deletingLastPathComponent().appendingPathComponent("codex-next")
+                try FileManager.default.copyItem(at: URL(fileURLWithPath: oldPath), to: newURL)
+                fixture.store.setManualCodexPath(newURL.path)
+            }
+            if change != "shutdown" {
+                try await waitForRequestCount(2, fetcher: fetcher)
+                await fetcher.releaseOne()
+                try await waitForRefreshToFinish(fixture.store)
+            }
+            await sleeper.releaseAll()
+            try await Task.sleep(for: .milliseconds(75))
+            let count = await fetcher.requestCount()
+            XCTAssertEqual(count, change == "shutdown" ? 1 : 2, change)
+            XCTAssertFalse(fixture.store.isRefreshing, change)
+            if change == "identity" {
+                let modes = await fetcher.requestedModes()
+                XCTAssertEqual(modes, [.quotaOnly, .quotaAndAccount])
+            } else if change == "path" {
+                let paths = await fetcher.requestedPaths()
+                XCTAssertEqual(paths.last, fixture.preferences.manualCodexPath)
+                XCTAssertNotEqual(paths.first, paths.last)
+            }
+        }
+    }
+
+    func testNonTransientFailureDoesNotScheduleRetry() async throws {
+        let sleeper = ControlledRetrySleeper()
+        let fetcher = GatedRecordingFetcher(outcomes: [.failure(.notLoggedIn)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic, retrySleep: { try await sleeper.sleep($0) }
+        )
+        defer { fixture.store.shutdown() }
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        let delays = await sleeper.delays()
+        XCTAssertEqual(delays, [])
+        XCTAssertEqual(fixture.store.connectionState, .unavailable(.notLoggedIn))
+    }
+
+    func testPopoverSkipsFreshConnectedDataButImmediatelyRetriesStaleData() async throws {
+        let now = Date()
+        let fresh = makeSnapshot(defaultLimitID: "default", defaultUsed: 20, sparkUsed: nil, fetchedAt: now)
+        let sleeper = ControlledRetrySleeper()
+        let fetcher = GatedRecordingFetcher(outcomes: [
+            .success(fresh), .failure(.requestTimedOut), .success(fresh)
+        ])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic, retrySleep: { try await sleeper.sleep($0) }
+        )
+        defer { fixture.store.shutdown() }
+        addTeardownBlock { await sleeper.releaseAll() }
+        fixture.store.refresh(trigger: .manual)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        fixture.store.popoverWillOpen(now: now.addingTimeInterval(59.999))
+        try await Task.sleep(for: .milliseconds(75))
+        let freshCount = await fetcher.requestCount()
+        XCTAssertEqual(freshCount, 1)
+        fixture.store.popoverWillOpen(now: now.addingTimeInterval(60))
+        try await waitForRequestCount(2, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await waitForRetrySleeps(1, sleeper: sleeper)
+        fixture.store.popoverWillOpen(now: now.addingTimeInterval(1))
+        try await waitForRequestCount(3, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        await sleeper.releaseAll()
+        try await Task.sleep(for: .milliseconds(75))
+        let finalCount = await fetcher.requestCount()
+        XCTAssertEqual(finalCount, 3)
+        XCTAssertEqual(fixture.store.connectionState, .connected)
+    }
+
+    func testAccountReadDegradationKeepsQuotaButIsolatesUsageAndNotificationBaseline() async throws {
+        let now = Date()
+        let accountA = AccountSummary(type: "chatgpt", email: "first@example.com", planType: "pro")
+        let accountB = AccountSummary(type: "chatgpt", email: "second@example.com", planType: "pro")
+        let values: [(Int, AccountSummary?, ConnectionIssue?)] = [
+            (40, accountA, nil), (95, nil, .requestTimedOut),
+            (20, nil, .requestTimedOut), (80, accountB, nil), (95, accountB, nil)
+        ]
+        let snapshots = values.enumerated().map { index, value in
+            makeSnapshot(
+                defaultLimitID: "default", defaultUsed: value.0, sparkUsed: nil,
+                fetchedAt: now.addingTimeInterval(Double(index)),
+                account: value.1, accountReadIssue: value.2
+            )
+        }
+        let quotaFetcher = GatedRecordingFetcher(outcomes: snapshots.map(FetchOutcome.success))
+        let usageFetcher = GatedStoreUsageFetcher()
+        let sleeper = ControlledRetrySleeper()
+        let notifications = StoreNotificationServiceFake()
+        let fixture = try makeStoreFixture(
+            fetcher: quotaFetcher, selection: .automatic, usageFetcher: usageFetcher,
+            retrySleep: { try await sleeper.sleep($0) },
+            notificationController: NotificationController(service: notifications)
+        )
+        defer { fixture.store.shutdown() }
+        fixture.preferences.identityMode = .quotaAndAccount
+        var notificationPreferences = NotificationPreferences()
+        notificationPreferences.isEnabled = true
+        notificationPreferences.recoveryEnabled = true
+        fixture.store.setNotificationPreferences(notificationPreferences)
+
+        func acceptQuota(_ request: Int) async throws {
+            fixture.store.refresh(trigger: .manual)
+            try await waitForRequestCount(request, fetcher: quotaFetcher)
+            await quotaFetcher.releaseOne()
+            try await waitForRefreshToFinish(fixture.store)
+            XCTAssertEqual(fixture.store.connectionState, .connected)
+            XCTAssertNil(fixture.store.lastIssue)
+        }
+
+        try await acceptQuota(1)
+        fixture.store.usageStore.refresh()
+        try await waitForUsageRequestCount(1, fetcher: usageFetcher)
+        await usageFetcher.releaseOne(tokens: 42)
+        try await waitForUsageToFinish(fixture.store.usageStore)
+        XCTAssertEqual(fixture.store.usageStore.snapshot?.summary.lifetimeTokens, 42)
+
+        try await acceptQuota(2)
+        XCTAssertNil(fixture.store.snapshot?.account, "Do not attach the previous email to fresh quota")
+        XCTAssertEqual(fixture.store.snapshot?.accountReadIssue, .requestTimedOut)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, snapshots[1].fetchedAt)
+        XCTAssertNil(fixture.store.usageStore.snapshot)
+        XCTAssertEqual(fixture.store.menuBarStatusPresentation.connectionBadge, .none)
+        let cacheText = try String(contentsOf: fixture.cacheFileURL, encoding: .utf8)
+        XCTAssertFalse(cacheText.contains("first@example.com"))
+        XCTAssertFalse(cacheText.contains("accountReadIssue"))
+
+        // A new usage request can outlive another unknown-identity quota result.
+        // Its eventual result must not repopulate the invalidated generation.
+        fixture.store.usageStore.refresh()
+        try await waitForUsageRequestCount(2, fetcher: usageFetcher)
+        try await acceptQuota(3)
+        XCTAssertFalse(fixture.store.usageStore.isRefreshing)
+        await usageFetcher.releaseOne(tokens: 84)
+        try await Task.sleep(for: .milliseconds(75))
+        XCTAssertNil(fixture.store.usageStore.snapshot)
+
+        fixture.store.usageStore.refresh()
+        try await waitForUsageRequestCount(3, fetcher: usageFetcher)
+        await usageFetcher.releaseOne(tokens: 126)
+        try await waitForUsageToFinish(fixture.store.usageStore)
+        XCTAssertEqual(fixture.store.usageStore.snapshot?.summary.lifetimeTokens, 126)
+        try await acceptQuota(4)
+        XCTAssertEqual(fixture.store.snapshot?.account, accountB)
+        XCTAssertNil(fixture.store.snapshot?.accountReadIssue)
+        XCTAssertNil(fixture.store.usageStore.snapshot, "Recovery cannot retain usage obtained with unknown identity")
+        try await Task.sleep(for: .milliseconds(75))
+        XCTAssertEqual(notifications.deliveries, 0, "Unknown identity must not fabricate crossing or recovery alerts")
+
+        try await acceptQuota(5)
+        let deadline = Date().addingTimeInterval(2)
+        while notifications.deliveries == 0, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(notifications.deliveries, 1, "Known identity resumes normal threshold notifications")
+        let delays = await sleeper.delays()
+        XCTAssertEqual(delays, [], "An account-only issue must never schedule quota retries")
+    }
+
     func testChangedExecutableDiscardsOldSuccessBeforeQueuedRequestFinishes() async throws {
         let now = Date(timeIntervalSince1970: 1_900_000_000)
         let baseline = makeSnapshot(
@@ -2225,7 +2508,11 @@ final class AppStoreTests: XCTestCase {
         selection: MenuBarQuotaSelection,
         cachedSnapshot: QuotaSnapshot? = nil,
         hasChosenIdentityMode: Bool = true,
-        usageFetcher: (any TokenUsageFetching)? = nil
+        usageFetcher: (any TokenUsageFetching)? = nil,
+        retrySleep: @escaping @Sendable (TimeInterval) async throws -> Void = {
+            try await Task.sleep(for: .seconds($0))
+        },
+        notificationController: NotificationController = NotificationController()
     ) throws -> StoreFixture {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("Codex94StoreTests-\(UUID().uuidString)", isDirectory: true)
@@ -2266,7 +2553,9 @@ final class AppStoreTests: XCTestCase {
             ),
             fetcher: fetcher,
             cache: cache,
-            usageStore: usageStore
+            notificationController: notificationController,
+            usageStore: usageStore,
+            retrySleep: retrySleep
         )
         return StoreFixture(
             store: store,
@@ -2320,13 +2609,41 @@ final class AppStoreTests: XCTestCase {
         XCTAssertEqual(modes.count, 1, "Change identity only after the old RPC has actually started")
     }
 
+    private func waitForRetrySleeps(_ expected: Int, sleeper: ControlledRetrySleeper) async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while await sleeper.delays().count < expected, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let delays = await sleeper.delays()
+        XCTAssertEqual(delays.count, expected)
+    }
+
+    private func waitForUsageRequestCount(_ expected: Int, fetcher: GatedStoreUsageFetcher) async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while await fetcher.requestCount() < expected, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let count = await fetcher.requestCount()
+        XCTAssertEqual(count, expected)
+    }
+
+    private func waitForUsageToFinish(_ store: TokenUsageStore) async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while store.isRefreshing, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertFalse(store.isRefreshing)
+    }
+
     private func makeSnapshot(
         defaultLimitID: String,
         defaultUsed: Int,
         sparkUsed: Int?,
         fetchedAt: Date,
         defaultResetsAt: Date? = nil,
-        sparkResetsAt: Date? = nil
+        sparkResetsAt: Date? = nil,
+        account: AccountSummary? = nil,
+        accountReadIssue: ConnectionIssue? = nil
     ) -> QuotaSnapshot {
         var buckets = [
             bucket(
@@ -2346,8 +2663,9 @@ final class AppStoreTests: XCTestCase {
             buckets: buckets,
             defaultLimitID: defaultLimitID,
             fetchedAt: fetchedAt,
-            account: nil,
-            codex: nil
+            account: account,
+            codex: nil,
+            accountReadIssue: accountReadIssue
         )
     }
 
@@ -2376,6 +2694,61 @@ final class AppStoreTests: XCTestCase {
             resetsAt: resetsAt
         )
     }
+}
+
+/// Cancellation is intentionally observed by AppStore after this gate returns.
+/// This exercises callbacks that were already enqueued when a cycle was cancelled.
+private actor ControlledRetrySleeper {
+    private var recordedDelays: [TimeInterval] = []
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+
+    func sleep(_ delay: TimeInterval) async throws {
+        recordedDelays.append(delay)
+        await withCheckedContinuation { continuations.append($0) }
+    }
+
+    func delays() -> [TimeInterval] { recordedDelays }
+
+    func releaseOne() {
+        guard !continuations.isEmpty else { return }
+        continuations.removeFirst().resume()
+    }
+
+    func releaseAll() {
+        let pending = continuations
+        continuations.removeAll()
+        pending.forEach { $0.resume() }
+    }
+}
+
+private actor GatedStoreUsageFetcher: TokenUsageFetching {
+    private var requests = 0
+    private var continuations: [CheckedContinuation<TokenUsageSnapshot, Never>] = []
+
+    func fetchUsage(executable: LocatedCodex) async throws -> TokenUsageSnapshot {
+        requests += 1
+        return await withCheckedContinuation { continuations.append($0) }
+    }
+
+    func requestCount() -> Int { requests }
+
+    func releaseOne(tokens: Int) {
+        guard !continuations.isEmpty else { return }
+        continuations.removeFirst().resume(returning: TokenUsageSnapshot(
+            summary: TokenUsageSummary(lifetimeTokens: tokens), dailyUsageBuckets: [], fetchedAt: Date()
+        ))
+    }
+}
+
+@MainActor
+private final class StoreNotificationServiceFake: QuotaNotificationServing {
+    private(set) var deliveries = 0
+    func authorization() async -> NotificationAuthorization { .authorized }
+    func requestAuthorization() async throws -> Bool {
+        XCTFail("Store tests must not request system notification permission")
+        return false
+    }
+    func deliver(title: String, body: String) async throws { deliveries += 1 }
 }
 
 private actor SnapshotSequenceFetcher: QuotaFetching {

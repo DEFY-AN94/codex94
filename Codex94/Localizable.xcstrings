@@ -2049,6 +2049,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前账号" } }
       }
     },
+    "connection.accountTemporarilyUnavailable" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Account details are temporarily unavailable." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "账号资料暂时无法获取。" } }
+      }
+    },
     "connection.choose" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose…" } },

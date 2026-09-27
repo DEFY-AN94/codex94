@@ -167,6 +167,7 @@ struct QuotaSnapshot: Equatable, Sendable {
     let account: AccountSummary?
     let codex: LocatedCodex?
     let resetCreditsAvailableCount: Int?
+    let accountReadIssue: ConnectionIssue?
 
     init(
         buckets: [QuotaBucketSnapshot],
@@ -174,7 +175,8 @@ struct QuotaSnapshot: Equatable, Sendable {
         fetchedAt: Date,
         account: AccountSummary?,
         codex: LocatedCodex?,
-        resetCreditsAvailableCount: Int? = nil
+        resetCreditsAvailableCount: Int? = nil,
+        accountReadIssue: ConnectionIssue? = nil
     ) {
         self.buckets = buckets
         self.defaultLimitID = defaultLimitID
@@ -182,6 +184,7 @@ struct QuotaSnapshot: Equatable, Sendable {
         self.account = account
         self.codex = codex
         self.resetCreditsAvailableCount = resetCreditsAvailableCount
+        self.accountReadIssue = accountReadIssue
     }
 
     var defaultBucket: QuotaBucketSnapshot? {
@@ -337,6 +340,7 @@ enum RefreshTrigger: String, Sendable {
     case systemWake
     case preferenceChange
     case quotaReset
+    case automaticRetry
 }
 
 enum ConnectionIssue: String, Codable, Equatable, Sendable, LocalizedError {

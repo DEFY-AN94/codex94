@@ -37,6 +37,7 @@ struct Codex94Palette {
     let terminalRed: Color
     let errorColor: Color
     let connectionAccent: Color
+    let staleAccent: Color
 
     static func resolve(
         _ preference: ThemePreference,
@@ -45,14 +46,14 @@ struct Codex94Palette {
     ) -> Codex94Palette {
         let isDark = preference == .terminalDark || (preference == .system && scheme == .dark)
         let defaultGreen = isDark
-            ? Color(red: 0.45, green: 0.88, blue: 0.58)
-            : Color(red: 0.12, green: 0.56, blue: 0.27)
+            ? Color(.sRGB, red: 0.45, green: 0.88, blue: 0.58, opacity: 1)
+            : Color(.sRGB, red: 0.12, green: 0.56, blue: 0.27, opacity: 1)
         let defaultAmber = isDark
-            ? Color(red: 0.96, green: 0.77, blue: 0.34)
-            : Color(red: 0.76, green: 0.48, blue: 0.05)
+            ? Color(.sRGB, red: 0.96, green: 0.77, blue: 0.34, opacity: 1)
+            : Color(.sRGB, red: 0.76, green: 0.48, blue: 0.05, opacity: 1)
         let defaultRed = isDark
-            ? Color(red: 0.96, green: 0.39, blue: 0.39)
-            : Color(red: 0.78, green: 0.16, blue: 0.16)
+            ? Color(.sRGB, red: 0.96, green: 0.39, blue: 0.39, opacity: 1)
+            : Color(.sRGB, red: 0.78, green: 0.16, blue: 0.16, opacity: 1)
 
         return Codex94Palette(
             background: isDark
@@ -68,8 +69,9 @@ struct Codex94Palette {
             // Error is independent of the critical override, including its default.
             errorColor: overrides[.error]?.color ?? defaultRed,
             connectionAccent: isDark
-                ? Color(red: 0.36, green: 0.78, blue: 0.98)
-                : Color(red: 0.00, green: 0.42, blue: 0.74)
+                ? Color(.sRGB, red: 0.36, green: 0.78, blue: 0.98, opacity: 1)
+                : Color(.sRGB, red: 0.00, green: 0.42, blue: 0.74, opacity: 1),
+            staleAccent: defaultAmber
         )
     }
 
@@ -92,7 +94,11 @@ struct Codex94Palette {
     }
 
     func connectionBadgeColor(for badge: ConnectionBadge) -> Color {
-        badge == .unavailable ? errorColor : connectionAccent
+        switch badge {
+        case .stale: staleAccent
+        case .unavailable: errorColor
+        case .none, .refreshing: connectionAccent
+        }
     }
 }
 

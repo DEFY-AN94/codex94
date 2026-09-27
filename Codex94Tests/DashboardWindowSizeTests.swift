@@ -566,7 +566,7 @@ final class MenuBarAppearanceTests: XCTestCase {
                 XCTAssertEqual(palette.quotaColor(for: .unknown), Color.secondary)
                 XCTAssertEqual(palette.connectionAccent, defaults.connectionAccent)
                 XCTAssertEqual(palette.connectionBadgeColor(for: .refreshing), defaults.connectionAccent)
-                XCTAssertEqual(palette.connectionBadgeColor(for: .stale), defaults.connectionAccent)
+                XCTAssertEqual(palette.connectionBadgeColor(for: .stale), defaults.staleAccent)
                 XCTAssertEqual(palette.connectionBadgeColor(for: .unavailable), palette.errorColor)
             }
         }

@@ -6,6 +6,22 @@ stable version is [`v3.1.2 (18)`](https://github.com/DEFY-AN94/codex94/releases/
 released on 2026-09-27 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
+## 3.1.3 candidate recovery behavior
+
+Quota is requested before optional account details. An account-detail timeout
+may leave a fresh quota snapshot with no identity; an earlier account's email
+is not reused. Unverified identity clears or invalidates account-dependent
+Token data and notification baselines. The optional error state is in memory
+only and is not added to quota cache v2.
+
+A transient quota failure may produce at most two additional read attempts,
+after 2 and 6 seconds. These reuse the same read-only quota RPC, including when
+the initial attempt followed a reset deadline; they never redeem reset credits.
+A new user/normal polling cycle starts its own bounded budget. Authentication,
+executable-discovery and malformed-data failures do not automatically retry.
+Only fixed trigger/stage names, timings and error categories are logged; no
+identity, response body, credentials or raw quota values are added to logs.
+
 ## Data access
 
 Codex94 starts a locally installed Codex executable and uses these JSON-RPC

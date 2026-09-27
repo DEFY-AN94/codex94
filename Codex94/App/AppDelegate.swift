@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private lazy var preferences = PreferencesStore()
     private lazy var store = AppStore(preferences: preferences)
     private var statusItem: NSStatusItem?
+    private var statusRenderer: MenuBarStatusRenderer?
     private let popover = NSPopover()
     private var dashboardController: DashboardWindowController?
     private var floatingController: FloatingWindowController?
@@ -15,7 +16,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var workspaceWakeObserver: NSObjectProtocol?
     private var systemClockObserver: NSObjectProtocol?
     private var themeObservation: AnyCancellable?
-    private var menuBarLayoutObservation: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
@@ -26,7 +26,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         configureSystemClockObservation()
         configureThemeObservation()
         configureStatusItem()
-        configureMenuBarLayoutObservation()
         configurePopover()
         configureGlobalHotKey()
         store.start()
@@ -64,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         floatingController?.shutdown()
         store.shutdown()
         themeObservation?.cancel()
-        menuBarLayoutObservation?.cancel()
+        statusRenderer?.shutdown()
         stopOutsideClickMonitoring()
     }
 
@@ -91,36 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         button.target = self
         button.action = #selector(togglePopover)
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        button.toolTip = "Codex94"
-        button.title = ""
-        button.setAccessibilityLabel(MenuBarStatusView.accessibilityLabel(
-            store: store,
-            resolvedQuota: store.menuBarQuota,
-            presentation: store.menuBarStatusPresentation,
-            now: Date()
-        ))
-
-        let statusView = MenuBarStatusView(
-            store: store,
-            onAccessibilityLabelChange: { [weak button] label in
-                button?.setAccessibilityLabel(label)
-            }
-        )
-            .codex94Environment(preferences)
-        let hostingView = NSHostingView(rootView: statusView)
-        hostingView.translatesAutoresizingMaskIntoConstraints = false
-        button.addSubview(hostingView)
-        NSLayoutConstraint.activate([
-            hostingView.leadingAnchor.constraint(
-                equalTo: button.leadingAnchor, constant: metrics.horizontalInset
-            ),
-            hostingView.trailingAnchor.constraint(
-                equalTo: button.trailingAnchor, constant: -metrics.horizontalInset
-            ),
-            hostingView.topAnchor.constraint(equalTo: button.topAnchor),
-            hostingView.bottomAnchor.constraint(equalTo: button.bottomAnchor)
-        ])
         statusItem = item
+        statusRenderer = MenuBarStatusRenderer(store: store, statusItem: item)
     }
 
     private func configureWorkspaceWakeObservation() {
@@ -177,15 +148,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             .receive(on: RunLoop.main)
             .sink { [weak self] theme in
                 self?.applyAppearance(theme)
-            }
-    }
-
-    private func configureMenuBarLayoutObservation() {
-        menuBarLayoutObservation = preferences.$menuBarLayout
-            .removeDuplicates()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] layout in
-                self?.statusItem?.length = layout.metrics.statusItemWidth
             }
     }
 

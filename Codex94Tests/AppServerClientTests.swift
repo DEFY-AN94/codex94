@@ -152,6 +152,7 @@ final class AppServerClientTests: XCTestCase {
             )
             XCTAssertEqual(snapshot.resetCreditsAvailableCount, expected)
             XCTAssertNil(snapshot.account)
+            XCTAssertNil(snapshot.accountReadIssue)
             let requests = try String(contentsOf: fixture.invocationFile, encoding: .utf8)
                 .split(whereSeparator: \.isNewline)
                 .map { line in
@@ -244,17 +245,25 @@ final class AppServerClientTests: XCTestCase {
     func testFetchIgnoresNotificationsAndMismatchedIDs() async throws {
         let fixture = try makeFixture(script: #"""
         IFS= read -r initialize
+        printf '%s\n' "$initialize" >> "__CODEX94_INVOCATION_FILE__"
         printf '%s\n' '{"method":"server/notice","params":{"ignored":true}}'
         printf '%s\n' '{"id":999,"result":{"ignored":true}}'
         printf '%s\n' '{"id":1,"result":{"serverInfo":{"name":"fake"}}}'
         IFS= read -r initialized
-        IFS= read -r account
-        printf '%s\n' '{"id":2,"result":{"account":{"type":"chatgpt","email":"test@example.com","planType":"pro"},"requiresOpenaiAuth":true}}'
+        printf '%s\n' "$initialized" >> "__CODEX94_INVOCATION_FILE__"
         IFS= read -r limits
+        printf '%s\n' "$limits" >> "__CODEX94_INVOCATION_FILE__"
+        printf '%s\n' '{"id":2,"result":{"rateLimits":{"primary":null,"secondary":{"usedPercent":27,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
+        IFS= read -r account
+        printf '%s\n' "$account" >> "__CODEX94_INVOCATION_FILE__"
         printf '%s\n' "$$" > "__CODEX94_PID_FILE__"
         sleep 30 &
         printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
-        printf '%s\n' '{"id":3,"result":{"rateLimits":{"planType":"pro","primary":null,"secondary":{"usedPercent":27,"windowDurationMins":10080,"resetsAt":2000000000}}}}'
+        sleep 0.2
+        printf 'responding\n' > "__CODEX94_HEARTBEAT_FILE__"
+        printf '%s\n' '{"method":"account/notice","params":{"ignored":true}}'
+        printf '%s\n' '{"id":2,"result":{"ignored":true}}'
+        printf '%s\n' '{"id":3,"result":{"account":{"type":"chatgpt","email":"test@example.com","planType":"pro"},"requiresOpenaiAuth":true}}'
         wait
         """#)
 
@@ -267,7 +276,176 @@ final class AppServerClientTests: XCTestCase {
         XCTAssertNil(snapshot.defaultBucket?.window(.fiveHour))
         XCTAssertEqual(snapshot.account?.email, "test@example.com")
         XCTAssertEqual(snapshot.planType, "pro")
+        XCTAssertNil(snapshot.accountReadIssue)
+        let requests = try recordedRequests(fixture)
+        XCTAssertEqual(requests.compactMap { $0["method"] as? String }, [
+            "initialize", "initialized", "account/rateLimits/read", "account/read"
+        ])
+        XCTAssertEqual(requests.compactMap { $0["id"] as? Int }, [1, 2, 3])
+        XCTAssertEqual((requests.last?["params"] as? [String: Bool])?["refreshToken"], false)
+        let responseMarker = try FileManager.default.attributesOfItem(
+            atPath: fixture.heartbeatFile.path
+        )
+        let accountResponseTime = try XCTUnwrap(responseMarker[.modificationDate] as? Date)
+        XCTAssertGreaterThan(accountResponseTime.timeIntervalSince(snapshot.fetchedAt), 0.1,
+                             "Quota must retain its timestamp from before the optional account wait")
 
+        try assertProcessIsGone(at: fixture.pidFile)
+        try assertProcessIsGone(at: fixture.descendantPIDFile)
+    }
+
+    func testSlowAndUnresponsiveAccountReadsKeepFreshQuotaAndStopTheirProcesses() async throws {
+        let accountScripts = [
+            #"""
+            sleep 1 &
+            printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
+            wait
+            printf '%s\n' '{"id":3,"result":{"account":{"type":"chatgpt","email":"late@example.com"}}}'
+            """#,
+            #"""
+            sleep 30 &
+            printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
+            wait
+            """#
+        ]
+        for script in accountScripts {
+            let fixture = try makeFixture(
+                script: quotaFirstScript(accountScript: script),
+                optionalAccountTimeout: 0.15
+            )
+            let snapshot = try await fixture.client.fetch(
+                executable: fixture.executable, identityMode: .quotaAndAccount
+            )
+            XCTAssertEqual(snapshot.defaultBucket?.window(.weekly)?.remainingPercent, 73)
+            XCTAssertEqual(snapshot.resetCreditsAvailableCount, 3)
+            XCTAssertNil(snapshot.account)
+            XCTAssertEqual(snapshot.accountReadIssue, .requestTimedOut)
+            XCTAssertEqual(try recordedRequests(fixture).compactMap { $0["method"] as? String }, [
+                "initialize", "initialized", "account/rateLimits/read", "account/read"
+            ])
+            try assertProcessIsGone(at: fixture.pidFile)
+            try assertProcessIsGone(at: fixture.descendantPIDFile)
+        }
+    }
+
+    func testOptionalAccountTransportAndMalformedResponsesDoNotDiscardQuota() async throws {
+        let responses: [(String, ConnectionIssue)] = [
+            ("exit 0", .serverExited),
+            (#"printf '%s\n' 'not-json'"#, .malformedResponse),
+            (#"printf '%s\n' '{"id":3,"result":null}'"#, .missingResult),
+            (#"printf '%s\n' '{"id":3,"error":{"code":-32000,"message":"failed"}}'"#, .serverError),
+            ("printf '%s\\n' '" + String(repeating: "x", count: 2_048) + "'", .responseTooLarge)
+        ]
+        for (script, expected) in responses {
+            let fixture = try makeFixture(
+                script: quotaFirstScript(accountScript: script), maximumLineBytes: 1_024
+            )
+            let snapshot = try await fixture.client.fetch(
+                executable: fixture.executable, identityMode: .quotaAndAccount
+            )
+            XCTAssertEqual(snapshot.defaultBucket?.window(.weekly)?.remainingPercent, 73)
+            XCTAssertEqual(snapshot.accountReadIssue, expected)
+            XCTAssertNil(snapshot.account)
+            try assertProcessIsGone(at: fixture.pidFile)
+        }
+    }
+
+    func testExplicitAccountAuthenticationFailuresStillFailTheFetch() async throws {
+        let responses = [
+            #"{"id":3,"result":{"requiresOpenaiAuth":true,"account":null}}"#,
+            #"{"id":3,"error":{"code":-32000,"message":"Authentication required"}}"#
+        ]
+        for response in responses {
+            let fixture = try makeFixture(script: quotaFirstScript(
+                accountScript: "printf '%s\\n' '\(response)'"
+            ))
+            await assertIssue(.notLoggedIn) {
+                try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaAndAccount)
+            }
+            XCTAssertEqual(try recordedRequests(fixture).last?["method"] as? String, "account/read")
+            try assertProcessIsGone(at: fixture.pidFile)
+        }
+    }
+
+    func testQuotaFailuresDoNotAttemptOptionalAccountRead() async throws {
+        let responses: [(String, ConnectionIssue)] = [
+            (#"{"id":2,"error":{"code":-32000,"message":"failed"}}"#, .serverError),
+            (#"{"id":2,"error":{"code":-32000,"message":"Not logged in"}}"#, .notLoggedIn),
+            (#"{"id":2,"result":{}}"#, .quotaUnavailable),
+            (#"{"id":2,"result":null}"#, .missingResult),
+            ("not-json", .malformedResponse),
+            ("", .requestTimedOut)
+        ]
+        for (response, expected) in responses {
+            let fixture = try makeFixture(script: quotaFirstScript(
+                accountScript: "exit 80", limitsResponse: response
+            ))
+            await assertIssue(expected) {
+                try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaAndAccount)
+            }
+            XCTAssertEqual(try recordedRequests(fixture).compactMap { $0["method"] as? String }, [
+                "initialize", "initialized", "account/rateLimits/read"
+            ])
+            try assertProcessIsGone(at: fixture.pidFile)
+        }
+    }
+
+    func testOptionalAccountReadStillRespectsTheTotalBudget() async throws {
+        let fixture = try makeFixture(
+            script: quotaFirstScript(accountScript: #"""
+            sleep 30 &
+            printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
+            wait
+            """#),
+            totalTimeout: 0.75,
+            optionalAccountTimeout: 10
+        )
+        let clock = ContinuousClock()
+        let start = clock.now
+        let snapshot = try await fixture.client.fetch(
+            executable: fixture.executable, identityMode: .quotaAndAccount
+        )
+        XCTAssertEqual(snapshot.accountReadIssue, .requestTimedOut)
+        XCTAssertLessThan(clock.now - start, .seconds(2), "Optional metadata cannot extend the total budget")
+        try assertProcessIsGone(at: fixture.pidFile)
+        try assertProcessIsGone(at: fixture.descendantPIDFile)
+    }
+
+    func testOptionalAccountBudgetDoesNotShortenUsageRequests() async throws {
+        let fixture = try makeFixture(
+            script: #"""
+            IFS= read -r initialize
+            printf '%s\n' '{"id":1,"result":{}}'
+            IFS= read -r initialized
+            IFS= read -r usage
+            printf '%s\n' "$usage" > "__CODEX94_INVOCATION_FILE__"
+            sleep 0.2
+            printf '%s\n' '{"id":2,"result":{"summary":{"lifetimeTokens":123}}}'
+            """#,
+            optionalAccountTimeout: 0.05
+        )
+        let snapshot = try await fixture.client.fetchUsage(executable: fixture.executable)
+        XCTAssertEqual(snapshot.summary.lifetimeTokens, 123)
+        XCTAssertEqual(try recordedRequests(fixture).compactMap { $0["method"] as? String }, [
+            "account/usage/read"
+        ])
+    }
+
+    func testShutdownDuringOptionalAccountDoesNotReturnPartialSuccess() async throws {
+        let fixture = try makeFixture(
+            script: quotaFirstScript(accountScript: #"""
+            sleep 30 &
+            printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
+            wait
+            """#),
+            optionalAccountTimeout: 2
+        )
+        let fetch = Task {
+            try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaAndAccount)
+        }
+        _ = try await waitForPID(at: fixture.descendantPIDFile)
+        fixture.client.shutdown()
+        await assertIssue(.serverExited) { try await fetch.value }
         try assertProcessIsGone(at: fixture.pidFile)
         try assertProcessIsGone(at: fixture.descendantPIDFile)
     }
@@ -486,6 +664,41 @@ final class AppServerClientTests: XCTestCase {
         let heartbeatFile: URL
     }
 
+    private func recordedRequests(_ fixture: Fixture) throws -> [[String: Any]] {
+        try String(contentsOf: fixture.invocationFile, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
+            .map { try XCTUnwrap(JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]) }
+    }
+
+    private func quotaFirstScript(
+        accountScript: String,
+        limitsResponse: String = #"{"id":2,"result":{"rateLimits":{"secondary":{"usedPercent":27,"windowDurationMins":10080}},"rateLimitResetCredits":{"availableCount":3}}}"#
+    ) -> String {
+        #"""
+        IFS= read -r initialize
+        printf '%s\n' "$initialize" >> "__CODEX94_INVOCATION_FILE__"
+        printf '%s\n' '{"id":1,"result":{}}'
+        IFS= read -r initialized
+        printf '%s\n' "$initialized" >> "__CODEX94_INVOCATION_FILE__"
+        IFS= read -r limits
+        printf '%s\n' "$limits" >> "__CODEX94_INVOCATION_FILE__"
+        case "$limits" in
+          *'"method":"account/rateLimits/read"'*|*'"method":"account\/rateLimits\/read"'*) ;;
+          *) exit 74 ;;
+        esac
+        printf '%s\n' "$$" > "__CODEX94_PID_FILE__"
+        printf '%s\n' '\#(limitsResponse)'
+        if IFS= read -r account; then
+          printf '%s\n' "$account" >> "__CODEX94_INVOCATION_FILE__"
+          case "$account" in
+            *'"method":"account/read"'*|*'"method":"account\/read"'*) ;;
+            *) exit 75 ;;
+          esac
+          \#(accountScript)
+        fi
+        """#
+    }
+
     private func waitForPID(at fileURL: URL) async throws -> pid_t {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: .seconds(2))
@@ -574,6 +787,7 @@ final class AppServerClientTests: XCTestCase {
         maximumLineBytes: Int = 1_048_576,
         initializeTimeout: TimeInterval = 1,
         totalTimeout: TimeInterval = 3,
+        optionalAccountTimeout: TimeInterval = 1,
         clientVersion: String = "test"
     ) throws -> Fixture {
         let directory = FileManager.default.temporaryDirectory
@@ -611,6 +825,7 @@ final class AppServerClientTests: XCTestCase {
             initialize: initializeTimeout,
             request: 1,
             total: totalTimeout,
+            optionalAccount: optionalAccountTimeout,
             terminationGrace: 0.05,
             maximumLineBytes: maximumLineBytes
         )
