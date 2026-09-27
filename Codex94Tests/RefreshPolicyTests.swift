@@ -4,6 +4,44 @@ import XCTest
 final class RefreshPolicyTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 2_000_000_000)
 
+    func testTransientRetryBudgetUsesOnlyTwoBoundedDelays() {
+        for issue in [ConnectionIssue.initializationTimedOut, .requestTimedOut, .totalTimedOut,
+                      .processLaunchFailed, .serverExited, .serverError] {
+            XCTAssertEqual(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 0), 2)
+            XCTAssertEqual(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 1), 6)
+            XCTAssertNil(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 2))
+            XCTAssertNil(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: -1))
+            XCTAssertNil(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: Int.max))
+        }
+        for issue in [ConnectionIssue.codexNotFound, .codexNotExecutable, .invalidCodexVersion,
+                      .notLoggedIn, .malformedResponse, .responseTooLarge, .missingResult,
+                      .quotaUnavailable, .cacheFailure, .unknown] {
+            XCTAssertNil(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 0))
+        }
+    }
+
+    func testPopoverFreshnessRequiresConnectedSnapshotAndStrictSixtySecondBoundary() {
+        for age in [0.0, 59.999] {
+            XCTAssertFalse(RefreshPolicy.shouldRefreshOnPopover(
+                connectionState: .connected, lastSuccessfulFetch: now.addingTimeInterval(-age), now: now
+            ))
+        }
+        for age in [-1.0, 60, 300] {
+            XCTAssertTrue(RefreshPolicy.shouldRefreshOnPopover(
+                connectionState: .connected, lastSuccessfulFetch: now.addingTimeInterval(-age), now: now
+            ))
+        }
+        XCTAssertTrue(RefreshPolicy.shouldRefreshOnPopover(
+            connectionState: .connected, lastSuccessfulFetch: nil, now: now
+        ))
+        for state in [ConnectionState.idle, .refreshing, .unavailable(.requestTimedOut),
+                      .stale(lastSuccess: now, issue: .requestTimedOut)] {
+            XCTAssertTrue(RefreshPolicy.shouldRefreshOnPopover(
+                connectionState: state, lastSuccessfulFetch: now, now: now
+            ))
+        }
+    }
+
     func testWakeRefreshesWithoutSuccessfulSnapshot() {
         XCTAssertTrue(RefreshPolicy.shouldRefreshAfterWake(
             lastSuccessfulFetch: nil,

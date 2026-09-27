@@ -220,6 +220,12 @@ final class ManagedSubprocessLifecycle: @unchecked Sendable {
     private var activeProcess: ManagedSubprocess?
     private var isShutDown = false
 
+    var hasShutDown: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return isShutDown
+    }
+
     func launch(
         _ operation: () throws -> ManagedSubprocess
     ) throws -> ManagedSubprocess {

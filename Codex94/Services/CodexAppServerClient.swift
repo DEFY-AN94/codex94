@@ -15,6 +15,7 @@ struct AppServerTimeouts: Sendable {
     var initialize: TimeInterval = 8
     var request: TimeInterval = 5
     var total: TimeInterval = 15
+    var optionalAccount: TimeInterval = 2
     var terminationGrace: TimeInterval = 1
     var maximumLineBytes: Int = 1_048_576
 }
@@ -71,6 +72,10 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
 
     func shutdown() {
         processLifecycle.shutdown(gracePeriod: timeouts.terminationGrace)
+    }
+
+    private func checkNotShutDown() throws {
+        if processLifecycle.hasShutDown { throw ConnectionIssue.serverExited }
     }
 
     private func withInitializedServer<Result>(
@@ -130,30 +135,32 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
             )
         }
 
-        let initializeID = 1
-        try write([
-            "id": initializeID,
-            "method": "initialize",
-            "params": [
-                "clientInfo": [
-                    "name": "codex94",
-                    "title": "Codex94",
-                    "version": clientVersion
-                ],
-                "capabilities": [
-                    "experimentalApi": true
+        try measuredStage(.initialize) {
+            let initializeID = 1
+            try write([
+                "id": initializeID,
+                "method": "initialize",
+                "params": [
+                    "clientInfo": [
+                        "name": "codex94",
+                        "title": "Codex94",
+                        "version": clientVersion
+                    ],
+                    "capabilities": [
+                        "experimentalApi": true
+                    ]
                 ]
-            ]
-        ], to: input.fileHandleForWriting)
+            ], to: input.fileHandleForWriting)
 
-        _ = try response(
-            id: initializeID,
-            channel: channel,
-            deadline: requestDeadline(seconds: timeouts.initialize, totalDeadline: totalDeadline),
-            timeoutIssue: totalDeadline.timeIntervalSinceNow <= timeouts.initialize
-                ? .totalTimedOut
-                : .initializationTimedOut
-        )
+            _ = try response(
+                id: initializeID,
+                channel: channel,
+                deadline: requestDeadline(seconds: timeouts.initialize, totalDeadline: totalDeadline),
+                timeoutIssue: totalDeadline.timeIntervalSinceNow <= timeouts.initialize
+                    ? .totalTimedOut
+                    : .initializationTimedOut
+            )
+        }
 
         try write(["method": "initialized"], to: input.fileHandleForWriting)
 
@@ -165,58 +172,120 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
         identityMode: IdentityMode
     ) throws -> QuotaSnapshot {
         try withInitializedServer(executable: executable) { input, channel, totalDeadline in
-            var nextID = 2
-            var accountResult: [String: Any]?
-            if identityMode == .quotaAndAccount {
+            // Validate quota before spending any time on optional account metadata.
+            let (limitsResult, quota) = try measuredStage(.rateLimits) {
                 try write([
-                    "id": nextID,
-                    "method": "account/read",
-                    "params": ["refreshToken": false]
+                    "id": 2,
+                    "method": "account/rateLimits/read"
                 ], to: input)
-                accountResult = try response(
-                    id: nextID,
+                let result = try response(
+                    id: 2,
                     channel: channel,
                     deadline: requestDeadline(seconds: timeouts.request, totalDeadline: totalDeadline),
                     timeoutIssue: .requestTimedOut
                 )
-                if accountResult?["requiresOpenaiAuth"] as? Bool == true,
-                   accountResult?["account"] is NSNull {
-                    throw ConnectionIssue.notLoggedIn
-                }
-                nextID += 1
+                let quotaFetchedAt = Date()
+                let snapshot = try RateLimitsParser.parse(
+                    limitsResult: result,
+                    accountResult: nil,
+                    executable: executable,
+                    fetchedAt: quotaFetchedAt
+                )
+                return (result, snapshot)
             }
+            try checkNotShutDown()
+            guard identityMode == .quotaAndAccount else { return quota }
 
-            try write([
-                "id": nextID,
-                "method": "account/rateLimits/read"
-            ], to: input)
-            let limitsResult = try response(
-                id: nextID,
-                channel: channel,
-                deadline: requestDeadline(seconds: timeouts.request, totalDeadline: totalDeadline),
-                timeoutIssue: .requestTimedOut
-            )
+            var accountResult: [String: Any]?
+            var accountReadIssue: ConnectionIssue?
+            do {
+                accountResult = try measuredStage(.account) {
+                    try write([
+                        "id": 3,
+                        "method": "account/read",
+                        "params": ["refreshToken": false]
+                    ], to: input)
+                    let result = try response(
+                        id: 3,
+                        channel: channel,
+                        deadline: requestDeadline(
+                            seconds: timeouts.optionalAccount,
+                            totalDeadline: totalDeadline
+                        ),
+                        timeoutIssue: .requestTimedOut
+                    )
+                    if result["requiresOpenaiAuth"] as? Bool == true,
+                       result["account"] is NSNull {
+                        throw ConnectionIssue.notLoggedIn
+                    }
+                    return result
+                }
+            } catch let issue as ConnectionIssue {
+                // Explicit authentication failures still invalidate the fetch. A failed
+                // optional read never attaches an account from an earlier snapshot.
+                if issue == .notLoggedIn { throw issue }
+                accountReadIssue = issue
+            }
+            try checkNotShutDown()
 
             return try RateLimitsParser.parse(
                 limitsResult: limitsResult,
                 accountResult: accountResult,
                 executable: executable,
-                fetchedAt: Date()
+                fetchedAt: quota.fetchedAt,
+                accountReadIssue: accountReadIssue
             )
         }
     }
 
     private func fetchUsageSynchronously(executable: LocatedCodex) throws -> TokenUsageSnapshot {
         try withInitializedServer(executable: executable) { input, channel, totalDeadline in
-            try write(["id": 2, "method": "account/usage/read"], to: input)
-            let result = try response(
-                id: 2,
-                channel: channel,
-                deadline: requestDeadline(seconds: timeouts.request, totalDeadline: totalDeadline),
-                timeoutIssue: .requestTimedOut,
-                tokenUsageRequest: true
+            try measuredStage(.usage) {
+                try write(["id": 2, "method": "account/usage/read"], to: input)
+                let result = try response(
+                    id: 2,
+                    channel: channel,
+                    deadline: requestDeadline(seconds: timeouts.request, totalDeadline: totalDeadline),
+                    timeoutIssue: .requestTimedOut,
+                    tokenUsageRequest: true
+                )
+                return try TokenUsageParser.parse(result: result, fetchedAt: Date())
+            }
+        }
+    }
+
+    private enum Stage: String {
+        case initialize, rateLimits, account, usage
+    }
+
+    private func measuredStage<Result>(
+        _ stage: Stage,
+        operation: () throws -> Result
+    ) rethrows -> Result {
+        let startedAt = ProcessInfo.processInfo.systemUptime
+        var outcome = "success"
+        defer {
+            let milliseconds = Int((ProcessInfo.processInfo.systemUptime - startedAt) * 1_000)
+            logger.info(
+                "stage=\(stage.rawValue, privacy: .public) duration_ms=\(milliseconds, privacy: .public) outcome=\(outcome, privacy: .public)"
             )
-            return try TokenUsageParser.parse(result: result, fetchedAt: Date())
+        }
+        do {
+            return try operation()
+        } catch {
+            // Only fixed error categories reach logs, never the server's message or payload.
+            switch error {
+            case let issue as ConnectionIssue: outcome = issue.rawValue
+            case let issue as TokenUsageIssue:
+                switch issue {
+                case .unsupported: outcome = "unsupported"
+                case .notLoggedIn: outcome = "notLoggedIn"
+                case .unavailable: outcome = "unavailable"
+                case .invalidData: outcome = "invalidData"
+                }
+            default: outcome = "unknown"
+            }
+            throw error
         }
     }
 
@@ -353,7 +422,8 @@ enum RateLimitsParser {
         limitsResult: [String: Any],
         accountResult: [String: Any]?,
         executable: LocatedCodex,
-        fetchedAt: Date
+        fetchedAt: Date,
+        accountReadIssue: ConnectionIssue? = nil
     ) throws -> QuotaSnapshot {
         let account = parseAccount(accountResult)
         let legacyLimits = limitsResult["rateLimits"] as? [String: Any]
@@ -421,7 +491,8 @@ enum RateLimitsParser {
             fetchedAt: fetchedAt,
             account: account,
             codex: executable,
-            resetCreditsAvailableCount: resetCreditsAvailableCount(in: limitsResult)
+            resetCreditsAvailableCount: resetCreditsAvailableCount(in: limitsResult),
+            accountReadIssue: accountReadIssue
         )
         guard snapshot.displayableBuckets.contains(where: { !$0.windows.isEmpty }) else {
             throw ConnectionIssue.quotaUnavailable

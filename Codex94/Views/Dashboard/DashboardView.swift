@@ -232,8 +232,15 @@ struct ConnectionSettingsView: View {
             if store.preferences.identityMode == .quotaAndAccount {
                 SettingsDivider()
                 SettingsRow("connection.account") {
-                    Text(store.snapshot?.account?.email ?? "—")
-                        .textSelection(.enabled)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(store.snapshot?.account?.email ?? "—")
+                            .textSelection(.enabled)
+                        if store.snapshot?.accountReadIssue != nil {
+                            Text("connection.accountTemporarilyUnavailable")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
         }

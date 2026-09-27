@@ -95,6 +95,8 @@
 		B683C230C7052D59AA64B7DA /* FloatingWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F618021643944B5F98E9E7B2 /* FloatingWindowTests.swift */; };
 		360DE70C8742984C4D6A01D7 /* TokenUsageImageExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC8D831B09F051CDBCB937C /* TokenUsageImageExportTests.swift */; };
 		9C8A34BE2A915C303E50F1EB /* TokenUsageImageExportControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4B696605F3B88443EF4540 /* TokenUsageImageExportControls.swift */; };
+		53A35E13AE7023E368E0C17B /* MenuBarStatusRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F6C240B6D65E55D77A411F1 /* MenuBarStatusRenderer.swift */; };
+		C30049CDE24355B49D7B4278 /* MenuBarStatusRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0748072C9608124C96ECB492 /* MenuBarStatusRendererTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -207,6 +209,8 @@
 		F618021643944B5F98E9E7B2 /* FloatingWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FloatingWindowTests.swift"; sourceTree = "<group>"; };
 		2AC8D831B09F051CDBCB937C /* TokenUsageImageExportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TokenUsageImageExportTests.swift"; sourceTree = "<group>"; };
 		CB4B696605F3B88443EF4540 /* TokenUsageImageExportControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Dashboard/TokenUsageImageExportControls.swift"; sourceTree = "<group>"; };
+		8F6C240B6D65E55D77A411F1 /* MenuBarStatusRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/MenuBar/MenuBarStatusRenderer.swift"; sourceTree = "<group>"; };
+		0748072C9608124C96ECB492 /* MenuBarStatusRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarStatusRendererTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -297,6 +301,7 @@
 				F0000000000000000000001A /* ConnectionBadgeView.swift */,
 				F0000000000000000000001E /* CopyTextButton.swift */,
 				F00000000000000000000010 /* MenuBarStatusView.swift */,
+				8F6C240B6D65E55D77A411F1 /* MenuBarStatusRenderer.swift */,
 				F00000000000000000000011 /* QuotaPopoverView.swift */,
 				F00000000000000000000012 /* DashboardView.swift */,
 				F0000000000000000000001F /* OverviewView.swift */,
@@ -329,6 +334,7 @@
 				F00000000000000000000104 /* AppServerClientTests.swift */,
 				F00000000000000000000105 /* SnapshotCacheTests.swift */,
 				F00000000000000000000106 /* DashboardWindowSizeTests.swift */,
+				0748072C9608124C96ECB492 /* MenuBarStatusRendererTests.swift */,
 				F00000000000000000000107 /* AppStoreTests.swift */,
 				F00000000000000000000108 /* QuotaPopoverLayoutTests.swift */,
 				F00000000000000000000109 /* StatusPresentationTests.swift */,
@@ -496,6 +502,7 @@
 				B00000000000000000000019 /* ConnectionBadgeView.swift in Sources */,
 				B0000000000000000000001D /* CopyTextButton.swift in Sources */,
 				B00000000000000000000010 /* MenuBarStatusView.swift in Sources */,
+				53A35E13AE7023E368E0C17B /* MenuBarStatusRenderer.swift in Sources */,
 				B00000000000000000000011 /* QuotaPopoverView.swift in Sources */,
 				B00000000000000000000012 /* DashboardView.swift in Sources */,
 				B0000000000000000000001E /* OverviewView.swift in Sources */,
@@ -525,6 +532,7 @@
 				B00000000000000000000104 /* AppServerClientTests.swift in Sources */,
 				B00000000000000000000105 /* SnapshotCacheTests.swift in Sources */,
 				B00000000000000000000106 /* DashboardWindowSizeTests.swift in Sources */,
+				C30049CDE24355B49D7B4278 /* MenuBarStatusRendererTests.swift in Sources */,
 				B00000000000000000000107 /* AppStoreTests.swift in Sources */,
 				B00000000000000000000108 /* QuotaPopoverLayoutTests.swift in Sources */,
 				B00000000000000000000109 /* StatusPresentationTests.swift in Sources */,
@@ -601,7 +609,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -609,7 +617,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 3.1.2;
+				MARKETING_VERSION = 3.1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -627,7 +635,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				DEAD_CODE_STRIPPING = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				ENABLE_APP_SANDBOX = NO;
@@ -635,7 +643,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 3.1.2;
+				MARKETING_VERSION = 3.1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

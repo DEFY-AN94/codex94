@@ -40,6 +40,15 @@ The existing adaptive floating layout, Token features, and privacy boundaries
 remain unchanged. See [issue #30](https://github.com/DEFY-AN94/codex94/issues/30)
 and [fix PR #31](https://github.com/DEFY-AN94/codex94/pull/31).
 
+## 3.1.3 candidate
+
+The next candidate reads quota before optional account details, adds bounded
+retries for transient quota failures, and skips redundant popover reads while
+data is still fresh. Cached status uses an amber clock; active refresh remains
+blue. Colored menu-bar content is rendered as a native non-template image.
+Native Spaces-transition acceptance is tracked separately from rendering tests.
+Published downloads below remain on 3.1.2 until a later release is confirmed.
+
 ## Features
 
 - The floating quota strip targets **480 × 90 logical points** for weekly-only

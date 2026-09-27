@@ -2,6 +2,33 @@ import XCTest
 @testable import Codex94
 
 final class SnapshotCacheTests: XCTestCase {
+    func testAccountReadFailureIsEphemeralAndClearedForQuotaOnly() throws {
+        let directory = try makeTemporaryDirectory()
+        let cache = SnapshotCache(fileURL: directory.appendingPathComponent("quota.json"))
+        let snapshot = QuotaSnapshot(
+            buckets: [QuotaBucketSnapshot(
+                limitID: "codex", limitName: nil, planType: "pro",
+                windows: [window(.weekly, used: 15, minutes: 10_080, reset: nil)]
+            )],
+            defaultLimitID: "codex",
+            fetchedAt: Date(timeIntervalSince1970: 1_900_000_000),
+            account: nil,
+            codex: nil,
+            accountReadIssue: .requestTimedOut
+        )
+
+        try cache.save(snapshot)
+        let restored = try XCTUnwrap(cache.load())
+        XCTAssertEqual(restored.buckets, snapshot.buckets)
+        XCTAssertNil(restored.accountReadIssue)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: Data(contentsOf: cache.fileURL)
+        ) as? [String: Any])
+        XCTAssertEqual(Set(object.keys), ["version", "buckets", "defaultLimitID", "fetchedAt"])
+        XCTAssertNil(snapshot.removingAccount().accountReadIssue)
+        XCTAssertEqual(snapshot.removingAccount().buckets, snapshot.buckets)
+    }
+
     func testV2ExtremePercentagesRoundTripWithoutOverflowOrSchemaChanges() throws {
         let directory = try makeTemporaryDirectory()
         let cache = SnapshotCache(fileURL: directory.appendingPathComponent("quota.json"))

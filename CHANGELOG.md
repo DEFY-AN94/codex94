@@ -2,6 +2,22 @@
 
 All notable changes to Codex94 are documented here.
 
+## 3.1.3 - 2026-09-28
+
+Version `3.1.3 (19)`. Release dates use Australia/Melbourne.
+
+### Fixed
+
+- Read quota before optional account details, so slow identity requests do not
+  discard a valid quota update. Unavailable identity is shown separately and
+  does not reuse a previous account's identity or Token snapshot.
+- Recover transient quota failures with a bounded retry policy and avoid a
+  redundant request when a recently refreshed popover is opened again.
+- Distinguish cached/Stale status from an active refresh and use the native
+  status-button image path for colored menu-bar content. The maintainer
+  verified that the reported Spaces-transition color flash is resolved on the
+  tested Mac; this acceptance is separate from automated rendering tests.
+
 ## 3.1.2 - 2026-09-27
 
 Version `3.1.2 (18)`. Release dates use Australia/Melbourne.

@@ -92,3 +92,19 @@ legacy flat-resource paths. Homebrew and standard CLI fallbacks remain, while
 an explicit manual choice is authoritative and is not bypassed on failure.
 Discovery does not recursively search directories or read authentication data;
 transport and quota-decoding responsibilities remain separate.
+
+## 3.1.3 candidate: recovery and native status rendering
+
+The transport validates quota first, then allows a short optional-account read.
+The quota response's timestamp is retained across that optional wait. Explicit
+authentication failure and shutdown still fail the request. The store owns the
+bounded retry budget and cancels obsolete retry tasks with its existing
+connection-generation boundary. Missing identity is not paired with a previous
+account's details or Token snapshot; notification baselines are isolated too.
+
+`MenuBarStatusRenderer` owns the native button image and reuses
+`MenuBarStatusContent` to create transparent, sRGB, non-template artwork. It
+rerenders only when visible inputs, appearance or backing scale change. Its
+freshness timer updates accessibility/tooltip text only, without quota requests.
+Native Spaces animation requires separate acceptance; a static image test does
+not establish that the reported transition has been fixed.

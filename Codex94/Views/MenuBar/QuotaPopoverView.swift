@@ -268,7 +268,7 @@ struct QuotaPopoverView: View {
             Divider()
             StatusBanner(
                 badge: .stale,
-                color: palette.connectionAccent,
+                color: palette.connectionBadgeColor(for: .stale),
                 text: cachedBannerText(presentation: presentation),
                 accessibilityText: cachedBannerText(presentation: presentation),
                 recoveryDestination: presentation.issue?.recoveryDestination,

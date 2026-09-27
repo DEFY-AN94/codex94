@@ -114,6 +114,7 @@ BUILD_INPUTS = (
     "Codex94/Views/Dashboard/DisplaySettingsView.swift",
     "Codex94/Views/Dashboard/OverviewView.swift",
     "Codex94/Views/MenuBar/MenuBarStatusView.swift",
+    "Codex94/Views/MenuBar/MenuBarStatusRenderer.swift",
     "Codex94/Views/MenuBar/QuotaPopoverView.swift",
     "Codex94Tests/AppServerClientTests.swift",
     "Codex94Tests/AppStoreTests.swift",

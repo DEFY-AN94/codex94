@@ -23,6 +23,7 @@ final class AppStore: ObservableObject {
     private let locator: CodexExecutableLocator
     private let fetcher: any QuotaFetching
     private let cache: SnapshotCache
+    private let retrySleep: @Sendable (TimeInterval) async throws -> Void
     private let logger = Logger(subsystem: "com.defyan94.codex94", category: "state")
     private var refreshTask: Task<Void, Never>?
     private var pendingRefreshTrigger: RefreshTrigger?
@@ -35,6 +36,10 @@ final class AppStore: ObservableObject {
     private var preferencesObservation: AnyCancellable?
     private var isShuttingDown = false
     private var connectionGeneration = 0
+    private var automaticRetryTask: Task<Void, Never>?
+    private var automaticRetryGeneration = 0
+    private var automaticRetryAttempt = 0
+    private var accountIdentityIsUnverified = false
 
     init(
         preferences: PreferencesStore = PreferencesStore(),
@@ -44,7 +49,8 @@ final class AppStore: ObservableObject {
         cache: SnapshotCache = SnapshotCache(),
         hotKeyController: GlobalHotKeyController = GlobalHotKeyController(),
         notificationController: NotificationController = NotificationController(),
-        usageStore: TokenUsageStore? = nil
+        usageStore: TokenUsageStore? = nil,
+        retrySleep: (@Sendable (TimeInterval) async throws -> Void)? = nil
     ) {
         self.preferences = preferences
         self.usageStore = usageStore ?? TokenUsageStore(preferences: preferences)
@@ -52,6 +58,7 @@ final class AppStore: ObservableObject {
         self.locator = locator
         self.fetcher = fetcher
         self.cache = cache
+        self.retrySleep = retrySleep ?? RefreshPolicy.sleepBeforeRetry
         self.hotKeyController = hotKeyController
         self.notificationController = notificationController
 
@@ -70,6 +77,7 @@ final class AppStore: ObservableObject {
         refreshTask?.cancel()
         backgroundTask?.cancel()
         resetRefreshTask?.cancel()
+        automaticRetryTask?.cancel()
         fetcher.shutdown()
         locator.shutdown()
     }
@@ -202,6 +210,14 @@ final class AppStore: ObservableObject {
             return
         }
 
+        // Only an accepted refresh starts a new retry cycle. Coalesced manual
+        // requests share the active request and its remaining recovery budget.
+        if trigger != .automaticRetry {
+            cancelAutomaticRetry()
+        }
+        let retryGeneration = automaticRetryGeneration
+        logger.info("refresh=started trigger=\(trigger.rawValue, privacy: .public)")
+
         consumeDueQuotaResetsForAcceptedRefresh(startedAt: startedAt)
         activeRefreshStartedAt = startedAt
         isRefreshing = true
@@ -217,6 +233,7 @@ final class AppStore: ObservableObject {
                 return
             }
             var successfulFetchedAt: Date?
+            var failureIssue: ConnectionIssue?
             do {
                 let located = try await Task.detached(priority: .utility) { [locator] in
                     try locator.locate(manualPath: manualPath)
@@ -231,24 +248,41 @@ final class AppStore: ObservableObject {
                     if requestGeneration == connectionGeneration {
                         applySuccess(freshSnapshot, located: located)
                         successfulFetchedAt = freshSnapshot.fetchedAt
+                        logger.info("refresh=finished trigger=\(trigger.rawValue, privacy: .public) result=success")
                     }
                 }
             } catch {
                 guard !Task.isCancelled, !isShuttingDown else { return }
                 if requestGeneration == connectionGeneration {
-                    applyFailure(Self.issue(from: error))
+                    let issue = Self.issue(from: error)
+                    applyFailure(issue)
+                    failureIssue = issue
+                    logger.info("refresh=finished trigger=\(trigger.rawValue, privacy: .public) result=failure")
                 }
             }
 
             // An obsolete request still releases the single-flight slot so the
             // queued request can use the latest connection preferences.
             guard !isShuttingDown else { return }
-            finishRefresh(successfulFetchedAt: successfulFetchedAt, now: Date())
+            finishRefresh(
+                successfulFetchedAt: successfulFetchedAt,
+                failureIssue: failureIssue,
+                retryGeneration: retryGeneration,
+                now: Date()
+            )
         }
     }
 
-    func popoverWillOpen() {
-        refresh(trigger: .popover)
+    func popoverWillOpen(now: Date = Date()) {
+        guard RefreshPolicy.shouldRefreshOnPopover(
+            connectionState: connectionState,
+            lastSuccessfulFetch: snapshot?.fetchedAt,
+            now: now
+        ) else {
+            logger.info("refresh=skipped trigger=popover result=fresh")
+            return
+        }
+        refresh(trigger: .popover, startedAt: now)
     }
 
     func handleSystemWake(now: Date = Date()) {
@@ -276,6 +310,7 @@ final class AppStore: ObservableObject {
         guard !isShuttingDown else { return }
         isShuttingDown = true
         pendingRefreshTrigger = nil
+        cancelAutomaticRetry()
 
         backgroundTask?.cancel()
         backgroundTask = nil
@@ -382,6 +417,8 @@ final class AppStore: ObservableObject {
 
     private func invalidateConnectionContext() {
         connectionGeneration += 1
+        cancelAutomaticRetry()
+        accountIdentityIsUnverified = false
         usageStore.reset()
         notificationPolicy.reset()
     }
@@ -402,8 +439,9 @@ final class AppStore: ObservableObject {
     }
 
     private func applySuccess(_ freshSnapshot: QuotaSnapshot, located: LocatedCodex) {
+        cancelAutomaticRetry()
         let visibleSnapshot: QuotaSnapshot
-        if preferences.identityMode == .quotaOnly, freshSnapshot.account != nil {
+        if preferences.identityMode == .quotaOnly {
             visibleSnapshot = freshSnapshot.removingAccount()
         } else {
             visibleSnapshot = freshSnapshot
@@ -412,12 +450,20 @@ final class AppStore: ObservableObject {
         // Account for targets covered by this response before replacing the old
         // windows: a completed reset may disappear from the successful snapshot.
         consumeCoveredQuotaResets(through: visibleSnapshot.fetchedAt)
-        if let previousAccount = snapshot?.account,
-           let currentAccount = visibleSnapshot.account,
-           previousAccount != currentAccount {
+        let accountIsUnverified = preferences.identityMode == .quotaAndAccount
+            && (visibleSnapshot.account == nil || visibleSnapshot.accountReadIssue != nil)
+        let accountChanged = snapshot?.account != nil
+            && visibleSnapshot.account != nil
+            && snapshot?.account != visibleSnapshot.account
+        let identityAvailabilityChanged = accountIsUnverified != accountIdentityIsUnverified
+        let unverifiedUsageExists = accountIsUnverified
+            && (usageStore.snapshot != nil || usageStore.isRefreshing)
+        if accountChanged || identityAvailabilityChanged || unverifiedUsageExists {
             notificationPolicy.reset()
+            notificationController.configure(enabled: preferences.notifications.isEnabled)
             usageStore.reset()
         }
+        accountIdentityIsUnverified = accountIsUnverified
         snapshot = visibleSnapshot
         hasFetchedLiveSnapshot = true
         locatedCodex = located
@@ -434,10 +480,14 @@ final class AppStore: ObservableObject {
             preferences.menuBarQuotaSelection = .automatic
         }
 
-        let notificationEvents = notificationPolicy.events(
-            for: visibleSnapshot, preferences: preferences.notifications
-        )
-        notificationController.deliver(notificationEvents, language: preferences.language)
+        // Unknown identity must not establish or compare a notification baseline
+        // that might belong to another account. Quota-only mode keeps its policy.
+        if !accountIsUnverified {
+            let notificationEvents = notificationPolicy.events(
+                for: visibleSnapshot, preferences: preferences.notifications
+            )
+            notificationController.deliver(notificationEvents, language: preferences.language)
+        }
 
         do {
             try cache.save(visibleSnapshot)
@@ -504,7 +554,12 @@ final class AppStore: ObservableObject {
         return true
     }
 
-    private func finishRefresh(successfulFetchedAt: Date?, now: Date) {
+    private func finishRefresh(
+        successfulFetchedAt: Date?,
+        failureIssue: ConnectionIssue? = nil,
+        retryGeneration: Int? = nil,
+        now: Date
+    ) {
         if let successfulFetchedAt {
             replaceQuotaResetScheduleAfterSuccess(fetchedAt: successfulFetchedAt)
         }
@@ -525,6 +580,38 @@ final class AppStore: ObservableObject {
             refresh(trigger: .quotaReset, startedAt: now)
         } else {
             isRefreshing = false
+            if let failureIssue, let retryGeneration {
+                scheduleAutomaticRetry(for: failureIssue, generation: retryGeneration)
+            }
+        }
+    }
+
+    private func cancelAutomaticRetry() {
+        automaticRetryTask?.cancel()
+        automaticRetryTask = nil
+        automaticRetryGeneration += 1
+        automaticRetryAttempt = 0
+    }
+
+    private func scheduleAutomaticRetry(for issue: ConnectionIssue, generation: Int) {
+        guard !isShuttingDown, generation == automaticRetryGeneration,
+              let delay = RefreshPolicy.automaticRetryDelay(
+                for: issue, completedRetries: automaticRetryAttempt
+              ) else { return }
+        automaticRetryAttempt += 1
+        let requestGeneration = connectionGeneration
+        logger.info("refresh=retry_scheduled attempt=\(self.automaticRetryAttempt, privacy: .public)")
+        automaticRetryTask = Task { [weak self, retrySleep] in
+            do {
+                try await retrySleep(delay)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled, let self, !isShuttingDown,
+                  generation == automaticRetryGeneration,
+                  requestGeneration == connectionGeneration else { return }
+            automaticRetryTask = nil
+            refresh(trigger: .automaticRetry)
         }
     }
 
