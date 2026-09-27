@@ -1,8 +1,8 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v3.1.2 (18)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2),
-released on 2026-09-27 (Australia/Melbourne). Its tag and DMG remain bound to
-release commit `8df7f920316b05f7065053d86203f66e6cf6e846`; later docs-only commits do not move
+The published stable version is [`v3.1.3 (19)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3),
+released on 2026-09-28 (Australia/Melbourne). Its tag and DMG remain bound to
+release commit `1dedf6230753f52510004c0355ec91ad626fbc23`; later docs-only commits do not move
 that tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -40,6 +40,15 @@ changes and existing tags; do not stash/reset/clean or force-push as preparation
 Keep candidate changelog notes under Unreleased without inventing a date.
 Historical release entries and the existing synthetic screenshot provenance
 remain unchanged. Planning and Goal files stay outside the Git repository.
+
+Version `3.1.3 (19)`, dated **2026-09-28** (Australia/Melbourne), prioritizes
+quota before optional identity, uses at most two transient-failure retries,
+and freshness-gates popover opens. Retain quota-first/identity-isolation,
+retry-budget/cancellation, and no-read-on-fresh-reopen tests. Native image
+checks cover sRGB colors, transparency, dimensions, the real status-button
+image and independent blue/amber/error state colors. Keep manual Spaces
+acceptance tied to its exact candidate and Mac rather than inferring it from
+static image or AX-geometry checks.
 
 Version `3.1.2 (18)`, dated **2026-09-27** (Australia/Melbourne), restores
 discovery of the newer nested bundled Codex CLI layout while retaining legacy
@@ -91,7 +100,7 @@ separate and tied to the revision actually tested.
 Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
 Its historical tag and DMG remain bound to
 `ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`. Current download and clone
-instructions point to `v3.1.2`. This maintenance release isolates quota request contexts, shares strict
+instructions point to `v3.1.3`. This maintenance release isolates quota request contexts, shares strict
 service-value parsing, reuses chart preparation/formatting, retires old Token
 clients outside the main actor, and validates development-script arguments
 before side effects. It does not introduce a broad timer rewrite, new data
@@ -121,7 +130,7 @@ or documentation releases do not move that tag or replace those asset bytes.
 
 Regression checks for the `0.2.2` features should cover the three legacy layouts and
 their saved selection, the independent dual-window preference, and both mouse
-buttons using the same popover toggle and normal refresh-on-open path. Check
+buttons using the same popover toggle and the current freshness-gated refresh path. Check
 hotkey registration/failure through a fake adapter, requiring Control or Option
 with optional Command and Shift. Notification tests use a fake system service:
 disabled defaults,
@@ -520,3 +529,62 @@ passed for Actions, Python and Swift.
 Quarantine was unchanged. The local desktop inspection connector was unavailable,
 so no new local visual/manual UI acceptance is claimed. Previously documented
 signing, first-launch Gatekeeper and untested native-interaction limits remain.
+
+
+### 3.1.3 refresh and menu-bar release — 2026-09-28
+
+[PR #34](https://github.com/DEFY-AN94/codex94/pull/34) fixes
+[issue #33](https://github.com/DEFY-AN94/codex94/issues/33). The full suite
+recorded **381 tests executed, 1 skipped, 0 failures**, including 11 native
+menu-bar renderer tests. The hosted key-window focus skip is not a pass.
+
+PR head `956aa1744dd4d71f03c0d714a4935d5dba952181` was tested as merge commit
+`f476d066c857cf7c71b980ab2d00c81c9c677918`, tree
+`e2410a6e6533a94bc7fb3329340f0f45cbe7a7e5`.
+[PR CI 36325976370](https://github.com/DEFY-AN94/codex94/actions/runs/36325976370)
+passed the full test/package job and Display, Recovery, Token usage and
+Floating UI jobs.
+[PR CodeQL 36325973592](https://github.com/DEFY-AN94/codex94/actions/runs/36325973592)
+passed Actions, Python and Swift. Main-only attestation was skipped for that
+PR run and is not counted as a passed PR check.
+
+The maintainer confirmed that the reported menu-bar color flash during Spaces
+switching was resolved on the tested Mac with the exact reviewed PR CI
+candidate: `3.1.3 (19)`, App main-binary SHA-256
+`1fd8dcbcdcb27c250ab6939f3f0eb761a603c68622fc286f2431caa72a17d26a`, copied
+from the PR DMG with SHA-256
+`949b19ec364b7d418fc844ce83eaac2aca5e920928137276b340b2719ee5e0fd`.
+That candidate's files/modes matched its DMG, its signature was checked and
+quarantine was not modified. These are candidate identifiers, not the final
+published asset hashes. This manual acceptance is limited to that Mac and
+candidate; it is not a claim about every macOS version, fullscreen configuration,
+floating-panel Spaces behavior, keyboard focus, or fresh-account Gatekeeper.
+
+- Frozen release source: `1dedf6230753f52510004c0355ec91ad626fbc23`.
+- Final-main CI and DMG-attestation evidence: [CI 36345607838](https://github.com/DEFY-AN94/codex94/actions/runs/36345607838) passed the full suite (381 executed, 1 skipped, 0 failures), all four synthetic UI jobs, packaging and DMG attestation.
+- Final-main Actions/Python/Swift CodeQL evidence: [CodeQL 36345607726](https://github.com/DEFY-AN94/codex94/actions/runs/36345607726) passed Actions, Python and Swift.
+- Publication/Latest verification: anonymous GitHub readback confirmed [v3.1.3](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3) as public, non-draft, non-prerelease and Latest (Release ID `397794268`, published `2026-09-27T20:11:27Z`, or 2026-09-28 in Australia/Melbourne).
+- Annotated tag object and `v3.1.3` source binding: tag object `f1f841f8a50e6e1f7e0178cdfac40cd8955ca8d8` peels to the frozen release commit above; its tree is `f435dda8ccfa6e72a05ceca1561815ac3223fd8a`.
+- Final DMG SHA-256: `15ee4d64be474c765ccb3d3480a712c1f581c11dd952bc085e5984fd0faf824c`; checksum-file SHA-256: `d839fa7693998e42d2c8c1936fafc24a20fd585957f906d42270626b98c97ee2`.
+- Public assets: both downloads matched the final-main CI bytes and GitHub API
+  digests. Package verification confirmed Universal 2, ad-hoc Hardened Runtime,
+  empty entitlements, no Team ID, and an unsigned, unnotarized outer DMG.
+- Strict DMG attestation verification passed for this repository's `main`, the
+  frozen source/signing SHA, and `.github/workflows/ci.yml`; the certificate
+  identified CI run `36345607838`, attempt 1, on a GitHub-hosted runner.
+- Public ZIP and TAR archives each matched all 146 tracked files at the frozen
+  commit, without extraction. The production update client used no cookies or
+  credentials, recognized 3.1.3 as newer than 3.1.2, and returned the correct
+  release and DMG URLs.
+- Installed App binary SHA-256: `1fd8dcbcdcb27c250ab6939f3f0eb761a603c68622fc286f2431caa72a17d26a`.
+- Final installation, retained rollback copy and live-refresh acceptance: the final App was installed and launched; its full file manifest, signature and extracted extended attributes were verified after launch. Launch refresh and the first scheduled background refresh succeeded. The complete 3.1.2 backup and original were retained; quarantine, signatures and user preferences were not changed. The installed main binary matches the PR candidate accepted for the reported Spaces color issue; no new animation capture or broader native acceptance is claimed.
+
+The synthetic UI evidence confirms freshness-gated reopening, bounded retry
+exhaustion, existing layout/selection behavior, and the amber cached indicator
+versus blue active refresh. Recovery remains click-functional with pending
+keyboard/AXPress/tooltip acceptance. Token UI checks open and cancel PNG/CSV
+save panels; they do not perform real Save/Copy or validate direct custom-date
+field editing. There is no CI capture of a real Spaces animation in these
+artifacts. Final package and installation evidence above must remain distinct
+from the maintainer's PR-candidate color acceptance. Documentation follow-ups
+do not move the release tag or replace asset bytes.

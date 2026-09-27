@@ -24,21 +24,24 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 > Codex94 与 OpenAI 没有隶属关系，也未获得 OpenAI 的认可、背书或赞助。Codex
 > `app-server` 是实验性接口，未来 Codex 版本可能会改变它。
 
-## 3.1.2 版本
+## 3.1.3 版本
 
-`3.1.2 (18)` 已于 **2026-09-27**（Australia/Melbourne）正式发布。
-本版恢复对已知 ChatGPT/Codex App 中新版嵌套 Codex CLI 的自动发现，修复因找不到
-可执行文件而无法刷新额度、继续显示上次缓存的问题。保留旧内置路径回退和显式手动
-路径优先级；既有自适应浮条、Token 功能与隐私边界保持不变。
-对应 [issue #30](https://github.com/DEFY-AN94/codex94/issues/30) 和
-[修复 PR #31](https://github.com/DEFY-AN94/codex94/pull/31)。
+`3.1.3 (19)` 已于 **2026-09-28**（Australia/Melbourne）正式发布。
+本版先读取额度，再读取可降级的账号资料，避免较慢的身份请求丢弃有效额度；额度请求
+短暂失败时采用有界重试。连接正常且数据不足 60 秒时，重新打开面板复用已有快照。
+缓存状态改用独立琥珀色时钟，刷新中仍为蓝色。菜单栏彩色内容由透明、sRGB、非模板的
+原生按钮图片绘制，提示文本也包含数据新鲜度。对应
+[issue #33](https://github.com/DEFY-AN94/codex94/issues/33) 和
+[修复 PR #34](https://github.com/DEFY-AN94/codex94/pull/34)。
 
-## 3.1.3 候选版
+维护者已确认：在本次测试的 Mac 上，使用精确的已审阅 CI 候选应用切换 Spaces 时，
+所报告的菜单栏闪色问题已解决。此验收不扩展为所有 macOS、全屏配置或键盘路径均已
+验证；候选身份与验收范围记录在[发布记录](docs/RELEASING.md)中。
 
-下一候选版优先读取额度，将账号资料作为可降级的独立信息；额度请求短暂失败时
-有限重试，数据仍新鲜时重新打开菜单不再重复请求。缓存状态用琥珀色时钟表示，
-正在刷新仍使用蓝色。菜单栏彩色内容改由原生非模板图片绘制；切换桌面时的实际
-表现需要与静态渲染测试分开验收。正式发布确认前，下方下载仍指向 3.1.2。
+`3.1.2 (18)` 引入的内置 CLI 兼容修复继续保留，包括已知 ChatGPT/Codex App 路径的
+自动发现、旧路径回退与显式手动路径优先级；原始记录仍为
+[issue #30](https://github.com/DEFY-AN94/codex94/issues/30) 和
+[PR #31](https://github.com/DEFY-AN94/codex94/pull/31)。
 
 ## 主要功能
 
@@ -56,7 +59,8 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
   统计历史库、系统权限或网络接口，也不改变签名和手动安装方式。
 
 验证包含第四个合成 **Floating** UI 场景及统计控件／图片检查，证据分类见下文。
-原生键盘焦点、跨 Spaces 与全屏应用行为须单独实测，不能仅凭图片或面板配置认定。
+原生键盘焦点、浮窗跨 Spaces 与全屏应用行为仍须分别实测，不能仅凭图片或面板配置
+认定；上文菜单栏闪色验收仅对应本次 Mac 与精确候选应用。
 
 ## 界面截图
 
@@ -103,8 +107,8 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 ## 当前分发状态
 
 - 已发布的稳定版为
-  [`v3.1.2 (18)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2)，
-  于 **2026-09-27**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
+  [`v3.1.3 (19)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3)，
+  于 **2026-09-28**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
   annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
   也不会重新生成已发布的资产。
@@ -118,7 +122,7 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 - 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
-已发布的 `3.1.2` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+已发布的 `3.1.3` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
 attestation 都不会改变这一 Apple 信任状态。
 
@@ -139,23 +143,23 @@ Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
 
 ## 安装 Universal DMG
 
-请从 [`v3.1.2` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2)
+请从 [`v3.1.3` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3)
 下载以下两个正式资产：
 
-- `Codex94-3.1.2-macos-universal-unnotarized.dmg`
-- `Codex94-3.1.2-SHA256SUMS.txt`
+- `Codex94-3.1.3-macos-universal-unnotarized.dmg`
+- `Codex94-3.1.3-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-3.1.2-SHA256SUMS.txt
+shasum -a 256 -c Codex94-3.1.3-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-3.1.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-3.1.3-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -175,7 +179,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v3.1.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v3.1.3 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
@@ -229,7 +233,8 @@ sudo xcodebuild -runFirstLaunch
 
 ### 既有额度行为
 
-以下行为继承自 `0.2.2 (13)`。**既有额度界面**折叠区保留历史截图；上方新增的
+保留 `0.2.2 (13)` 引入的额度功能，并包含下述新鲜度与恢复改进。**既有额度界面**
+折叠区保留历史截图；上方新增的
 Token 统计预览另有独立的来源记录。
 
 - 新建 Dashboard 窗口默认打开**总览**，复用当前连接状态、数据新鲜度文案和菜单栏
@@ -245,7 +250,7 @@ Token 统计预览另有独立的来源记录。
   数值。它的选桶偏好独立于原三种布局的额度选择，切换布局会保留原有选择；
   不伪造缺失窗口，也不合并不同窗口的额度。
 - 鼠标左键或右键点击菜单栏状态项，都会切换同一个 Popover 的开关状态；
-  打开后仍沿用正常的展开刷新路径。可配置的全局快捷键也切换同一个面板，
+  打开时遵循下述新鲜度门控刷新路径。可配置的全局快捷键也切换同一个面板，
   **默认未设置**。组合必须包含 Control 或 Option，也可另外添加 Command 和 Shift。
 - 本地额度通知**默认关闭**，只有显式启用时才请求 macOS 通知权限。剩余比例
   默认在 **20% 和 10%** 两档提醒，均可调整或关闭；默认监测默认额度桶，
@@ -273,7 +278,12 @@ Token 统计预览另有独立的来源记录。
   原有**刷新**。未登录时会提示先在 Codex 中登录、再回来刷新；Codex94 不代为登录。
 - 修改布局/颜色、呈现总览、渲染重置时间文案以及恢复导航本身不会请求额度、写入
   额度缓存或改变连接状态；打开 Popover 和独立的 post-reset 调度仍按下述行为刷新。
-- App 启动、每次展开菜单栏面板，以及按所选的 1、5、15 或 30 分钟间隔刷新。
+- App 启动时及所选的 1、5、15 或 30 分钟间隔刷新。展开面板时，若连接正常且
+  成功数据不足 60 秒则直接复用；其他情况进入既有单飞刷新路径。仍可手动选择
+  **刷新**，已进行中的读取会合并，不额外并发。
+- 额度请求短暂失败后，最多分别等待 2 秒、6 秒进行两次额外读取；Reset 触发的
+  请求也可使用同一有界重试预算。认证、路径发现或畸形数据错误不会自动重试，
+  后续正常刷新周期会建立自己的预算。
 - Mac 唤醒后，如果没有成功快照，或上次成功已过去至少 60 秒，则刷新一次；
   更鲜的快照保持不变。唤醒、后台、手动和展开面板触发的请求共用同一条单飞
   刷新路径。
@@ -282,8 +292,10 @@ Token 统计预览另有独立的来源记录。
   单飞路径，已消费目标不会进行 Reset 专属重试。仅保存在本次运行中的已消费时间
   水位防止时钟回拨后重新安排旧 Reset。唤醒与系统时钟变化会重新协调这项一次性
   计划；不新增持久化 Reset 账本或后台刷新周期。
-- 使用 `account/rateLimits/read` 读取实时额度；在 **额度 + 账号信息** 模式下，
-  还会调用 `account/read`，并固定使用 `refreshToken: false`。
+- 先用 `account/rateLimits/read` 读取实时额度；在 **额度 + 账号信息** 模式下，
+  再调用可降级的 `account/read`，固定使用 `refreshToken: false`。账号读取有独立的
+  较短等待上限；身份信息较慢时仍保留有效额度，缺失身份单独显示，不复用旧账号的
+  资料或 Token 快照。明确的认证失败仍会使本次读取失败。
 - 将 Codex 返回的标准/默认额度桶与额外命名的模型额度桶分开处理。默认额度桶显示
   为 **Codex**；其他额度桶使用服务端提供的名称，不写死模型可用性或下架日期。
   历史合成截图可能仍包含旧模型名称。
@@ -298,17 +310,18 @@ Token 统计预览另有独立的来源记录。
   窗口的额度行和选择项会隐藏，不根据套餐名称推断权限，不估算额度，也不合并
   彼此独立的窗口。
 - 将额度严重度与连接/数据新鲜度分开：额度圆环、百分比和进度条使用同一套解析后
-  的充足/偏低/紧张颜色，默认依次为绿色、琥珀色和红色。刷新中与缓存标记保持
-  蓝色/青色连接强调色。在没有可用数据且连接不可用时，标记、横幅和
+  的充足/偏低/紧张颜色，默认依次为绿色、琥珀色和红色。刷新中保留蓝色/青色
+  连接强调色；缓存时钟使用独立琥珀色，不受用户自定义的额度 warning 色影响。
+  在没有可用数据且连接不可用时，标记、横幅和
   Dashboard 错误状态点使用独立错误色，默认取应用紧张色覆盖前的主题红色。
 - 刷新失败时保留最后一次成功的额度并标记为缓存数据；没有可用额度快照时显示
   灰色 `--`，不会伪装成 `0%`。
 - Popover 标题区域会显示最后一次成功额度数据的相对时间。已有快照时刷新会明确
   显示“上次成功”，刷新中或不可用且没有快照时则使用不同的“暂无成功数据”语义；
-  菜单栏和 Popover 的辅助功能描述也包含相同的新鲜度信息。
+  菜单栏和 Popover 的辅助功能描述、原生菜单栏按钮的提示文本也包含相同的新鲜度信息。
 - 点击面板以外区域会收起临时面板，不会吞掉原始点击，也不需要辅助功能权限。
-- Codex 检测顺序为：手动路径、ChatGPT App 内置文件、Homebrew、
-  `/usr/local/bin`、`~/.local/bin`，最后是 `PATH` 中的绝对路径。
+- Codex 检测顺序为：显式手动路径、已知 ChatGPT/Codex App 新版嵌套位置、旧内置
+  路径、Homebrew、`/usr/local/bin`、`~/.local/bin`，最后是 `PATH` 中的绝对路径。
 - Dashboard 提供 900x600、1280x720、1440x810 和 1920x1080 逻辑点窗口预设；
   超出当前屏幕时会按比例适配，并保留用户选择的预设；用户主动拖动调整窗口时
   仍更新预设。
@@ -454,6 +467,14 @@ hosted 焦点跳过项不计作通过。外部 UI、安全分析、最终 main �
 `3.1.2 (18)` 的本地验证记录为 **353 项执行、1 项跳过、0 项失败**，跳过不计作通过。
 最终 main 检查、公开资产与安装后的 App 验收单独记录在
 [发布记录](docs/RELEASING.md)中。
+
+`3.1.3 (19)` 的完整测试记录为 **381 项执行、1 项跳过、0 项失败**，包含 11 项
+菜单栏渲染测试；hosted 焦点跳过项不计作通过。
+[发布 CI](https://github.com/DEFY-AN94/codex94/actions/runs/36345607838) 的四个合成 UI
+场景均通过，[发布 CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/36345607726)
+的 Actions、Python、Swift 检查均通过。维护者对切换 Spaces 时菜单栏颜色的验收，
+仅对应测试 Mac 上的精确 CI 候选应用；最终 main 资产与安装验收另见
+[RELEASING.md](docs/RELEASING.md)。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。组件职责与复用约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；

@@ -2,16 +2,17 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v3.1.2 (18)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2),
-released on 2026-09-27 (Australia/Melbourne). It includes the user-triggered
+stable version is [`v3.1.3 (19)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3),
+released on 2026-09-28 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
-## 3.1.3 candidate recovery behavior
+## 3.1.3: quota recovery and status presentation
 
 Quota is requested before optional account details. An account-detail timeout
 may leave a fresh quota snapshot with no identity; an earlier account's email
-is not reused. Unverified identity clears or invalidates account-dependent
-Token data and notification baselines. The optional error state is in memory
+is not reused. In **Quota + account** mode, unverified identity clears or
+invalidates account-dependent Token data and notification baselines. The optional
+error state is in memory
 only and is not added to quota cache v2.
 
 A transient quota failure may produce at most two additional read attempts,
@@ -21,6 +22,12 @@ A new user/normal polling cycle starts its own bounded budget. Authentication,
 executable-discovery and malformed-data failures do not automatically retry.
 Only fixed trigger/stage names, timings and error categories are logged; no
 identity, response body, credentials or raw quota values are added to logs.
+
+Opening a connected popover with a successful snapshot less than 60 seconds old
+reuses it instead of sending another read. The native menu-bar image and its
+freshness tooltip derive only from existing quota/status state. Appearance,
+backing-scale changes and the tooltip timer do not fetch quota, record desktop
+content, or access account stores. The tooltip adds no account identity.
 
 ## Data access
 
@@ -162,8 +169,9 @@ Changing layout/colors, opening or browsing Overview, rendering Reset text, or
 opening a recovery destination does not itself request quota, write quota cache,
 or change connection state. Recovery buttons only open an existing Dashboard
 section; they do not execute a login or introduce a separate retry request. The
-post-reset task is a new trigger for the existing quota refresh path: each
-consumed target gets at most one attempt and no Reset-specific immediate retry.
+post-reset task uses the existing quota refresh path: each consumed target
+gets one Reset-triggered attempt, without rearming that target. The generic
+3.1.3 transient-failure budget described above may also follow that attempt.
 
 Version `0.2.1` keeps a consumed Reset watermark only in memory, including
 across clock changes; no Reset history is written to disk. If a fresh successful

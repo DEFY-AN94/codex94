@@ -29,25 +29,29 @@ and security-scanned before it is tagged.
 > `app-server` is an experimental interface and may change in future Codex
 > releases.
 
-## Version 3.1.2
+## Version 3.1.3
 
-`3.1.2 (18)` is the published stable release, dated **2026-09-27**
-(Australia/Melbourne). It restores automatic discovery of the newer Codex CLI
-nested inside the known ChatGPT and Codex App bundles, fixing quota refreshes
-that otherwise remain on the last cached snapshot after executable discovery
-fails. Legacy bundled paths and explicit manual-path precedence are retained.
-The existing adaptive floating layout, Token features, and privacy boundaries
-remain unchanged. See [issue #30](https://github.com/DEFY-AN94/codex94/issues/30)
-and [fix PR #31](https://github.com/DEFY-AN94/codex94/pull/31).
+`3.1.3 (19)` is the published stable release, dated **2026-09-28**
+(Australia/Melbourne). It reads quota before optional account details, keeps
+valid quota when optional identity is slow, and recovers transient quota
+failures with a bounded retry budget. Reopening a connected popover with data
+less than 60 seconds old reuses that snapshot. Cached status has an independent
+amber clock; active refresh remains blue. Colored menu-bar content now uses a
+transparent, sRGB, non-template native button image, with freshness in its
+tooltip. See [issue #33](https://github.com/DEFY-AN94/codex94/issues/33) and
+[fix PR #34](https://github.com/DEFY-AN94/codex94/pull/34).
 
-## 3.1.3 candidate
+The maintainer confirmed that the reported menu-bar color flash while switching
+Spaces was resolved on the tested Mac with the exact reviewed CI candidate.
+This acceptance does not establish behavior on every macOS version, fullscreen
+configuration, or keyboard path. The candidate identity and scope are recorded
+in the [release record](docs/RELEASING.md).
 
-The next candidate reads quota before optional account details, adds bounded
-retries for transient quota failures, and skips redundant popover reads while
-data is still fresh. Cached status uses an amber clock; active refresh remains
-blue. Colored menu-bar content is rendered as a native non-template image.
-Native Spaces-transition acceptance is tracked separately from rendering tests.
-Published downloads below remain on 3.1.2 until a later release is confirmed.
+The bundled-CLI compatibility fix introduced in `3.1.2 (18)` is retained,
+including discovery of the known ChatGPT/Codex App layouts, legacy fallbacks,
+and explicit manual-path precedence. Its original record remains
+[issue #30](https://github.com/DEFY-AN94/codex94/issues/30) and
+[PR #31](https://github.com/DEFY-AN94/codex94/pull/31).
 
 ## Features
 
@@ -71,9 +75,10 @@ Published downloads below remain on 3.1.2 until a later release is confirmed.
   manual installation.
 
 Validation includes a fourth synthetic **Floating** UI scenario and Token
-controls/image checks. Evidence is listed below; native keyboard-focus,
-cross-Space, and fullscreen behavior must be assessed separately from rendered
-images and configured panel flags.
+controls/image checks. Evidence is listed below. Native keyboard focus,
+floating-panel behavior across Spaces, and fullscreen behavior remain separate
+from rendered images and panel flags; the menu-bar color acceptance above is limited to the tested
+Mac and candidate.
 
 ## Screenshots
 
@@ -122,8 +127,8 @@ statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v3.1.2 (18)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2),
-  released on **2026-09-27** (Australia/Melbourne) as a Universal 2 DMG and
+  [`v3.1.3 (19)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3),
+  released on **2026-09-28** (Australia/Melbourne) as a Universal 2 DMG and
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
   Later documentation commits do not move its tag or regenerate its assets.
@@ -141,7 +146,7 @@ statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `3.1.2` DMG itself is completely unsigned, has no Apple Developer ID
+The published `3.1.3` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -165,23 +170,23 @@ precedence; an invalid manual choice is not silently bypassed.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v3.1.2` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2):
+[`v3.1.3` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3):
 
-- `Codex94-3.1.2-macos-universal-unnotarized.dmg`
-- `Codex94-3.1.2-SHA256SUMS.txt`
+- `Codex94-3.1.3-macos-universal-unnotarized.dmg`
+- `Codex94-3.1.3-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-3.1.2-SHA256SUMS.txt
+shasum -a 256 -c Codex94-3.1.3-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-3.1.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-3.1.3-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -203,7 +208,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v3.1.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v3.1.3 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
@@ -265,7 +270,8 @@ source installer does not migrate or remove a DMG-installed copy.
 
 ### Existing quota behavior
 
-The following behavior is retained from `0.2.2 (13)`. The **Earlier quota
+The quota features introduced in `0.2.2 (13)` remain, with the freshness and
+recovery refinements described below. The **Earlier quota
 interface** gallery retains older captures; the new Token usage previews have
 their own provenance above.
 
@@ -288,8 +294,8 @@ their own provenance above.
   layouts preserves those existing choices; an unavailable window is not
   invented or combined with another window.
 - Left-clicking or right-clicking the menu-bar item toggles the same popover.
-  Opening follows the normal refresh-on-open path. A configurable global
-  keyboard shortcut also toggles that popover and is **unset by default**.
+  Opening follows the freshness-gated refresh path described below. A configurable
+  global keyboard shortcut also toggles that popover and is **unset by default**.
   It must include Control or Option; Command and Shift may be added.
 - Optional local quota notifications are **off by default**. Explicitly enabling
   them requests macOS notification permission. Remaining-quota warning levels
@@ -331,8 +337,14 @@ their own provenance above.
   navigation do not themselves trigger quota requests, write quota cache, or
   change connection state. Opening the popover and the separate post-reset
   schedule follow their documented refresh behavior below.
-- Refreshes at launch, whenever the popover opens, and every 1, 5, 15, or 30
-  minutes according to the selected setting.
+- Refreshes at launch and every 1, 5, 15, or 30 minutes according to the
+  selected setting. Opening a connected popover reuses successful data less
+  than 60 seconds old; otherwise it uses the existing single-flight refresh.
+  Explicit **Refresh** remains available and coalesces an already active read.
+- Transient quota failures may receive at most two additional read attempts,
+  after delays of 2 and 6 seconds. The same bounded budget can follow a
+  Reset-triggered attempt. Authentication, discovery and malformed-data errors
+  do not automatically retry; a later normal refresh starts a new budget.
 - After the Mac wakes, refreshes once when there is no successful snapshot or
   the last success is at least 60 seconds old. A fresher snapshot is kept, and
   wake, background, manual, and popover requests share the same single-flight
@@ -344,8 +356,11 @@ their own provenance above.
   A session-only consumed-target watermark prevents clock rollback from
   rearming an already attempted Reset. Wake and system-clock changes reconcile
   the one-shot schedule without a persistent ledger or new background cadence.
-- Uses `account/rateLimits/read` for live quota data. In **Quota + account**
-  mode it also uses `account/read` with `refreshToken: false`.
+- Uses `account/rateLimits/read` for live quota data before the optional
+  `account/read` request in **Quota + account** mode, with `refreshToken: false`.
+  A short optional-account deadline preserves valid quota if identity is slow;
+  missing identity is shown separately, without reusing an earlier account's
+  details or Token snapshot. Explicit authentication failures still fail the read.
 - Keeps the standard/default quota bucket separate from additional named model
   buckets returned by Codex. The default bucket is shown as **Codex**; named
   buckets use service-provided names. No model's availability or retirement
@@ -366,8 +381,9 @@ their own provenance above.
   from plan type. It never estimates or combines independent quota windows.
 - Keeps quota severity separate from connection and data freshness: quota
   rings, percentages, and bars share the same resolved healthy/warning/critical
-  colors, defaulting to green, amber, and red. Refreshing and cached indicators
-  retain the blue/cyan connection accent. A hard-unavailable badge, banner, or
+  colors, defaulting to green, amber, and red. Refreshing keeps the blue/cyan
+  connection accent; cached status uses its own amber clock, independent of
+  the user's quota warning-color override. A hard-unavailable badge, banner, or
   Dashboard error dot uses its independent error color,
   defaulting to the theme red before any critical override.
 - Keeps the last successful quota value after a refresh failure and marks it as
@@ -376,11 +392,12 @@ their own provenance above.
   header. Refreshing with an existing snapshot reports the last success, while
   refreshing or unavailable states without a snapshot use explicit no-success
   wording. The same freshness context is included in menu-bar and popover
-  accessibility descriptions.
+  accessibility descriptions and the native menu-bar button's tooltip.
 - Closes the transient popover when the user clicks elsewhere without consuming
   the original click or requesting Accessibility permission.
-- Locates Codex in this order: manually selected path, ChatGPT app bundle,
-  Homebrew, `/usr/local/bin`, `~/.local/bin`, then absolute `PATH` entries.
+- Locates Codex in this order: explicit manual path, the known ChatGPT/Codex
+  nested bundled locations, their legacy paths, Homebrew, `/usr/local/bin`,
+  `~/.local/bin`, then absolute `PATH` entries.
 - Offers Dashboard window presets at 900x600, 1280x720, 1440x810, and 1920x1080
   logical points, with proportional fitting to the current display. Screen
   fitting preserves the requested preset; a user resize still updates it.
@@ -553,6 +570,15 @@ Local validation for `3.1.2 (18)` recorded **353 tests executed, 1 skipped,
 0 failures**. The skipped check is not a pass. Final-main checks, published
 assets, and installed-App acceptance are recorded separately in the
 [release record](docs/RELEASING.md).
+
+Validation for `3.1.3 (19)` recorded **381 tests executed, 1 skipped,
+0 failures**, including 11 menu-bar renderer tests. The hosted focus skip is
+not a pass. [release CI](https://github.com/DEFY-AN94/codex94/actions/runs/36345607838)
+passed the four synthetic UI scenarios, and
+[release CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/36345607726) passed
+Actions, Python and Swift. The maintainer's Spaces color acceptance applies
+only to the reviewed CI candidate on the tested Mac; final-main assets and
+installation are separate records in [RELEASING.md](docs/RELEASING.md).
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See the

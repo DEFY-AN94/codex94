@@ -1,7 +1,7 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints in the published stable
-[`3.1.2 (18)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.2).
+[`3.1.3 (19)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3).
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
@@ -10,7 +10,8 @@ defines component responsibilities, not a substitute for those records.
 | `AppDelegate` | Compose the running app, own the status item and popover, retain Dashboard and floating-window controllers, route mouse/hotkey actions, and register/remove platform observers. Forward wake and clock events to the store. |
 | `DashboardWindowController` / `DashboardWindowState` | Own the reusable window lifecycle, size/restoration behavior, visibility, and selected page. Opening a page must not recreate application services. |
 | `FloatingWindowController` / `FloatingWindowState` | Own the reusable native panel, placement/screen fitting, pinning, visibility, and expansion. Receive the existing store; do not own another quota fetcher or polling timer. |
-| `AppStore` | Own quota state, cache writes, selection reconciliation, notification observations, and the existing single-flight/background/Reset coordination. Coordinate source-context changes with child features. |
+| `AppStore` | Own quota state, cache writes, selection reconciliation, notification observations, freshness-gated popover reads, and single-flight/background/Reset coordination. Own and cancel the bounded transient retry budget; isolate unverified identity from child features. |
+| `MenuBarStatusRenderer` | Own the native status-button image, visible-input render cache and appearance/backing-scale observer. Reuse pure SwiftUI content for transparent sRGB artwork; update only accessibility/tooltip text on freshness ticks. Never fetch quota. |
 | `TokenUsageStore` | Own on-demand aggregate statistics and their request lifetime. Replace snapshots, reject obsolete results, and manage retired clients without coupling statistics failures to quota status. |
 | `AppUpdateController` | Own the explicit GitHub metadata check and its UI state. It does not poll, download, install, or share quota authentication. |
 | Token image export views/helpers | Render the current prepared chart without interaction controls or identity; own explicit PNG save/copy actions. Pass the pasteboard explicitly so tests can isolate it. |
@@ -93,7 +94,7 @@ an explicit manual choice is authoritative and is not bypassed on failure.
 Discovery does not recursively search directories or read authentication data;
 transport and quota-decoding responsibilities remain separate.
 
-## 3.1.3 candidate: recovery and native status rendering
+## 3.1.3: recovery and native status rendering
 
 The transport validates quota first, then allows a short optional-account read.
 The quota response's timestamp is retained across that optional wait. Explicit
@@ -106,5 +107,8 @@ account's details or Token snapshot; notification baselines are isolated too.
 `MenuBarStatusContent` to create transparent, sRGB, non-template artwork. It
 rerenders only when visible inputs, appearance or backing scale change. Its
 freshness timer updates accessibility/tooltip text only, without quota requests.
-Native Spaces animation requires separate acceptance; a static image test does
-not establish that the reported transition has been fixed.
+The maintainer separately confirmed the reported menu-bar Spaces color flash
+was resolved on the tested Mac with the reviewed CI candidate. This does not
+cover every macOS version, floating-panel behavior across Spaces, fullscreen,
+or keyboard interaction. Static image tests alone do not establish animation
+behavior; the exact candidate identity is in [RELEASING.md](RELEASING.md).
