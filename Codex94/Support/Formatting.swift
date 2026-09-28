@@ -83,6 +83,20 @@ enum QuotaFormatting {
         return "\(formatter.string(from: date)) (\(zone))"
     }
 
+    /// An absolute local clock time avoids a second countdown timer for retry UI.
+    static func automaticRefreshTime(
+        at date: Date,
+        timeZone: TimeZone = .autoupdatingCurrent
+    ) -> String? {
+        guard date.timeIntervalSince1970.isFinite else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: date)
+    }
+
     static func relativeAge(since date: Date, now: Date = Date()) -> RelativeAge {
         let seconds = max(0, Int(now.timeIntervalSince(date)))
         if seconds < 60 { return .justNow }

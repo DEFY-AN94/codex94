@@ -5,9 +5,9 @@ import XCTest
 
 @MainActor
 final class AppStoreTests: XCTestCase {
-    func testTransientFailureRetriesTwiceAndCoalescedManualKeepsRemainingBudget() async throws {
+    func testTransientFailureRetriesThreeTimesAndCoalescedManualKeepsRemainingBudget() async throws {
         let sleeper = ControlledRetrySleeper()
-        let fetcher = GatedRecordingFetcher(outcomes: Array(repeating: .failure(.requestTimedOut), count: 3))
+        let fetcher = GatedRecordingFetcher(outcomes: Array(repeating: .failure(.requestTimedOut), count: 4))
         let fixture = try makeStoreFixture(
             fetcher: fetcher, selection: .automatic, retrySleep: { try await sleeper.sleep($0) }
         )
@@ -15,16 +15,18 @@ final class AppStoreTests: XCTestCase {
         addTeardownBlock { await sleeper.releaseAll() }
 
         fixture.store.refresh(trigger: .manual)
-        for request in 1...3 {
+        for request in 1...4 {
             try await waitForRequestCount(request, fetcher: fetcher)
             fixture.store.refresh(trigger: .manual)
             fixture.store.refresh(trigger: .background)
             await fetcher.releaseOne()
             try await waitForRefreshToFinish(fixture.store)
             XCTAssertEqual(fixture.store.lastIssue, .requestTimedOut)
-            if request < 3 {
+            if request < 4 {
                 try await waitForRetrySleeps(request, sleeper: sleeper)
                 XCTAssertFalse(fixture.store.isRefreshing, "Backoff is not an active refresh")
+                XCTAssertNotNil(fixture.store.nextRetryAt)
+                XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, fixture.store.nextRetryAt)
                 await sleeper.releaseOne()
             }
         }
@@ -32,9 +34,11 @@ final class AppStoreTests: XCTestCase {
         let delays = await sleeper.delays()
         let count = await fetcher.requestCount()
         let concurrent = await fetcher.maximumConcurrentRequests()
-        XCTAssertEqual(delays, [2, 6])
-        XCTAssertEqual(count, 3)
+        XCTAssertEqual(delays, [5, 20, 60])
+        XCTAssertEqual(count, 4)
         XCTAssertEqual(concurrent, 1)
+        XCTAssertNil(fixture.store.nextRetryAt)
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt, "No background loop was started in this manual-only test")
     }
 
     func testRetrySuccessEndsCycleAndPublishesFreshQuota() async throws {
@@ -62,8 +66,319 @@ final class AppStoreTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(75))
         let delays = await sleeper.delays()
         let count = await fetcher.requestCount()
-        XCTAssertEqual(delays, [2])
+        XCTAssertEqual(delays, [5])
         XCTAssertEqual(count, 2)
+        XCTAssertNil(fixture.store.nextRetryAt)
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt)
+    }
+
+    func testStartedBackgroundLoopRecoversOnThirdRetryAndContinuesWithoutPopover() async throws {
+        let retry = ControlledRetrySleeper()
+        let background = ControlledRetrySleeper()
+        let now = Date()
+        let initial = makeSnapshot(defaultLimitID: "default", defaultUsed: 50, sparkUsed: nil, fetchedAt: now)
+        let recovered = makeSnapshot(defaultLimitID: "default", defaultUsed: 45, sparkUsed: nil, fetchedAt: now.addingTimeInterval(1))
+        let later = makeSnapshot(defaultLimitID: "default", defaultUsed: 40, sparkUsed: nil, fetchedAt: now.addingTimeInterval(2))
+        let fetcher = GatedRecordingFetcher(outcomes: [
+            .success(initial), .failure(.requestTimedOut), .failure(.requestTimedOut),
+            .failure(.requestTimedOut), .success(recovered), .success(later)
+        ])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic,
+            retrySleep: { try await retry.sleep($0) }, backgroundSleep: { try await background.sleep($0) }
+        )
+        defer { fixture.store.shutdown() }
+        addTeardownBlock { await retry.releaseAll(); await background.releaseAll() }
+
+        let beforeStart = Date()
+        fixture.store.start()
+        try await waitForRetrySleeps(1, sleeper: background)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        let firstBackgroundDate = try XCTUnwrap(fixture.store.nextBackgroundRefreshAt)
+        assertScheduledDate(firstBackgroundDate, delay: 300, after: beforeStart)
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt, "An active or successful request does not advertise recovery")
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+
+        // Wake the actual background-loop sleep; no manual/popover call is used.
+        await background.releaseOne()
+        try await waitForRequestCount(2, fetcher: fetcher)
+        try await waitForRetrySleeps(2, sleeper: background)
+        var beforeFailure = Date()
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+
+        for attempt in 1...3 {
+            try await waitForRetrySleeps(attempt, sleeper: retry)
+            let due = try XCTUnwrap(fixture.store.nextRetryAt)
+            assertScheduledDate(due, delay: [5.0, 20, 60][attempt - 1], after: beforeFailure)
+            XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, due)
+            XCTAssertEqual(fixture.store.snapshot?.fetchedAt, initial.fetchedAt)
+            if attempt == 1 {
+                fixture.preferences.hasChosenIdentityMode = false
+                XCTAssertNil(fixture.store.nextAutomaticRefreshAt)
+                fixture.preferences.hasChosenIdentityMode = true
+                XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, due)
+            }
+            await retry.releaseOne()
+            try await waitForRequestCount(attempt + 2, fetcher: fetcher)
+            XCTAssertNil(fixture.store.nextRetryAt, "An executing retry is no longer pending")
+            XCTAssertNil(fixture.store.nextAutomaticRefreshAt)
+            beforeFailure = Date()
+            await fetcher.releaseOne()
+            try await waitForRefreshToFinish(fixture.store)
+        }
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, recovered.fetchedAt)
+        XCTAssertEqual(fixture.store.connectionState, .connected)
+        XCTAssertNil(fixture.store.nextRetryAt)
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt)
+        XCTAssertNotNil(fixture.store.nextBackgroundRefreshAt)
+        let retryDelays = await retry.delays()
+        XCTAssertEqual(retryDelays, [5, 20, 60])
+
+        await background.releaseOne()
+        try await waitForRequestCount(6, fetcher: fetcher)
+        try await waitForRetrySleeps(3, sleeper: background)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, later.fetchedAt)
+        let backgroundDelays = await background.delays()
+        let concurrent = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(backgroundDelays, [300, 300, 300])
+        XCTAssertEqual(concurrent, 1)
+    }
+
+    func testExhaustedRetriesExposeBackgroundDeadlineAndNextAutomaticCycleGetsNewBudget() async throws {
+        let retry = ControlledRetrySleeper()
+        let background = ControlledRetrySleeper()
+        let fresh = makeSnapshot(defaultLimitID: "default", defaultUsed: 20, sparkUsed: nil, fetchedAt: Date())
+        let fetcher = GatedRecordingFetcher(outcomes:
+            Array(repeating: .failure(.requestTimedOut), count: 5) + [.success(fresh)]
+        )
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic,
+            retrySleep: { try await retry.sleep($0) }, backgroundSleep: { try await background.sleep($0) }
+        )
+        defer { fixture.store.shutdown() }
+        addTeardownBlock { await retry.releaseAll(); await background.releaseAll() }
+        fixture.store.start()
+        try await waitForRetrySleeps(1, sleeper: background)
+        for request in 1...4 {
+            try await waitForRequestCount(request, fetcher: fetcher)
+            await fetcher.releaseOne()
+            try await waitForRefreshToFinish(fixture.store)
+            if request < 4 {
+                try await waitForRetrySleeps(request, sleeper: retry)
+                await retry.releaseOne()
+            }
+        }
+        XCTAssertNil(fixture.store.nextRetryAt)
+        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, fixture.store.nextBackgroundRefreshAt)
+        XCTAssertNotNil(fixture.store.nextAutomaticRefreshAt)
+        try await Task.sleep(for: .milliseconds(75))
+        let exhaustedCount = await fetcher.requestCount()
+        XCTAssertEqual(exhaustedCount, 4)
+
+        await background.releaseOne()
+        try await waitForRequestCount(5, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await waitForRetrySleeps(4, sleeper: retry)
+        let delays = await retry.delays()
+        XCTAssertEqual(delays, [5, 20, 60, 5])
+        await retry.releaseOne()
+        try await waitForRequestCount(6, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        XCTAssertEqual(fixture.store.connectionState, .connected)
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt)
+    }
+
+    func testAcceptedBackgroundRefreshCancelsPendingRetryWithoutOverlappingRequests() async throws {
+        let retry = ControlledRetrySleeper()
+        let background = ControlledRetrySleeper()
+        let fresh = makeSnapshot(defaultLimitID: "default", defaultUsed: 20, sparkUsed: nil, fetchedAt: Date())
+        let fetcher = GatedRecordingFetcher(outcomes: [.success(fresh), .failure(.requestTimedOut), .success(fresh)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic,
+            retrySleep: { try await retry.sleep($0) }, backgroundSleep: { try await background.sleep($0) }
+        )
+        defer { fixture.store.shutdown() }
+        addTeardownBlock { await retry.releaseAll(); await background.releaseAll() }
+        fixture.store.start()
+        try await waitForRetrySleeps(1, sleeper: background)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        await background.releaseOne()
+        try await waitForRequestCount(2, fetcher: fetcher)
+        try await waitForRetrySleeps(2, sleeper: background)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await waitForRetrySleeps(1, sleeper: retry)
+        XCTAssertNotNil(fixture.store.nextRetryAt)
+
+        await background.releaseOne()
+        try await waitForRequestCount(3, fetcher: fetcher)
+        try await waitForRetrySleeps(3, sleeper: background)
+        let nextBackgroundDate = fixture.store.nextBackgroundRefreshAt
+        XCTAssertNil(fixture.store.nextRetryAt)
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt)
+        await retry.releaseOne() // Resume the cancelled generation after its replacement starts.
+        try await Task.sleep(for: .milliseconds(75))
+        let count = await fetcher.requestCount()
+        XCTAssertEqual(count, 3)
+        XCTAssertEqual(fixture.store.nextBackgroundRefreshAt, nextBackgroundDate)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        let concurrent = await fetcher.maximumConcurrentRequests()
+        XCTAssertEqual(concurrent, 1)
+        XCTAssertNil(fixture.store.nextRetryAt)
+    }
+
+    func testBackgroundIntervalWakeAndShutdownPublishOnlyCurrentSchedule() async throws {
+        let background = ControlledRetrySleeper()
+        let now = Date()
+        let fresh = makeSnapshot(defaultLimitID: "default", defaultUsed: 20, sparkUsed: nil, fetchedAt: now)
+        let fetcher = GatedRecordingFetcher(outcomes: [.success(fresh), .success(fresh)])
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic,
+            backgroundSleep: { try await background.sleep($0) }
+        )
+        defer { fixture.store.shutdown() }
+        addTeardownBlock { await background.releaseAll() }
+        fixture.store.start()
+        try await waitForRetrySleeps(1, sleeper: background)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+
+        let beforeIntervalChange = Date()
+        fixture.store.setRefreshInterval(.oneMinute)
+        XCTAssertNil(fixture.store.nextBackgroundRefreshAt)
+        try await waitForRetrySleeps(2, sleeper: background)
+        let intervalDate = try XCTUnwrap(fixture.store.nextBackgroundRefreshAt)
+        assertScheduledDate(intervalDate, delay: 60, after: beforeIntervalChange)
+        await background.releaseOne() // Old 300s callback cannot clear the new date or fetch.
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(fixture.store.nextBackgroundRefreshAt, intervalDate)
+
+        let beforeWake = Date()
+        fixture.store.handleSystemWake(now: now.addingTimeInterval(30))
+        XCTAssertNil(fixture.store.nextBackgroundRefreshAt)
+        try await waitForRetrySleeps(3, sleeper: background)
+        let wakeDate = try XCTUnwrap(fixture.store.nextBackgroundRefreshAt)
+        assertScheduledDate(wakeDate, delay: 60, after: beforeWake)
+        await background.releaseOne() // Cancelled pre-wake sleep does not resume an old loop.
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(fixture.store.nextBackgroundRefreshAt, wakeDate)
+        let beforeTick = await fetcher.requestCount()
+        XCTAssertEqual(beforeTick, 1, "Fresh wake only replaces the schedule")
+
+        await background.releaseOne()
+        try await waitForRequestCount(2, fetcher: fetcher)
+        try await waitForRetrySleeps(4, sleeper: background)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        let delays = await background.delays()
+        XCTAssertEqual(delays, [300, 60, 60, 60])
+        fixture.store.shutdown()
+        XCTAssertNil(fixture.store.nextBackgroundRefreshAt)
+        XCTAssertNil(fixture.store.nextRetryAt)
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt)
+        await background.releaseAll()
+        try await Task.sleep(for: .milliseconds(50))
+        let afterShutdown = await fetcher.requestCount()
+        XCTAssertEqual(afterShutdown, 2)
+    }
+
+    func testClockChangeHidesEstimatesWithoutRestartingRelativeTasksOrRetryBudget() async throws {
+        let retry = ControlledRetrySleeper()
+        let background = ControlledRetrySleeper()
+        let cached = makeSnapshot(
+            defaultLimitID: "default", defaultUsed: 50, sparkUsed: nil,
+            fetchedAt: Date(), defaultResetsAt: Date().addingTimeInterval(7_200)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: Array(repeating: .failure(.requestTimedOut), count: 3))
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic, cachedSnapshot: cached,
+            retrySleep: { try await retry.sleep($0) }, backgroundSleep: { try await background.sleep($0) }
+        )
+        defer { fixture.store.shutdown() }
+        addTeardownBlock { await retry.releaseAll(); await background.releaseAll() }
+        fixture.store.start()
+        try await waitForRetrySleeps(1, sleeper: background)
+        try await waitForRequestCount(1, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await waitForRetrySleeps(1, sleeper: retry)
+        XCTAssertNotNil(fixture.store.nextRetryAt)
+        XCTAssertNotNil(fixture.store.nextBackgroundRefreshAt)
+        let task = try XCTUnwrap(fixture.store.backgroundTask)
+        fixture.store.handleSystemClockChange(now: Date().addingTimeInterval(3_600))
+        XCTAssertNil(fixture.store.nextRetryAt)
+        XCTAssertNil(fixture.store.nextBackgroundRefreshAt)
+        XCTAssertNotNil(fixture.store.scheduledResetRefreshDate)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt, "A known Reset cannot be called next while another armed date is unknown")
+        XCTAssertFalse(task.isCancelled)
+        let beforeTick = await fetcher.requestCount()
+        let backgroundDelays = await background.delays()
+        XCTAssertEqual(beforeTick, 1)
+        XCTAssertEqual(backgroundDelays, [300])
+
+        await retry.releaseOne()
+        try await waitForRequestCount(2, fetcher: fetcher)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await waitForRetrySleeps(2, sleeper: retry)
+        let retryDelays = await retry.delays()
+        XCTAssertEqual(retryDelays, [5, 20], "A wall-clock change must not replenish the retry budget")
+        XCTAssertNotNil(fixture.store.nextRetryAt)
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt, "The original background sleep still has an unknown wall date")
+        XCTAssertNil(fixture.store.nextBackgroundRefreshAt)
+
+        await background.releaseOne()
+        try await waitForRequestCount(3, fetcher: fetcher)
+        try await waitForRetrySleeps(2, sleeper: background)
+        await fetcher.releaseOne()
+        try await waitForRefreshToFinish(fixture.store)
+        try await waitForRetrySleeps(3, sleeper: retry)
+        XCTAssertNotNil(fixture.store.nextBackgroundRefreshAt)
+        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, fixture.store.nextRetryAt)
+    }
+
+    func testNextAutomaticRefreshIncludesEarlierArmedQuotaReset() async throws {
+        let retry = ControlledRetrySleeper()
+        // Match the cache's ISO-8601 whole-second encoding before exact comparisons.
+        let now = Date(timeIntervalSince1970: floor(Date().timeIntervalSince1970))
+        let reset = now.addingTimeInterval(30)
+        let cached = makeSnapshot(
+            defaultLimitID: "default", defaultUsed: 50, sparkUsed: nil,
+            fetchedAt: now, defaultResetsAt: reset.addingTimeInterval(-5)
+        )
+        let fetcher = GatedRecordingFetcher(outcomes: Array(repeating: .failure(.requestTimedOut), count: 3))
+        let fixture = try makeStoreFixture(
+            fetcher: fetcher, selection: .automatic, cachedSnapshot: cached,
+            retrySleep: { try await retry.sleep($0) }
+        )
+        defer { fixture.store.shutdown() }
+        addTeardownBlock { await retry.releaseAll() }
+        fixture.store.refresh(trigger: .manual)
+        for request in 1...3 {
+            try await waitForRequestCount(request, fetcher: fetcher)
+            await fetcher.releaseOne()
+            try await waitForRefreshToFinish(fixture.store)
+            try await waitForRetrySleeps(request, sleeper: retry)
+            if request < 3 { await retry.releaseOne() }
+        }
+        let nextRetry = try XCTUnwrap(fixture.store.nextRetryAt)
+        XCTAssertGreaterThan(nextRetry, reset)
+        XCTAssertEqual(fixture.store.scheduledResetRefreshDate, reset)
+        XCTAssertNotNil(fixture.store.resetRefreshTask)
+        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, reset)
+        let count = await fetcher.requestCount()
+        XCTAssertEqual(count, 3, "Reading the combined deadline must not execute either task")
     }
 
     func testAcceptedManualSupersedesPendingRetryAndStartsFreshBudget() async throws {
@@ -91,7 +406,7 @@ final class AppStoreTests: XCTestCase {
         try await waitForRefreshToFinish(fixture.store)
         try await waitForRetrySleeps(2, sleeper: sleeper)
         let delays = await sleeper.delays()
-        XCTAssertEqual(delays, [2, 2])
+        XCTAssertEqual(delays, [5, 5])
         await sleeper.releaseOne()
         try await waitForRequestCount(3, fetcher: fetcher)
         await fetcher.releaseOne()
@@ -136,6 +451,8 @@ final class AppStoreTests: XCTestCase {
             let count = await fetcher.requestCount()
             XCTAssertEqual(count, change == "shutdown" ? 1 : 2, change)
             XCTAssertFalse(fixture.store.isRefreshing, change)
+            XCTAssertNil(fixture.store.nextRetryAt, change)
+            XCTAssertNil(fixture.store.nextAutomaticRefreshAt, change)
             if change == "identity" {
                 let modes = await fetcher.requestedModes()
                 XCTAssertEqual(modes, [.quotaOnly, .quotaAndAccount])
@@ -2509,9 +2826,8 @@ final class AppStoreTests: XCTestCase {
         cachedSnapshot: QuotaSnapshot? = nil,
         hasChosenIdentityMode: Bool = true,
         usageFetcher: (any TokenUsageFetching)? = nil,
-        retrySleep: @escaping @Sendable (TimeInterval) async throws -> Void = {
-            try await Task.sleep(for: .seconds($0))
-        },
+        retrySleep: (@Sendable (TimeInterval) async throws -> Void)? = nil,
+        backgroundSleep: (@Sendable (TimeInterval) async throws -> Void)? = nil,
         notificationController: NotificationController = NotificationController()
     ) throws -> StoreFixture {
         let directory = FileManager.default.temporaryDirectory
@@ -2555,7 +2871,8 @@ final class AppStoreTests: XCTestCase {
             cache: cache,
             notificationController: notificationController,
             usageStore: usageStore,
-            retrySleep: retrySleep
+            retrySleep: retrySleep,
+            backgroundSleep: backgroundSleep
         )
         return StoreFixture(
             store: store,
@@ -2616,6 +2933,14 @@ final class AppStoreTests: XCTestCase {
         }
         let delays = await sleeper.delays()
         XCTAssertEqual(delays.count, expected)
+    }
+
+    private func assertScheduledDate(
+        _ date: Date, delay: TimeInterval, after lowerBound: Date,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        XCTAssertGreaterThanOrEqual(date, lowerBound.addingTimeInterval(delay), file: file, line: line)
+        XCTAssertLessThanOrEqual(date, Date().addingTimeInterval(delay), file: file, line: line)
     }
 
     private func waitForUsageRequestCount(_ expected: Int, fetcher: GatedStoreUsageFetcher) async throws {

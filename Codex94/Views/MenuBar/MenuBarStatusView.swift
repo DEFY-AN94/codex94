@@ -54,29 +54,39 @@ struct MenuBarStatusView: View {
         presentation: StatusPresentation,
         now: Date
     ) -> String {
+        let summary: String
         if store.preferences.menuBarLayout == .dualWindow {
             let bucket = store.dualWindowBucket
-            return dualWindowAccessibilityLabel(
+            summary = dualWindowAccessibilityLabel(
                 bucketName: bucket.flatMap { store.snapshot?.displayName(for: $0) } ?? "Codex",
                 bucket: bucket,
                 presentation: presentation,
                 now: now,
                 language: store.preferences.language
             )
-        }
-        let bucketName: String
-        if let snapshot = store.snapshot, let bucket = resolvedQuota?.bucket {
-            bucketName = snapshot.displayName(for: bucket)
         } else {
-            bucketName = "Codex"
+            let bucketName: String
+            if let snapshot = store.snapshot, let bucket = resolvedQuota?.bucket {
+                bucketName = snapshot.displayName(for: bucket)
+            } else {
+                bucketName = "Codex"
+            }
+            summary = StatusAccessibilityString.quotaSummary(
+                bucketName: bucketName,
+                window: resolvedQuota?.window,
+                presentation: presentation,
+                now: now,
+                language: store.preferences.language
+            )
         }
-        return StatusAccessibilityString.quotaSummary(
-            bucketName: bucketName,
-            window: resolvedQuota?.window,
+        if let recovery = ConnectionRecoveryText.context(
             presentation: presentation,
-            now: now,
+            nextAutomaticRefreshAt: store.nextAutomaticRefreshAt,
             language: store.preferences.language
-        )
+        ) {
+            return summary + ", " + recovery
+        }
+        return summary
     }
 
     static func dualWindowAccessibilityLabel(

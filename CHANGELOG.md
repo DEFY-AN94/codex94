@@ -2,6 +2,19 @@
 
 All notable changes to Codex94 are documented here.
 
+## 3.1.4 - 2026-09-28
+
+Version `3.1.4 (20)`. Release dates use Australia/Melbourne.
+
+### Fixed
+
+- Give quota reads their own 10-second request and 20-second transaction
+  budgets while preserving Token usage and optional-account deadlines.
+- Spread up to three automatic retries across 5, 20 and 60 seconds after
+  transient failures, retaining single-flight reads and cancellation guards.
+- Show the next scheduled automatic attempt alongside cached-data recovery
+  information, and retain fixed failure-stage timing in diagnostic logs.
+
 ## 3.1.3 - 2026-09-28
 
 Version `3.1.3 (19)`. Release dates use Australia/Melbourne.

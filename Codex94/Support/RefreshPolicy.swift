@@ -11,16 +11,38 @@ enum RefreshPolicy {
         try await Task.sleep(for: .seconds(delay))
     }
 
+    nonisolated static func sleepBeforeBackgroundRefresh(_ delay: TimeInterval) async throws {
+        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+    }
+
     static func automaticRetryDelay(for issue: ConnectionIssue, completedRetries: Int) -> TimeInterval? {
-        let delays: [TimeInterval] = [2, 6]
-        guard delays.indices.contains(completedRetries) else { return nil }
+        let delays: [TimeInterval] = [5, 20, 60]
+        guard isTransientQuotaIssue(issue), delays.indices.contains(completedRetries) else { return nil }
+        return delays[completedRetries]
+    }
+
+    static func isTransientQuotaIssue(_ issue: ConnectionIssue?) -> Bool {
+        guard let issue else { return false }
         switch issue {
         case .initializationTimedOut, .requestTimedOut, .totalTimedOut,
              .processLaunchFailed, .serverExited, .serverError:
-            return delays[completedRetries]
+            return true
         default:
-            return nil
+            return false
         }
+    }
+
+    static func nextAutomaticRefreshDate(
+        issue: ConnectionIssue?,
+        isRefreshing: Bool,
+        nextRetryAt: Date?,
+        nextBackgroundRefreshAt: Date?,
+        nextQuotaResetRefreshAt: Date? = nil,
+        now: Date
+    ) -> Date? {
+        guard isTransientQuotaIssue(issue), !isRefreshing else { return nil }
+        return [nextRetryAt, nextBackgroundRefreshAt, nextQuotaResetRefreshAt]
+            .compactMap { $0 }.filter { $0 > now }.min()
     }
 
     static func shouldRefreshOnPopover(

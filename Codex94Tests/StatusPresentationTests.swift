@@ -382,6 +382,56 @@ final class StatusPresentationTests: XCTestCase {
         XCTAssertFalse(label.contains("/Users/"))
     }
 
+    func testAutomaticAttemptTextUsesLocalClockWithSecondsInBothLanguages() throws {
+        let instant = Date(timeIntervalSince1970: 0)
+        let kathmandu = try XCTUnwrap(TimeZone(secondsFromGMT: 5 * 3_600 + 45 * 60))
+        XCTAssertEqual(ConnectionRecoveryText.nextAttempt(
+            at: instant, language: .english, timeZone: kathmandu
+        ), "Next automatic attempt: 05:45:00")
+        XCTAssertEqual(ConnectionRecoveryText.nextAttempt(
+            at: instant, language: .simplifiedChinese, timeZone: kathmandu
+        ), "下次自动尝试：05:45:00")
+        XCTAssertNil(ConnectionRecoveryText.nextAttempt(at: nil, language: .english))
+        XCTAssertNil(QuotaFormatting.automaticRefreshTime(at: Date(timeIntervalSince1970: .infinity)))
+    }
+
+    func testAutomaticAttemptClockUsesTheDeadlineDSTOffset() throws {
+        let zone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let parser = ISO8601DateFormatter()
+        let before = try XCTUnwrap(parser.date(from: "2033-03-13T09:59:59Z"))
+        let after = before.addingTimeInterval(1)
+        XCTAssertEqual(QuotaFormatting.automaticRefreshTime(at: before, timeZone: zone), "01:59:59")
+        XCTAssertEqual(QuotaFormatting.automaticRefreshTime(at: after, timeZone: zone), "03:00:00")
+    }
+
+    func testRecoveryContextUsesExistingReasonAndDoesNotPromiseWorkWhileRefreshing() throws {
+        let utc = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let next = Date(timeIntervalSince1970: 5)
+        let cached = makePresentation(
+            state: .stale(lastSuccess: lastSuccess, issue: .requestTimedOut),
+            lastSuccessfulFetch: lastSuccess
+        )
+        XCTAssertEqual(ConnectionRecoveryText.context(
+            presentation: cached, nextAutomaticRefreshAt: next, language: .english, timeZone: utc
+        ), "Codex timed out, Next automatic attempt: 00:00:05")
+        XCTAssertEqual(ConnectionRecoveryText.context(
+            presentation: cached, nextAutomaticRefreshAt: next, language: .simplifiedChinese, timeZone: utc
+        ), "Codex 响应超时, 下次自动尝试：00:00:05")
+        XCTAssertEqual(ConnectionRecoveryText.context(
+            presentation: cached, nextAutomaticRefreshAt: nil, language: .english, timeZone: utc
+        ), "Codex timed out")
+        for presentation in [
+            makePresentation(state: .connected, lastSuccessfulFetch: lastSuccess),
+            makePresentation(state: .stale(lastSuccess: lastSuccess, issue: .unknown), lastSuccessfulFetch: lastSuccess),
+            makePresentation(state: .stale(lastSuccess: lastSuccess, issue: .requestTimedOut),
+                             isRefreshing: true, lastSuccessfulFetch: lastSuccess)
+        ] {
+            XCTAssertNil(ConnectionRecoveryText.context(
+                presentation: presentation, nextAutomaticRefreshAt: next, language: .english
+            ))
+        }
+    }
+
     private func makePresentation(
         remainingPercent: Int? = 80,
         state: ConnectionState,

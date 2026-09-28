@@ -199,6 +199,37 @@ final class MenuBarStatusRendererTests: XCTestCase {
         XCTAssertEqual(fetches, 1)
     }
 
+    func testRetryDeadlineUpdatesNativeTextWithoutRenderingAnotherImage() async throws {
+        let fixture = try makeFixture(allowRefresh: true)
+        defer { fixture.cleanUp() }
+        let calls = RenderCalls()
+        let renderer = MenuBarStatusRenderer(store: fixture.store, statusItem: fixture.item) { input in
+            calls.inputs.append(input)
+            return MenuBarStatusImageRenderer.render(input)
+        }
+        defer { renderer.shutdown() }
+        fixture.store.refresh(trigger: .manual)
+        try await wait { fixture.item.button?.toolTip?.contains("Next automatic attempt:") == true }
+        let button = try XCTUnwrap(fixture.item.button)
+        XCTAssertEqual(button.toolTip, button.accessibilityLabel())
+        XCTAssertTrue(button.toolTip?.contains("Codex timed out") == true)
+        XCTAssertTrue(button.toolTip?.contains("Cached data") == true)
+        XCTAssertFalse(button.toolTip?.contains("Refreshing") == true)
+        XCTAssertFalse(button.toolTip?.contains("/Users/") == true)
+        let image = button.image
+        let count = calls.inputs.count
+        // A wall-clock change invalidates the displayed estimate but must keep
+        // the same amber cached image and the existing read-only retry task.
+        fixture.store.handleSystemClockChange()
+        try await wait { button.toolTip?.contains("Next automatic attempt:") == false }
+        XCTAssertEqual(calls.inputs.count, count)
+        XCTAssertTrue(button.image === image)
+        XCTAssertTrue(button.toolTip?.contains("Codex timed out") == true)
+        XCTAssertEqual(button.toolTip, button.accessibilityLabel())
+        let fetches = await fixture.fetcher.calls
+        XCTAssertEqual(fetches, 1)
+    }
+
     func testSyntheticPixelEvidenceForCustomAndNativeImages() async throws {
         let output = try temporaryDirectory()
         var evidence: [[String: Any]] = []

@@ -242,6 +242,35 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         assertContentMatchesPopover(for: unavailableFixture)
     }
 
+    func testAutomaticAttemptFitsAsOneExtraFailureBannerLineInBothLanguages() throws {
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let reason = StatusAccessibilityString.localized(
+                "error.timeout", language: language, bundle: .main
+            )
+            func size(nextAttempt: String?) -> NSSize {
+                let view = StatusBanner(
+                    badge: .stale, color: .orange,
+                    text: Text(verbatim: reason), accessibilityText: Text(verbatim: reason),
+                    recoveryDestination: .diagnostics, openDashboard: { _ in },
+                    nextAutomaticAttempt: nextAttempt
+                ).frame(width: QuotaPopoverLayout.contentWidth)
+                let hosting = NSHostingController(rootView: view)
+                return hosting.sizeThatFits(in: NSSize(
+                    width: QuotaPopoverLayout.contentWidth, height: .greatestFiniteMagnitude
+                ))
+            }
+            let next = try XCTUnwrap(ConnectionRecoveryText.nextAttempt(
+                at: referenceDate, language: language, timeZone: resetTimeZone
+            ))
+            let original = size(nextAttempt: nil)
+            let scheduled = size(nextAttempt: next)
+            XCTAssertEqual(scheduled.width, QuotaPopoverLayout.contentWidth, accuracy: 1)
+            XCTAssertGreaterThan(scheduled.height - original.height, 10)
+            XCTAssertLessThanOrEqual(scheduled.height - original.height, 28,
+                                     "The schedule should add one readable line, not a second large banner")
+        }
+    }
+
     func testFreshnessLayoutFitsLanguagesAndThemes() throws {
         let fixture = try makeFixture(snapshot: snapshot(includeSpark: true))
         defer { fixture.cleanUp() }

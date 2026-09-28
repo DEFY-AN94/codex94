@@ -11,6 +11,8 @@ final class AppStore: ObservableObject {
     @Published private(set) var lastIssue: ConnectionIssue?
     @Published private(set) var viewedBucketID: String?
     @Published private(set) var hasFetchedLiveSnapshot = false
+    @Published private(set) var nextRetryAt: Date?
+    @Published private(set) var nextBackgroundRefreshAt: Date?
 
     let preferences: PreferencesStore
     let usageStore: TokenUsageStore
@@ -24,6 +26,7 @@ final class AppStore: ObservableObject {
     private let fetcher: any QuotaFetching
     private let cache: SnapshotCache
     private let retrySleep: @Sendable (TimeInterval) async throws -> Void
+    private let backgroundSleep: @Sendable (TimeInterval) async throws -> Void
     private let logger = Logger(subsystem: "com.defyan94.codex94", category: "state")
     private var refreshTask: Task<Void, Never>?
     private var pendingRefreshTrigger: RefreshTrigger?
@@ -39,6 +42,7 @@ final class AppStore: ObservableObject {
     private var automaticRetryTask: Task<Void, Never>?
     private var automaticRetryGeneration = 0
     private var automaticRetryAttempt = 0
+    private var backgroundGeneration = 0
     private var accountIdentityIsUnverified = false
 
     init(
@@ -50,7 +54,8 @@ final class AppStore: ObservableObject {
         hotKeyController: GlobalHotKeyController = GlobalHotKeyController(),
         notificationController: NotificationController = NotificationController(),
         usageStore: TokenUsageStore? = nil,
-        retrySleep: (@Sendable (TimeInterval) async throws -> Void)? = nil
+        retrySleep: (@Sendable (TimeInterval) async throws -> Void)? = nil,
+        backgroundSleep: (@Sendable (TimeInterval) async throws -> Void)? = nil
     ) {
         self.preferences = preferences
         self.usageStore = usageStore ?? TokenUsageStore(preferences: preferences)
@@ -59,6 +64,7 @@ final class AppStore: ObservableObject {
         self.fetcher = fetcher
         self.cache = cache
         self.retrySleep = retrySleep ?? RefreshPolicy.sleepBeforeRetry
+        self.backgroundSleep = backgroundSleep ?? RefreshPolicy.sleepBeforeBackgroundRefresh
         self.hotKeyController = hotKeyController
         self.notificationController = notificationController
 
@@ -84,6 +90,24 @@ final class AppStore: ObservableObject {
 
     var menuBarQuota: ResolvedQuotaWindow? {
         preferredMenuBarQuota ?? snapshot?.automaticResolvedWindow
+    }
+
+    /// Scheduled wall-clock estimates, not a guarantee of execution while the
+    /// system is asleep or delaying this process. Reading this never starts work.
+    var nextAutomaticRefreshAt: Date? {
+        guard !isShuttingDown, preferences.hasChosenIdentityMode else { return nil }
+        // After a wall-clock change an armed relative sleep may have an unknown
+        // wall date. Another known deadline cannot honestly be called "next".
+        guard automaticRetryTask == nil || nextRetryAt != nil,
+              backgroundTask == nil || nextBackgroundRefreshAt != nil else { return nil }
+        return RefreshPolicy.nextAutomaticRefreshDate(
+            issue: lastIssue,
+            isRefreshing: isRefreshing,
+            nextRetryAt: automaticRetryTask == nil ? nil : nextRetryAt,
+            nextBackgroundRefreshAt: backgroundTask == nil ? nil : nextBackgroundRefreshAt,
+            nextQuotaResetRefreshAt: resetRefreshTask == nil ? nil : scheduledResetRefreshDate,
+            now: Date()
+        )
     }
 
     var dualWindowBucket: QuotaBucketSnapshot? {
@@ -302,6 +326,10 @@ final class AppStore: ObservableObject {
 
     func handleSystemClockChange(now: Date = Date()) {
         guard !isShuttingDown else { return }
+        // Relative sleeps keep their existing budget. The old wall-clock
+        // estimates are no longer reliable; publish a date when next armed.
+        nextRetryAt = nil
+        nextBackgroundRefreshAt = nil
         guard preferences.hasChosenIdentityMode else { return }
         _ = reconcileQuotaResetRefresh(now: now)
     }
@@ -312,8 +340,7 @@ final class AppStore: ObservableObject {
         pendingRefreshTrigger = nil
         cancelAutomaticRetry()
 
-        backgroundTask?.cancel()
-        backgroundTask = nil
+        cancelBackgroundRefresh()
         resetRefreshTask?.cancel()
         resetRefreshTask = nil
         scheduledResetRefreshDate = nil
@@ -581,7 +608,7 @@ final class AppStore: ObservableObject {
         } else {
             isRefreshing = false
             if let failureIssue, let retryGeneration {
-                scheduleAutomaticRetry(for: failureIssue, generation: retryGeneration)
+                scheduleAutomaticRetry(for: failureIssue, generation: retryGeneration, now: now)
             }
         }
     }
@@ -589,28 +616,34 @@ final class AppStore: ObservableObject {
     private func cancelAutomaticRetry() {
         automaticRetryTask?.cancel()
         automaticRetryTask = nil
+        if nextRetryAt != nil { nextRetryAt = nil }
         automaticRetryGeneration += 1
         automaticRetryAttempt = 0
     }
 
-    private func scheduleAutomaticRetry(for issue: ConnectionIssue, generation: Int) {
+    private func scheduleAutomaticRetry(for issue: ConnectionIssue, generation: Int, now: Date) {
         guard !isShuttingDown, generation == automaticRetryGeneration,
               let delay = RefreshPolicy.automaticRetryDelay(
                 for: issue, completedRetries: automaticRetryAttempt
               ) else { return }
         automaticRetryAttempt += 1
+        nextRetryAt = now.addingTimeInterval(delay)
         let requestGeneration = connectionGeneration
         logger.info("refresh=retry_scheduled attempt=\(self.automaticRetryAttempt, privacy: .public)")
         automaticRetryTask = Task { [weak self, retrySleep] in
             do {
                 try await retrySleep(delay)
             } catch {
+                guard let self, generation == automaticRetryGeneration else { return }
+                automaticRetryTask = nil
+                nextRetryAt = nil
                 return
             }
             guard !Task.isCancelled, let self, !isShuttingDown,
                   generation == automaticRetryGeneration,
                   requestGeneration == connectionGeneration else { return }
             automaticRetryTask = nil
+            nextRetryAt = nil
             refresh(trigger: .automaticRetry)
         }
     }
@@ -728,17 +761,40 @@ final class AppStore: ObservableObject {
     }
 
     private func configureBackgroundRefresh() {
-        backgroundTask?.cancel()
-        backgroundTask = nil
+        cancelBackgroundRefresh()
         guard !isShuttingDown else { return }
-        let nanoseconds = UInt64(preferences.refreshInterval.seconds * 1_000_000_000)
-        backgroundTask = Task { [weak self] in
+        let interval = preferences.refreshInterval.seconds
+        let generation = backgroundGeneration
+        backgroundTask = Task { [weak self, backgroundSleep] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: nanoseconds)
-                guard !Task.isCancelled else { return }
-                self?.refresh(trigger: .background)
+                guard self?.armBackgroundEstimate(interval: interval, generation: generation) == true else { return }
+                do {
+                    try await backgroundSleep(interval)
+                } catch {
+                    guard let self, generation == backgroundGeneration else { return }
+                    backgroundTask = nil
+                    nextBackgroundRefreshAt = nil
+                    return
+                }
+                guard !Task.isCancelled, let self, !isShuttingDown,
+                      generation == backgroundGeneration else { return }
+                nextBackgroundRefreshAt = nil
+                refresh(trigger: .background)
             }
         }
+    }
+
+    private func cancelBackgroundRefresh() {
+        backgroundTask?.cancel()
+        backgroundTask = nil
+        if nextBackgroundRefreshAt != nil { nextBackgroundRefreshAt = nil }
+        backgroundGeneration += 1
+    }
+
+    private func armBackgroundEstimate(interval: TimeInterval, generation: Int) -> Bool {
+        guard !isShuttingDown, generation == backgroundGeneration else { return false }
+        nextBackgroundRefreshAt = Date().addingTimeInterval(interval)
+        return true
     }
 
     private static func issue(from error: Error) -> ConnectionIssue {

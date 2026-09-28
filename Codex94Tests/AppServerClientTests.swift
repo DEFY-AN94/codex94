@@ -98,14 +98,54 @@ final class AppServerClientTests: XCTestCase {
         sleep 30 &
         printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
         wait
-        """#)
+        """#,
+            requestTimeout: 0.2,
+            totalTimeout: 2,
+            quotaRequestTimeout: 3,
+            quotaTotalTimeout: 4
+        )
 
+        let clock = ContinuousClock()
+        let startedAt = clock.now
         do {
             _ = try await fixture.client.fetchUsage(executable: fixture.executable)
             XCTFail("Expected a bounded usage timeout")
         } catch {
             XCTAssertEqual(error as? ConnectionIssue, .requestTimedOut)
         }
+        XCTAssertLessThan(clock.now - startedAt, .seconds(2), "Usage must not inherit the quota request budget")
+        try assertProcessIsGone(at: fixture.pidFile)
+        try assertProcessIsGone(at: fixture.descendantPIDFile)
+    }
+
+    func testUsageTransactionBudgetDoesNotInheritQuotaBudget() async throws {
+        let fixture = try makeFixture(
+            script: #"""
+            IFS= read -r initialize
+            sleep 0.25
+            printf '%s\n' '{"id":1,"result":{}}'
+            IFS= read -r initialized
+            IFS= read -r usage
+            printf '%s\n' "$$" > "__CODEX94_PID_FILE__"
+            sleep 30 &
+            printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
+            wait
+            """#,
+            initializeTimeout: 3,
+            requestTimeout: 5,
+            totalTimeout: 2,
+            quotaRequestTimeout: 6,
+            quotaTotalTimeout: 8
+        )
+        let clock = ContinuousClock()
+        let startedAt = clock.now
+        do {
+            _ = try await fixture.client.fetchUsage(executable: fixture.executable)
+            XCTFail("Expected the independent usage transaction limit")
+        } catch {
+            XCTAssertEqual(error as? ConnectionIssue, .requestTimedOut)
+        }
+        XCTAssertLessThan(clock.now - startedAt, .seconds(3), "Usage total must remain below either request budget")
         try assertProcessIsGone(at: fixture.pidFile)
         try assertProcessIsGone(at: fixture.descendantPIDFile)
     }
@@ -240,6 +280,70 @@ final class AppServerClientTests: XCTestCase {
         XCTAssertEqual(spark.limitName, "Spark")
         XCTAssertEqual(spark.window(.fiveHour)?.usedPercent, 28)
         XCTAssertEqual(spark.window(.weekly)?.usedPercent, 16)
+    }
+
+    func testDefaultQuotaBudgetAcceptsResponseAfterFormerFiveSecondDeadline() async throws {
+        let defaults = AppServerTimeouts()
+        XCTAssertEqual(defaults.quotaRequest, 10)
+        XCTAssertEqual(defaults.quotaTotal, 20)
+        XCTAssertEqual(defaults.request, 5)
+        XCTAssertEqual(defaults.total, 15)
+        XCTAssertEqual(defaults.initialize, 8)
+        XCTAssertEqual(defaults.optionalAccount, 2)
+        let fixture = try makeFixture(
+            script: quotaFirstScript(accountScript: "exit 80", quotaDelay: 5.2),
+            quotaRequestTimeout: defaults.quotaRequest,
+            quotaTotalTimeout: defaults.quotaTotal
+        )
+        let clock = ContinuousClock()
+        let startedAt = clock.now
+        let snapshot = try await fixture.client.fetch(
+            executable: fixture.executable, identityMode: .quotaOnly
+        )
+        XCTAssertGreaterThan(clock.now - startedAt, .seconds(5))
+        XCTAssertLessThan(clock.now - startedAt, .seconds(12))
+        XCTAssertEqual(snapshot.defaultBucket?.window(.weekly)?.remainingPercent, 73)
+        XCTAssertNil(snapshot.account)
+        XCTAssertNil(snapshot.accountReadIssue)
+        XCTAssertEqual(try recordedRequests(fixture).compactMap { $0["method"] as? String }, [
+            "initialize", "initialized", "account/rateLimits/read"
+        ])
+        try assertProcessIsGone(at: fixture.pidFile)
+        try assertProcessIsGone(at: fixture.descendantPIDFile)
+    }
+
+    func testQuotaRequestAndWholeTransactionLimitsRemainBounded() async throws {
+        let scenarios: [(initializeDelay: TimeInterval, responseDelay: TimeInterval,
+                         requestLimit: TimeInterval, totalLimit: TimeInterval)] = [
+            (0, 0.6, 0.2, 3),
+            // Leave startup headroom, then exceed total well before the request limit.
+            (0.25, 3, 5, 2)
+        ]
+        for scenario in scenarios {
+            let fixture = try makeFixture(
+                script: quotaFirstScript(
+                    accountScript: "exit 80",
+                    initializeDelay: scenario.initializeDelay,
+                    quotaDelay: scenario.responseDelay
+                ),
+                initializeTimeout: 3,
+                requestTimeout: 3,
+                totalTimeout: 4,
+                quotaRequestTimeout: scenario.requestLimit,
+                quotaTotalTimeout: scenario.totalLimit
+            )
+            let clock = ContinuousClock()
+            let startedAt = clock.now
+            await assertIssue(.requestTimedOut) {
+                try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaAndAccount)
+            }
+            XCTAssertLessThan(clock.now - startedAt, .seconds(3))
+            XCTAssertEqual(try recordedRequests(fixture).compactMap { $0["method"] as? String }, [
+                "initialize", "initialized", "account/rateLimits/read"
+            ])
+            try assertProcessIsGone(at: fixture.pidFile)
+            try assertProcessIsGone(at: fixture.descendantPIDFile)
+        }
     }
 
     func testFetchIgnoresNotificationsAndMismatchedIDs() async throws {
@@ -397,7 +501,7 @@ final class AppServerClientTests: XCTestCase {
             printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
             wait
             """#),
-            totalTimeout: 0.75,
+            quotaTotalTimeout: 0.75,
             optionalAccountTimeout: 10
         )
         let clock = ContinuousClock()
@@ -500,7 +604,7 @@ final class AppServerClientTests: XCTestCase {
             wait
             """#,
             initializeTimeout: 1,
-            totalTimeout: 2
+            quotaTotalTimeout: 2
         )
         await assertIssue(.initializationTimedOut) {
             try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaOnly)
@@ -530,7 +634,7 @@ final class AppServerClientTests: XCTestCase {
             wait
             """#,
             initializeTimeout: 3,
-            totalTimeout: 3
+            quotaTotalTimeout: 3
         )
 
         let fetchTask = Task {
@@ -601,7 +705,7 @@ final class AppServerClientTests: XCTestCase {
             exec /bin/sleep 30
             """#,
             initializeTimeout: 3,
-            totalTimeout: 3
+            quotaTotalTimeout: 3
         )
 
         let fetchTask = Task {
@@ -672,11 +776,20 @@ final class AppServerClientTests: XCTestCase {
 
     private func quotaFirstScript(
         accountScript: String,
-        limitsResponse: String = #"{"id":2,"result":{"rateLimits":{"secondary":{"usedPercent":27,"windowDurationMins":10080}},"rateLimitResetCredits":{"availableCount":3}}}"#
+        limitsResponse: String = #"{"id":2,"result":{"rateLimits":{"secondary":{"usedPercent":27,"windowDurationMins":10080}},"rateLimitResetCredits":{"availableCount":3}}}"#,
+        initializeDelay: TimeInterval = 0,
+        quotaDelay: TimeInterval = 0
     ) -> String {
-        #"""
+        let waitForInitialize = initializeDelay > 0 ? "sleep \(initializeDelay)" : ""
+        let waitForQuota = quotaDelay > 0 ? #"""
+        sleep \#(quotaDelay) &
+        printf '%s\n' "$!" > "__CODEX94_DESCENDANT_PID_FILE__"
+        wait
+        """# : ""
+        return #"""
         IFS= read -r initialize
         printf '%s\n' "$initialize" >> "__CODEX94_INVOCATION_FILE__"
+        \#(waitForInitialize)
         printf '%s\n' '{"id":1,"result":{}}'
         IFS= read -r initialized
         printf '%s\n' "$initialized" >> "__CODEX94_INVOCATION_FILE__"
@@ -687,6 +800,7 @@ final class AppServerClientTests: XCTestCase {
           *) exit 74 ;;
         esac
         printf '%s\n' "$$" > "__CODEX94_PID_FILE__"
+        \#(waitForQuota)
         printf '%s\n' '\#(limitsResponse)'
         if IFS= read -r account; then
           printf '%s\n' "$account" >> "__CODEX94_INVOCATION_FILE__"
@@ -786,7 +900,10 @@ final class AppServerClientTests: XCTestCase {
         script: String,
         maximumLineBytes: Int = 1_048_576,
         initializeTimeout: TimeInterval = 1,
+        requestTimeout: TimeInterval = 1,
         totalTimeout: TimeInterval = 3,
+        quotaRequestTimeout: TimeInterval = 1,
+        quotaTotalTimeout: TimeInterval = 3,
         optionalAccountTimeout: TimeInterval = 1,
         clientVersion: String = "test"
     ) throws -> Fixture {
@@ -823,8 +940,10 @@ final class AppServerClientTests: XCTestCase {
 
         let timeouts = AppServerTimeouts(
             initialize: initializeTimeout,
-            request: 1,
+            request: requestTimeout,
             total: totalTimeout,
+            quotaRequest: quotaRequestTimeout,
+            quotaTotal: quotaTotalTimeout,
             optionalAccount: optionalAccountTimeout,
             terminationGrace: 0.05,
             maximumLineBytes: maximumLineBytes

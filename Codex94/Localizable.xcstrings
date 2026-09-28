@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "connection.nextAutomaticAttempt %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next automatic attempt: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下次自动尝试：%@" } }
+      }
+    },
     "floating.toggle": {
       "localizations": {
         "en": {

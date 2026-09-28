@@ -4,12 +4,13 @@ import XCTest
 final class RefreshPolicyTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 2_000_000_000)
 
-    func testTransientRetryBudgetUsesOnlyTwoBoundedDelays() {
+    func testTransientRetryBudgetUsesOnlyThreeBoundedDelays() {
         for issue in [ConnectionIssue.initializationTimedOut, .requestTimedOut, .totalTimedOut,
                       .processLaunchFailed, .serverExited, .serverError] {
-            XCTAssertEqual(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 0), 2)
-            XCTAssertEqual(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 1), 6)
-            XCTAssertNil(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 2))
+            XCTAssertEqual(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 0), 5)
+            XCTAssertEqual(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 1), 20)
+            XCTAssertEqual(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 2), 60)
+            XCTAssertNil(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 3))
             XCTAssertNil(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: -1))
             XCTAssertNil(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: Int.max))
         }
@@ -17,6 +18,48 @@ final class RefreshPolicyTests: XCTestCase {
                       .notLoggedIn, .malformedResponse, .responseTooLarge, .missingResult,
                       .quotaUnavailable, .cacheFailure, .unknown] {
             XCTAssertNil(RefreshPolicy.automaticRetryDelay(for: issue, completedRetries: 0))
+        }
+    }
+
+    func testNextAutomaticRefreshChoosesOnlyFutureDeadlinesForTransientIdleFailure() {
+        let retry = now.addingTimeInterval(20)
+        let background = now.addingTimeInterval(5)
+        XCTAssertEqual(RefreshPolicy.nextAutomaticRefreshDate(
+            issue: .requestTimedOut, isRefreshing: false,
+            nextRetryAt: retry, nextBackgroundRefreshAt: background, now: now
+        ), background)
+        XCTAssertEqual(RefreshPolicy.nextAutomaticRefreshDate(
+            issue: .serverExited, isRefreshing: false,
+            nextRetryAt: background, nextBackgroundRefreshAt: retry, now: now
+        ), background)
+        XCTAssertEqual(RefreshPolicy.nextAutomaticRefreshDate(
+            issue: .requestTimedOut, isRefreshing: false,
+            nextRetryAt: now, nextBackgroundRefreshAt: background, now: now
+        ), background)
+        let reset = now.addingTimeInterval(1)
+        XCTAssertEqual(RefreshPolicy.nextAutomaticRefreshDate(
+            issue: .requestTimedOut, isRefreshing: false,
+            nextRetryAt: retry, nextBackgroundRefreshAt: background,
+            nextQuotaResetRefreshAt: reset, now: now
+        ), reset)
+        XCTAssertEqual(RefreshPolicy.nextAutomaticRefreshDate(
+            issue: .requestTimedOut, isRefreshing: false,
+            nextRetryAt: retry, nextBackgroundRefreshAt: background,
+            nextQuotaResetRefreshAt: now, now: now
+        ), background)
+        XCTAssertNil(RefreshPolicy.nextAutomaticRefreshDate(
+            issue: .requestTimedOut, isRefreshing: false,
+            nextRetryAt: now.addingTimeInterval(-1), nextBackgroundRefreshAt: now, now: now
+        ))
+        XCTAssertNil(RefreshPolicy.nextAutomaticRefreshDate(
+            issue: .requestTimedOut, isRefreshing: true,
+            nextRetryAt: retry, nextBackgroundRefreshAt: background, now: now
+        ))
+        for issue in [nil, ConnectionIssue.notLoggedIn, .invalidCodexVersion, .malformedResponse] {
+            XCTAssertNil(RefreshPolicy.nextAutomaticRefreshDate(
+                issue: issue, isRefreshing: false,
+                nextRetryAt: retry, nextBackgroundRefreshAt: background, now: now
+            ))
         }
     }
 
