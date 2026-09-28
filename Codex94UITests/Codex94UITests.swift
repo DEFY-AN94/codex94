@@ -605,14 +605,17 @@ final class Codex94UITests: XCTestCase {
         XCTAssertEqual(try fixture.cacheFingerprint(), cacheBefore,
                        "Failed attempts must retain the last successful synthetic quota")
         let nextAttempt = try uniqueIdentified("quota-next-automatic-refresh", in: popover)
-        let plannedText = nextAttempt.label
+        let plannedText = try automaticRecoveryText(nextAttempt, identifier: "quota-next-automatic-refresh")
         try require(plannedText.hasPrefix(language.nextAttemptPrefix),
                     "Cached quota must show a localized automatic-attempt clock time")
-        try require(plannedText.range(of: "[0-9]{2}:[0-9]{2}:[0-9]{2}$", options: .regularExpression) != nil,
-                    "The plan must include hours, minutes and seconds")
+        try require(plannedText.range(of: "(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$", options: .regularExpression) != nil,
+                    "The plan must include valid hours, minutes and seconds")
         let cachedReason = try uniqueIdentified("quota-failure-reason", in: popover)
-        try require(cachedReason.label.contains(language.connectionFailed),
-                    "The existing combined cached banner must retain its failure reason")
+        XCTAssertEqual(
+            try automaticRecoveryText(cachedReason, identifier: "quota-failure-reason"),
+            language.cachedStatus + " · " + language.connectionFailed,
+            "The existing combined cached banner must retain its exact localized failure reason"
+        )
         let statusLabel = try statusItem().label
         try require(statusLabel.contains(language.connectionFailed) && statusLabel.contains(plannedText),
                     "The native status accessibility text must share the same reason and deadline")
@@ -622,9 +625,15 @@ final class Codex94UITests: XCTestCase {
         let dashboard = try openDashboard(from: popover)
         try selectPage(.connection, in: dashboard)
         let connectionPlan = try uniqueIdentified("connection-next-automatic-refresh", in: dashboard)
-        XCTAssertEqual(connectionPlan.label, plannedText)
+        XCTAssertEqual(
+            try automaticRecoveryText(connectionPlan, identifier: "connection-next-automatic-refresh"),
+            plannedText
+        )
         let reason = try uniqueIdentified("connection-failure-reason", in: dashboard)
-        XCTAssertEqual(reason.label, language.connectionFailed)
+        XCTAssertEqual(
+            try automaticRecoveryText(reason, identifier: "connection-failure-reason"),
+            language.connectionFailed
+        )
         try require(!identified("quota-popover-header", in: application).exists,
                     "The popover must remain closed throughout automatic recovery")
         try waitUntil("The service failure must last longer than the former retry window", timeout: 32) {
@@ -645,6 +654,64 @@ final class Codex94UITests: XCTestCase {
         try assertNoRecoveryAction(in: try currentPopover())
         try require(!identified("quota-next-automatic-refresh", in: application).exists,
                     "The recovered popover must not retain a stale retry hint")
+    }
+
+    /// macOS can expose a SwiftUI Text through value rather than label. Read
+    /// only these four already-uniquely-resolved app-owned nodes, and accept one
+    /// distinct actual text that satisfies its strict localized contract. An
+    /// identifier, an arbitrary nonempty field, or expected-text fallback can
+    /// never satisfy this helper. Diagnostics contain field names and flags only.
+    private func automaticRecoveryText(_ element: XCUIElement, identifier: String) throws -> String {
+        let artifactNames = [
+            "quota-next-automatic-refresh": "retry-text-quota-plan.json",
+            "quota-failure-reason": "retry-text-quota-reason.json",
+            "connection-next-automatic-refresh": "retry-text-connection-plan.json",
+            "connection-failure-reason": "retry-text-connection-reason.json"
+        ]
+        try require(fixture.scenario == "display" && !fixture.readOnlyFocusProbeEnabled,
+                    "Recovery text inspection is limited to the production Display scenario")
+        guard let artifactName = artifactNames[identifier] else {
+            throw UITestFailure("Recovery text inspection requires one of four known identifiers")
+        }
+        try require(element.exists && element.identifier == identifier,
+                    "Recovery text inspection must stay on its exact app-owned node")
+        let value = element.value as? String
+        let fields: [(name: String, text: String)] = [
+            ("label", element.label), ("title", element.title), ("value", value ?? "")
+        ]
+        let expectsClock = identifier == "quota-next-automatic-refresh"
+            || identifier == "connection-next-automatic-refresh"
+        func matches(_ text: String) -> Bool {
+            if expectsClock {
+                guard text.hasPrefix(language.nextAttemptPrefix) else { return false }
+                let clock = String(text.dropFirst(language.nextAttemptPrefix.count))
+                return clock.count == 8 && clock.range(
+                    of: "^(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$",
+                    options: .regularExpression
+                ) != nil
+            }
+            let expected = identifier == "quota-failure-reason"
+                ? language.cachedStatus + " · " + language.connectionFailed
+                : language.connectionFailed
+            return text == expected
+        }
+        let matchingFields = fields.filter { matches($0.text) }
+        let distinctTexts = Set(matchingFields.map(\.text))
+        try fixture.writeReport(artifactName, fields: [
+            "scenario": "display", "language": language.artifactName,
+            "identifier": identifier, "role": element.elementType.rawValue,
+            "nonemptyFields": fields.filter { !$0.text.isEmpty }.map(\.name),
+            "matchingFields": matchingFields.map(\.name),
+            "identifierValuedFields": fields.filter { $0.text == identifier }.map(\.name),
+            "valueIsString": value != nil, "expectsStrictLocalClock": expectsClock,
+            "hasUniqueMatchingText": distinctTexts.count == 1,
+            "hasAmbiguousMatchingTexts": distinctTexts.count > 1,
+            "textIncluded": false, "readOnlyDiagnostic": true
+        ])
+        guard distinctTexts.count == 1, let text = distinctTexts.first else {
+            throw UITestFailure("The known recovery node must expose one distinct text matching its exact contract")
+        }
+        return text
     }
 
     private func dashboardFloatingToggle(in dashboard: XCUIElement) throws -> XCUIElement {
@@ -2848,6 +2915,7 @@ private enum UILanguage: String, CaseIterable {
     var refresh: String { chinese ? "刷新" : "Refresh" }
     var refreshing: String { chinese ? "正在刷新" : "Refreshing" }
     var connectionFailed: String { chinese ? "无法读取额度" : "Could not read quota" }
+    var cachedStatus: String { chinese ? "缓存数据" : "Cached data" }
     var nextAttemptPrefix: String { chinese ? "下次自动尝试：" : "Next automatic attempt: " }
     var choose: String { chinese ? "选择…" : "Choose…" }
     var quotaModel: String { chinese ? "额度模型" : "Quota model" }
@@ -3430,7 +3498,9 @@ private struct SyntheticFixture {
             "status-item-reference.json", "dashboard-sidebar-probe.json"
         ]
         let display: Set<String> = scenario == "display" ? [
-            "popover-retry-scheduled-en.png"
+            "popover-retry-scheduled-en.png",
+            "retry-text-quota-plan.json", "retry-text-quota-reason.json",
+            "retry-text-connection-plan.json", "retry-text-connection-reason.json"
         ] : []
         let usage: Set<String> = scenario == "usage" ? [
             "usage-complete-en.png", "usage-seven-days-en.png", "usage-complete-zh-Hans.png",
