@@ -1,12 +1,12 @@
 # Update checks
 
 This document describes the published stable release
-[`v3.1.3 (19)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3), released
+[`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4), released
 on 2026-09-28 (Australia/Melbourne). README download and source instructions
 refer to this release. Update checks are manual; installation remains user-managed.
 
-Version `3.1.3 (19)` changes quota recovery and menu-bar rendering while
-retaining this manual-only update design. It adds no update polling, download, installation,
+Version `3.1.4 (20)` refines background quota recovery and retains this
+manual-only update design. It adds no update polling, download, installation,
 relaunch, endpoint, or signing-policy change. Stable discovery continues to
 follow the latest published GitHub Release.
 
@@ -101,7 +101,7 @@ be proposed. This document does not claim that path already exists.
 
 ## 中文使用说明
 
-[`v3.1.3 (19)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3) 已于
+[`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4) 已于
 2026-09-28（Australia/Melbourne）正式发布，现为稳定下载。“关于 → 检查新版本”只在
 用户点击后查询本仓库最新公开稳定 Release，显示版本和纯文本说明，并可通过系统
 浏览器打开经过验证的发布页面。下载、校验和安装仍由用户完成，不会自动替换或重启

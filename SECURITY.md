@@ -51,9 +51,9 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-3.1.3-SHA256SUMS.txt` before opening the DMG. The optional
+Verify `Codex94-3.1.4-SHA256SUMS.txt` before opening the DMG. The optional
 GitHub command
-`gh attestation verify Codex94-3.1.3-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
+`gh attestation verify Codex94-3.1.4-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
 can prove repository/workflow/commit provenance for the exact DMG. A matching
 checksum or attestation is not notarization, malware review, a security audit,
 or Gatekeeper approval. If the exact release is trusted, use only Apple's
@@ -145,10 +145,15 @@ boundaries remain unchanged.
 
 ## Supported versions
 
-The supported published stable version is [`v3.1.3 (19)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3),
+The supported published stable version is [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4),
 released on 2026-09-28 (Australia/Melbourne).
 Feature branches and `main` may contain development work that has not passed
 release acceptance. Current stable-version links identify the published release.
+Version `3.1.4` adjusts bounded quota deadlines and permits three extra
+read-only attempts after transient failures. Failure-stage logs contain fixed
+categories and timings, not raw payloads. The next-attempt display uses existing
+in-memory schedules and adds no permission, endpoint or persistent account data.
+
 Version `3.1.3` prioritizes quota over optional identity, adds a bounded
 transient-error retry budget, and renders menu-bar status through native
 non-template images. Authentication failures remain errors, and unavailable

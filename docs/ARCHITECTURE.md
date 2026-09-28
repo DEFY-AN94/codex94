@@ -1,7 +1,7 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints in the published stable
-[`3.1.3 (19)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3).
+[`3.1.4 (20)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4).
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
@@ -112,3 +112,18 @@ was resolved on the tested Mac with the reviewed CI candidate. This does not
 cover every macOS version, floating-panel behavior across Spaces, fullscreen,
 or keyboard interaction. Static image tests alone do not establish animation
 behavior; the exact candidate identity is in [RELEASING.md](RELEASING.md).
+
+
+## 3.1.4: bounded recovery and schedule presentation
+
+Quota request/transaction budgets are 10/20 seconds; Token usage remains 5/15,
+and optional identity remains capped at 2 seconds. Transient quota failures
+allow three extra attempts after 5/20/60-second delays. The store continues to
+own single-flight reads, retry cancellation and the background/reset schedules.
+
+`nextAutomaticRefreshAt` projects the earliest armed retry, background or reset
+deadline only while waiting after a transient failure. Unknown wall-clock
+estimates suppress the date. Views share a local `HH:mm:ss` formatter and
+localized text; native status text changes do not invalidate its image cache.
+No new polling timer is added. Failed transport stages log fixed categories and
+durations at error level without server messages or payloads.
