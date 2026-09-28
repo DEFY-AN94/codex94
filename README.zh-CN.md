@@ -24,7 +24,15 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 > Codex94 与 OpenAI 没有隶属关系，也未获得 OpenAI 的认可、背书或赞助。Codex
 > `app-server` 是实验性接口，未来 Codex 版本可能会改变它。
 
-## 3.1.3 版本
+## 3.1.4 版本
+
+`3.1.4 (20)` 已于 **2026-09-28**（Australia/Melbourne）正式发布。
+本版为额度读取提供更充足的等待时间，并在短暂失败后分别等待 5、20、60 秒重试。
+重试间隔内继续显示最后成功的额度、琥珀色缓存标记和失败原因；下一次计划时间已知时，
+Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
+[issue #36](https://github.com/DEFY-AN94/codex94/issues/36) 和[修复 PR](https://github.com/DEFY-AN94/codex94/pull/37)。
+
+### 先前的 3.1.3 版本
 
 `3.1.3 (19)` 已于 **2026-09-28**（Australia/Melbourne）正式发布。
 本版先读取额度，再读取可降级的账号资料，避免较慢的身份请求丢弃有效额度；额度请求
@@ -60,7 +68,7 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 
 验证包含第四个合成 **Floating** UI 场景及统计控件／图片检查，证据分类见下文。
 原生键盘焦点、浮窗跨 Spaces 与全屏应用行为仍须分别实测，不能仅凭图片或面板配置
-认定；上文菜单栏闪色验收仅对应本次 Mac 与精确候选应用。
+认定；先前 3.1.3 的菜单栏闪色验收仅对应当时测试的 Mac 与精确候选应用。
 
 ## 界面截图
 
@@ -107,7 +115,7 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 ## 当前分发状态
 
 - 已发布的稳定版为
-  [`v3.1.3 (19)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3)，
+  [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4)，
   于 **2026-09-28**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
   annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
@@ -122,7 +130,7 @@ Codex94 是采用 MIT 许可的源码项目，使用 Mac 上已有的 Codex 可�
 - 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
-已发布的 `3.1.3` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+已发布的 `3.1.4` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
 attestation 都不会改变这一 Apple 信任状态。
 
@@ -143,23 +151,23 @@ Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
 
 ## 安装 Universal DMG
 
-请从 [`v3.1.3` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3)
+请从 [`v3.1.4` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4)
 下载以下两个正式资产：
 
-- `Codex94-3.1.3-macos-universal-unnotarized.dmg`
-- `Codex94-3.1.3-SHA256SUMS.txt`
+- `Codex94-3.1.4-macos-universal-unnotarized.dmg`
+- `Codex94-3.1.4-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-3.1.3-SHA256SUMS.txt
+shasum -a 256 -c Codex94-3.1.4-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-3.1.3-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-3.1.4-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -179,7 +187,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v3.1.3 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v3.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
@@ -281,9 +289,12 @@ Token 统计预览另有独立的来源记录。
 - App 启动时及所选的 1、5、15 或 30 分钟间隔刷新。展开面板时，若连接正常且
   成功数据不足 60 秒则直接复用；其他情况进入既有单飞刷新路径。仍可手动选择
   **刷新**，已进行中的读取会合并，不额外并发。
-- 额度请求短暂失败后，最多分别等待 2 秒、6 秒进行两次额外读取；Reset 触发的
-  请求也可使用同一有界重试预算。认证、路径发现或畸形数据错误不会自动重试，
+- 额度请求短暂失败后，最多分别等待 5、20、60 秒进行三次额外读取，含首次共四次；
+  Reset 触发的请求也可使用同一有界重试预算。认证、路径发现或畸形数据错误不会自动重试，
   后续正常刷新周期会建立自己的预算。
+- 短暂失败后的等待期间，Popover、连接页和原生菜单栏提示／辅助功能文本显示
+  本地 `HH:mm:ss` 格式的下次自动尝试时间，取已知重试、后台或 Reset 计划中最早
+  的时刻。计划未知（包括时钟变化后）时隐藏具体时间，仍保留失败原因和缓存说明。
 - Mac 唤醒后，如果没有成功快照，或上次成功已过去至少 60 秒，则刷新一次；
   更鲜的快照保持不变。唤醒、后台、手动和展开面板触发的请求共用同一条单飞
   刷新路径。
@@ -293,8 +304,9 @@ Token 统计预览另有独立的来源记录。
   水位防止时钟回拨后重新安排旧 Reset。唤醒与系统时钟变化会重新协调这项一次性
   计划；不新增持久化 Reset 账本或后台刷新周期。
 - 先用 `account/rateLimits/read` 读取实时额度；在 **额度 + 账号信息** 模式下，
-  再调用可降级的 `account/read`，固定使用 `refreshToken: false`。账号读取有独立的
-  较短等待上限；身份信息较慢时仍保留有效额度，缺失身份单独显示，不复用旧账号的
+  再调用可降级的 `account/read`，固定使用 `refreshToken: false`。额度请求与整体事务
+  上限分别为 10 秒、20 秒；Token 统计保留 5 秒、15 秒，账号读取仍以 2 秒为上限。
+  身份信息较慢时仍保留有效额度，缺失身份单独显示，不复用旧账号的
   资料或 Token 快照。明确的认证失败仍会使本次读取失败。
 - 将 Codex 返回的标准/默认额度桶与额外命名的模型额度桶分开处理。默认额度桶显示
   为 **Codex**；其他额度桶使用服务端提供的名称，不写死模型可用性或下架日期。
@@ -475,6 +487,9 @@ hosted 焦点跳过项不计作通过。外部 UI、安全分析、最终 main �
 的 Actions、Python、Swift 检查均通过。维护者对切换 Spaces 时菜单栏颜色的验收，
 仅对应测试 Mac 上的精确 CI 候选应用；最终 main 资产与安装验收另见
 [RELEASING.md](docs/RELEASING.md)。
+
+`3.1.4 (20)` 验证记录：**396 项执行、1 项既有 hosted 焦点跳过、0 项失败**。
+最终 main 检查、公开资产核验及本机后台刷新观察单独记录在 [RELEASING.md](docs/RELEASING.md)。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。组件职责与复用约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；

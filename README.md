@@ -29,9 +29,19 @@ and security-scanned before it is tagged.
 > `app-server` is an experimental interface and may change in future Codex
 > releases.
 
-## Version 3.1.3
+## Version 3.1.4
 
-`3.1.3 (19)` is the published stable release, dated **2026-09-28**
+`3.1.4 (20)` is the published stable release, dated **2026-09-28**
+(Australia/Melbourne). Quota reads now have more time to complete, and transient
+failures retry after 5, 20 and 60 seconds. Between attempts, the last successful
+quota remains visible with an amber cached indicator and the failure reason.
+The popover, Connection page and menu-bar tooltip show the next automatic
+attempt when its scheduled time is known. See
+[issue #36](https://github.com/DEFY-AN94/codex94/issues/36) and [fix PR](https://github.com/DEFY-AN94/codex94/pull/37).
+
+### Earlier 3.1.3 release
+
+`3.1.3 (19)` was released on **2026-09-28**
 (Australia/Melbourne). It reads quota before optional account details, keeps
 valid quota when optional identity is slow, and recovers transient quota
 failures with a bounded retry budget. Reopening a connected popover with data
@@ -77,8 +87,8 @@ and explicit manual-path precedence. Its original record remains
 Validation includes a fourth synthetic **Floating** UI scenario and Token
 controls/image checks. Evidence is listed below. Native keyboard focus,
 floating-panel behavior across Spaces, and fullscreen behavior remain separate
-from rendered images and panel flags; the menu-bar color acceptance above is limited to the tested
-Mac and candidate.
+from rendered images and panel flags; the earlier 3.1.3 menu-bar color acceptance
+is limited to its tested Mac and candidate.
 
 ## Screenshots
 
@@ -127,7 +137,7 @@ statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v3.1.3 (19)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3),
+  [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4),
   released on **2026-09-28** (Australia/Melbourne) as a Universal 2 DMG and
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
@@ -146,7 +156,7 @@ statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `3.1.3` DMG itself is completely unsigned, has no Apple Developer ID
+The published `3.1.4` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -170,23 +180,23 @@ precedence; an invalid manual choice is not silently bypassed.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v3.1.3` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3):
+[`v3.1.4` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4):
 
-- `Codex94-3.1.3-macos-universal-unnotarized.dmg`
-- `Codex94-3.1.3-SHA256SUMS.txt`
+- `Codex94-3.1.4-macos-universal-unnotarized.dmg`
+- `Codex94-3.1.4-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-3.1.3-SHA256SUMS.txt
+shasum -a 256 -c Codex94-3.1.4-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-3.1.3-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-3.1.4-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -208,7 +218,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v3.1.3 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v3.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
@@ -341,10 +351,16 @@ their own provenance above.
   selected setting. Opening a connected popover reuses successful data less
   than 60 seconds old; otherwise it uses the existing single-flight refresh.
   Explicit **Refresh** remains available and coalesces an already active read.
-- Transient quota failures may receive at most two additional read attempts,
-  after delays of 2 and 6 seconds. The same bounded budget can follow a
-  Reset-triggered attempt. Authentication, discovery and malformed-data errors
+- Transient quota failures may receive at most three additional read attempts,
+  after delays of 5, 20 and 60 seconds (four attempts including the initial read).
+  The same bounded budget can follow a Reset-triggered attempt. Authentication,
+  discovery and malformed-data errors
   do not automatically retry; a later normal refresh starts a new budget.
+- While waiting after a transient failure, the popover, Connection page and
+  native menu-bar tooltip/accessibility text show the next scheduled automatic
+  attempt as local `HH:mm:ss`. This uses the earliest known retry, background
+  or post-reset deadline. An unknown schedule, including after a clock change,
+  hides the timestamp; the existing failure and cached-data information remain.
 - After the Mac wakes, refreshes once when there is no successful snapshot or
   the last success is at least 60 seconds old. A fresher snapshot is kept, and
   wake, background, manual, and popover requests share the same single-flight
@@ -358,7 +374,9 @@ their own provenance above.
   the one-shot schedule without a persistent ledger or new background cadence.
 - Uses `account/rateLimits/read` for live quota data before the optional
   `account/read` request in **Quota + account** mode, with `refreshToken: false`.
-  A short optional-account deadline preserves valid quota if identity is slow;
+  Quota requests have a 10-second request budget and a 20-second transaction
+  budget; Token usage retains 5 and 15 seconds respectively. The optional
+  account read keeps its 2-second cap and preserves valid quota if identity is slow;
   missing identity is shown separately, without reusing an earlier account's
   details or Token snapshot. Explicit authentication failures still fail the read.
 - Keeps the standard/default quota bucket separate from additional named model
@@ -579,6 +597,10 @@ passed the four synthetic UI scenarios, and
 Actions, Python and Swift. The maintainer's Spaces color acceptance applies
 only to the reviewed CI candidate on the tested Mac; final-main assets and
 installation are separate records in [RELEASING.md](docs/RELEASING.md).
+
+Validation for `3.1.4 (20)`: **396 tests executed, 1 existing hosted-focus skip,
+0 failures**. Exact final-main checks, public asset verification and local background-refresh observation are recorded in
+[RELEASING.md](docs/RELEASING.md).
 
 SwiftUI owns views and state presentation; AppKit owns the status item, popover,
 application appearance, and Dashboard window lifecycle. See the

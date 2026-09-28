@@ -1,8 +1,8 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v3.1.3 (19)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3),
+The published stable version is [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4),
 released on 2026-09-28 (Australia/Melbourne). Its tag and DMG remain bound to
-release commit `1dedf6230753f52510004c0355ec91ad626fbc23`; later docs-only commits do not move
+release commit `0aae38d7eff9c910ce25778c60ccf429b67cd22a`; later docs-only commits do not move
 that tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -40,6 +40,14 @@ changes and existing tags; do not stash/reset/clean or force-push as preparation
 Keep candidate changelog notes under Unreleased without inventing a date.
 Historical release entries and the existing synthetic screenshot provenance
 remain unchanged. Planning and Goal files stay outside the Git repository.
+
+Version `3.1.4 (20)`, dated **2026-09-28** (Australia/Melbourne), separates
+quota 10/20-second budgets from Token usage 5/15 and optional-account 2 seconds.
+Retain exact four-attempt checks for the 5/20/60 retry schedule, a no-request
+observation beyond the longest backoff, and closed-popover automatic recovery.
+Check the next scheduled time across retry/background/reset changes and unknown
+clock estimates, with no extra image render, timer or RPC. Record local
+background-refresh observation separately from synthetic CI.
 
 Version `3.1.3 (19)`, dated **2026-09-28** (Australia/Melbourne), prioritizes
 quota before optional identity, uses at most two transient-failure retries,
@@ -100,7 +108,7 @@ separate and tied to the revision actually tested.
 Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
 Its historical tag and DMG remain bound to
 `ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`. Current download and clone
-instructions point to `v3.1.3`. This maintenance release isolates quota request contexts, shares strict
+instructions point to `v3.1.4`. This maintenance release isolates quota request contexts, shares strict
 service-value parsing, reuses chart preparation/formatting, retires old Token
 clients outside the main actor, and validates development-script arguments
 before side effects. It does not introduce a broad timer rewrite, new data
@@ -588,3 +596,55 @@ field editing. There is no CI capture of a real Spaces animation in these
 artifacts. Final package and installation evidence above must remain distinct
 from the maintainer's PR-candidate color acceptance. Documentation follow-ups
 do not move the release tag or replace asset bytes.
+
+
+### 3.1.4 background recovery release — 2026-09-28
+
+[Fix PR](https://github.com/DEFY-AN94/codex94/pull/37) addresses
+[issue #36](https://github.com/DEFY-AN94/codex94/issues/36), now closed.
+
+- Full test result: 396 tests executed, 1 existing hosted-focus skip, 0 failures.
+- Frozen release source: `0aae38d7eff9c910ce25778c60ccf429b67cd22a`.
+- Final-main CI, four synthetic UI jobs and DMG attestation: [CI
+  36380134556](https://github.com/DEFY-AN94/codex94/actions/runs/36380134556) passed the
+  full suite, all four synthetic UI jobs, packaging and DMG attestation.
+- Final-main Actions/Python/Swift CodeQL: [CodeQL
+  36380133690](https://github.com/DEFY-AN94/codex94/actions/runs/36380133690) passed
+  Actions, Python and Swift.
+- Annotated `v3.1.4` tag and source/tree binding: tag object
+  `6f3e03525fc74a4443e37eec5660abc8677993b3` peels to the frozen commit above, tree
+  `02f3cefaa9e2454bb4a44f6c85faa5f49c271a14`.
+- Final DMG SHA-256: `24f1b3a5dc5bbbd0cb084e8f242cb5eb817653b059e44cef619c0127940620a5`.
+- Checksum-file SHA-256:
+  `8686683b54ce34a4e70f66997c81dffc76f2d055a6cd5087ba0e51e268e52ac0`.
+- Public Latest, asset digests, strict attestation and ZIP/TAR verification: anonymous
+  readback confirmed public, non-prerelease Latest Release `397971188`, published
+  `2026-09-28T05:25:29Z`. Both public assets matched final CI bytes and API digests.
+  Package verification and strict attestation passed for the exact source/signing SHA,
+  `main`, `ci.yml` and GitHub-hosted run `36380134556` attempt 1. Public ZIP and TAR
+  each matched all 146 tracked files. The production updater recognized 3.1.4 as newer
+  than 3.1.3 with valid release/DMG URLs.
+- Local candidate background-refresh observation and exact binary identity: the locally
+  built Release candidate, binary SHA-256
+  `29bf8026cf99385a4adc7fad32af6383561c27a9f096c365fc163d889c3bd22c`, ran without
+  menu/manual refreshes for 50 minutes 23 seconds, with 10 background successes.
+  Across launch and those background cycles, four successful quota stages took
+  just over five seconds. No real quota
+  failure occurred during this observation; it does not establish failure recovery for
+  that candidate.
+- Installed App binary SHA-256:
+  `e19d83ff7d3176aba2d8d556003821d4c1a6ac0d6e3708b0dfe01fd32c0a1b7b`.
+- Final installation, retained rollback copy and refresh acceptance: the final CI
+  Release App was installed and observed without clicks. Its launch quota read timed out
+  after 10.001 seconds; an automatic retry started 5.04 seconds later and succeeded with
+  a 722 ms quota stage. The first five-minute background refresh also succeeded. Full
+  files/modes, signature and all extracted extended attributes were verified; the
+  complete old 3.1.3 backup and original were retained, and quarantine was unchanged.
+
+[PR Display CI](https://github.com/DEFY-AN94/codex94/actions/runs/36378589587)
+verified exactly four attempts, 61 seconds without a fifth, and recovery with
+the popover closed after at least 31 seconds of simulated service failure,
+using production retry delays. This synthetic Debug UI evidence is separate
+from both Release binaries and the local observations above. Earlier 3.1.3
+Spaces acceptance remains bound to that Mac and candidate; it is not new 3.1.4 native-interaction evidence. Documentation
+follow-ups do not move the release tag or replace its assets.

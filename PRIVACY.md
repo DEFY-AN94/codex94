@@ -2,26 +2,34 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v3.1.3 (19)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.3),
+stable version is [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4),
 released on 2026-09-28 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
-## 3.1.3: quota recovery and status presentation
+## Quota recovery and status presentation (3.1.3–3.1.4)
 
 Quota is requested before optional account details. An account-detail timeout
 may leave a fresh quota snapshot with no identity; an earlier account's email
 is not reused. In **Quota + account** mode, unverified identity clears or
 invalidates account-dependent Token data and notification baselines. The optional
-error state is in memory
-only and is not added to quota cache v2.
+error state is in memory only and is not added to quota cache v2.
 
-A transient quota failure may produce at most two additional read attempts,
-after 2 and 6 seconds. These reuse the same read-only quota RPC, including when
+In 3.1.4, a transient quota failure may produce at most three additional read
+attempts, after 5, 20 and 60 seconds (four attempts in one cycle). These reuse
+the same read-only quota RPC, including when
 the initial attempt followed a reset deadline; they never redeem reset credits.
 A new user/normal polling cycle starts its own bounded budget. Authentication,
 executable-discovery and malformed-data failures do not automatically retry.
 Only fixed trigger/stage names, timings and error categories are logged; no
 identity, response body, credentials or raw quota values are added to logs.
+Failed stages use error-level logging so the fixed failure category and duration
+remain available without retaining a server message or payload.
+
+Quota reads use 10-second request and 20-second transaction budgets. Token usage
+keeps 5/15 seconds, and optional account details keep a 2-second cap. The next
+scheduled retry/background/reset time is held only in memory and displayed as
+local clock text. Unknown estimates after a clock change are hidden. This text
+adds no request, timer, stored preference or account identity.
 
 Opening a connected popover with a successful snapshot less than 60 seconds old
 reuses it instead of sending another read. The native menu-bar image and its
@@ -171,7 +179,7 @@ or change connection state. Recovery buttons only open an existing Dashboard
 section; they do not execute a login or introduce a separate retry request. The
 post-reset task uses the existing quota refresh path: each consumed target
 gets one Reset-triggered attempt, without rearming that target. The generic
-3.1.3 transient-failure budget described above may also follow that attempt.
+current transient-failure budget described above may also follow that attempt.
 
 Version `0.2.1` keeps a consumed Reset watermark only in memory, including
 across clock changes; no Reset history is written to disk. If a fresh successful
