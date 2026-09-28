@@ -141,6 +141,24 @@ struct ConnectionSettingsView: View {
                         Text(store.connectionState.localizedTitle)
                         if store.isRefreshing { ProgressView().controlSize(.small) }
                     }
+                    if !store.isRefreshing, let issue = store.lastIssue, issue != .notLoggedIn {
+                        Text(issue.localizedKey)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("connection-failure-reason")
+                    }
+                    if let nextAttempt = ConnectionRecoveryText.nextAttempt(
+                        at: store.nextAutomaticRefreshAt,
+                        language: store.preferences.language,
+                        timeZone: resetTimeZone
+                    ) {
+                        Text(verbatim: nextAttempt)
+                            .font(.callout.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("connection-next-automatic-refresh")
+                    }
                     if store.lastIssue == .notLoggedIn {
                         Text("connection.notLoggedIn.guidance")
                             .font(.callout)

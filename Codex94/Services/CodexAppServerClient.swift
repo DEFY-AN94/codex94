@@ -13,8 +13,11 @@ extension QuotaFetching {
 
 struct AppServerTimeouts: Sendable {
     var initialize: TimeInterval = 8
+    // Token usage keeps its own request and transaction limits.
     var request: TimeInterval = 5
     var total: TimeInterval = 15
+    var quotaRequest: TimeInterval = 10
+    var quotaTotal: TimeInterval = 20
     var optionalAccount: TimeInterval = 2
     var terminationGrace: TimeInterval = 1
     var maximumLineBytes: Int = 1_048_576
@@ -80,6 +83,7 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
 
     private func withInitializedServer<Result>(
         executable: LocatedCodex,
+        totalTimeout: TimeInterval,
         operation: (FileHandle, JSONLineChannel, Date) throws -> Result
     ) throws -> Result {
         try FileManager.default.createDirectory(
@@ -96,7 +100,7 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
         let output = Pipe()
 
         let startedAt = Date()
-        let totalDeadline = startedAt.addingTimeInterval(timeouts.total)
+        let totalDeadline = startedAt.addingTimeInterval(totalTimeout)
         logger.info("stage=start source=\(executable.source.rawValue, privacy: .public)")
 
         let process: ManagedSubprocess
@@ -171,7 +175,9 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
         executable: LocatedCodex,
         identityMode: IdentityMode
     ) throws -> QuotaSnapshot {
-        try withInitializedServer(executable: executable) { input, channel, totalDeadline in
+        try withInitializedServer(
+            executable: executable, totalTimeout: timeouts.quotaTotal
+        ) { input, channel, totalDeadline in
             // Validate quota before spending any time on optional account metadata.
             let (limitsResult, quota) = try measuredStage(.rateLimits) {
                 try write([
@@ -181,7 +187,7 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
                 let result = try response(
                     id: 2,
                     channel: channel,
-                    deadline: requestDeadline(seconds: timeouts.request, totalDeadline: totalDeadline),
+                    deadline: requestDeadline(seconds: timeouts.quotaRequest, totalDeadline: totalDeadline),
                     timeoutIssue: .requestTimedOut
                 )
                 let quotaFetchedAt = Date()
@@ -239,7 +245,9 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
     }
 
     private func fetchUsageSynchronously(executable: LocatedCodex) throws -> TokenUsageSnapshot {
-        try withInitializedServer(executable: executable) { input, channel, totalDeadline in
+        try withInitializedServer(
+            executable: executable, totalTimeout: timeouts.total
+        ) { input, channel, totalDeadline in
             try measuredStage(.usage) {
                 try write(["id": 2, "method": "account/usage/read"], to: input)
                 let result = try response(
@@ -266,9 +274,15 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
         var outcome = "success"
         defer {
             let milliseconds = Int((ProcessInfo.processInfo.systemUptime - startedAt) * 1_000)
-            logger.info(
-                "stage=\(stage.rawValue, privacy: .public) duration_ms=\(milliseconds, privacy: .public) outcome=\(outcome, privacy: .public)"
-            )
+            if outcome == "success" {
+                logger.info(
+                    "stage=\(stage.rawValue, privacy: .public) duration_ms=\(milliseconds, privacy: .public) outcome=\(outcome, privacy: .public)"
+                )
+            } else {
+                logger.error(
+                    "stage=\(stage.rawValue, privacy: .public) duration_ms=\(milliseconds, privacy: .public) outcome=\(outcome, privacy: .public)"
+                )
+            }
         }
         do {
             return try operation()

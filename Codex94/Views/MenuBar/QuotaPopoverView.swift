@@ -272,7 +272,8 @@ struct QuotaPopoverView: View {
                 text: cachedBannerText(presentation: presentation),
                 accessibilityText: cachedBannerText(presentation: presentation),
                 recoveryDestination: presentation.issue?.recoveryDestination,
-                openDashboard: openDashboard
+                openDashboard: openDashboard,
+                nextAutomaticAttempt: nextAutomaticAttempt
             )
         } else if presentation.connectionBadge == .unavailable {
             Divider()
@@ -282,9 +283,18 @@ struct QuotaPopoverView: View {
                 text: issueText(for: presentation),
                 accessibilityText: issueText(for: presentation),
                 recoveryDestination: presentation.issue?.recoveryDestination,
-                openDashboard: openDashboard
+                openDashboard: openDashboard,
+                nextAutomaticAttempt: nextAutomaticAttempt
             )
         }
+    }
+
+    private var nextAutomaticAttempt: String? {
+        ConnectionRecoveryText.nextAttempt(
+            at: store.nextAutomaticRefreshAt,
+            language: store.preferences.language,
+            timeZone: resetTimeZone
+        )
     }
 
     private func issueText(for presentation: StatusPresentation) -> Text {
@@ -525,6 +535,7 @@ struct StatusBanner: View {
     let accessibilityText: Text
     let recoveryDestination: ConnectionRecoveryDestination?
     let openDashboard: (DashboardSection?) -> Void
+    var nextAutomaticAttempt: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -539,6 +550,15 @@ struct StatusBanner: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityText)
+            .accessibilityIdentifier("quota-failure-reason")
+
+            if let nextAutomaticAttempt {
+                Text(verbatim: nextAutomaticAttempt)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("quota-next-automatic-refresh")
+            }
 
             if let recoveryDestination {
                 Button {

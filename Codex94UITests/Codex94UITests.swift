@@ -23,6 +23,7 @@ final class Codex94UITests: XCTestCase {
     private var observedStatusWidths: [String: CGFloat] = [:]
     private var layoutMeasurementIndex = 0
     private var floatingQueryDiagnosticWritten = false
+    private var verifiedRetryBudgetExhaustion = false
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -216,7 +217,7 @@ final class Codex94UITests: XCTestCase {
         try capture(try currentPopover(), named: "popover-refreshing.png")
         try waitForRequestCompletion(after: slowBaseline, delta: 1)
         try fixture.setMode("serverError")
-        try manualRefresh(in: try currentPopover(), expectedAttempts: 3)
+        try manualRefresh(in: try currentPopover(), expectedAttempts: 4)
         popover = try currentPopover()
         try require(identified("quota-recovery-button", in: popover).exists,
                     "A cached failure must keep its independent recovery action")
@@ -225,6 +226,7 @@ final class Codex94UITests: XCTestCase {
         try fixture.setMode("normal")
         try manualRefresh(in: popover)
         try assertNoRecoveryAction(in: try currentPopover())
+        try assertClosedPopoverAutomaticRecovery()
 
         // Every layout change must resize the one existing status item in the
         // same application process. Opening its popover after each transition
@@ -254,8 +256,16 @@ final class Codex94UITests: XCTestCase {
             "rightClickPopoverToggle": true,
             "freshPopoverReopenRequestCount": 0,
             "freshPopoverReopenPreservesCache": true,
-            "transientFailureAttemptsWithoutFurtherClicks": 3,
+            "transientFailureAttemptsWithoutFurtherClicks": 4,
             "retryBudgetExhaustionVerified": true,
+            "retryExhaustionObservationSeconds": 61,
+            "productionRetryDelaysSeconds": [5, 20, 60],
+            "popoverAndConnectionNextAttemptVerified": true,
+            "nativeStatusAccessibilityRecoveryHint": true,
+            "closedPopoverAutomaticRecovery": true,
+            "serviceUnavailableForAtLeastSeconds": 31,
+            "automaticRecoveryAttempts": 4,
+            "productionRetryTimingUnmodified": true,
             "sameProcessLayoutTransitions": true,
             "missingBucketSavedAuto": true,
             "returningBucketKeepsAuto": true,
@@ -319,10 +329,10 @@ final class Codex94UITests: XCTestCase {
 
             try selectPage(.display, in: dashboard)
             try fixture.setMode("serverError")
-            _ = try openPopover(expectedRequestDelta: 3)
+            _ = try openPopover(expectedRequestDelta: 4)
             dashboard = try exerciseRecoveryByClick(.diagnostics)
             try selectPage(.display, in: dashboard)
-            _ = try openPopover(expectedRequestDelta: 3)
+            _ = try openPopover(expectedRequestDelta: 4)
             dashboard = try exerciseRecoveryByClick(.diagnostics)
             XCTAssertEqual(dashboard.frame, firstDashboardFrame)
             // Restore a successful baseline explicitly before the next language.
@@ -337,7 +347,7 @@ final class Codex94UITests: XCTestCase {
         try selectPage(.display, in: dashboard)
         popover = try openPopoverWithConnectedData()
         try fixture.setMode("serverError")
-        try manualRefresh(in: popover, expectedAttempts: 3)
+        try manualRefresh(in: popover, expectedAttempts: 4)
         popover = try currentPopover()
         try capturePendingKeyboardDiagnostic(
             button: try uniqueIdentified("quota-recovery-button", in: popover),
@@ -356,7 +366,7 @@ final class Codex94UITests: XCTestCase {
             "permissionPromptsRequested": false,
             "authenticationFailureAttempts": 1,
             "authenticationFailureDoesNotRetry": true,
-            "transientFailureAttempts": 3,
+            "transientFailureAttempts": 4,
             "retryBudgetExhaustionVerified": true,
             "rawTestResultsUploaded": false
         ])
@@ -368,8 +378,8 @@ final class Codex94UITests: XCTestCase {
         // A cold failing launch and its deferred popover would otherwise race
         // between coalescing and starting two independent retry cycles.
         application.launchArguments = []
-        try launchWithoutPopover(expectedRequestDelta: 3)
-        _ = try openPopover(expectedRequestDelta: 3)
+        try launchWithoutPopover(expectedRequestDelta: 4)
+        _ = try openPopover(expectedRequestDelta: 4)
         let originalPID = try ownedApplicationPID()
         try require(try fixture.cacheFingerprint()["exists"] as? Bool == false,
                     "The cold failure must not have a successful quota cache")
@@ -508,7 +518,7 @@ final class Codex94UITests: XCTestCase {
 
         try fixture.setMode("serverError")
         let cacheBeforeFailure = try fixture.cacheFingerprint()
-        try refreshFloating(floating, expectedAttempts: 3)
+        try refreshFloating(floating, expectedAttempts: 4)
         try assertFloatingGeometry(floating, expanded: false)
         try assertFloatingMetric("floating-quota-weekly", contains: "32%", in: floating)
         try assertFloatingMetric("floating-refresh", contains: "Failed", in: floating)
@@ -555,9 +565,9 @@ final class Codex94UITests: XCTestCase {
             "scenario": "floating", "completed": true, "language": "en",
             "popoverEntryVerified": true, "dashboardEntryVerified": true,
             "coldFailureUnknownValuesVerified": true, "successfulManualRefreshVerified": true,
-            "coldLaunchAttemptsWithoutClicks": 3,
-            "coldPopoverAttempts": 3,
-            "transientFailureAttempts": 3,
+            "coldLaunchAttemptsWithoutClicks": 4,
+            "coldPopoverAttempts": 4,
+            "transientFailureAttempts": 4,
             "retryBudgetExhaustionVerified": true,
             "failedRefreshRetainsQuotaAndCache": true, "explicitManualRefreshCount": 2,
             "pinPreferenceVerified": true, "expandedResetCountVerified": true,
@@ -574,6 +584,67 @@ final class Codex94UITests: XCTestCase {
             "sourceData": "fixed-synthetic-quota", "screenCoordinatesIncluded": false,
             "rawTestResultsUploaded": false
         ])
+    }
+
+    /// Real production backoffs, with only the synthetic service's availability
+    /// changed after 31 wall-clock seconds. No refresh or popover action occurs
+    /// while awaiting the fourth attempt; the application's retry timer owns it.
+    private func assertClosedPopoverAutomaticRecovery() throws {
+        try require(fixture.scenario == "display", "Automatic recovery evidence belongs to the production Display AUT")
+        let popover = try currentPopover()
+        let before = try fixture.requestCount()
+        let cacheBefore = try fixture.cacheFingerprint()
+        try fixture.setMode("serverError")
+        let startedAt = Date()
+        try commandButton(language.refresh, in: popover).click()
+        try waitUntil("The first three real attempts must fail before the final 60s backoff", timeout: 45) {
+            try self.fixture.requestCount() == before + 3 && self.fixture.requestsHaveExited()
+        }
+        try waitForSettledRequests()
+        XCTAssertEqual(try fixture.requestCount(), before + 3)
+        XCTAssertEqual(try fixture.cacheFingerprint(), cacheBefore,
+                       "Failed attempts must retain the last successful synthetic quota")
+        let nextAttempt = try uniqueIdentified("quota-next-automatic-refresh", in: popover)
+        let plannedText = nextAttempt.label
+        try require(plannedText.hasPrefix(language.nextAttemptPrefix),
+                    "Cached quota must show a localized automatic-attempt clock time")
+        try require(plannedText.range(of: "[0-9]{2}:[0-9]{2}:[0-9]{2}$", options: .regularExpression) != nil,
+                    "The plan must include hours, minutes and seconds")
+        let cachedReason = try uniqueIdentified("quota-failure-reason", in: popover)
+        try require(cachedReason.label.contains(language.connectionFailed),
+                    "The existing combined cached banner must retain its failure reason")
+        let statusLabel = try statusItem().label
+        try require(statusLabel.contains(language.connectionFailed) && statusLabel.contains(plannedText),
+                    "The native status accessibility text must share the same reason and deadline")
+        try require(!statusLabel.localizedCaseInsensitiveContains(language.refreshing),
+                    "Waiting between attempts must not appear as an active blue refresh")
+        try capture(popover, named: "popover-retry-scheduled-en.png")
+        let dashboard = try openDashboard(from: popover)
+        try selectPage(.connection, in: dashboard)
+        let connectionPlan = try uniqueIdentified("connection-next-automatic-refresh", in: dashboard)
+        XCTAssertEqual(connectionPlan.label, plannedText)
+        let reason = try uniqueIdentified("connection-failure-reason", in: dashboard)
+        XCTAssertEqual(reason.label, language.connectionFailed)
+        try require(!identified("quota-popover-header", in: application).exists,
+                    "The popover must remain closed throughout automatic recovery")
+        try waitUntil("The service failure must last longer than the former retry window", timeout: 32) {
+            Date().timeIntervalSince(startedAt) >= 31
+        }
+        XCTAssertEqual(try fixture.requestCount(), before + 3)
+        try fixture.setMode("normal")
+        try waitForRequestCompletion(after: before, delta: 4)
+        try require(!identified("quota-popover-header", in: application).exists,
+                    "Automatic recovery must not open the popover")
+        XCTAssertNotEqual(try fixture.cacheFingerprint(), cacheBefore,
+                          "The fourth automatic attempt must write a new successful snapshot")
+        try require(!identified("connection-next-automatic-refresh", in: dashboard).exists,
+                    "Success must remove the planned-retry hint")
+        try require(!identified("connection-failure-reason", in: dashboard).exists,
+                    "Success must clear the old failure reason")
+        _ = try openPopover(expectedRequestDelta: 0)
+        try assertNoRecoveryAction(in: try currentPopover())
+        try require(!identified("quota-next-automatic-refresh", in: application).exists,
+                    "The recovered popover must not retain a stale retry hint")
     }
 
     private func dashboardFloatingToggle(in dashboard: XCUIElement) throws -> XCUIElement {
@@ -1523,18 +1594,19 @@ final class Codex94UITests: XCTestCase {
         delta: Int,
         verifyNoAutomaticRetry: Bool = false
     ) throws {
-        try require([0, 1, 3].contains(delta), "Each quota action needs an exact documented request budget")
-        try waitUntil("The quota action did not finish its expected attempt budget", timeout: delta == 3 ? 30 : 10) {
+        try require([0, 1, 4].contains(delta), "Each quota action needs an exact documented request budget")
+        try waitUntil("The quota action did not finish its expected attempt budget", timeout: delta == 4 ? 110 : 10) {
             try self.fixture.requestCount() >= before + delta && self.fixture.requestsHaveExited()
         }
         try waitForSettledRequests()
         XCTAssertEqual(try fixture.requestCount(), before + delta,
                        "The quota action must consume exactly its expected request budget")
-        if delta == 3 || verifyNoAutomaticRetry {
-            // A half-second idle gap is insufficient evidence between 2s/6s
-            // retries. Observe past the longest backoff before entering any
-            // navigation or no-RPC assertion, without another user click.
-            let deadline = Date().addingTimeInterval(6.5)
+        if (delta == 4 && !verifiedRetryBudgetExhaustion) || verifyNoAutomaticRetry {
+            // Observe beyond the real longest 60s backoff. Repeat navigation
+            // cycles still require exactly four requests, but one full idle
+            // observation per scenario avoids spending the 20-minute CI job
+            // budget on identical 61s guards. No production timing is changed.
+            let deadline = Date().addingTimeInterval(61)
             repeat {
                 XCTAssertEqual(try fixture.requestCount(), before + delta,
                                "The quota retry budget must not create another attempt")
@@ -1542,6 +1614,7 @@ final class Codex94UITests: XCTestCase {
                               "A completed retry cycle must not leave another child request active")
                 RunLoop.current.run(until: Date().addingTimeInterval(0.1))
             } while Date() < deadline
+            if delta == 4 { verifiedRetryBudgetExhaustion = true }
         }
     }
 
@@ -2774,6 +2847,8 @@ private enum UILanguage: String, CaseIterable {
     var quit: String { chinese ? "退出 Codex94" : "Quit Codex94" }
     var refresh: String { chinese ? "刷新" : "Refresh" }
     var refreshing: String { chinese ? "正在刷新" : "Refreshing" }
+    var connectionFailed: String { chinese ? "无法读取额度" : "Could not read quota" }
+    var nextAttemptPrefix: String { chinese ? "下次自动尝试：" : "Next automatic attempt: " }
     var choose: String { chinese ? "选择…" : "Choose…" }
     var quotaModel: String { chinese ? "额度模型" : "Quota model" }
     var menuBarQuota: String { chinese ? "菜单栏额度" : "Menu bar quota" }
@@ -3354,6 +3429,9 @@ private struct SyntheticFixture {
             "popover-unavailable-zh-Hans.png", "display-result.json", "recovery-click-functional-result.json",
             "status-item-reference.json", "dashboard-sidebar-probe.json"
         ]
+        let display: Set<String> = scenario == "display" ? [
+            "popover-retry-scheduled-en.png"
+        ] : []
         let usage: Set<String> = scenario == "usage" ? [
             "usage-complete-en.png", "usage-seven-days-en.png", "usage-complete-zh-Hans.png",
             "usage-daily-table-en.png", "usage-line-seven-days-en.png", "usage-custom-seven-days-en.png",
@@ -3374,7 +3452,7 @@ private struct SyntheticFixture {
         let keyboardProbe = Set((0...6).map { "popover-keyboard-focus-\($0).png" })
             .union(["keyboard-navigation-probe.json", "keyboard-activation-probe.json"])
         let layoutMeasurements = Set((0..<32).map { "quota-layout-\($0).json" })
-        guard fixed.union(variants).union(keyboardProbe).union(layoutMeasurements).union(usage).union(floating)
+        guard fixed.union(display).union(variants).union(keyboardProbe).union(layoutMeasurements).union(usage).union(floating)
             .contains(filename) else {
             throw UITestFailure("Artifact filename is outside the explicit allowlist")
         }

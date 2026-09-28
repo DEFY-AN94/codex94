@@ -102,7 +102,9 @@ extension LanguagePreference {
 }
 
 extension ConnectionIssue {
-    var localizedKey: LocalizedStringKey {
+    var localizedKey: LocalizedStringKey { LocalizedStringKey(localizationKey) }
+
+    var localizationKey: String {
         switch self {
         case .codexNotFound: "error.codexNotFound"
         case .codexNotExecutable: "error.codexNotExecutable"
@@ -508,6 +510,43 @@ enum StatusAccessibilityString {
             return fallback
         }
         return localizedBundle
+    }
+}
+
+/// Shared text only: the store owns the retry policy, deadline and lifetime.
+enum ConnectionRecoveryText {
+    static func nextAttempt(
+        at date: Date?,
+        language: LanguagePreference,
+        timeZone: TimeZone = .autoupdatingCurrent,
+        bundle: Bundle = .main
+    ) -> String? {
+        guard let date, let time = QuotaFormatting.automaticRefreshTime(at: date, timeZone: timeZone) else {
+            return nil
+        }
+        return StatusAccessibilityString.localized(
+            "connection.nextAutomaticAttempt %@", arguments: [time], language: language, bundle: bundle
+        )
+    }
+
+    static func context(
+        presentation: StatusPresentation,
+        nextAutomaticRefreshAt: Date?,
+        language: LanguagePreference,
+        timeZone: TimeZone = .autoupdatingCurrent,
+        bundle: Bundle = .main
+    ) -> String? {
+        guard presentation.connectionBadge == .stale || presentation.connectionBadge == .unavailable,
+              let issue = presentation.issue, issue != .unknown else { return nil }
+        var components = [StatusAccessibilityString.localized(
+            issue.localizationKey, language: language, bundle: bundle
+        )]
+        if let nextAttempt = nextAttempt(
+            at: nextAutomaticRefreshAt, language: language, timeZone: timeZone, bundle: bundle
+        ) {
+            components.append(nextAttempt)
+        }
+        return components.joined(separator: ", ")
     }
 }
 
