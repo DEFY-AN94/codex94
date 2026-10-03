@@ -249,8 +249,12 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         let executable = try helperExecutable()
         let fixture = try installerFixture(executable: executable)
         let parentFile = fixture.support.appendingPathComponent("original-pid")
+        let childFile = fixture.support.appendingPathComponent("child-pid")
         let cleanupFile = fixture.support.appendingPathComponent("term-cleanup")
-        let command = "trap 'printf cleaned > \"\(cleanupFile.path)\"; exit 0' TERM; printf '%s' $$ > '\(parentFile.path)'; while :; do sleep 30; done"
+        // Publish readiness after the trap and its only child exist. The wait
+        // builtin is interruptible by TERM; a foreground sleep launched after
+        // the PID marker can miss the group signal and defer the shell's trap.
+        let command = "trap 'printf cleaned > \"\(cleanupFile.path)\"; exit 0' TERM; sleep 30 & child=$!; printf '%s' $$ > '\(parentFile.path)'; printf '%s' \"$child\" > '\(childFile.path)'; wait \"$child\""
         try JSONSerialization.data(withJSONObject: ["statusLine": ["type": "command", "command": command]])
             .write(to: fixture.installer.settingsURL)
         try fixture.installer.install(fixture.installer.previewInstall())
@@ -263,18 +267,31 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()
+        defer {
+            if process.isRunning { process.terminate(); try? waitForExit(process) }
+        }
         try input.fileHandleForWriting.write(contentsOf: Data("{}".utf8))
         try input.fileHandleForWriting.close()
         let deadline = ContinuousClock().now.advanced(by: .seconds(3))
-        while !FileManager.default.fileExists(atPath: parentFile.path), ContinuousClock().now < deadline { usleep(10_000) }
-        let parent = try XCTUnwrap(Int32(try String(contentsOf: parentFile, encoding: .utf8)))
-        defer { _ = kill(parent, SIGKILL) }
+        var ready: (parent: Int32, child: Int32)?
+        while ContinuousClock().now < deadline {
+            if let parentText = try? String(contentsOf: parentFile, encoding: .utf8), let parent = Int32(parentText),
+               let childText = try? String(contentsOf: childFile, encoding: .utf8), let child = Int32(childText),
+               parent > 1, child > 1, getpgid(parent) == parent, getpgid(child) == parent {
+                ready = (parent, child)
+                break
+            }
+            usleep(10_000)
+        }
+        let (parent, child) = try XCTUnwrap(ready, "The original command and its child must be ready in their owned group")
+        defer { _ = kill(parent, SIGKILL); _ = kill(child, SIGKILL) }
         process.terminate()
         try waitForExit(process)
         XCTAssertEqual(process.terminationStatus, 128 + SIGTERM)
         XCTAssertEqual(try String(contentsOf: cleanupFile, encoding: .utf8), "cleaned",
                        "The original shell must receive TERM and run its own cleanup")
         XCTAssertEqual(kill(parent, 0), -1)
+        XCTAssertEqual(kill(child, 0), -1)
     }
 
     func testTerminalQueriesSurviveEveryByteBoundaryWithoutRepeatedReplies() {
