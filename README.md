@@ -32,9 +32,10 @@ and security-scanned before it is tagged.
 ## 4.0.0 development — not released
 
 These features are implemented on the development branch. The published stable
-release and all download/clone links below remain **3.1.4 (20)**. Authenticated
-Claude CLI compatibility and native end-to-end acceptance are still pending;
-no particular Claude Code version is claimed as verified yet.
+release and all download/clone links below remain **3.1.4 (20)**. The production
+reader has fetched authenticated 5-hour and weekly quotas from native Claude
+Code **2.1.286** with a default Max profile. Remaining native App interaction
+and unattended dual-provider acceptance are still pending.
 
 - **Codex is on by default; Claude is off.** Enable Claude in Dashboard →
   **Services**. Each service has its own refresh tasks, quota selection, source,

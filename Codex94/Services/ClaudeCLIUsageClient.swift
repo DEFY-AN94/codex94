@@ -128,7 +128,7 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
                 lastTrustInput = key
                 try primary.write(contentsOf: Data(key.utf8)); trustSteps += 1; lastOutput = clock.now; continue
             }
-            if !sentUsage, normalized.contains("?forshortcuts") {
+            if !sentUsage, ClaudeUsageScreen.isReadyForUsage(screen) {
                 try primary.write(contentsOf: Data("/usage\r".utf8))
                 sentUsage = true; output.removeAll(keepingCapacity: true); lastOutput = clock.now; continue
             }
@@ -283,6 +283,29 @@ struct ClaudeTerminalQueries {
 }
 
 enum ClaudeUsageScreen {
+    static func isReadyForUsage(_ text: String) -> Bool {
+        if text.lowercased().filter({ !$0.isWhitespace }).contains("?forshortcuts") { return true }
+        let lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        // Newer CLI releases omit the shortcut hint. A selection marker alone
+        // is not an input prompt: require its banner, framed input, and footer.
+        guard let banner = lines.firstIndex(where: {
+            $0.range(of: #"\bClaude Code v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.]+)?(?:\s|$)"#,
+                     options: .regularExpression) != nil
+        }) else { return false }
+        let prompts = lines.indices.filter { lines[$0].hasPrefix("❯") }
+        guard prompts.count == 1, let prompt = prompts.first,
+              prompt > banner + 1, prompt + 1 < lines.count else { return false }
+        let upper = lines[prompt - 1], lower = lines[prompt + 1]
+        guard upper.count >= 20, upper.allSatisfy({ $0 == "─" }), upper == lower else { return false }
+        let input = lines[prompt].dropFirst().trimmingCharacters(in: .whitespaces)
+        guard input.isEmpty || (input.hasPrefix("Try \"") && input.hasSuffix("\"")) else { return false }
+        return lines.dropFirst(prompt + 2).contains { line in
+            line.replacingOccurrences(of: "\u{fe0f}", with: "")
+                .components(separatedBy: .whitespaces).filter { !$0.isEmpty }.joined(separator: " ")
+                == "⏸ plan mode on (shift+tab to cycle)"
+        }
+    }
+
     static func report(from text: String, at date: Date) throws -> ClaudeQuotaReport {
         let lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
         var windows: [ClaudeQuotaWindow] = []

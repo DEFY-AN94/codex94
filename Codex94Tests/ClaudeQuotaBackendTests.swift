@@ -288,52 +288,48 @@ final class ClaudeQuotaBackendTests: XCTestCase {
     }
 
     func testCLIHandshakeGatesReadyOnDeviceAttributesVersionAndCursorReplies() async throws {
-        let root = try fixtureDirectory()
-        let executable = root.appendingPathComponent("claude")
-        let trace = root.appendingPathComponent("handshake-trace")
-        let unexpectedInput = root.appendingPathComponent("unexpected-input")
-        let childPID = root.appendingPathComponent("child-pid")
-        let script = """
-        #!/bin/sh
-        if [ "$1" = "--version" ]; then printf '2.1.286 (Claude Code)\\n'; exit 0; fi
-        /bin/stty raw -echo
-        printf '\\033[c'
-        expected=$(printf '\\033[?1;2c')
-        reply=$(/bin/dd bs=1 count="${#expected}" 2>/dev/null)
-        [ "$reply" = "$expected" ] || exit 73
-        printf 'device-attributes\\n' > '\(trace.path)'
-        printf '\\033[>0q'
-        expected=$(printf '\\033P>|xterm(400)\\033\\\\')
-        reply=$(/bin/dd bs=1 count="${#expected}" 2>/dev/null)
-        [ "$reply" = "$expected" ] || exit 74
-        printf 'terminal-version\\n' >> '\(trace.path)'
-        printf '\\033[6n'
-        expected=$(printf '\\033[1;1R')
-        reply=$(/bin/dd bs=1 count="${#expected}" 2>/dev/null)
-        [ "$reply" = "$expected" ] || exit 75
-        printf 'cursor-position\\n' >> '\(trace.path)'
-        printf '\\033[2J\\033[H? for shortcuts\\r\\n'
-        key=$(/bin/dd bs=1 count=7 2>/dev/null)
-        [ "$key" = "$(printf '/usage\\r')" ] || exit 76
-        printf 'usage\\n' >> '\(trace.path)'
-        printf '\\033[2J\\033[HCurrent session\\r\\n23.5%% used\\r\\n'
-        sleep 30 &
-        printf '%s' $! > '\(childPID.path)'
-        /bin/dd bs=1 count=1 > '\(unexpectedInput.path)' 2>/dev/null
-        wait
-        """
-        try script.write(to: executable, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
-        let client = ClaudeCLIUsageClient(executableURL: executable, runtimeDirectory: root.appendingPathComponent("runtime"), timeout: 5)
-        defer { client.shutdown() }
-        let report = try await client.fetch()
-        XCTAssertEqual(report.windows.first?.usedPercentage, 23.5)
-        XCTAssertEqual(try String(contentsOf: trace, encoding: .utf8),
-                       "device-attributes\nterminal-version\ncursor-position\nusage\n")
-        XCTAssertTrue(try Data(contentsOf: unexpectedInput).isEmpty,
-                      "After terminal negotiation the probe must submit only the built-in usage command")
-        let child = try XCTUnwrap(Int32(try String(contentsOf: childPID, encoding: .utf8)))
-        XCTAssertEqual(kill(child, 0), -1)
+        try await assertGatedCLIUsage(readyScreen: "? for shortcuts")
+    }
+
+    func testNewCLIFramedPromptBecomesReadyOnlyAfterTerminalHandshake() async throws {
+        let rule = String(repeating: "─", count: 80)
+        for prompt in ["❯\u{00a0}Try \"how do I log an error?\"", "❯"] {
+            let screen = """
+            Claude Code v2.1.286
+            \(rule)
+            \(prompt)
+            \(rule)
+            ⚠ Transcript saving is off — CLAUDE_CODE_SKIP_PROMPT_HISTORY is set
+            ⏸ plan mode on (shift+tab to cycle)
+            """
+            try await assertGatedCLIUsage(readyScreen: screen)
+        }
+    }
+
+    func testPromptLikeDialogsNeverReceiveUsageInput() async throws {
+        let rule = String(repeating: "─", count: 80)
+        for body in ["\(rule)\n❯ Yes, continue\n\(rule)", "❯\n\(rule)"] {
+            let root = try fixtureDirectory()
+            let executable = root.appendingPathComponent("claude")
+            let unexpectedInput = root.appendingPathComponent("unexpected-input")
+            let frame = "Claude Code v2.1.286\n\(body)\n⏸ plan mode on (shift+tab to cycle)"
+                .replacingOccurrences(of: "\n", with: "\\r\\n")
+            let script = """
+            #!/bin/sh
+            if [ "$1" = "--version" ]; then printf '2.1.286 (Claude Code)\\n'; exit 0; fi
+            /bin/stty raw -echo
+            printf '\\033[2J\\033[H\(frame)\\r\\n'
+            /bin/dd bs=1 count=1 > '\(unexpectedInput.path)' 2>/dev/null
+            sleep 30
+            """
+            try script.write(to: executable, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+            let client = ClaudeCLIUsageClient(executableURL: executable, runtimeDirectory: root.appendingPathComponent("runtime"), timeout: 1)
+            defer { client.shutdown() }
+            do { _ = try await client.fetch(); XCTFail("A dialog is not a ready command input") }
+            catch { XCTAssertEqual(error as? ClaudeQuotaIssue, .timedOut) }
+            XCTAssertTrue(try Data(contentsOf: unexpectedInput).isEmpty)
+        }
     }
 
     func testUsageParserSkipsModelScopedWindowsAndClearedTerminalFrames() throws {
@@ -603,6 +599,56 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         XCTAssertLessThan(clock.now - started, .seconds(4))
         let process = try XCTUnwrap(Int32(try String(contentsOf: pidFile, encoding: .utf8)))
         XCTAssertEqual(kill(process, 0), -1)
+    }
+
+    private func assertGatedCLIUsage(readyScreen: String) async throws {
+        let root = try fixtureDirectory()
+        let executable = root.appendingPathComponent("claude")
+        let trace = root.appendingPathComponent("handshake-trace")
+        let unexpectedInput = root.appendingPathComponent("unexpected-input")
+        let childPID = root.appendingPathComponent("child-pid")
+        let readyFrame = readyScreen.replacingOccurrences(of: "\n", with: "\\r\\n")
+        let script = """
+        #!/bin/sh
+        if [ "$1" = "--version" ]; then printf '2.1.286 (Claude Code)\\n'; exit 0; fi
+        /bin/stty raw -echo
+        printf '\\033[c'
+        expected=$(printf '\\033[?1;2c')
+        reply=$(/bin/dd bs=1 count="${#expected}" 2>/dev/null)
+        [ "$reply" = "$expected" ] || exit 73
+        printf 'device-attributes\\n' > '\(trace.path)'
+        printf '\\033[>0q'
+        expected=$(printf '\\033P>|xterm(400)\\033\\\\')
+        reply=$(/bin/dd bs=1 count="${#expected}" 2>/dev/null)
+        [ "$reply" = "$expected" ] || exit 74
+        printf 'terminal-version\\n' >> '\(trace.path)'
+        printf '\\033[6n'
+        expected=$(printf '\\033[1;1R')
+        reply=$(/bin/dd bs=1 count="${#expected}" 2>/dev/null)
+        [ "$reply" = "$expected" ] || exit 75
+        printf 'cursor-position\\n' >> '\(trace.path)'
+        printf '\\033[2J\\033[H\(readyFrame)\\r\\n'
+        key=$(/bin/dd bs=1 count=7 2>/dev/null)
+        [ "$key" = "$(printf '/usage\\r')" ] || exit 76
+        printf 'usage\\n' >> '\(trace.path)'
+        printf '\\033[2J\\033[HCurrent session\\r\\n23.5%% used\\r\\n'
+        sleep 30 &
+        printf '%s' $! > '\(childPID.path)'
+        /bin/dd bs=1 count=1 > '\(unexpectedInput.path)' 2>/dev/null
+        wait
+        """
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let client = ClaudeCLIUsageClient(executableURL: executable, runtimeDirectory: root.appendingPathComponent("runtime"), timeout: 5)
+        defer { client.shutdown() }
+        let report = try await client.fetch()
+        XCTAssertEqual(report.windows.first?.usedPercentage, 23.5)
+        XCTAssertEqual(try String(contentsOf: trace, encoding: .utf8),
+                       "device-attributes\nterminal-version\ncursor-position\nusage\n")
+        XCTAssertTrue(try Data(contentsOf: unexpectedInput).isEmpty,
+                      "After terminal negotiation the probe must submit only the built-in usage command")
+        let child = try XCTUnwrap(Int32(try String(contentsOf: childPID, encoding: .utf8)))
+        XCTAssertEqual(kill(child, 0), -1)
     }
 
     private func payload(session: String = "00000000-0000-0000-0000-000000000001", used: String = "23.5") -> Data {

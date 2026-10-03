@@ -254,9 +254,11 @@ version/build, checks, risks, rollback, artifact hashes, and both acceptance
 states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
-Wait for CI and, for `3.1.0` and later, all four synthetic UI smokes
-(Display, Recovery, Token usage, and Floating),
-and Actions/Python/Swift CodeQL on the actual tested revision.
+Wait for CI, every synthetic UI smoke required by the candidate, and
+Actions/Python/Swift CodeQL on the actual tested revision. The `4.0.0` gate
+includes five UI scenarios: Display, Recovery, Token usage, Floating, and
+Providers. Providers uses only synthetic CLI data; its success does not replace
+separate acceptance of the installed Claude Code version and authenticated profile.
 Skipped, cancelled, unavailable, pending, or failed is not passed. Review the
 synthetic images themselves for UI and privacy. Retain the existing screenshots
 as historical captures unless separately replacing them with reviewed evidence.

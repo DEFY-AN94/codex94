@@ -13,6 +13,10 @@ official Claude Code program and its built-in `/usage` command. Claude Code
 owns subscription authentication and any connection to Anthropic. The probe
 runs in a dedicated Codex94 directory, disables tools, hooks, MCP servers and
 remote-control startup, and has bounded output, runtime and process cleanup.
+Its folder-trust handler accepts only the verified, app-owned
+`~/Library/Application Support/Codex94/Claude/UsageProbe` directory. Claude Code
+may consult its own local state when rendering `/usage`; Codex94 extracts only
+quota windows and reset labels from that terminal output.
 It does not send a conversation prompt. Codex94 does not read Claude tokens,
 browser cookies, Keychain entries or conversation transcripts.
 The probe sets `DISABLE_AUTOUPDATER=1` and

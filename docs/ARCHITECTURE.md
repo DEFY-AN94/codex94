@@ -39,6 +39,19 @@ configuration, key backup and conflict-aware removal. The Claude store owns
 report freshness: cache reads and duplicate statusline reports cannot renew
 quota age, reset-expired windows disappear, and unknown data is never 100%.
 
+Claude reset reads reuse the store's existing 15-second poll; they add no timer.
+Raw reported reset dates produce sorted, distinct `resetsAt + 5` targets, even
+after their windows disappear from the display. A refresh accepted by the
+single-flight path records its start time for due-target coverage. A request begun before a target that
+finishes afterward leaves one follow-up read pending, while simultaneous manual,
+background and reset reads remain single-flight. A failed reset attempt consumes
+that target instead of retrying it every poll; normal refreshes and other due
+targets remain eligible. Coverage belongs to the report source/producer context;
+passive reports do not inherit a CLI request's coverage. Authentication failure and disable clear
+the reset context, and clock rollback does not repeat a consumed target.
+`nextAutomaticRefreshAt` is the earlier normal/reset due time, not a guarantee of
+execution at that instant: the next poll and any in-flight read can delay it.
+
 Shared quota models preserve Codex's strict integer wire/cache contract while
 carrying an optional validated fractional percentage for Claude. Auto selection,
 warning colors and notification thresholds compare precise values. Compact
@@ -51,7 +64,7 @@ unattended live monitoring are separate release evidence.
 
 | Owner | Responsibility |
 | --- | --- |
-| `AppDelegate` | Compose the running app, own the status item and popover, retain Dashboard and floating-window controllers, route mouse/hotkey actions, and register/remove platform observers. Forward wake and clock events to the store. |
+| `AppDelegate` | Compose the running app, own one or two native status items and the shared popover, retain Dashboard and floating-window controllers, route mouse/hotkey actions, and register/remove platform observers. Forward wake and clock events to the store. |
 | `DashboardWindowController` / `DashboardWindowState` | Own the reusable window lifecycle, size/restoration behavior, visibility, and selected page. Opening a page must not recreate application services. |
 | `FloatingWindowController` / `FloatingWindowState` | Own the reusable native panel, placement/screen fitting, pinning, visibility, and expansion. Receive the existing store; do not own another quota fetcher or polling timer. |
 | `AppStore` | Own quota state, cache writes, selection reconciliation, notification observations, freshness-gated popover reads, and single-flight/background/Reset coordination. Own and cancel the bounded transient retry budget; isolate unverified identity from child features. |

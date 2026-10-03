@@ -162,8 +162,8 @@ test preferences, caches, and output paths separate from daily app data.
   CI or producing a nonempty image is not evidence of GUI correctness.
 
 The `Codex94` scheme retains the unit/release gate. The separate `Codex94UI`
-scheme uses an external UI test runner. Display, Token usage, and Floating
-exercise the unmodified app;
+scheme uses an external UI test runner. Display, Token usage, Floating, and
+the `4.0.0` Providers scenario exercise the unmodified app;
 Recovery exercises a temporary instrumented App copy with a read-only focus
 probe, marked `instrumentedAUT` and `readOnlyFocusDiagnostic` in the fixture
 manifest. Recovery click success applies to that diagnostic copy and does not
@@ -173,6 +173,17 @@ fixture preparer refuses existing app data and seeds quota-only preferences
 and an explicit synthetic executable before any app initialization. It must
 not be run on a daily-use desktop; local UI testing needs a separately reviewed
 isolation setup, not overridden CI guard variables.
+
+Providers additionally refuses known native Claude installations and configuration
+paths before launch. It checks the fake executable's exact registered path,
+ownership, permissions and SHA-256, then sets a fixture-first `PATH` for the AUT.
+The synthetic terminal accepts only version checks and the fixed `/usage`
+invocation; its log contains only the fixed usage-event/mode schema. The scenario
+does not run a real Claude CLI, install a statusline connection, or operate
+authentication UI. Check exact request counts, independent provider errors,
+single/both native status items, shared popover content, disabled Codex Token
+reads and the all-disabled settings entry. Keep these synthetic results separate
+from real CLI compatibility, account acceptance and unattended monitoring.
 
 The external runner keeps Xcode's test sandbox. Its extra write access is
 limited to the current scenario's synthetic control and artifact directories;
