@@ -3,6 +3,7 @@ import SwiftUI
 
 enum QuotaPopoverLayout {
     static let contentWidth: CGFloat = 500
+    static let maximumProviderViewportHeight: CGFloat = 480
 
     @MainActor
     static func install<Content: View>(
@@ -20,6 +21,48 @@ enum QuotaPopoverLayout {
         let contentSize = NSSize(width: contentWidth, height: ceil(measuredHeight))
         guard popover.contentSize != contentSize else { return }
         popover.contentSize = contentSize
+    }
+}
+
+/// A single scroll tree whose viewport follows its actual content up to the
+/// popover limit. Measuring inside the scroll view keeps overflowing content
+/// unconstrained; status/source changes invalidate the same measurement.
+struct QuotaPopoverScrollViewport<Content: View>: View {
+    let content: Content
+    @State private var contentHeight = QuotaPopoverLayout.maximumProviderViewportHeight
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            content
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(key: QuotaPopoverContentHeightKey.self,
+                                               value: geometry.size.height)
+                            .allowsHitTesting(false)
+                    }
+                }
+        }
+        .frame(height: min(contentHeight, QuotaPopoverLayout.maximumProviderViewportHeight), alignment: .top)
+        .onPreferenceChange(QuotaPopoverContentHeightKey.self) { height in
+            guard height.isFinite, height > 0 else { return }
+            let roundedHeight = ceil(height)
+            guard roundedHeight != contentHeight else { return }
+            contentHeight = roundedHeight
+        }
+    }
+}
+
+private struct QuotaPopoverContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
@@ -130,17 +173,9 @@ struct QuotaPopoverView: View {
             if store.preferences.enabledProviders.isEmpty {
                 ProvidersDisabledView { openDashboard(.providers) }
             } else if store.preferences.codexMonitoringEnabled {
-                ScrollView {
-                    VStack(spacing: 14) {
-                        ProviderQuotaSummaries(
-                            store: store, openDashboard: openDashboard,
-                            referenceDate: referenceDate, resetTimeZone: resetTimeZone
-                        )
-                        providerDetails
-                    }
-                    .padding(14)
+                QuotaPopoverScrollViewport {
+                    providerScrollContent
                 }
-                .frame(height: 480)
                 .accessibilityIdentifier("provider-quota-sections")
             } else {
                 claudeSection
@@ -148,6 +183,19 @@ struct QuotaPopoverView: View {
             Divider()
             commandRows
         }
+    }
+
+    /// Kept separate so layout tests can measure the same complete content,
+    /// including selectors and recovery hints, independently of its viewport.
+    var providerScrollContent: some View {
+        VStack(spacing: 14) {
+            ProviderQuotaSummaries(
+                store: store, openDashboard: openDashboard,
+                referenceDate: referenceDate, resetTimeZone: resetTimeZone
+            )
+            providerDetails
+        }
+        .padding(14)
     }
 
     private var providerDetails: some View {
@@ -405,7 +453,7 @@ struct QuotaPopoverView: View {
         .padding(.vertical, 12)
     }
 
-    private var commandRows: some View {
+    var commandRows: some View {
         VStack(spacing: 2) {
             CommandRow(
                 title: Text(store.preferences.enabledProviders.count > 1 ? "providers.refreshAll" : "command.refresh"),

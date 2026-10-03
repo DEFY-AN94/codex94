@@ -72,6 +72,60 @@ final class QuotaPopoverLayoutTests: XCTestCase {
         XCTAssertEqual(popover.contentSize.height, 352, accuracy: 0.5)
     }
 
+    func testProviderViewportUsesContentHeightAndCapsOnlyOverflow() {
+        for naturalHeight: CGFloat in [160, 479, 480, 720] {
+            let model = ProviderViewportHeightModel(height: naturalHeight)
+            let controller = QuotaPopoverHostingController(rootView: ProviderViewportHeightFixture(model: model))
+            let popover = NSPopover()
+            controller.install(in: popover)
+            let expectedViewport = min(ceil(naturalHeight), QuotaPopoverLayout.maximumProviderViewportHeight)
+            XCTAssertTrue(waitForLayout {
+                controller.view.layoutSubtreeIfNeeded()
+                return abs(idealHeight(of: controller) - (expectedViewport + 80)) < 0.5
+            }, "A short body must shrink and an overflowing body must keep a bounded scroll viewport")
+            controller.synchronizeSize()
+            XCTAssertEqual(popover.contentSize.height, expectedViewport + 80, accuracy: 0.5,
+                           "The footer remains outside the capped scroll viewport")
+            XCTAssertEqual(popover.contentSize.width, 500, accuracy: 0.5)
+        }
+    }
+
+    func testProviderViewportAllowsNativePixelAlignmentOfFractionalContent() {
+        let naturalHeight: CGFloat = 160.25
+        let model = ProviderViewportHeightModel(height: naturalHeight)
+        let controller = QuotaPopoverHostingController(rootView: ProviderViewportHeightFixture(model: model))
+        let popover = NSPopover()
+        controller.install(in: popover)
+        // AppKit/SwiftUI can pixel-align the proposed fractional height before
+        // GeometryReader reports it. Rounding that measured size up is within
+        // one logical point of the proposal; it need not equal ceil(proposal).
+        XCTAssertTrue(waitForLayout {
+            controller.view.layoutSubtreeIfNeeded()
+            return abs(idealHeight(of: controller) - (naturalHeight + 80)) <= 1
+        })
+        controller.synchronizeSize()
+        XCTAssertEqual(popover.contentSize.height, naturalHeight + 80, accuracy: 1)
+        XCTAssertLessThan(popover.contentSize.height, 480 + 80)
+    }
+
+    func testExistingPopoverResizesWhenProviderContentGrowsAndShrinks() {
+        let model = ProviderViewportHeightModel(height: 170)
+        let controller = QuotaPopoverHostingController(rootView: ProviderViewportHeightFixture(model: model))
+        let popover = NSPopover()
+        controller.install(in: popover)
+        for naturalHeight: CGFloat in [170, 760, 240] {
+            model.height = naturalHeight
+            let expected = min(naturalHeight, QuotaPopoverLayout.maximumProviderViewportHeight) + 80
+            XCTAssertTrue(waitForLayout {
+                controller.view.layoutSubtreeIfNeeded()
+                _ = idealHeight(of: controller)
+                return abs(popover.contentSize.height - expected) < 0.5
+            }, "Layout changes must reach the existing hosting controller's scheduled popover sizing")
+            XCTAssertIdentical(popover.contentViewController, controller)
+            XCTAssertEqual(popover.contentSize.width, 500, accuracy: 0.5)
+        }
+    }
+
     func testHostingViewUsesNaturalHeightForSingleAndMultipleBuckets() throws {
         let singleFixture = try makeFixture(snapshot: snapshot(includeSpark: false))
         defer { singleFixture.cleanUp() }
@@ -1122,5 +1176,26 @@ private actor NoRequestLayoutFetcher: QuotaFetching {
     func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot {
         XCTFail("Layout-only fixture must not request quota")
         throw ConnectionIssue.unknown
+    }
+}
+
+@MainActor
+private final class ProviderViewportHeightModel: ObservableObject {
+    @Published var height: CGFloat
+    init(height: CGFloat) { self.height = height }
+}
+
+private struct ProviderViewportHeightFixture: View {
+    @ObservedObject var model: ProviderViewportHeightModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            QuotaPopoverScrollViewport {
+                Color.clear.frame(height: model.height)
+            }
+            Color.clear.frame(height: 80)
+        }
+        .frame(width: QuotaPopoverLayout.contentWidth)
+        .fixedSize(horizontal: true, vertical: true)
     }
 }

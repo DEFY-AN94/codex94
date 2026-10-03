@@ -15,6 +15,8 @@ Version `4.0.2 (23)` is a release candidate; no publication date is assigned.
 
 - Use separate large service cards in Dashboard, compact terminal-style service
   rows in the popover, and a smaller read-only manual-reset count.
+- Fit the shared popover to its actual content, removing unused space for short
+  reports while keeping longer content in a bounded scroll area.
 - Hide redundant provider names in single-service menu-bar items.
 - Add the `compactBoth` service-display choice: two independent quota rings in
   one native menu-bar item. Preserve `single` and the legacy `both` mode with

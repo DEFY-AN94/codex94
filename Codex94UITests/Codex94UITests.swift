@@ -787,7 +787,8 @@ final class Codex94UITests: XCTestCase {
 
     private func assertProviderQuotaVisibility(in popover: XCUIElement, codexFiveHour: Bool, reportName: String) throws {
         let viewport = try uniqueIdentified("provider-quota-sections", in: popover).frame.intersection(popover.frame)
-        let viewportMatches = abs(viewport.width - 500) <= 2 && abs(viewport.height - 480) <= 2
+        let viewportMatches = abs(viewport.width - 500) <= 2 && viewport.height.isFinite
+            && viewport.height > 0 && viewport.height <= 482
         let inset: CGFloat = 14
         let geometryTolerance: CGFloat = 1
         let maximumPaintWidth = viewport.width - 2 * inset + geometryTolerance
@@ -840,7 +841,8 @@ final class Codex94UITests: XCTestCase {
             "scenario": "providers", "method": "external-aut-accessibility-geometry",
             "quotaRows": geometry, "quotaRowCount": values.count,
             "viewportWidth": diagnosticNumber(viewport.width), "viewportHeight": diagnosticNumber(viewport.height),
-            "viewportMeetsContract": viewportMatches, "rowsMeetGeometryContract": rowsMeetGeometry,
+            "viewportMeetsContract": viewportMatches, "viewportMaximumHeight": 480,
+            "rowsMeetGeometryContract": rowsMeetGeometry,
             "sharedViewportContainsBothProviders": quotaFrames.values.allSatisfy { viewport.insetBy(dx: -1, dy: -1).contains($0) },
             "providerQuotaRegionsAreDistinct": regionsAreDistinct, "providerRowsDoNotOverlap": rowPairsDoNotOverlap,
             "recordedBeforeAssertions": true,
@@ -852,7 +854,7 @@ final class Codex94UITests: XCTestCase {
             try captureProviderPopover(popover, marker: "provider-quota-sections", named: imageName)
         }
         try require(viewportMatches,
-                    "Both-provider viewport must be 500 × 480; actual width=\(viewport.width), height=\(viewport.height)")
+                    "Both-provider viewport must be 500pt wide and at most 480pt high (2pt native tolerance); actual width=\(viewport.width), height=\(viewport.height)")
         for (identifier, percent) in values {
             let frame = try XCTUnwrap(quotaFrames[identifier])
             let relativeFrame = frame.offsetBy(dx: -viewport.minX, dy: -viewport.minY)
