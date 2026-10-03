@@ -57,6 +57,21 @@ final class ProviderPreferencesTests: XCTestCase {
         XCTAssertTrue(PreferencesStore(defaults: defaults).claudeMonitoringEnabled)
     }
 
+    func testPassiveProducerSelectionPersistsOnlyNormalizedOpaqueHashes() throws {
+        let defaults = try isolatedDefaults()
+        let preferences = PreferencesStore(defaults: defaults)
+        XCTAssertNil(preferences.claudePassiveProducerID)
+        let hash = String(repeating: "A1", count: 32)
+        preferences.setClaudePassiveProducerID(hash)
+        XCTAssertEqual(PreferencesStore(defaults: defaults).claudePassiveProducerID, hash.lowercased())
+        for value in ["", String(repeating: "g", count: 64), String(repeating: "a", count: 63), "session-id"] {
+            defaults.set(value, forKey: "claude.passiveProducerID.v1")
+            XCTAssertNil(PreferencesStore(defaults: defaults).claudePassiveProducerID)
+        }
+        preferences.setClaudePassiveProducerID(nil)
+        XCTAssertNil(defaults.object(forKey: "claude.passiveProducerID.v1"))
+    }
+
     func testClaudeSettingsRoundTripWithoutChangingCodexKeys() throws {
         let defaults = try isolatedDefaults()
         let preferences = PreferencesStore(defaults: defaults)

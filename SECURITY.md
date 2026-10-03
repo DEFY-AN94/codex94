@@ -21,6 +21,10 @@ The CLI reader has a separate, default-off opt-in with a quota-consumption
 warning. Enabling Claude monitoring does not opt into CLI sessions. While the
 backup reader is off, automatic and manual refreshes only inspect the local
 statusline cache. Disabling it cancels and retires an active reader.
+Source modes are isolated: a CLI failure does not adopt an account-unverified
+statusline report. Passive monitoring pins its selected report stream and asks
+for explicit adoption when a different session reports; a session fingerprint
+never proves account identity. No OAuth token access or refresh is implemented.
 The CLI probe has an owned working directory, disabled tools/hooks/MCP and
 remote-control startup, bounded output and a deadline. Only a recognized
 built-in usage action is submitted; unexpected login/onboarding screens are

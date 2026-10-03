@@ -1,19 +1,274 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "claude.passive.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passive reading (default)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "被动读取（默认）"
+          }
+        }
+      }
+    },
+    "claude.passive.reread": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reread local report"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新读取本地报告"
+          }
+        }
+      }
+    },
+    "claude.passive.notConfigured": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect the status line in Services to receive local reports."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未连接状态栏报告。请前往服务设置配置。"
+          }
+        }
+      }
+    },
+    "claude.passive.waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for a report from your normal Claude Code use."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待你正常使用 Claude Code 时产生报告。"
+          }
+        }
+      }
+    },
+    "claude.passive.expiredEmpty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This report has no valid quota windows left. Waiting for a new report."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此报告已无有效额度窗口；等待新报告。"
+          }
+        }
+      }
+    },
+    "claude.passive.confirmationRequired": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm the latest local report in Services before using it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在“服务”中确认是否采用最新本地报告。"
+          }
+        }
+      }
+    },
+    "claude.issue.sourceChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source account unverified; confirmation required."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来源账号未验证，需确认后采用。"
+          }
+        }
+      }
+    },
+    "claude.localReportTime %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local report: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地报告时间：%@"
+          }
+        }
+      }
+    },
+    "claude.passive.accountHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local reports do not verify account identity; a session identifier is not account proof. A different source will not replace the selected report automatically."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地报告无法验证账号身份，会话标识也不是账号证明。不同来源不会自动替换已选报告。"
+          }
+        }
+      }
+    },
+    "claude.passive.pending": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new local report needs confirmation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新的本地报告需要确认"
+          }
+        }
+      }
+    },
+    "claude.passive.pendingTime %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pending local report: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "待采用本地报告时间：%@"
+          }
+        }
+      }
+    },
+    "claude.passive.adopt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use this passive report…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "采用这份被动报告…"
+          }
+        }
+      }
+    },
+    "claude.passive.adoptConfirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use this passive report?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "采用这份被动报告？"
+          }
+        }
+      }
+    },
+    "claude.passive.adoptHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the pending local report shown in Services? Its account remains unverified, and it may replace the selected values. Expired reports cannot be adopted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "采用服务设置中显示的待确认本地报告？其账号身份仍未验证，当前数值可能被替换。已过期的报告不能采用。"
+          }
+        }
+      }
+    },
+    "claude.passive.adoptAction": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use report"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "采用报告"
+          }
+        }
+      }
+    },
     "claude.cliUsage.title": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Backup quota reader"
+            "value": "CLI /usage reading (optional)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "备用额度读取"
+            "value": "CLI /usage 读取（可选）"
           }
         }
       }
@@ -24,13 +279,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enable Claude Code /usage backup"
+            "value": "Enable CLI /usage reading"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "启用 Claude Code /usage 备用读取"
+            "value": "启用 CLI /usage 读取"
           }
         }
       }
@@ -41,13 +296,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Off by default. When off, Claude monitoring only reads existing status-line reports; refreshing does not launch Claude Code."
+            "value": "Off by default. When off, automatic refresh, opening the popover, manual refresh and recovery only reread local reports and never launch Claude Code. Other source failures do not enable this option."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "默认关闭。关闭时仅读取已有的 Claude 状态栏报告，刷新不会启动 Claude Code。"
+            "value": "默认关闭。关闭时，自动刷新、打开面板、手动刷新和错误恢复都只重读本地报告，不启动 Claude Code；其他来源失败也不会自动开启此选项。"
           }
         }
       }
@@ -58,13 +313,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quota consumption risk: enabling this option allows automatic and manual refreshes to start Claude Code /usage sessions, which may consume subscription quota. Enable only when needed."
+            "value": "This method starts Claude Code and may consume additional Tokens and subscription quota, including five-hour and weekly quota. Enable only when needed."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "额度消耗风险：启用后，自动刷新和手动刷新会启动 Claude Code /usage 会话，可能消耗订阅额度。请仅在需要时开启。"
+            "value": "此方式会启动 Claude Code，可能额外消耗 Token 和订阅额度，包括五小时及每周额度。请按需开启。"
           }
         }
       }
@@ -195,8 +450,8 @@
     },
     "claude.setup.installed" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connection installed. Values appear when Claude Code reports quota." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接已安装。Claude Code 报告额度后即可显示数值。" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connection installed. New reports arrive during your normal Claude Code use." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接已安装。你正常使用 Claude Code 时会产生新的报告。" } }
       }
     },
     "dashboard.providers": {
@@ -524,13 +779,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code status line"
+            "value": "Local report · account unverified"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code 状态栏"
+            "value": "本地报告 · 账号未验证"
           }
         }
       }
@@ -540,13 +795,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code /usage (backup)"
+            "value": "Claude Code /usage"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code /usage（备用）"
+            "value": "Claude Code /usage"
           }
         }
       }
@@ -556,13 +811,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Local Claude Code data"
+            "value": "Waiting for CLI quota"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "本地 Claude Code 数据"
+            "value": "等待 CLI 额度"
           }
         }
       }
@@ -684,13 +939,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Backup reader refresh interval"
+            "value": "CLI query interval"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "备用读取刷新间隔"
+            "value": "CLI 查询间隔"
           }
         }
       }
@@ -892,13 +1147,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connect Claude Code’s status line to share the quota it reports. Preview the change before installing; existing status-line commands are preserved."
+            "value": "Passive reading uses only local status-line reports produced during your normal Claude Code use. It does not launch Claude Code. Preview the connection before installing; existing commands are preserved."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连接 Claude Code 状态栏以读取其报告的额度。安装前可预览修改，并保留已有状态栏命令。"
+            "value": "被动读取仅读取你正常使用 Claude Code 时产生的本地状态栏报告，不会启动 Claude Code。安装前可预览连接修改，并保留已有命令。"
           }
         }
       }

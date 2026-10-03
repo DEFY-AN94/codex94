@@ -7,7 +7,7 @@ import XCTest
 final class ClaudeQuotaStoreTests: XCTestCase {
     func testCLIUsageOffNeverCreatesOrCallsFetcherAndKeepsPassiveCacheReadable() async throws {
         let fixture = try fixture(cliEnabled: false)
-        let payload = Data(#"{"rate_limits":{"five_hour":{"used_percentage":31.5,"resets_at":2000001000}}}"#.utf8)
+        let payload = Data(#"{"session_id":"00000000-0000-0000-0000-000000000001","rate_limits":{"five_hour":{"used_percentage":31.5,"resets_at":2000001000}}}"#.utf8)
         try fixture.cache.capture(payload, at: fixture.clock.read())
         let original = try Data(contentsOf: fixture.cache.fileURL)
         fixture.store.start()
@@ -32,11 +32,13 @@ final class ClaudeQuotaStoreTests: XCTestCase {
 
     func testDisablingCLIUsageRetiresInflightReadAndFallsBackOnlyToStatusline() async throws {
         let fixture = try fixture()
-        let payload = Data(#"{"rate_limits":{"five_hour":{"used_percentage":50,"resets_at":2000010000}}}"#.utf8)
+        let payload = Data(#"{"session_id":"00000000-0000-0000-0000-000000000001","rate_limits":{"five_hour":{"used_percentage":50,"resets_at":2000010000}}}"#.utf8)
         try fixture.cache.capture(payload, at: fixture.clock.read())
         let cachedAt = fixture.clock.read()
         let original = try Data(contentsOf: fixture.cache.fileURL)
         fixture.store.start()
+        XCTAssertNil(fixture.store.snapshot, "CLI selection must not preload an unverified passive report")
+        XCTAssertNil(fixture.store.source)
         try await wait { await fixture.fetcher.count() == 1 }
         fixture.clock.advance(1)
         await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 30)))
@@ -63,6 +65,8 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let disabledCalls = await fixture.fetcher.count()
         XCTAssertEqual(disabledCalls, 2)
         fixture.store.setCLIUsageEnabled(true)
+        XCTAssertNil(fixture.store.snapshot, "Explicitly selecting CLI must clear the previous passive source")
+        XCTAssertNil(fixture.store.source)
         try await wait { await fixture.fetcher.count() == 3 }
         XCTAssertEqual(fixture.factoryCalls.read(), 2)
         fixture.clock.advance(1)
@@ -231,7 +235,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertEqual(fixture.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 60)
     }
 
-    func testPassiveSourceSwitchDoesNotBorrowCLIWatermarkAndCLIReplyUsesItsAcceptedStart() async throws {
+    func testPassiveReportCannotReplaceCLIDataOrItsResetWatermark() async throws {
         let fixture = try fixture()
         fixture.preferences.claudeRefreshInterval = .thirtyMinutes
         let began = fixture.clock.read()
@@ -248,9 +252,9 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let payload = Data(#"{"session_id":"00000000-0000-0000-0000-000000000002","rate_limits":{"five_hour":{"used_percentage":90,"resets_at":2000000055},"seven_day":{"used_percentage":20,"resets_at":2000010000}}}"#.utf8)
         try fixture.cache.capture(payload, at: fixture.clock.read())
         try await poll(fixture)
-        XCTAssertEqual(fixture.store.source, .statusline)
-        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(60),
-                       "A new passive source does not inherit another source's covered targets")
+        XCTAssertEqual(fixture.store.source, .cliUsage)
+        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(1_860),
+                       "Passive reports cannot replace an explicitly selected CLI source or its schedule")
         fixture.clock.advance(5)
         await fixture.fetcher.complete(.success(.init(source: .cliUsage, reportedAt: fixture.clock.read(),
                                                      receivedAt: fixture.clock.read(), windows: windows)))
@@ -330,6 +334,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertEqual(fixture.store.connectionState, .connected)
         XCTAssertNil(fixture.store.lastIssue)
 
+        try fixture.cache.capture(passivePayload(session: 2, used: 95), at: fixture.clock.read())
         fixture.store.refresh()
         try await wait { await fixture.fetcher.count() == 2 }
         await fixture.fetcher.complete(.failure(.timedOut))
@@ -339,6 +344,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         await fixture.sleeper.tick()
         try await wait { await fixture.sleeper.count() >= 3 }
         XCTAssertEqual(fixture.store.snapshot, old)
+        XCTAssertEqual(fixture.store.source, .cliUsage)
         XCTAssertEqual(fixture.store.lastIssue, .timedOut)
         guard case .stale = fixture.store.connectionState else { return XCTFail("Polling old data must not erase a fetch failure") }
     }
@@ -427,37 +433,128 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         }
     }
 
-    func testSourceChangeResetsNotificationBaselineAndCachedReplayIsSilent() async throws {
-        let fixture = try fixture()
-        let reset = fixture.clock.read().addingTimeInterval(10_000)
-        var notifications = NotificationPreferences()
-        notifications.isEnabled = true
-        fixture.preferences.claudeNotifications = notifications
+    func testPassiveProducerChangeRequiresFrozenConfirmationWhileSelectedStreamKeepsUpdating() async throws {
+        let fixture = try fixture(cliEnabled: false)
+        var preferences = NotificationPreferences()
+        preferences.isEnabled = true
+        fixture.preferences.claudeNotifications = preferences
+        try fixture.cache.capture(passivePayload(session: 1, used: 50), at: fixture.clock.read())
         fixture.store.start()
-        try await wait { await fixture.fetcher.count() == 1 }
-        await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 50, resetAt: reset)))
-        try await wait { !fixture.store.isRefreshing && fixture.store.notificationController.authorization == .authorized }
+        try await wait { fixture.store.notificationController.authorization == .authorized }
+        let selected = fixture.preferences.claudePassiveProducerID
+        let originalDate = fixture.store.reportedAt
         fixture.clock.advance(1)
+        let pendingDate = fixture.clock.read()
+        try fixture.cache.capture(passivePayload(session: 2, used: 99), at: pendingDate)
         fixture.store.refresh()
-        try await wait { await fixture.fetcher.count() == 2 }
-        await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 85, resetAt: reset)))
-        try await wait { fixture.notifications.deliveries.count == 1 }
-        let payload = Data(#"{"session_id":"00000000-0000-0000-0000-000000000002","rate_limits":{"five_hour":{"used_percentage":95,"resets_at":2000010000}}}"#.utf8)
+        XCTAssertTrue(fixture.store.passiveReportNeedsConfirmation)
+        XCTAssertEqual(fixture.store.lastIssue, .sourceChanged)
+        XCTAssertEqual(fixture.store.reportedAt, originalDate)
+        XCTAssertEqual(fixture.preferences.claudePassiveProducerID, selected)
+
+        fixture.clock.advance(1)
+        try fixture.cache.capture(passivePayload(session: 3, used: 98), at: fixture.clock.read())
+        fixture.store.refresh()
+        XCTAssertEqual(fixture.store.pendingPassiveReportedAt, pendingDate, "The report shown for confirmation must stay frozen")
+        fixture.clock.advance(1)
+        try fixture.cache.capture(passivePayload(session: 1, used: 90), at: fixture.clock.read())
+        fixture.store.refresh()
+        XCTAssertEqual(fixture.store.reportedAt, fixture.clock.read(), "The selected stream must continue updating")
+        XCTAssertEqual(fixture.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 10)
+        XCTAssertTrue(fixture.store.passiveReportNeedsConfirmation)
+        XCTAssertEqual(fixture.store.pendingPassiveReportedAt, pendingDate)
+        XCTAssertTrue(fixture.notifications.deliveries.isEmpty)
+
+        fixture.store.adoptPendingPassiveReport()
+        XCTAssertFalse(fixture.store.passiveReportNeedsConfirmation)
+        XCTAssertEqual(fixture.store.reportedAt, pendingDate)
+        XCTAssertEqual(fixture.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 1,
+                       "Confirmation adopts the displayed producer 2 report, not the current producer 1 cache")
+        XCTAssertNotEqual(fixture.preferences.claudePassiveProducerID, selected)
+        XCTAssertTrue(fixture.notifications.deliveries.isEmpty, "Adoption establishes a new baseline")
+        fixture.store.refresh()
+        XCTAssertTrue(fixture.store.passiveReportNeedsConfirmation, "The now different cache source needs a separate confirmation")
+        XCTAssertEqual(fixture.factoryCalls.read(), 0)
+    }
+
+    func testRestartRequiresConfirmationBeforeAnotherPassiveProducerCanReplaceTheSavedSelection() throws {
+        let fixture = try fixture(cliEnabled: false)
+        try fixture.cache.capture(passivePayload(session: 1, used: 50), at: fixture.clock.read())
+        fixture.store.start()
+        let selection = try XCTUnwrap(fixture.preferences.claudePassiveProducerID)
+        fixture.store.stop()
         fixture.clock.advance(20)
-        try fixture.cache.capture(payload, at: fixture.clock.read())
-        try await wait { await fixture.sleeper.count() >= 1 }
-        await fixture.sleeper.tick()
-        try await wait { fixture.store.source == .statusline }
-        XCTAssertEqual(fixture.notifications.deliveries.count, 1, "Changing source must establish a fresh baseline")
-        let observedAt = fixture.store.reportedAt
-        fixture.clock.advance(15)
-        try fixture.cache.capture(payload, at: fixture.clock.read())
-        let bytes = try Data(contentsOf: fixture.cache.fileURL)
-        await fixture.sleeper.tick()
-        try await wait { await fixture.sleeper.count() >= 3 }
-        XCTAssertEqual(fixture.store.reportedAt, observedAt)
-        XCTAssertEqual(fixture.notifications.deliveries.count, 1)
-        XCTAssertEqual(try Data(contentsOf: fixture.cache.fileURL), bytes)
+        try fixture.cache.capture(passivePayload(session: 2, used: 95), at: fixture.clock.read())
+        let preferences = PreferencesStore(defaults: fixture.defaults)
+        XCTAssertEqual(preferences.claudePassiveProducerID, selection)
+        let fetcher = fixture.fetcher, counter = fixture.factoryCalls, clock = fixture.clock
+        let restarted = ClaudeQuotaStore(
+            preferences: preferences, cache: fixture.cache,
+            installer: ClaudeStatuslineInstaller(settingsURL: fixture.directory.appendingPathComponent("settings.json"),
+                cache: fixture.cache, executableURL: URL(fileURLWithPath: "/bin/echo"),
+                supportDirectory: fixture.directory.appendingPathComponent("support")),
+            fetcherFactory: { counter.increment(); return fetcher },
+            notificationController: NotificationController(service: ClaudeStoreTestNotifications()),
+            now: { clock.read() }, sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
+        )
+        defer { restarted.shutdown() }
+        restarted.start()
+        XCTAssertNil(restarted.snapshot)
+        XCTAssertTrue(restarted.passiveReportNeedsConfirmation)
+        XCTAssertEqual(restarted.lastIssue, .sourceChanged)
+        XCTAssertEqual(preferences.claudePassiveProducerID, selection)
+        restarted.adoptPendingPassiveReport()
+        XCTAssertNotNil(restarted.snapshot)
+        XCTAssertNotEqual(preferences.claudePassiveProducerID, selection)
+        XCTAssertEqual(PreferencesStore(defaults: fixture.defaults).claudePassiveProducerID, preferences.claudePassiveProducerID)
+        XCTAssertEqual(counter.read(), 0)
+    }
+
+    func testUnknownPassiveProvenanceOnlyAuthorizesTheExplicitlyAdoptedReport() throws {
+        for producer in [nil, ClaudeStatuslineParser.legacyUnknownProducerID] as [String?] {
+            let fixture = try fixture(cliEnabled: false)
+            let date = fixture.clock.read()
+            let windows = [ClaudeQuotaWindow(kind: .fiveHour, usedPercentage: 30, resetsAt: date.addingTimeInterval(1_000))]
+            let report = ClaudeQuotaReport(source: .statusline, reportedAt: date, receivedAt: date,
+                                           windows: windows, producerID: producer)
+            try writePassiveReport(report, cache: fixture.cache)
+            fixture.store.start()
+            XCTAssertNil(fixture.store.snapshot)
+            XCTAssertTrue(fixture.store.passiveReportNeedsConfirmation)
+            fixture.store.adoptPendingPassiveReport()
+            XCTAssertNotNil(fixture.store.snapshot)
+            XCTAssertNil(fixture.preferences.claudePassiveProducerID, "An anonymous placeholder is never a stream binding")
+            fixture.clock.advance(15)
+            try writePassiveReport(.init(source: .statusline, reportedAt: date, receivedAt: fixture.clock.read(),
+                                          windows: windows, producerID: producer), cache: fixture.cache)
+            fixture.store.refresh()
+            XCTAssertFalse(fixture.store.passiveReportNeedsConfirmation)
+            XCTAssertEqual(fixture.store.reportedAt, date, "Rereading the same anonymous report must not freshen it")
+            try writePassiveReport(.init(source: .statusline, reportedAt: fixture.clock.read(), receivedAt: fixture.clock.read(),
+                windows: [.init(kind: .fiveHour, usedPercentage: 95, resetsAt: date.addingTimeInterval(1_000))],
+                producerID: producer), cache: fixture.cache)
+            fixture.store.refresh()
+            XCTAssertTrue(fixture.store.passiveReportNeedsConfirmation)
+            XCTAssertEqual(fixture.store.reportedAt, date)
+            XCTAssertEqual(fixture.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 70)
+            XCTAssertEqual(fixture.factoryCalls.read(), 0)
+        }
+    }
+
+    func testExpiredPendingReportCannotBeAdoptedOrRebindTheSelectedStream() throws {
+        let fixture = try fixture(cliEnabled: false)
+        let selected = String(repeating: "a", count: 64)
+        fixture.preferences.setClaudePassiveProducerID(selected)
+        try fixture.cache.capture(passivePayload(session: 2, used: 95, reset: 2_000_000_005), at: fixture.clock.read())
+        fixture.store.start()
+        XCTAssertTrue(fixture.store.passiveReportNeedsConfirmation)
+        fixture.clock.advance(6)
+        fixture.store.adoptPendingPassiveReport()
+        XCTAssertFalse(fixture.store.passiveReportNeedsConfirmation)
+        XCTAssertNil(fixture.store.snapshot)
+        XCTAssertEqual(fixture.store.lastIssue, .staleData)
+        XCTAssertEqual(fixture.preferences.claudePassiveProducerID, selected)
+        XCTAssertEqual(fixture.factoryCalls.read(), 0)
     }
 
     func testStopDoesNotWaitOnMainActorForCLIThatIgnoresTermination() async throws {
@@ -495,6 +592,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let directory: URL
         let store: ClaudeQuotaStore
         let preferences: PreferencesStore
+        let defaults: UserDefaults
         let cache: ClaudeStatuslineCache
         let fetcher: ClaudeStoreTestFetcher
         let sleeper: ClaudeStoreTestSleeper
@@ -534,8 +632,18 @@ final class ClaudeQuotaStoreTests: XCTestCase {
             UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
             try? FileManager.default.removeItem(at: root)
         }
-        return Fixture(directory: root, store: store, preferences: preferences, cache: cache, fetcher: fetcher,
+        return Fixture(directory: root, store: store, preferences: preferences, defaults: defaults, cache: cache, fetcher: fetcher,
                        sleeper: sleeper, clock: clock, notifications: notifications, factoryCalls: factoryCalls)
+    }
+
+    private func passivePayload(session: Int, used: Double, reset: Int = 2_000_010_000) -> Data {
+        Data("{\"session_id\":\"00000000-0000-0000-0000-\(String(format: "%012d", session))\",\"rate_limits\":{\"five_hour\":{\"used_percentage\":\(used),\"resets_at\":\(reset)}}}".utf8)
+    }
+
+    private func writePassiveReport(_ report: ClaudeQuotaReport, cache: ClaudeStatuslineCache) throws {
+        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(report))
+        let data = try JSONSerialization.data(withJSONObject: ["version": 1, "report": object, "producers": [:]])
+        try ClaudeLocalFile.write(data, to: cache.fileURL)
     }
 
     private func report(at date: Date, used: Double, resetAt: Date? = nil) -> ClaudeQuotaReport {

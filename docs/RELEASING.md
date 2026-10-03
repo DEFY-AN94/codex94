@@ -34,15 +34,18 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
-Release work is paused at the maintainer's request. Do not resume live `/usage`
-probes, merge, tag or publish until the maintainer provides new direction.
-The CLI reader is a separate default-off backup option with a quota-consumption
-warning. Earlier green CI does not resolve the subsequent runtime and consumption
-concerns, and does not validate this new opt-in boundary.
+The maintainer has authorized development under the revised conditional
+data-source plan. The OAuth authorization prerequisite is not met, so this
+candidate uses passive statusline reports by default. Live `/usage` probing
+remains suspended. The CLI reader stays an independent default-off option with
+a quota-consumption warning, never an automatic fallback. Validate source
+isolation and report age with synthetic data; do not launch Claude or send a
+prompt merely to populate test data. Earlier green CI does not validate these
+new source boundaries or resolve the historical CLI consumption/timeout concern.
 
 The current target is `4.0.1 (22)`, dated 2026-10-03 (Australia/Melbourne), still
-unpublished. It carries forward dual-provider monitoring and fixes delayed
-`/usage` submission when the Claude input footer has right-aligned hints.
+unpublished. It carries forward dual-provider monitoring with passive Claude
+reports by default and a separate, explicitly enabled CLI option.
 The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
 do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
 records do not establish validation of this fix. Keep public stable links at

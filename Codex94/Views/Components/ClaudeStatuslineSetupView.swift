@@ -14,6 +14,17 @@ struct ClaudeStatuslineSetupView: View {
             Text("claude.setup.help")
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Text("claude.passive.accountHelp")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("claude-passive-account-help")
+            if store.passiveReportNeedsConfirmation && !store.isCLIUsageEnabled {
+                ClaudePassiveReportAdoptionView(
+                    reportedAt: store.pendingPassiveReportedAt,
+                    canAdopt: store.isEnabled,
+                    adopt: { clearFeedback(); confirmation = .adoptReport }
+                )
+            }
             if store.statuslineSetupState == .conflict {
                 VStack(alignment: .leading, spacing: 5) {
                     Label("claude.setup.conflict", systemImage: "exclamationmark.triangle")
@@ -64,6 +75,11 @@ struct ClaudeStatuslineSetupView: View {
             }
         }
         .onAppear { store.refreshSetupState() }
+        .onChange(of: store.isCLIUsageEnabled) { _, _ in dismissAdoptionConfirmation() }
+        .onChange(of: store.isEnabled) { _, _ in dismissAdoptionConfirmation() }
+        .onChange(of: store.passiveReportNeedsConfirmation) { _, needsConfirmation in
+            if !needsConfirmation { dismissAdoptionConfirmation() }
+        }
         .sheet(isPresented: $showingPreview) {
             if let preview {
                 ClaudeStatuslinePreviewView(preview: preview) {
@@ -86,9 +102,8 @@ struct ClaudeStatuslineSetupView: View {
             titleVisibility: .visible
         ) {
             if let action = confirmation {
-                Button(action.actionKey, role: .destructive) { perform(action) }
-                    .accessibilityIdentifier(action == .forgetRecord
-                        ? "claude-setup-confirm-forget-record" : "claude-setup-confirm-remove")
+                Button(action.actionKey, role: action == .adoptReport ? nil : .destructive) { perform(action) }
+                    .accessibilityIdentifier(action.accessibilityIdentifier)
             }
             Button("claude.setup.cancel", role: .cancel) { confirmation = nil }
         } message: {
@@ -102,6 +117,10 @@ struct ClaudeStatuslineSetupView: View {
         successMessage = nil
     }
 
+    private func dismissAdoptionConfirmation() {
+        if confirmation == .adoptReport { confirmation = nil }
+    }
+
     private func perform(_ action: SetupConfirmation) {
         clearFeedback()
         defer { confirmation = nil; store.refreshSetupState() }
@@ -113,6 +132,12 @@ struct ClaudeStatuslineSetupView: View {
             case .forgetRecord:
                 try store.forgetConflictingStatuslineInstallation()
                 successMessage = "claude.setup.recordForgotten"
+            case .adoptReport:
+                // The store owns the frozen pending report and may reject it
+                // if expired. Its published state is the result, not a toast.
+                guard store.isEnabled, !store.isCLIUsageEnabled,
+                      store.passiveReportNeedsConfirmation else { return }
+                store.adoptPendingPassiveReport()
             }
         } catch {
             operationIssue = error as? ClaudeQuotaIssue ?? .unavailable
@@ -121,16 +146,65 @@ struct ClaudeStatuslineSetupView: View {
     }
 
     private enum SetupConfirmation: Equatable {
-        case remove, forgetRecord
+        case remove, forgetRecord, adoptReport
         var titleKey: LocalizedStringKey {
-            self == .remove ? "claude.setup.removeConfirm" : "claude.setup.forgetConfirm"
+            switch self {
+            case .remove: "claude.setup.removeConfirm"
+            case .forgetRecord: "claude.setup.forgetConfirm"
+            case .adoptReport: "claude.passive.adoptConfirm"
+            }
         }
         var messageKey: LocalizedStringKey {
-            self == .remove ? "claude.setup.removeHelp" : "claude.setup.forgetHelp"
+            switch self {
+            case .remove: "claude.setup.removeHelp"
+            case .forgetRecord: "claude.setup.forgetHelp"
+            case .adoptReport: "claude.passive.adoptHelp"
+            }
         }
         var actionKey: LocalizedStringKey {
-            self == .remove ? "claude.setup.remove" : "claude.setup.forgetRecord"
+            switch self {
+            case .remove: "claude.setup.remove"
+            case .forgetRecord: "claude.setup.forgetRecord"
+            case .adoptReport: "claude.passive.adoptAction"
+            }
         }
+        var accessibilityIdentifier: String {
+            switch self {
+            case .remove: "claude-setup-confirm-remove"
+            case .forgetRecord: "claude-setup-confirm-forget-record"
+            case .adoptReport: "claude-passive-confirm-adopt"
+            }
+        }
+    }
+}
+
+/// Only the pending report's local time enters this view; no session or account
+/// identifier is presented as identity proof.
+struct ClaudePassiveReportAdoptionView: View {
+    let reportedAt: Date?
+    let canAdopt: Bool
+    let adopt: () -> Void
+    var timeZone: TimeZone = .autoupdatingCurrent
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label("claude.passive.pending", systemImage: "exclamationmark.circle")
+                .font(.callout.weight(.medium)).foregroundStyle(.orange)
+            if let reportedAt, let time = QuotaFormatting.absoluteReset(
+                to: reportedAt, locale: locale,
+                calendar: Calendar(identifier: .gregorian), timeZone: timeZone
+            ) {
+                Text("claude.passive.pendingTime \(time)")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("claude-passive-pending-time")
+            }
+            Button("claude.passive.adopt", action: adopt)
+                .disabled(!canAdopt)
+                .accessibilityIdentifier("claude-passive-adopt-report")
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("claude-passive-pending-report")
     }
 }
 

@@ -12,8 +12,11 @@ final class ClaudeQuotaStore: ObservableObject {
     @Published private(set) var reportedAt: Date?
     @Published private(set) var isEnabled = false
     @Published private(set) var nextAutomaticRefreshAt: Date?
+    @Published private(set) var passiveReportNeedsConfirmation = false
+    @Published private(set) var pendingPassiveReportedAt: Date?
     @Published private(set) var statuslineSetupState: ClaudeStatuslineSetupState = .notInstalled
     var isStatuslineInstalled: Bool { statuslineSetupState == .installed }
+    var isCLIUsageEnabled: Bool { preferences.claudeCLIUsageEnabled }
     let notificationController: NotificationController
 
     private let preferences: PreferencesStore
@@ -25,6 +28,7 @@ final class ClaudeQuotaStore: ObservableObject {
     private let now: @Sendable () -> Date
     private let maximumReportAge: TimeInterval
     private var report: ClaudeQuotaReport?
+    private var pendingPassiveReport: ClaudeQuotaReport?
     private var policy = QuotaNotificationPolicy()
     private var requestTask: Task<Void, Never>?
     private var pollingTask: Task<Void, Never>?
@@ -68,7 +72,8 @@ final class ClaudeQuotaStore: ObservableObject {
     func start() {
         guard !stopped, !isEnabled, preferences.claudeMonitoringEnabled else { return }
         fetcher = preferences.claudeCLIUsageEnabled ? fetcherFactory() : nil
-        if !preferences.claudeCLIUsageEnabled { discardCLIReport() }
+        let expectedSource: ClaudeQuotaSource = isCLIUsageEnabled ? .cliUsage : .statusline
+        if report?.source != expectedSource { discardReport() }
         isEnabled = true
         logger.info("monitor=started")
         notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
@@ -90,6 +95,7 @@ final class ClaudeQuotaStore: ObservableObject {
         logger.info("monitor=stopped")
         nextBackgroundRefreshAt = nil
         clearResetSchedule()
+        clearPendingPassiveReport()
         nextAutomaticRefreshAt = nil
         policy.reset()
         notificationController.configure(enabled: false)
@@ -144,8 +150,7 @@ final class ClaudeQuotaStore: ObservableObject {
                     notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
                     setIssue(issue)
                 } else {
-                    loadBridgeReport()
-                    if report?.source != .statusline || !isCurrent(report) { setIssue(issue) }
+                    setIssue(issue)
                 }
                 logRefresh(trigger: trigger, startedAt: startedAt, issue: issue)
             }
@@ -190,7 +195,7 @@ final class ClaudeQuotaStore: ObservableObject {
         activeReadIssue = nil
         nextBackgroundRefreshAt = nil
         clearResetSchedule()
-        discardCLIReport()
+        discardReport()
         policy.reset()
         notificationController.configure(enabled: isEnabled && preferences.claudeNotifications.isEnabled)
         guard isEnabled else { updateNextAutomaticRefresh(); return }
@@ -212,15 +217,56 @@ final class ClaudeQuotaStore: ObservableObject {
         cleanup.async { retired?.shutdown() }
     }
 
-    private func discardCLIReport() {
+    private func discardReport() {
         activeReadIssue = nil
         lastIssue = nil
         connectionState = .idle
-        guard report?.source == .cliUsage else { return }
         report = nil
         snapshot = nil
         source = nil
         reportedAt = nil
+        clearPendingPassiveReport()
+    }
+
+    func adoptPendingPassiveReport() {
+        guard isEnabled, !stopped, !isCLIUsageEnabled, let pending = pendingPassiveReport else { return }
+        // Adopt the frozen report shown by the confirmation UI, never a newer
+        // cache value that may have arrived while the dialog was open.
+        clearPendingPassiveReport()
+        let date = now()
+        guard pending.reportedAt <= date.addingTimeInterval(5), pending.receivedAt >= pending.reportedAt else {
+            projectReport(at: date)
+            setIssue(.invalidData)
+            return
+        }
+        guard pending.snapshot(at: date) != nil else {
+            projectReport(at: date)
+            if report == nil { setIssue(.staleData) }
+            return
+        }
+        preferences.setClaudePassiveProducerID(ClaudeStatuslineParser.identifiableProducerID(pending.producerID))
+        discardReport()
+        clearResetSchedule()
+        policy.reset()
+        notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
+        accept(pending)
+    }
+
+    private func clearPendingPassiveReport() {
+        pendingPassiveReport = nil
+        pendingPassiveReportedAt = nil
+        passiveReportNeedsConfirmation = false
+    }
+
+    private func requireConfirmation(for value: ClaudeQuotaReport) {
+        if pendingPassiveReport == nil {
+            pendingPassiveReport = value
+            pendingPassiveReportedAt = value.reportedAt
+            passiveReportNeedsConfirmation = true
+            policy.reset()
+            notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
+        }
+        setIssue(.sourceChanged)
     }
 
     func setNotificationPreferences(_ value: NotificationPreferences) {
@@ -289,13 +335,38 @@ final class ClaudeQuotaStore: ObservableObject {
     }
 
     private func loadBridgeReport() {
-        guard activeReadIssue != .loginRequired else { return }
+        guard !isCLIUsageEnabled else { return }
+        // The pending candidate stays frozen, but the selected producer can
+        // still publish newer values while another report awaits confirmation.
         guard let value = try? cache.load() else { return }
         guard value.snapshot(at: now()) != nil else { return }
+        guard value.reportedAt <= now().addingTimeInterval(5) else { setIssue(.invalidData); return }
+        let producer = ClaudeStatuslineParser.identifiableProducerID(value.producerID)
+        let selected = ClaudeStatuslineParser.identifiableProducerID(preferences.claudePassiveProducerID)
+        if producer == nil {
+            // An explicitly adopted anonymous report may be reread unchanged,
+            // but its shared placeholder never authorizes a different report.
+            if let report, report.source == .statusline,
+               report.producerID == value.producerID, report.reportedAt == value.reportedAt,
+               report.windows == value.windows { return }
+            requireConfirmation(for: value)
+            return
+        }
+        if let selected {
+            guard producer == selected else { requireConfirmation(for: value); return }
+        } else {
+            guard report == nil else { requireConfirmation(for: value); return }
+            preferences.setClaudePassiveProducerID(producer)
+        }
         if report == nil || value.reportedAt > report!.reportedAt { accept(value) }
     }
 
     private func accept(_ value: ClaudeQuotaReport, requestStartedAt: Date? = nil) {
+        guard value.source == (isCLIUsageEnabled ? .cliUsage : .statusline) else {
+            activeReadIssue = .invalidData
+            setIssue(.invalidData)
+            return
+        }
         guard value.reportedAt <= now().addingTimeInterval(5),
               value.receivedAt >= value.reportedAt else { setIssue(.invalidData); return }
         guard value.snapshot(at: now()) != nil else {
@@ -320,7 +391,7 @@ final class ClaudeQuotaStore: ObservableObject {
         source = value.source
         projectReport(at: now())
         if isNew, value.source == .statusline { logger.info("source=statusline result=reported") }
-        if isNew, isCurrent(value), let snapshot {
+        if isNew, !passiveReportNeedsConfirmation, isCurrent(value), let snapshot {
             let events = policy.events(for: snapshot, preferences: preferences.claudeNotifications)
             notificationController.deliver(events, language: preferences.language, provider: .claude)
         }
@@ -336,6 +407,11 @@ final class ClaudeQuotaStore: ObservableObject {
     }
 
     private func projectReport(at date: Date) {
+        if passiveReportNeedsConfirmation {
+            snapshot = report?.snapshot(at: date)
+            setIssue(.sourceChanged)
+            return
+        }
         guard let report else { return }
         snapshot = report.snapshot(at: date)
         if snapshot == nil { setIssue(.noData) }

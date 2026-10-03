@@ -6,11 +6,17 @@ All notable changes to Codex94 are documented here.
 
 Version `4.0.1 (22)`. Release dates use Australia/Melbourne.
 
-Development and publication are paused at the maintainer's request pending
-further direction on Claude quota consumption and intermittent CLI timeouts.
+Passive-first development has resumed under the maintainer's conditional
+data-source plan. Direct OAuth remains deferred pending an officially permitted
+integration; live `/usage` probing remains suspended.
 
 ### Changed
 
+- Use local statusline reports as the default Claude source. Clearly identify
+  unverified account identity, preserve report age, and require explicit adoption
+  when the reporting session changes instead of silently replacing quota.
+- Isolate passive and optional CLI modes; CLI failures cannot automatically
+  replace their result with an account-unverified statusline report.
 - Make Claude Code `/usage` a separate, default-off backup reader with a
   subscription-quota consumption warning. Enabling Claude monitoring alone
   reads only existing local statusline reports; disabling the backup cancels

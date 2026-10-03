@@ -13,10 +13,85 @@ final class ProviderViewTests: XCTestCase {
         let later = card(snapshot: snapshot, source: .statusline, now: reportedAt.addingTimeInterval(500))
         XCTAssertEqual(first.sourceTimeText, later.sourceTimeText,
                        "Rendering or reading the same report must not label it freshly updated")
-        XCTAssertTrue(first.sourceTimeText.hasPrefix("Quota report: "))
+        XCTAssertTrue(first.sourceTimeText.hasPrefix("Local report: "))
         let empty = card(snapshot: nil, source: nil, now: reportedAt)
         XCTAssertEqual(empty.sourceTimeText, "No quota report yet")
         XCTAssertEqual(snapshot.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 95.4)
+    }
+
+    func testPassiveWaitingDoesNotImplyCLIActivityOrLoginFailure() {
+        for issue in [ClaudeQuotaIssue.setupRequired, .noData, .loginRequired, .timedOut] {
+            var content = card(snapshot: nil, source: nil, now: reportedAt, issue: issue)
+            XCTAssertEqual(content.badge, .none)
+            XCTAssertNil(content.statusKey)
+            XCTAssertEqual(content.refreshTitleKey, "claude.passive.reread")
+            XCTAssertEqual(content.emptyStateKey, "claude.passive.notConfigured")
+            content.statuslineSetupState = .installed
+            XCTAssertEqual(content.emptyStateKey, "claude.passive.waiting")
+        }
+        var cli = card(snapshot: nil, source: nil, now: reportedAt, issue: .loginRequired)
+        cli.isCLIUsageEnabled = true
+        XCTAssertEqual(cli.badge, .unavailable)
+        XCTAssertEqual(cli.statusKey, "claude.issue.loginRequired")
+        XCTAssertEqual(cli.refreshTitleKey, "claude.refresh")
+    }
+
+    func testUnverifiedAndExpiredPassiveReportsKeepTheirOwnTimeAndUnknownWindows() throws {
+        let snapshot = try claudeSnapshot()
+        let original = card(snapshot: snapshot, source: .statusline, now: reportedAt)
+        var pending = card(snapshot: snapshot, source: .statusline,
+                           now: reportedAt.addingTimeInterval(300), issue: .sourceChanged)
+        pending.passiveReportNeedsConfirmation = true
+        XCTAssertEqual(pending.badge, .stale)
+        XCTAssertEqual(pending.statusKey, "claude.issue.sourceChanged")
+        XCTAssertEqual(pending.sourceTimeText, original.sourceTimeText)
+        XCTAssertEqual(pending.sourceTitleKey, "claude.source.statusline")
+        XCTAssertEqual(pending.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 95.4)
+
+        let expired = ClaudeQuotaCardContent(
+            snapshot: nil, source: .statusline, reportedAt: reportedAt, issue: .staleData,
+            isRefreshing: false, isEnabled: true, language: .english,
+            now: reportedAt.addingTimeInterval(30_000), palette: .resolve(.system, scheme: .light),
+            refresh: {}, openSetup: {}, timeZone: TimeZone(secondsFromGMT: 0)!
+        )
+        XCTAssertEqual(expired.badge, .stale)
+        XCTAssertEqual(expired.emptyStateKey, "claude.passive.expiredEmpty")
+        XCTAssertNil(expired.snapshot, "An expired report must not invent a restored quota window")
+        XCTAssertEqual(expired.sourceTimeText, original.sourceTimeText)
+    }
+
+    func testCLIWarningIncludesTheExactApprovedQuotaRiskAndPassiveIdentityIsUnverified() {
+        let localized: (String, LanguagePreference) -> String = { key, language in
+            StatusAccessibilityString.localized(key, language: language, bundle: .main)
+        }
+        XCTAssertEqual(localized("claude.cliUsage.warning", .simplifiedChinese),
+                       "此方式会启动 Claude Code，可能额外消耗 Token 和订阅额度，包括五小时及每周额度。请按需开启。")
+        let english = localized("claude.cliUsage.warning", .english)
+        for phrase in ["Tokens", "five-hour", "weekly"] { XCTAssertTrue(english.contains(phrase)) }
+        XCTAssertTrue(localized("claude.source.statusline", .english).contains("account unverified"))
+        XCTAssertTrue(localized("claude.source.statusline", .simplifiedChinese).contains("账号未验证"))
+    }
+
+    func testExpiredPassiveWindowsReportedAsNoDataStayAmberButNeverReportedDataDoesNot() throws {
+        let original = card(snapshot: try claudeSnapshot(), source: .statusline, now: reportedAt)
+        let expired = ClaudeQuotaCardContent(
+            snapshot: nil, source: .statusline, reportedAt: reportedAt, issue: .noData,
+            isRefreshing: false, isEnabled: true, language: .english,
+            now: reportedAt.addingTimeInterval(30_000), palette: .resolve(.system, scheme: .light),
+            refresh: {}, openSetup: {}, timeZone: TimeZone(secondsFromGMT: 0)!,
+            statuslineSetupState: .installed
+        )
+        XCTAssertEqual(expired.badge, .stale)
+        XCTAssertEqual(expired.emptyStateKey, "claude.passive.expiredEmpty")
+        XCTAssertEqual(expired.sourceTimeText, original.sourceTimeText)
+        XCTAssertNil(expired.snapshot, "Expired windows must remain unknown, not become 100%")
+        XCTAssertNil(expired.statusKey, "No-data must not become a login failure")
+
+        var waiting = card(snapshot: nil, source: .statusline, now: reportedAt, issue: .noData)
+        waiting.statuslineSetupState = .installed
+        XCTAssertEqual(waiting.badge, .none)
+        XCTAssertEqual(waiting.emptyStateKey, "claude.passive.waiting")
+        XCTAssertEqual(waiting.sourceTimeText, "No quota report yet")
     }
 
     func testClaudeCardsRenderReportedUnknownCachedAndZeroStatesInBothLanguages() throws {
@@ -28,20 +103,27 @@ final class ProviderViewTests: XCTestCase {
             ("live", complete, .cliUsage, nil, false),
             ("cached-zero", zero, .statusline, .staleData, false),
             ("unknown", nil, nil, .setupRequired, false),
-            ("refreshing", complete, .statusline, .timedOut, true)
+            ("refreshing", complete, .cliUsage, .timedOut, true),
+            ("waiting", nil, .statusline, .noData, false),
+            ("source-changed", complete, .statusline, .sourceChanged, false),
+            ("expired", nil, .statusline, .staleData, false)
         ]
         for language in [LanguagePreference.english, .simplifiedChinese] {
             for dark in [false, true] {
                 for scenario in scenarios {
                     let content = ClaudeQuotaCardContent(
                         snapshot: scenario.1, source: scenario.2,
-                        reportedAt: scenario.1?.fetchedAt, issue: scenario.3,
+                        reportedAt: scenario.1?.fetchedAt ?? (scenario.0 == "expired" ? reportedAt : nil),
+                        issue: scenario.3,
                         isRefreshing: scenario.4, isEnabled: true, language: language,
                         now: reportedAt.addingTimeInterval(90),
                         palette: .resolve(.system, scheme: dark ? .dark : .light),
                         refresh: { XCTFail("Rendering must not refresh Claude") },
                         openSetup: { XCTFail("Rendering must not open settings") },
-                        timeZone: TimeZone(secondsFromGMT: 0)!
+                        timeZone: TimeZone(secondsFromGMT: 0)!,
+                        isCLIUsageEnabled: scenario.2 == .cliUsage,
+                        statuslineSetupState: scenario.0 == "unknown" ? .notInstalled : .installed,
+                        passiveReportNeedsConfirmation: scenario.3 == .sourceChanged
                     )
                     let size = try render(
                         content, width: 500, dark: dark, language: language,
@@ -52,6 +134,24 @@ final class ProviderViewTests: XCTestCase {
                     XCTAssertGreaterThan(size.height, 130)
                     XCTAssertLessThan(size.height, 420)
                 }
+            }
+        }
+    }
+
+    func testPendingPassiveReportRenderingDoesNotAdoptOrTriggerARead() throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            for dark in [false, true] {
+                let size = try render(
+                    ClaudePassiveReportAdoptionView(
+                        reportedAt: reportedAt, canAdopt: true,
+                        adopt: { XCTFail("Rendering cannot confirm a report") },
+                        timeZone: TimeZone(secondsFromGMT: 0)!
+                    ), width: 360, dark: dark, language: language,
+                    name: "passive-adoption-\(language.rawValue)-\(dark ? "dark" : "light")", output: directory
+                )
+                XCTAssertLessThan(size.height, 200)
             }
         }
     }
@@ -212,9 +312,10 @@ final class ProviderViewTests: XCTestCase {
                        language: .english, name: "setup-after-forgetting-record", output: directory)
     }
 
-    private func card(snapshot: QuotaSnapshot?, source: ClaudeQuotaSource?, now: Date) -> ClaudeQuotaCardContent {
+    private func card(snapshot: QuotaSnapshot?, source: ClaudeQuotaSource?, now: Date,
+                      issue: ClaudeQuotaIssue? = nil) -> ClaudeQuotaCardContent {
         ClaudeQuotaCardContent(
-            snapshot: snapshot, source: source, reportedAt: snapshot?.fetchedAt, issue: nil,
+            snapshot: snapshot, source: source, reportedAt: snapshot?.fetchedAt, issue: issue,
             isRefreshing: false, isEnabled: true, language: .english, now: now,
             palette: .resolve(.system, scheme: .light), refresh: {}, openSetup: {},
             timeZone: TimeZone(secondsFromGMT: 0)!
@@ -245,7 +346,7 @@ final class ProviderViewTests: XCTestCase {
         preferences.language = .english
         let notifications = ProviderViewNotificationService()
         let report = ClaudeQuotaReport(
-            source: .statusline, reportedAt: reportedAt, receivedAt: reportedAt,
+            source: .cliUsage, reportedAt: reportedAt, receivedAt: reportedAt,
             windows: (bothWindows ? [ClaudeQuotaWindow(kind: .fiveHour, usedPercentage: 4.6,
                                                        resetsAt: reportedAt.addingTimeInterval(12_000))] : [])
                 + [ClaudeQuotaWindow(kind: .weekly, usedPercentage: 47.5,

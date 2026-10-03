@@ -52,7 +52,7 @@ struct ProviderSettingsView: View {
                 )
             }
             SettingsDivider()
-            SettingsRow("claude.setup.title") {
+            SettingsRow("claude.passive.title") {
                 ClaudeStatuslineSetupView(store: store.claudeStore)
             }
             SettingsDivider()
@@ -72,7 +72,7 @@ struct ProviderSettingsView: View {
                         .accessibilityIdentifier("claude-cli-usage-warning")
                 }
             }
-            if store.preferences.claudeMonitoringEnabled {
+            if store.preferences.claudeMonitoringEnabled && store.preferences.claudeCLIUsageEnabled {
                 SettingsDivider()
                 SettingsRow("claude.refreshInterval") {
                     Picker("claude.refreshInterval", selection: Binding(
@@ -85,9 +85,10 @@ struct ProviderSettingsView: View {
                         }
                     }
                     .labelsHidden().frame(width: 180)
-                    .disabled(!store.preferences.claudeCLIUsageEnabled)
                     .accessibilityIdentifier("claude-refresh-interval")
                 }
+            }
+            if store.preferences.claudeMonitoringEnabled {
                 SettingsDivider()
                 SettingsRow("claude.menuBarQuota") {
                     if store.preferences.menuBarLayout == .dualWindow {

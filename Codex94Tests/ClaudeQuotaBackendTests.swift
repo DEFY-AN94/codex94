@@ -23,6 +23,18 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         }
     }
 
+    func testMissingSessionDiscriminatorCannotBeUsedAsASelectedStream() throws {
+        for input in [#"{}"#, #"{"session_id":"not-a-session"}"#] {
+            let producer = try ClaudeStatuslineParser.producerID(from: Data(input.utf8))
+            XCTAssertEqual(producer, ClaudeStatuslineParser.legacyUnknownProducerID)
+            XCTAssertNil(ClaudeStatuslineParser.identifiableProducerID(producer))
+        }
+        let known = try ClaudeStatuslineParser.producerID(from: payload())
+        XCTAssertEqual(ClaudeStatuslineParser.identifiableProducerID(known), known)
+        XCTAssertNil(ClaudeStatuslineParser.identifiableProducerID(nil))
+        XCTAssertNil(ClaudeStatuslineParser.identifiableProducerID(String(repeating: "g", count: 64)))
+    }
+
     func testNullAndAbsentWindowsStayUnknownAndExpiredWindowsDisappear() throws {
         for source in [#"{}"#, #"{"rate_limits":null}"#, #"{"rate_limits":{"five_hour":null}}"#,
                        #"{"rate_limits":{"spend_limit":{"used_percentage":150,"resets_at":2000000010}}}"#] {

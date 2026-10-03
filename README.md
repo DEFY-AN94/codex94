@@ -32,19 +32,26 @@ and security-scanned before it is tagged.
 ## 4.0.1 candidate — not released
 
 `4.0.1 (22)` carries forward the dual-provider features from the unpublished
-4.0.0 candidate and fixes Claude input-screen recognition when right-aligned
-hints share its mode footer. The fix sends `/usage` promptly rather than waiting
-until the read times out. The `v4.0.0` tag is retained unchanged; its Draft
+4.0.0 candidate and makes passive status-line reports the default Claude source.
+CLI `/usage` remains a separate, explicitly enabled option. The `v4.0.0` tag is retained unchanged; its Draft
 Release was removed. The published stable release and all download/clone links
 below remain **3.1.4 (20)**. New-candidate validation and publication are pending;
 prior 4.0.0 results below are historical evidence.
 
-**Development and publication are paused at the maintainer's request.** The
-Claude Code `/usage` reader is now a separate, default-off backup option in
-Services. Its warning explains that starting CLI sessions may consume subscription
-quota. With it off, startup, automatic refresh and manual refresh only read
-existing local status-line reports and never launch the CLI reader. The quota
-consumption concern and intermittent CLI timeout remain open for future review.
+The candidate now uses **passive local status-line reports by default**. Direct
+OAuth access is deferred: [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
+do not establish permission for this third-party app to reuse subscription
+credentials. No OAuth credential reader, token refresh or Claude HTTP client is
+included. Live `/usage` probing remains suspended; that reader is a separate,
+default-off option with a quota-consumption warning.
+
+Passive reports arrive when you normally use Claude Code; Codex94 does not start
+a session or send a prompt to produce them. The official status-line schema has
+no verified account ID. Reports are labelled account-unverified, CLI mode never
+automatically falls back to them, and a different reporting session requires
+explicit adoption. A session fingerprint identifies a report stream, not an
+account. Unchanged reports keep their original local report time; expired windows
+become unknown rather than being reset to 100%.
 
 - **Codex is on by default; Claude is off.** Enable Claude in Dashboard →
   **Services**. Each service has its own refresh tasks, quota selection, source,
