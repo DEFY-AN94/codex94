@@ -13,13 +13,13 @@ Codex itself owns authentication. Codex94 does not implement OAuth or a direct
 HTTP client for quota or Token usage and does not directly inspect authentication
 stores, browser state, session logs, or local usage databases.
 
-The 4.0.1 candidate adds optional Claude subscription monitoring
-through official Claude Code `/usage` and an explicitly installed local
-statusline bridge. Authentication remains inside Claude Code. There is no
+Version 4.0.1 adds optional Claude subscription monitoring through an explicitly
+installed local statusline bridge by default, with a separate optional official
+Claude Code `/usage` reader. Authentication remains inside Claude Code. There is no
 direct Claude quota HTTP/OAuth implementation or credential-store access.
 The CLI reader has a separate, default-off opt-in with a quota-consumption
 warning. Enabling Claude monitoring does not opt into CLI sessions. While the
-backup reader is off, automatic and manual refreshes only inspect the local
+CLI reader is off, automatic and manual refreshes only inspect the local
 statusline cache. Disabling it cancels and retires an active reader.
 Source modes are isolated: a CLI failure does not adopt an account-unverified
 statusline report. Passive monitoring pins its selected report stream and asks
@@ -85,9 +85,9 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-3.1.4-SHA256SUMS.txt` before opening the DMG. The optional
+Verify `Codex94-4.0.1-SHA256SUMS.txt` before opening the DMG. The optional
 GitHub command
-`gh attestation verify Codex94-3.1.4-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
+`gh attestation verify Codex94-4.0.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
 can prove repository/workflow/commit provenance for the exact DMG. A matching
 checksum or attestation is not notarization, malware review, a security audit,
 or Gatekeeper approval. If the exact release is trusted, use only Apple's
@@ -179,12 +179,12 @@ boundaries remain unchanged.
 
 ## Supported versions
 
-The current development target is `4.0.1 (22)`, including the Claude input-footer
-recognition fix. It is not yet a published release. The retained `v4.0.0` tag
-identifies an unpublished candidate, not a supported stable release.
+Version `4.0.1 (22)` uses passive Claude reports by default with explicit
+report-stream adoption and a separate default-off CLI reader. The retained
+`v4.0.0` tag identifies an unpublished candidate, not a supported stable release.
 
-The supported published stable version is [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4),
-released on 2026-09-28 (Australia/Melbourne).
+The supported published stable version is [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
+released on 2026-10-03 (Australia/Melbourne).
 Feature branches and `main` may contain development work that has not passed
 release acceptance. Current stable-version links identify the published release.
 Version `3.1.4` adjusts bounded quota deadlines and permits three extra

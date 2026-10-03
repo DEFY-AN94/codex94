@@ -4,9 +4,10 @@
 
 ## 产品简介
 
-Codex94 是一款非官方、独立的 macOS **Codex 额度监控与 Token 统计**工具。
-4.0.1 候选版新增可选的 **Claude Code 额度监控**，与 Codex 并列显示。菜单栏
-展示剩余额度和重置时间，不占用 Dock；同一弹出面板和 Dashboard 提供详细信息。
+Codex94 是一款非官方、独立的 macOS **Codex 与 Claude Code 额度监控**工具，
+同时提供 **Codex Token 统计**。默认开启 Codex；Claude 可选启用，默认读取本地
+被动报告。菜单栏展示剩余额度和重置时间，不占用 Dock；同一弹出面板和 Dashboard
+提供详细信息。
 
 `0.3.0 (14)` 新增 Codex 服务端汇总卡、可切换的**柱状图／折线图**，以及每日 Token 记录的
 **CSV 导出**。手动检查更新可查看 GitHub 上更新的稳定 Release，下载和安装仍由用户完成。
@@ -15,8 +16,8 @@ Codex94 是一款非官方、独立的 macOS **Codex 额度监控与 Token 统�
 恢复提醒和可配置全局快捷键。鼠标左键或右键都切换同一个面板。面板和总览中的只读
 **手动额度重置**卡片展示可用次数，不执行重置兑换。
 
-Codex94 是采用 MIT 许可的源码项目，使用各已启用服务在本机安装的 CLI，
-不捆绑第三方运行时框架。
+Codex94 是采用 MIT 许可的源码项目。Codex 监控使用本机安装的 Codex CLI；
+Claude 默认仅读取已有的本地状态栏报告，不捆绑第三方运行时框架。
 
 **本项目通过 Codex 辅助的 vibe coding 工作流构建。** 每个版本在创建标签前
 仍会由维护者检查，并通过测试与安全扫描。
@@ -24,14 +25,13 @@ Codex94 是采用 MIT 许可的源码项目，使用各已启用服务在本机�
 > Codex94 与 OpenAI 或 Anthropic 没有隶属关系，也未获得两者的认可、背书或赞助。
 > Codex `app-server` 是实验性接口；上游更新也可能改变 CLI 和状态栏的数据格式。
 
-## 4.0.1 候选版——尚未发布
+## 4.0.1 版本
 
-`4.0.1 (22)` 保留未公开 4.0.0 候选版的双服务功能，将被动状态栏报告作为 Claude
-默认来源；CLI `/usage` 保留为独立、需要明确启用的选项。`v4.0.0` 标签
-原样保留，其 Draft Release 已移除。已发布稳定版以及下方下载／clone 链接仍为
-**3.1.4 (20)**。新候选版验证与公开发布尚待完成，下方 4.0.0 结果保留为历史证据。
+`4.0.1 (22)` 已于 **2026-10-03**（Australia/Melbourne）正式发布，现为稳定版。
+本版保留未公开 4.0.0 候选版的双服务功能；`v4.0.0` 标签原样保留，其 Draft Release
+已移除，下方该候选版的验证结果继续作为历史证据保留。
 
-候选版调整为**默认读取本地状态栏的被动报告**。根据
+Claude **默认读取本地状态栏的被动报告**。根据
 [Anthropic 的凭据使用规则](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)，
 目前未满足第三方复用订阅 OAuth 凭据的授权前提，因此不接入 OAuth，不读取令牌、不刷新凭据，
 也不增加 Claude HTTP 客户端。`/usage` 实测继续暂停；它保留为独立、默认关闭的选项，
@@ -50,7 +50,7 @@ Codex94 是采用 MIT 许可的源码项目，使用各已启用服务在本机�
   账号模式和只读重置次数继续保留。
 - 悬浮窗可独立选择服务，不必跟随主要菜单栏服务。关闭某服务会停止其监控和提醒；
   两者均关闭时保留中性状态项，仍可进入服务设置。
-- Claude 额度可来自**状态栏连接**；只有单独开启备用选项后才会使用官方 CLI 的
+- Claude 额度可来自**状态栏连接**；只有单独开启 CLI 选项后才会使用官方 CLI 的
   **`/usage` 页面**。卡片明确
   标注来源与报告时间，保留服务报告的小数精度；缺失额度或重置时间保持未知，
   不把 Codex 和 Claude 的百分比合并计算。
@@ -61,10 +61,11 @@ Codex94 是采用 MIT 许可的源码项目，使用各已启用服务在本机�
 - **Token 统计、图表、CSV／PNG 导出和图表复制仍仅支持 Codex。** 关闭 Codex
   监控后，该页面不再读取数据；本次没有加入 Claude Token／费用分析。
 
-## 3.1.4 版本
+## 先前的 3.1.4 版本
 
-`3.1.4 (20)` 已于 **2026-09-28**（Australia/Melbourne）正式发布。
-本版为额度读取提供更充足的等待时间，并在短暂失败后分别等待 5、20、60 秒重试。
+`3.1.4 (20)` 于 **2026-09-28**（Australia/Melbourne）发布。该版为 Codex
+额度读取提供更充足的等待时间，并在短暂失败后分别等待 5、20、60 秒重试；
+这些功能继续保留。
 重试间隔内继续显示最后成功的额度、琥珀色缓存标记和失败原因；下一次计划时间已知时，
 Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 [issue #36](https://github.com/DEFY-AN94/codex94/issues/36) 和[修复 PR](https://github.com/DEFY-AN94/codex94/pull/37)。
@@ -154,8 +155,8 @@ Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 ## 当前分发状态
 
 - 已发布的稳定版为
-  [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4)，
-  于 **2026-09-28**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
+  [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1)，
+  于 **2026-10-03**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
   annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
   也不会重新生成已发布的资产。
@@ -169,16 +170,15 @@ Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 - 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
-已发布的 `3.1.4` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+已发布的 `4.0.1` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
 attestation 都不会改变这一 Apple 信任状态。
 
 ## 系统要求
 
 - macOS 14 或更高版本。
-- Codex 监控需要兼容的 Codex 可执行文件和当前登录状态；已发布的 3.1.4 仅监控
-  Codex。
-- 4.0.1 候选版的可选 Claude 监控需要官方 Claude Code CLI，并已在终端完成首次设置
+- Codex 监控需要兼容的 Codex 可执行文件和当前登录状态。
+- 可选 Claude 监控需要官方 Claude Code CLI，并已在终端完成首次设置
   和登录。Codex94 不代为完成 Claude 登录或首次引导；只有 Claude Code 实际报告
   额度后才会出现状态栏数据，安装连接不会凭空生成额度。
 
@@ -194,23 +194,23 @@ Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
 
 ## 安装 Universal DMG
 
-请从 [`v3.1.4` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4)
+请从 [`v4.0.1` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1)
 下载以下两个正式资产：
 
-- `Codex94-3.1.4-macos-universal-unnotarized.dmg`
-- `Codex94-3.1.4-SHA256SUMS.txt`
+- `Codex94-4.0.1-macos-universal-unnotarized.dmg`
+- `Codex94-4.0.1-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-3.1.4-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.0.1-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-3.1.4-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.0.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -230,7 +230,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v3.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.0.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
@@ -388,10 +388,10 @@ Token 统计预览另有独立的来源记录。
   项目链接指向 `https://github.com/DEFY-AN94/codex94`，通过系统浏览器打开；
   独立的手动检查更新流程见上文。
 - 支持跟随系统、Terminal Dark、Terminal Light 主题，以及 English 和简体中文。
-- 只使用当前 Codex 登录；不管理多账号或其他 `CODEX_HOME` 目录，不收集本地额度历史账本。
+- Codex 监控只使用当前 Codex 登录；不管理多账号或其他 `CODEX_HOME` 目录，不收集本地额度历史账本。
 
 ## 安全与隐私
-4.0.1 候选版新增独立的本地 Claude CLI 读取和可选的状态栏额度缓存。预览设置只读；
+4.0.1 新增独立、默认关闭的本地 Claude CLI 读取和状态栏额度缓存。预览设置只读；
 安装或移除连接会明确修改 Claude Code 的状态栏设置，并保留恢复材料。
 下图描述的是既有 Codex 数据路径。
 
@@ -535,7 +535,7 @@ hosted 焦点跳过项不计作通过。外部 UI、安全分析、最终 main �
 仅对应测试 Mac 上的精确 CI 候选应用；最终 main 资产与安装验收另见
 [RELEASING.md](docs/RELEASING.md)。
 
-`3.1.4 (20)` 验证记录：**396 项执行、1 项既有 hosted 焦点跳过、0 项失败**。
+`3.1.4 (20)` 历史验证记录：**396 项执行、1 项既有 hosted 焦点跳过、0 项失败**。
 最终 main 检查、公开资产核验及本机后台刷新观察单独记录在 [RELEASING.md](docs/RELEASING.md)。
 
 未公开的 `4.0.0 (21)` 产品候选 `c9e7c01` 已通过 **486 项执行、1 项既有 hosted 焦点跳过、
@@ -545,6 +545,10 @@ hosted 焦点跳过项不计作通过。外部 UI、安全分析、最终 main �
 观察实际持续 626 秒：Codex 两次、Claude 一次后台刷新，以及每家一次弹窗触发
 读取均成功，失败数为零。该观察包含交互，不代表长期无人操作稳定性验证。以上仅为
 4.0.0 历史结果，不作为 4.0.1 修复或最终发布制品的验收。
+
+当前被动模式的本机验收仅确认连接已配置，尚未收到自然产生的报告，因此没有验证
+真实被动额度；合成测试不代表真实账号额度准确性已获验证。最终发布验收单独记录在
+[RELEASING.md](docs/RELEASING.md)。
 
 SwiftUI 负责视图与状态呈现；AppKit 负责菜单栏状态项、Popover、App 外观和
 Dashboard 窗口生命周期。组件职责与复用约束见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；

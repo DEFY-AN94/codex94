@@ -1,9 +1,8 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4),
-released on 2026-09-28 (Australia/Melbourne). Its tag and DMG remain bound to
-release commit `0aae38d7eff9c910ce25778c60ccf429b67cd22a`; later docs-only commits do not move
-that tag or regenerate its assets. Keep public download and source-clone
+The published stable version is [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
+released on 2026-10-03 (Australia/Melbourne). Later docs-only commits do not
+move its tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
 Each release uses one verified source commit, one annotated tag, and exactly
@@ -34,22 +33,22 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
-The maintainer has authorized development under the revised conditional
-data-source plan. The OAuth authorization prerequisite is not met, so this
-candidate uses passive statusline reports by default. Live `/usage` probing
+Version 4.0.1 follows the revised conditional data-source plan. The OAuth
+authorization prerequisite is not met, so it uses passive statusline reports
+by default. Live `/usage` probing
 remains suspended. The CLI reader stays an independent default-off option with
 a quota-consumption warning, never an automatic fallback. Validate source
 isolation and report age with synthetic data; do not launch Claude or send a
 prompt merely to populate test data. Earlier green CI does not validate these
 new source boundaries or resolve the historical CLI consumption/timeout concern.
 
-The current target is `4.0.1 (22)`, dated 2026-10-03 (Australia/Melbourne), still
-unpublished. It carries forward dual-provider monitoring with passive Claude
+Version `4.0.1 (22)`, released on 2026-10-03 (Australia/Melbourne), carries
+forward dual-provider monitoring with passive Claude
 reports by default and a separate, explicitly enabled CLI option.
 The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
 do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
-records do not establish validation of this fix. Keep public stable links at
-3.1.4 until the new release is verified and published.
+records do not establish validation of these source boundaries. Final checks,
+artifacts and installation need separate records. Public stable links point to 4.0.1.
 
 For this release, the maintainer approved a ten-minute live-observation scope.
 The earlier 4.0.0 candidate observation lasted 626 seconds: two Codex and one
@@ -131,7 +130,7 @@ separate and tied to the revision actually tested.
 Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
 Its historical tag and DMG remain bound to
 `ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`. Current download and clone
-instructions point to `v3.1.4`. This maintenance release isolates quota request contexts, shares strict
+instructions point to `v4.0.1`. This maintenance release isolates quota request contexts, shares strict
 service-value parsing, reuses chart preparation/formatting, retires old Token
 clients outside the main actor, and validates development-script arguments
 before side effects. It does not introduce a broad timer rewrite, new data
@@ -673,3 +672,67 @@ using production retry delays. This synthetic Debug UI evidence is separate
 from both Release binaries and the local observations above. Earlier 3.1.3
 Spaces acceptance remains bound to that Mac and candidate; it is not new 3.1.4 native-interaction evidence. Documentation
 follow-ups do not move the release tag or replace its assets.
+
+### 4.0.1 passive Claude monitoring release — 2026-10-03
+
+- Version/build: `4.0.1 (22)`. Release source: `841a4e57fff51ddc7813e642cc013c2211a93622`;
+  tree `4e1308bf0c59d2852c781bee1066866749b3cabc`. [PR #41](https://github.com/DEFY-AN94/codex94/pull/41)
+  was marked Ready and squash-merged after its final-head checks passed.
+- Final-main [CI 37120608417](https://github.com/DEFY-AN94/codex94/actions/runs/37120608417)
+  passed test/package, five synthetic UI scenarios and main-only attestation.
+  **503 tests executed, 1 existing hosted-focus skip, 0 failures**; the skip is
+  not counted as a pass. The installed-entry-point regression also passed on CI.
+- Final-main [CodeQL 37120608168](https://github.com/DEFY-AN94/codex94/actions/runs/37120608168)
+  passed Actions, Python and Swift analysis. The tested PR tree and final main
+  tree match. A shallow clone of the annotated release tag reproduced the
+  frozen commit/tree and version/build.
+- Annotated `v4.0.1` tag object: `021bd52acfb1e1f98a316dd1234dcd83eb3a365a`,
+  peeling to the frozen source above. The unpublished `v4.0.0` tag remains
+  unchanged (`bff5a990619c3f05faf30c134c9ba8e17043c051`, peeling to
+  `53b20227a1689c5200c13f53130e987a8a843b93`); its Draft Release was removed.
+- CI artifact `11273218056`, `codex94-dmg-841a4e57fff51ddc7813e642cc013c2211a93622`, had ZIP
+  SHA-256 `9d2f9f292f5e49869b2254b95edfa301bcbe6758f3143930131f810ed146d0be`.
+  It contained exactly the DMG and checksum file.
+- DMG SHA-256: `c60ba6f6ea94a9e488caec1a6fac63e2425cd816ec8adebabef754b231b5c03b`.
+- Checksum-file SHA-256: `eb9aa98d4db94d30cc9412368c4a40c2292459fd67043960ad8e2679cfcdce05`.
+- [GitHub attestation 52408733](https://github.com/DEFY-AN94/codex94/attestations/52408733) was strictly verified
+  against the exact source/signing SHA, this repository, `refs/heads/main`,
+  `.github/workflows/ci.yml`, a GitHub-hosted runner, and CI run 37120608417
+  attempt 1. The verified statement's subject matches the DMG name/hash.
+- [Public v4.0.1 Release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1), ID `402497037`,
+  was published as Latest at `2026-10-03T12:13:44Z`. Both Draft and anonymous
+  public asset downloads matched the original CI bytes and GitHub API SHA-256
+  digests. Anonymous Latest discovery returned this stable, non-draft release.
+  Manual asset IDs are `607756378` (DMG) and `607756379` (checksum).
+- The installed `/Applications/Codex94.app` executable SHA-256 is
+  `a90674b3249795508b25ef5edd20685d3f0d226ac3f09b420cba8efe0f3cdc96`. Its 14 bundle entries plus root mode match the
+  extracted final CI App. Original signing was preserved; quarantine was not
+  removed or changed. Extraction added only macOS `com.apple.provenance`
+  metadata, recorded separately. The installed copy was verified without
+  re-signing, and the previous local candidate was retained during replacement.
+- Final-package checks confirmed macOS 14+, arm64 and x86_64, an unsigned and
+  unnotarized outer DMG, and an ad-hoc Hardened Runtime App with no Team ID or
+  added entitlements. This existing installation context did not require a new
+  Open Anyway operation; it does not establish notarization or first-launch
+  Gatekeeper acceptance on another Mac.
+- Codex startup quota reading succeeded. Claude monitoring is enabled locally
+  in passive mode and the independent CLI flag remains off. The optional
+  statusline connection was installed without changing unrelated Claude
+  settings; there was no previous statusline command to replace.
+- Two calls to the exact final installed App's bridge entry point used only
+  isolated synthetic manifests/settings/caches. Both exited successfully,
+  captured the expected two windows, preserved the original `reportedAt` on
+  repeated input, advanced only receipt time, and left the GUI process and
+  binary unchanged. No fake report was written into the user's actual cache,
+  and no Claude process or model request was started for this validation.
+- No natural passive account report had arrived at acceptance, so real passive
+  quota values are not claimed as verified. Native UI control was unavailable;
+  reviewed local renders and fresh-host CI interactions used synthetic data.
+  The earlier interaction-inclusive 626-second CLI observation is historical
+  and does not validate passive account data.
+
+Direct OAuth remains unimplemented because the proposal's official-authorization
+prerequisite was not established. Passive reports have no verified account ID;
+report-stream selection is not authentication. The optional CLI reader remains
+default-off, with a quota-consumption warning and suspended live probing.
+Later documentation commits do not move either tag or replace release assets.
