@@ -9,6 +9,7 @@ import unittest
 
 
 SCANNER = Path(__file__).resolve().parents[1] / "security_check.sh"
+PROJECT_ROOT = SCANNER.parent.parent
 # Assemble test data at runtime so these script sources contain no machine path
 # or credential-shaped literal outside the scanner's existing test boundary.
 TRUST_PATH = "/" + "Users/" + "synthetic/" + "runtime"
@@ -67,6 +68,90 @@ class SecurityCheckFixtureTests(unittest.TestCase):
         self.commit()
         self.write(relative, "// Removed synthetic observation.\n")
         self.commit()
+
+    def install_oauth_boundary(self):
+        for relative in ["Codex94/Services/ClaudeOAuthUsageClient.swift", "Codex94/Models/ClaudeOAuthTypes.swift"]:
+            self.write(relative, (PROJECT_ROOT / relative).read_text(encoding="utf-8"))
+
+    def test_exact_oauth_client_and_anonymous_release_checker_are_allowed(self):
+        self.install_oauth_boundary()
+        relative = "Codex94/Services/AppUpdateClient.swift"
+        self.write(relative, (PROJECT_ROOT / relative).read_text(encoding="utf-8"))
+        self.scan()
+
+    def test_network_client_outside_exact_two_files_is_rejected(self):
+        for relative in ["Codex94/Services/OtherClient.swift", "Codex94/Views/ClaudeOAuthUsageClient.swift"]:
+            with self.subTest(relative=relative):
+                self.write(relative, "let session = URLSession.shared\n")
+                self.scan("direct networking outside approved HTTP clients")
+                (self.root / relative).unlink()
+
+    def test_release_checker_and_other_files_cannot_gain_bearer_credentials(self):
+        for relative in ["Codex94/Services/AppUpdateClient.swift", "Codex94/Other.swift"]:
+            with self.subTest(relative=relative):
+                self.write(relative, 'request.setValue("Bearer " + value, forHTTPHeaderField: "Authorization")\n')
+                self.scan("credential headers outside the guarded OAuth authorize operation")
+                (self.root / relative).unlink()
+
+    def test_oauth_authorize_requires_its_guard_and_cannot_be_reused_elsewhere(self):
+        self.install_oauth_boundary()
+        relative = "Codex94/Models/ClaudeOAuthTypes.swift"
+        original = (self.root / relative).read_text(encoding="utf-8")
+        guard = "        guard ClaudeOAuthUsageClient.isAllowed(request) else { throw ClaudeOAuthIssue.invalidDestination }\n"
+        self.assertIn(guard, original)
+        self.write(relative, original.replace(guard, "", 1))
+        self.scan("credential headers outside the guarded OAuth authorize operation")
+        self.write(relative, original + '\nrequest.setValue("Bearer " + value, forHTTPHeaderField: "Authorization")\n')
+        self.scan("additional credential header access outside OAuth authorize")
+
+    def test_oauth_endpoint_method_transport_and_redirect_contracts_fail_closed(self):
+        self.install_oauth_boundary()
+        relative = "Codex94/Services/ClaudeOAuthUsageClient.swift"
+        original = (self.root / relative).read_text(encoding="utf-8")
+        cases = [
+            ("https://api.anthropic.com/api/oauth/usage", "https://example.invalid/usage", "endpoint allowlist changed"),
+            ('request.httpMethod = "GET"', 'request.httpMethod = "POST"', "GET/cache/cookie boundary changed"),
+            ('return request.httpMethod == "GET"', 'return request.httpMethod == "POST"', "method/destination/budget validator changed"),
+            ("        guard ClaudeOAuthUsageClient.isAllowed(request) else { throw ClaudeOAuthIssue.invalidDestination }\n", "", "transport destination guard changed"),
+            ("completionHandler(nil)", "completionHandler(request)", "redirect rejection changed"),
+            ("configuration.urlCache = nil", "configuration.urlCache = URLCache.shared", "GET/cache/cookie boundary changed"),
+            ("configuration.httpShouldSetCookies = false", "configuration.httpShouldSetCookies = true", "GET/cache/cookie boundary changed"),
+        ]
+        for before, after, expected in cases:
+            with self.subTest(expected=expected, changed=before):
+                self.assertIn(before, original)
+                self.write(relative, original.replace(before, after, 1))
+                self.scan(expected)
+        self.write(relative, original + "\nlet secondSession = URLSession.shared\n")
+        self.scan("additional OAuth URLSession transport is not approved")
+
+    def test_keychain_cookie_and_ambient_credentials_stay_forbidden_in_allowed_client(self):
+        self.install_oauth_boundary()
+        relative = "Codex94/Services/ClaudeOAuthUsageClient.swift"
+        original = (self.root / relative).read_text(encoding="utf-8")
+        for operation in ["SecItemCopyMatching(query, nil)", "SecItemAdd(query, nil)", "SecItemUpdate(query, value)",
+                          "SecItemDelete(query)", "SecKeychainFindGenericPassword()", "HTTPCookieStorage.shared",
+                          "URLCredentialStorage.shared", 'read("auth.json")']:
+            with self.subTest(operation=operation):
+                self.write(relative, original + "\n" + operation + "\n")
+                self.scan("prohibited credential or direct-HTTP pattern found")
+
+    def test_sensitive_access_in_other_production_files_still_fails(self):
+        for operation in ["SecItemCopyMatching(query, nil)", "HTTPCookieStorage.shared", 'read("auth.json")']:
+            with self.subTest(operation=operation):
+                self.write("Codex94/Other.swift", operation + "\n")
+                self.scan("prohibited credential or direct-HTTP pattern found")
+
+    def test_oauth_exception_does_not_skip_current_or_historical_secret_scan(self):
+        self.install_oauth_boundary()
+        relative = "Codex94/Models/ClaudeOAuthTypes.swift"
+        original = (self.root / relative).read_text(encoding="utf-8")
+        self.write(relative, original + "\n// " + TOKEN + "\n")
+        self.scan("possible committed credential or private key found")
+        self.commit()
+        self.write(relative, original)
+        self.commit()
+        self.scan("possible credential or private key exists in Git history")
 
     def test_exact_trust_path_and_private_alias_allowed_in_current_and_history_tests(self):
         self.scan()

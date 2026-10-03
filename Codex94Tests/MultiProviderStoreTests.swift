@@ -19,7 +19,7 @@ final class MultiProviderStoreTests: XCTestCase {
         await fixture.claude.completeNext(claudeReport(used: 25.5))
         try await waitFor("The opted-in fake response is accepted") { !fixture.store.claudeStore.isRefreshing }
         XCTAssertNotNil(fixture.store.providerSnapshot(for: .claude))
-        fixture.store.setClaudeCLIUsageEnabled(false)
+        fixture.store.setClaudeSourceMode(.statuslineOnly)
         fixture.store.refreshProvider(.claude)
         XCTAssertNil(fixture.store.providerSnapshot(for: .claude))
         XCTAssertTrue(fixture.preferences.claudeMonitoringEnabled)
@@ -256,7 +256,7 @@ final class MultiProviderStoreTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults)
         preferences.codexMonitoringEnabled = codexEnabled
         preferences.claudeMonitoringEnabled = claudeEnabled
-        preferences.claudeCLIUsageEnabled = claudeCLIEnabled
+        preferences.claudeSourceMode = claudeCLIEnabled ? .legacyCLI : .statuslineOnly
         preferences.hasChosenIdentityMode = true
         preferences.identityMode = .quotaOnly
         preferences.manualCodexPath = executable.path

@@ -1,6 +1,7 @@
 import Foundation
 
 enum ClaudeQuotaSource: String, Codable, Sendable {
+    case oauth
     case statusline
     case cliUsage
 }
@@ -8,6 +9,8 @@ enum ClaudeQuotaSource: String, Codable, Sendable {
 enum ClaudeQuotaIssue: String, Error, Equatable, Sendable {
     case cliUnavailable, loginRequired, setupRequired, timedOut, invalidData
     case noData, staleData, sourceChanged, configurationConflict, unavailable
+    case oauthNotReady, oauthNotConnected, oauthCredentialsRestricted, oauthLoginRequired
+    case oauthScopeMissing, oauthAccessDenied, oauthForbidden, oauthRateLimited, oauthNetwork, oauthServer, oauthInvalidData, oauthTimedOut
 }
 
 /// An opaque report-stream selection, never proof of account identity.
@@ -34,14 +37,25 @@ struct ClaudeQuotaReport: Codable, Equatable, Sendable {
     let receivedAt: Date
     let windows: [ClaudeQuotaWindow]
     let producerID: String?
+    let accountContext: ClaudeOAuthAccountContext?
 
     init(source: ClaudeQuotaSource, reportedAt: Date, receivedAt: Date,
-         windows: [ClaudeQuotaWindow], producerID: String? = nil) {
+         windows: [ClaudeQuotaWindow], producerID: String? = nil,
+         accountContext: ClaudeOAuthAccountContext? = nil) {
         self.source = source
         self.reportedAt = reportedAt
         self.receivedAt = receivedAt
         self.windows = windows
         self.producerID = producerID
+        self.accountContext = accountContext
+    }
+
+    var identityConfidence: ClaudeQuotaIdentityConfidence {
+        switch source {
+        case .oauth: accountContext == nil ? .unknown : .verifiedOAuth
+        case .statusline: .unverifiedLocal
+        case .cliUsage: .unknown
+        }
     }
 
     func snapshot(at now: Date) -> QuotaSnapshot? {

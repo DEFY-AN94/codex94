@@ -24,6 +24,8 @@ final class PreferencesStore: ObservableObject {
         static let codexMonitoringEnabled = "codexMonitoringEnabled.v1"
         static let claudeMonitoringEnabled = "claudeMonitoringEnabled.v1"
         static let claudeCLIUsageEnabled = "claude.cliUsageEnabled.v1"
+        static let claudeSourceMode = "claude.sourceMode.v1"
+        static let claudeStatuslineFallbackEnabled = "claude.statuslineFallbackEnabled.v1"
         static let claudePassiveProducerID = "claude.passiveProducerID.v1"
         static let menuBarServiceMode = "menuBarServiceMode.v1"
         static let primaryProvider = "primaryProvider.v1"
@@ -48,8 +50,23 @@ final class PreferencesStore: ObservableObject {
     @Published var claudeMonitoringEnabled: Bool {
         didSet { defaults.set(claudeMonitoringEnabled, forKey: Key.claudeMonitoringEnabled) }
     }
-    @Published var claudeCLIUsageEnabled: Bool {
-        didSet { defaults.set(claudeCLIUsageEnabled, forKey: Key.claudeCLIUsageEnabled) }
+    @Published var claudeSourceMode: ClaudeQuotaSourceMode {
+        didSet {
+            defaults.set(claudeSourceMode.rawValue, forKey: Key.claudeSourceMode)
+            defaults.set(claudeSourceMode == .legacyCLI, forKey: Key.claudeCLIUsageEnabled)
+        }
+    }
+    @Published var claudeStatuslineFallbackEnabled: Bool {
+        didSet { defaults.set(claudeStatuslineFallbackEnabled, forKey: Key.claudeStatuslineFallbackEnabled) }
+    }
+    /// Compatibility for existing callers; an independent source choice is now
+    /// authoritative and is also written to the old opt-in key for downgrades.
+    var claudeCLIUsageEnabled: Bool {
+        get { claudeSourceMode == .legacyCLI }
+        set {
+            if newValue { claudeSourceMode = .legacyCLI }
+            else if claudeSourceMode == .legacyCLI { claudeSourceMode = .oauthPreferred }
+        }
     }
     @Published private(set) var claudePassiveProducerID: String? {
         didSet {
@@ -138,7 +155,10 @@ final class PreferencesStore: ObservableObject {
         self.defaults = defaults
         codexMonitoringEnabled = Self.loadBoolean(from: defaults, key: Key.codexMonitoringEnabled, fallback: true)
         claudeMonitoringEnabled = Self.loadBoolean(from: defaults, key: Key.claudeMonitoringEnabled, fallback: false)
-        claudeCLIUsageEnabled = Self.loadBoolean(from: defaults, key: Key.claudeCLIUsageEnabled, fallback: false)
+        let legacyCLI = Self.loadBoolean(from: defaults, key: Key.claudeCLIUsageEnabled, fallback: false)
+        let savedSource = ClaudeQuotaSourceMode(rawValue: defaults.string(forKey: Key.claudeSourceMode) ?? "")
+        claudeSourceMode = legacyCLI ? .legacyCLI : (savedSource == .statuslineOnly ? .statuslineOnly : .oauthPreferred)
+        claudeStatuslineFallbackEnabled = Self.loadBoolean(from: defaults, key: Key.claudeStatuslineFallbackEnabled, fallback: true)
         claudePassiveProducerID = ClaudePassiveProducerID.normalized(defaults.string(forKey: Key.claudePassiveProducerID))
         menuBarServiceMode = MenuBarServiceMode(rawValue: defaults.string(forKey: Key.menuBarServiceMode) ?? "") ?? .single
         primaryProvider = QuotaProviderID(rawValue: defaults.string(forKey: Key.primaryProvider) ?? "") ?? .codex

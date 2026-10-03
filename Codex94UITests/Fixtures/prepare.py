@@ -25,6 +25,18 @@ METADATA_HELPER = "script/release_metadata.py"
 # Only these tracked build inputs may enter the disposable recovery source copy.
 # No repository metadata, documentation, scripts, local state or directory copy.
 BUILD_INPUTS = (
+    "Codex94/Models/ClaudeOAuthTypes.swift",
+    "Codex94/Services/ClaudeOAuthCredentialProvider.swift",
+    "Codex94/Services/ClaudeOAuthQuotaCache.swift",
+    "Codex94/Services/ClaudeOAuthResponseParser.swift",
+    "Codex94/Services/ClaudeOAuthUsageClient.swift",
+    "Codex94/Stores/ClaudeOAuthMonitor.swift",
+    "Codex94/Support/ClaudeQuotaSourcePolicy.swift",
+    "Codex94Tests/ClaudeOAuthClientTests.swift",
+    "Codex94Tests/ClaudeOAuthCachePolicyTests.swift",
+    "Codex94Tests/ClaudeOAuthMonitorTests.swift",
+    "Codex94Tests/ClaudeOAuthStoreIntegrationTests.swift",
+    "Codex94Tests/ClaudeOAuthViewTests.swift",
     "Codex94Tests/ClaudeExecutableLocatorTests.swift",
     "Codex94/Services/ClaudeExecutableLocator.swift",
     "Codex94Tests/ClaudeStatuslineInstallerRecoveryTests.swift",

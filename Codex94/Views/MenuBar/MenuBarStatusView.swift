@@ -86,7 +86,16 @@ struct MenuBarStatusView: View {
             let context = claudeAccessibilityContext(
                 source: store.claudeStore.source, issue: store.claudeStore.lastIssue,
                 nextAttempt: store.providerNextAutomaticRefreshAt(for: provider),
-                language: store.preferences.language
+                language: store.preferences.language,
+                sourceMode: store.claudeStore.sourceMode,
+                oauthIssue: store.claudeStore.oauthIssue,
+                oauthIdentityIssue: store.claudeStore.oauthIdentityIssue,
+                identityConfidence: store.claudeStore.identityConfidence,
+                oauthIdentityPending: store.claudeStore.oauthIdentityPending,
+                isUsingOAuthFallback: store.claudeStore.isUsingOAuthFallback,
+                passiveReportNeedsConfirmation: store.claudeStore.passiveReportNeedsConfirmation,
+                reportedAt: store.claudeStore.reportedAt,
+                retryAllowedAt: store.claudeStore.oauthRetryAllowedAt
             )
             return context.isEmpty ? summary : summary + ", " + context
         }
@@ -101,16 +110,75 @@ struct MenuBarStatusView: View {
     }
 
     static func claudeAccessibilityContext(source: ClaudeQuotaSource?, issue: ClaudeQuotaIssue?,
-                                           nextAttempt: Date?, language: LanguagePreference) -> String {
-        var components: [String] = []
-        if let source {
-            components.append(StatusAccessibilityString.localized(source.localizationKey, language: language, bundle: .main))
+                                           nextAttempt: Date?, language: LanguagePreference,
+                                           sourceMode: ClaudeQuotaSourceMode = .statuslineOnly,
+                                           oauthIssue: ClaudeOAuthIssue? = nil,
+                                           oauthIdentityIssue: ClaudeOAuthIssue? = nil,
+                                           identityConfidence: ClaudeQuotaIdentityConfidence = .unknown,
+                                           oauthIdentityPending: Bool = false,
+                                           isUsingOAuthFallback: Bool = false,
+                                           passiveReportNeedsConfirmation: Bool = false,
+                                           reportedAt: Date? = nil,
+                                           retryAllowedAt: Date? = nil) -> String {
+        func localized(_ key: String) -> String {
+            StatusAccessibilityString.localized(key, language: language, bundle: .main)
         }
-        if let issue {
-            components.append(StatusAccessibilityString.localized(issue.localizationKey, language: language, bundle: .main))
-            if let next = ConnectionRecoveryText.nextAttempt(at: nextAttempt, language: language) {
+        var components: [String] = []
+        let usesOAuth = sourceMode == .oauthPreferred
+        if usesOAuth && isUsingOAuthFallback {
+            components.append(localized("claude.oauth.fallback.source"))
+            components.append(localized("claude.oauth.unverifiedNotifications"))
+        } else if let source {
+            components.append(localized(source.localizationKey))
+        } else if usesOAuth {
+            components.append(localized("claude.source.oauth"))
+        }
+        if usesOAuth {
+            if source == .oauth {
+                if let reportedAt, let timestamp = QuotaFormatting.absoluteReset(
+                    to: reportedAt, locale: language.locale, calendar: Calendar(identifier: .gregorian),
+                    timeZone: .autoupdatingCurrent
+                ) {
+                    components.append(StatusAccessibilityString.localized(
+                        "claude.oauth.queryTime %@", arguments: [timestamp], language: language, bundle: .main
+                    ))
+                }
+                if oauthIdentityPending || identityConfidence != .verifiedOAuth || oauthIdentityIssue != nil {
+                    components.append(localized("claude.oauth.identity.pending"))
+                    if let oauthIdentityIssue { components.append(localized(oauthIdentityIssue.quotaIssue.localizationKey)) }
+                }
+            }
+            if isUsingOAuthFallback, let reportedAt, let timestamp = QuotaFormatting.absoluteReset(
+                to: reportedAt, locale: language.locale, calendar: Calendar(identifier: .gregorian),
+                timeZone: .autoupdatingCurrent
+            ) {
+                components.append(StatusAccessibilityString.localized(
+                    "claude.localReportTime %@", arguments: [timestamp], language: language, bundle: .main
+                ))
+            }
+            if passiveReportNeedsConfirmation { components.append(localized("claude.oauth.fallback.pending")) }
+        }
+        let cooldown = ([oauthIssue, oauthIdentityIssue].compactMap { issue -> Date? in
+            if case let .rateLimited(date) = issue { return date }
+            return nil
+        } + [retryAllowedAt].compactMap { $0 }).max()
+        if let issue = oauthIssue?.quotaIssue ?? issue {
+            components.append(localized(issue.localizationKey))
+            let planned: Date?
+            if let retryNotBefore = cooldown {
+                planned = max(retryNotBefore, nextAttempt ?? retryNotBefore)
+            } else { planned = nextAttempt }
+            if let next = ConnectionRecoveryText.nextAttempt(at: planned, language: language) {
                 components.append(next)
             }
+        } else if usesOAuth, let cooldown {
+            let reason = localized("claude.oauth.rateLimited")
+            if !components.contains(reason) { components.append(reason) }
+            if let next = ConnectionRecoveryText.nextAttempt(at: max(cooldown, nextAttempt ?? cooldown), language: language) {
+                components.append(next)
+            }
+        } else if usesOAuth && source == nil {
+            components.append(localized("claude.oauth.notConnected"))
         }
         return components.joined(separator: ", ")
     }

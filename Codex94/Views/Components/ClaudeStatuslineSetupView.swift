@@ -19,10 +19,20 @@ struct ClaudeStatuslineSetupView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("claude-passive-account-help")
             if store.passiveReportNeedsConfirmation && !store.isCLIUsageEnabled {
+                let pendingID = store.pendingPassiveConfirmationID
+                let pendingReport = store.pendingPassivePreview
                 ClaudePassiveReportAdoptionView(
                     reportedAt: store.pendingPassiveReportedAt,
-                    canAdopt: store.isEnabled,
-                    adopt: { clearFeedback(); confirmation = .adoptReport }
+                    canAdopt: store.isEnabled && pendingID != nil && pendingReport != nil,
+                    adopt: {
+                        // Capture the ID paired with this displayed report, not
+                        // whatever report happens to be current at confirmation.
+                        guard let pendingID, pendingReport != nil,
+                              store.pendingPassiveConfirmationID == pendingID else { return }
+                        clearFeedback()
+                        confirmation = .adoptReport(pendingID)
+                    },
+                    reportPreview: pendingReport
                 )
             }
             if store.statuslineSetupState == .conflict {
@@ -76,6 +86,8 @@ struct ClaudeStatuslineSetupView: View {
         }
         .onAppear { store.refreshSetupState() }
         .onChange(of: store.isCLIUsageEnabled) { _, _ in dismissAdoptionConfirmation() }
+        .onChange(of: store.sourceMode) { _, _ in dismissAdoptionConfirmation() }
+        .onChange(of: store.pendingPassiveConfirmationID) { _, _ in dismissAdoptionConfirmation() }
         .onChange(of: store.isEnabled) { _, _ in dismissAdoptionConfirmation() }
         .onChange(of: store.passiveReportNeedsConfirmation) { _, needsConfirmation in
             if !needsConfirmation { dismissAdoptionConfirmation() }
@@ -102,7 +114,7 @@ struct ClaudeStatuslineSetupView: View {
             titleVisibility: .visible
         ) {
             if let action = confirmation {
-                Button(action.actionKey, role: action == .adoptReport ? nil : .destructive) { perform(action) }
+                Button(action.actionKey, role: action.isAdoption ? nil : .destructive) { perform(action) }
                     .accessibilityIdentifier(action.accessibilityIdentifier)
             }
             Button("claude.setup.cancel", role: .cancel) { confirmation = nil }
@@ -118,7 +130,7 @@ struct ClaudeStatuslineSetupView: View {
     }
 
     private func dismissAdoptionConfirmation() {
-        if confirmation == .adoptReport { confirmation = nil }
+        if confirmation?.isAdoption == true { confirmation = nil }
     }
 
     private func perform(_ action: SetupConfirmation) {
@@ -132,12 +144,12 @@ struct ClaudeStatuslineSetupView: View {
             case .forgetRecord:
                 try store.forgetConflictingStatuslineInstallation()
                 successMessage = "claude.setup.recordForgotten"
-            case .adoptReport:
+            case let .adoptReport(expectedConfirmationID):
                 // The store owns the frozen pending report and may reject it
                 // if expired. Its published state is the result, not a toast.
                 guard store.isEnabled, !store.isCLIUsageEnabled,
                       store.passiveReportNeedsConfirmation else { return }
-                store.adoptPendingPassiveReport()
+                store.adoptPendingPassiveReport(expectedConfirmationID: expectedConfirmationID)
             }
         } catch {
             operationIssue = error as? ClaudeQuotaIssue ?? .unavailable
@@ -146,7 +158,12 @@ struct ClaudeStatuslineSetupView: View {
     }
 
     private enum SetupConfirmation: Equatable {
-        case remove, forgetRecord, adoptReport
+        case remove, forgetRecord
+        case adoptReport(UUID)
+        var isAdoption: Bool {
+            if case .adoptReport = self { return true }
+            return false
+        }
         var titleKey: LocalizedStringKey {
             switch self {
             case .remove: "claude.setup.removeConfirm"
@@ -178,20 +195,57 @@ struct ClaudeStatuslineSetupView: View {
     }
 }
 
-/// Only the pending report's local time enters this view; no session or account
-/// identifier is presented as identity proof.
+/// Frozen report values and a shortened stream fingerprint, never an account ID
+/// or proof that this local report belongs to the OAuth account.
 struct ClaudePassiveReportAdoptionView: View {
     let reportedAt: Date?
     let canAdopt: Bool
     let adopt: () -> Void
     var timeZone: TimeZone = .autoupdatingCurrent
+    var reportPreview: ClaudeQuotaReport? = nil
     @Environment(\.locale) private var locale
+
+    var displayedReportedAt: Date? { reportPreview?.reportedAt ?? reportedAt }
+
+    var sourceFingerprint: String? {
+        reportPreview?.producerID.flatMap { ClaudeStatuslineParser.identifiableProducerID($0) }
+            .map { String($0.prefix(12)) }
+    }
+
+    var previewWindows: [ClaudeQuotaWindow] {
+        (reportPreview?.windows ?? []).sorted { $0.kind.sortOrder < $1.kind.sortOrder }
+    }
+
+    func remainingText(for window: ClaudeQuotaWindow) -> String {
+        QuotaFormatting.percent(precise: 100 - window.usedPercentage)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Label("claude.passive.pending", systemImage: "exclamationmark.circle")
                 .font(.callout.weight(.medium)).foregroundStyle(.orange)
-            if let reportedAt, let time = QuotaFormatting.absoluteReset(
+            if reportPreview != nil {
+                Text(sourceFingerprint.map { LocalizedStringKey("claude.passive.preview.fingerprint \($0)") }
+                     ?? "claude.passive.preview.unknownFingerprint")
+                    .font(.system(.caption, design: .monospaced))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("claude-passive-preview-fingerprint")
+                Text("claude.passive.preview.fingerprintHelp")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(previewWindows, id: \.kind) { window in
+                    HStack {
+                        Text(window.kind.localizedKey)
+                        Spacer(minLength: 12)
+                        Text("quota.remaining \(remainingText(for: window))")
+                            .monospacedDigit()
+                    }
+                    .font(.caption)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("claude-passive-preview-" + window.kind.rawValue)
+                }
+            }
+            if let reportedAt = displayedReportedAt, let time = QuotaFormatting.absoluteReset(
                 to: reportedAt, locale: locale,
                 calendar: Calendar(identifier: .gregorian), timeZone: timeZone
             ) {

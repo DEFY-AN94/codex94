@@ -5,10 +5,15 @@ and a zero third-party runtime dependency model.
 
 ## Before opening a pull request
 
-1. Keep credential access inside the existing Codex subprocess boundary. Do not
-   add browser-cookie, Keychain, token-file, or direct usage-endpoint readers.
-2. Do not log or persist account identity, credentials, raw RPC payloads, or
-   private filesystem paths.
+1. Keep Codex authentication inside its subprocess boundary. The 4.1.0 Claude
+   OAuth client accepts explicitly injected credentials only at its fixed HTTP
+   allowlist; the production provider remains unavailable pending authorized
+   project integration details. Do not add ambient cookie, Keychain or token-file
+   discovery, reuse another application's client ID, or start CLI authentication.
+2. Do not log credentials, account identity, raw payloads or private paths. The
+   documented private OAuth quota cache is the only new identity-persistence
+   exception: verified account/organization UUIDs and normalized quota reports,
+   never credentials, email or raw response bodies.
 3. Add focused tests for behavior changes and both English and Simplified Chinese
    strings for visible UI.
 4. Keep `README.md` and `README.zh-CN.md` synchronized when installation,
@@ -185,8 +190,21 @@ authentication UI. Check exact request counts, independent provider errors,
 reads and the all-disabled settings entry. Keep these synthetic results separate
 from real CLI compatibility, account acceptance and unattended monitoring.
 
-For the 4.0.2 candidate, use background-thread fake completions for notification
-authorization, permission and delivery; do not test this by changing the user's
+For 4.1.0, keep OAuth tests fully synthetic with injected credential providers,
+HTTP transports, clocks and isolated cache directories. Cover independent usage
+and profile completion, profile failure with valid quota, credential-generation
+changes and late cancellation, one owned-renew/external-reload operation,
+non-bypassable authentication suspension and 429 cooldown, bounded transient
+recovery, wake/clock changes and explicit fallback confirmation. Only verified
+OAuth reports may enter their account-isolated cache or notification evaluation;
+unverified statusline reports never alert. Verify no CLI construction in the
+OAuth or fallback chain, including unavailable-credential startup. Do not read
+real credentials, launch Claude, open authorization pages or contact real quota
+endpoints to fill test fixtures. Production access details and a controlled
+integration check must be recorded separately before claiming live support.
+
+For the separate 4.0.2 candidate, use background-thread fake completions for
+notification authorization, permission and delivery; do not test this by changing the user's
 notification settings. Inspect the large Dashboard cards separately from the
 compact popover rows and reset count. Verify that `compactBoth` combines only
 presentation in one item, preserves independent provider states, and does not

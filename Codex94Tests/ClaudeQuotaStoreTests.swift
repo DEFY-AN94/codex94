@@ -5,7 +5,7 @@ import XCTest
 
 @MainActor
 final class ClaudeQuotaStoreTests: XCTestCase {
-    func testCLIUsageOffNeverCreatesOrCallsFetcherAndKeepsPassiveCacheReadable() async throws {
+    func testStatuslineOnlyNeverCreatesOrCallsFetcherAndKeepsPassiveCacheReadable() async throws {
         let fixture = try fixture(cliEnabled: false)
         let payload = Data(#"{"session_id":"00000000-0000-0000-0000-000000000001","rate_limits":{"five_hour":{"used_percentage":31.5,"resets_at":2000001000}}}"#.utf8)
         try fixture.cache.capture(payload, at: fixture.clock.read())
@@ -30,7 +30,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: fixture.cache.fileURL), original)
     }
 
-    func testDisablingCLIUsageRetiresInflightReadAndFallsBackOnlyToStatusline() async throws {
+    func testSelectingStatuslineOnlyRetiresInflightCLIRead() async throws {
         let fixture = try fixture()
         let payload = Data(#"{"session_id":"00000000-0000-0000-0000-000000000001","rate_limits":{"five_hour":{"used_percentage":50,"resets_at":2000010000}}}"#.utf8)
         try fixture.cache.capture(payload, at: fixture.clock.read())
@@ -46,7 +46,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertEqual(fixture.store.source, .cliUsage)
         fixture.store.refresh()
         try await wait { await fixture.fetcher.count() == 2 }
-        fixture.store.setCLIUsageEnabled(false)
+        fixture.store.setSourceMode(.statuslineOnly)
         XCTAssertFalse(fixture.preferences.claudeCLIUsageEnabled)
         XCTAssertTrue(fixture.store.isEnabled)
         XCTAssertFalse(fixture.store.isRefreshing)
@@ -76,13 +76,13 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertEqual(fixture.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 80)
     }
 
-    func testDisablingCLIUsageWithoutPassiveCacheClearsItsPreviousReport() async throws {
+    func testSelectingStatuslineOnlyWithoutCacheClearsTheCLIReport() async throws {
         let fixture = try fixture()
         fixture.store.start()
         try await wait { await fixture.fetcher.count() == 1 }
         await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 10)))
         try await wait { !fixture.store.isRefreshing }
-        fixture.store.setCLIUsageEnabled(false)
+        fixture.store.setSourceMode(.statuslineOnly)
         XCTAssertNil(fixture.store.snapshot)
         XCTAssertNil(fixture.store.source)
         XCTAssertNil(fixture.store.reportedAt)
@@ -608,7 +608,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         let preferences = PreferencesStore(defaults: defaults)
         preferences.claudeMonitoringEnabled = true
-        preferences.claudeCLIUsageEnabled = cliEnabled
+        preferences.claudeSourceMode = cliEnabled ? .legacyCLI : .statuslineOnly
         let cache = ClaudeStatuslineCache(fileURL: root.appendingPathComponent("support/statusline-quota.json"))
         let installer = ClaudeStatuslineInstaller(settingsURL: root.appendingPathComponent("settings.json"), cache: cache,
             executableURL: URL(fileURLWithPath: "/bin/echo"), supportDirectory: root.appendingPathComponent("support"))

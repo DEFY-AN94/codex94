@@ -3,14 +3,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_DIR="$ROOT_DIR/Codex94"
-FORBIDDEN='account/rateLimitResetCredit/consume|HTTPCookie|backend-api/codex/usage|browser-cookie|auth[.]json|Authorization[^\n]*Bearer|SecItemCopyMatching|kSecClassGenericPassword'
+FORBIDDEN='account/rateLimitResetCredit/consume|HTTPCookie|backend-api/codex/usage|browser-cookie|auth[.]json|Authorization[^\n]*Bearer|SecItemCopyMatching|kSecClassGenericPassword|SecItem(Add|Update|Delete)|SecKeychain|URLCredentialStorage[.]shared'
 SECRET_PATTERN='-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sk-(proj-|admin-|svcacct-)?[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|glpat-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|xox[baprs]-[A-Za-z0-9-]{20,}|npm_[A-Za-z0-9]{30,}|pypi-[A-Za-z0-9_-]{30,}|hf_[A-Za-z0-9]{30,}|[sr]k_live_[A-Za-z0-9]{20,}|whsec_[A-Za-z0-9]{20,}|SG[.][A-Za-z0-9_-]{16,}[.][A-Za-z0-9_-]{16,}|Bearer[[:space:]]+[A-Za-z0-9._~+/-]{20,}|eyJ[A-Za-z0-9_-]{10,}[.][A-Za-z0-9_-]{10,}[.][A-Za-z0-9_-]{10,}|[A-Za-z][A-Za-z0-9+.-]*://[^[:space:]/:@]+:[^[:space:]/@]+@|(api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|password|passwd)[[:space:]]*[:=][^[:alnum:]]{0,3}[A-Za-z0-9_./+=-]{16,}'
 PII_PATTERN='(/Users/[A-Za-z0-9._/-]+)|(/(private/)?var/folders/[A-Za-z0-9._/-]+)|([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,})'
 # Synthetic identities for account-switch/late-response tests, plus the exact
 # trust-alias fixture path. This allowlist applies only to tests, including history.
 ALLOWED_FIXTURE_PII='^(/Users/(example|private|another-person)(/[A-Za-z0-9._/-]+)?|/Users/synthetic/runtime|(user|test|private|account|first|late|second)@example[.]com)$'
 
-for required_command in rg git sort; do
+for required_command in rg git sort python3; do
   if ! command -v "$required_command" >/dev/null 2>&1; then
     echo "Security check failed: required command '$required_command' is unavailable." >&2
     exit 1
@@ -102,16 +102,116 @@ append_matches() {
 
 cd "$ROOT_DIR"
 
-# The anonymous, user-triggered GitHub release checker is the only direct
-# network client. Credential/cookie/reset-consumption bans still apply to it.
+# Two exact HTTP implementation files; neither exception bypasses credential,
+# cookie, reset-consumption, current-tree or Git-history secret scans below.
 network_matches="$(scan_matches "network-client scan could not be completed" \
   rg -l --glob '*.swift' 'URLSession' "$SOURCE_DIR")"
 while IFS= read -r source_file; do
-  [[ -z "$source_file" || "$source_file" == "$SOURCE_DIR/Services/AppUpdateClient.swift" ]] || {
-    echo "Security check failed: direct networking outside the release checker: $source_file" >&2
+  [[ -z "$source_file" || "$source_file" == "$SOURCE_DIR/Services/AppUpdateClient.swift" \
+    || "$source_file" == "$SOURCE_DIR/Services/ClaudeOAuthUsageClient.swift" ]] || {
+    echo "Security check failed: direct networking outside approved HTTP clients: $source_file" >&2
     exit 1
   }
 done <<< "$network_matches"
+
+# A narrow source contract complements the client's injected transport tests.
+# This is deliberately not a whole-file credential exemption: only authorize's
+# exact guarded header assignment is admitted. Changes to these boundaries need
+# a corresponding explicit policy review, not a new path/directory wildcard.
+python3 -I - "$SOURCE_DIR" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+root = Path(sys.argv[1])
+client_path = root / "Services/ClaudeOAuthUsageClient.swift"
+credential_path = root / "Models/ClaudeOAuthTypes.swift"
+header_pattern = re.compile(r'"Authorization"|"Bearer(?:\s|"|\\)', re.IGNORECASE)
+
+def fail(message):
+    raise SystemExit("Security check failed: " + message)
+
+def normalized(source):
+    return "\n".join(line.strip() for line in source.splitlines()
+                     if line.strip() and not line.lstrip().startswith("//"))
+
+authorize = normalized('''
+    func authorize(_ request: inout URLRequest, now: Date) throws {
+        guard ClaudeOAuthUsageClient.isAllowed(request) else { throw ClaudeOAuthIssue.invalidDestination }
+        guard scopes.contains("user:profile") else { throw ClaudeOAuthIssue.insufficientScope }
+        guard expiresAt.map({ $0 > now }) ?? true else { throw ClaudeOAuthIssue.expired }
+        request.setValue("Bearer " + accessToken, forHTTPHeaderField: "Authorization")
+    }
+''')
+for path in root.rglob("*.swift"):
+    source = path.read_text(encoding="utf-8")
+    if not header_pattern.search(source):
+        continue
+    stripped = normalized(source)
+    if path != credential_path or stripped.count(authorize) != 1:
+        fail("credential headers outside the guarded OAuth authorize operation: " + str(path.relative_to(root)))
+    if header_pattern.search(stripped.replace(authorize, "", 1)):
+        fail("additional credential header access outside OAuth authorize: " + str(path.relative_to(root)))
+
+if client_path.exists() or credential_path.exists():
+    if not client_path.is_file() or not credential_path.is_file():
+        fail("OAuth HTTP boundary is incomplete")
+    client = client_path.read_text(encoding="utf-8")
+    compact = normalized(client)
+    if normalized(credential_path.read_text(encoding="utf-8")).count(authorize) != 1:
+        fail("OAuth credential destination/scope/expiry guard changed")
+    urls = re.findall(r'https?://[^\s"\'<>]+', client)
+    if urls != ["https://api.anthropic.com/api/oauth/usage", "https://api.anthropic.com/api/oauth/profile"]:
+        fail("OAuth HTTP endpoint allowlist changed")
+    allowed = normalized('''
+    static func isAllowed(_ request: URLRequest) -> Bool {
+        let maximumTimeout: TimeInterval
+        switch request.url {
+        case usageEndpoint: maximumTimeout = usageTimeout
+        case profileEndpoint: maximumTimeout = profileTimeout
+        default: return false
+        }
+        return request.httpMethod == "GET" && request.httpBody == nil && request.httpBodyStream == nil
+            && request.timeoutInterval.isFinite && request.timeoutInterval > 0
+            && request.timeoutInterval <= maximumTimeout
+    }
+    ''')
+    if compact.count(allowed) != 1:
+        fail("OAuth HTTP method/destination/budget validator changed")
+    transport_entry = normalized('''
+    func response(for request: URLRequest) async throws -> ClaudeOAuthHTTPResponse {
+        guard ClaudeOAuthUsageClient.isAllowed(request) else { throw ClaudeOAuthIssue.invalidDestination }
+        try Task.checkCancellation()
+    ''')
+    if compact.count(transport_entry) != 1:
+        fail("OAuth transport destination guard changed")
+    # Require exactly one reviewed assignment, so a later overriding write also
+    # fails. The release checker remains anonymous via the header scan above.
+    assignments = {
+        "request.httpMethod": '"GET"',
+        "request.httpShouldHandleCookies": "false",
+        "configuration.urlCache": "nil",
+        "configuration.httpCookieStorage": "nil",
+        "configuration.urlCredentialStorage": "nil",
+        "configuration.httpShouldSetCookies": "false",
+        "configuration.requestCachePolicy": ".reloadIgnoringLocalCacheData",
+    }
+    for target, expected in assignments.items():
+        values = re.findall(re.escape(target) + r'\s*=(?!=)\s*([^\n]+)', compact)
+        if values != [expected]:
+            fail("OAuth GET/cache/cookie boundary changed: " + target)
+    for required in [
+        "static let usageTimeout: TimeInterval = 10", "static let profileTimeout: TimeInterval = 2",
+        "let configuration = URLSessionConfiguration.ephemeral",
+        "let session = URLSession(configuration: configuration, delegate: ClaudeOAuthSessionDelegate(), delegateQueue: nil)",
+        "let (bytes, rawResponse) = try await session.bytes(for: request)",
+        "completionHandler: @escaping (URLRequest?) -> Void) {\ncompletionHandler(nil)\n}",
+    ]:
+        if compact.count(required) != 1:
+            fail("OAuth bounded ephemeral transport or redirect rejection changed")
+    if len(re.findall(r'URLSession\s*\(', client)) != 1 or "URLSession.shared" in client:
+        fail("additional OAuth URLSession transport is not approved")
+PY
 
 forbidden_matches="$(
   scan_matches \

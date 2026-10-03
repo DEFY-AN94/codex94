@@ -33,12 +33,48 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
-The current candidate is **`4.0.2 (23)`**, with its changelog under **Unreleased**.
-Keep the stable `v4.0.1` download, clone, checksum and attestation references
-until public 4.0.2 publication is verified. Do not move or reuse any existing
-release tag, including the retained `v4.0.0` candidate tag.
+The current development branch prepares **`4.1.0 (24)`** under **Unreleased**.
+**`4.0.2 (23)`** is a separate maintenance candidate in PR #43; its checks,
+installation and publication are not 4.1.0 evidence. Keep the stable `v4.0.1`
+download, clone, checksum and attestation references until a newer public
+release is verified. Do not move or reuse any existing release tag, including
+the retained `v4.0.0` candidate tag.
 
-For 4.0.2, verify the following changes against its own source and artifacts:
+For 4.1.0, record the following before claiming production OAuth support:
+
+- Confirm the project's actual authorized client, callback, scopes, endpoints and
+  credential-ownership contract. The maintainer has indicated this information
+  will be supplied; public third-party code or another app's login is not a
+  substitute. Do not reuse a foreign client ID or read another application's
+  credentials without the project's approved integration contract.
+- Replace the explicitly unavailable production credential provider only through
+  reviewed, authorized work. Browser authorization, Keychain storage and OAuth
+  connect/disconnect UI are not currently implemented. Until these prerequisites
+  are satisfied, describe the feature as injectable development infrastructure,
+  not live Claude App/web monitoring. A controlled real integration check remains
+  pending, separate from synthetic tests and local UI rendering.
+- Test the fixed destination/method allowlist, ephemeral transport, response and
+  time bounds, redirect/auth-challenge rejection and redacted errors with fake
+  HTTP. Verify that no default, failure, manual or passive-fallback path constructs
+  a CLI client or starts `/usage`.
+- Verify concurrent usage/profile completion: quota appears before slow identity;
+  a profile-only 401/403 does not block successful quota or trigger quota renewal.
+  Pending/failed identity cannot borrow an old account, write cache or send alerts.
+  Check generation/account changes, late cancellation, verified cache isolation,
+  one owned-renew or external read-only reload, auth suspension, shared 429 cooldown
+  and bounded transient recovery.
+- Use injected clocks to cover sleep, wall-clock changes, the 60-second open/wake
+  freshness gate, single-flight coalescing and reset coverage. Check source/time/
+  identity presentation in both languages, frozen fallback confirmation, producer
+  changes and expiry. Passive data must remain unverified and must not alert.
+- Keep mock credentials and reports confined to fixtures. Do not read real tokens,
+  Keychain, cookies or conversations, or launch real CLI/model requests to obtain
+  screenshots. Do not prefill test totals, CI status, package identity or connection
+  success; each requires evidence from its actual candidate.
+
+The existing 4.0.2 presentation/notification checks below also remain regression
+coverage for later versions. For that separate candidate, verify against its own
+source and artifacts:
 
 - Invoke authorization, permission and delivery completions from a background
   fake notification adapter. They must not trigger MainActor isolation checks;
@@ -63,10 +99,11 @@ Record actual local tests, synthetic UI results, changed-behavior acceptance,
 final-main checks and package identities separately. No 4.0.2 validation result
 is implied by the historical records below.
 
-Version 4.0.1 follows the revised conditional data-source plan. The OAuth
-authorization prerequisite is not met, so it uses passive statusline reports
-by default. Live `/usage` probing
-remains suspended. The CLI reader stays an independent default-off option with
+Published 4.0.1 followed the revised conditional data-source plan. Its OAuth
+authorization prerequisite was not met, so it uses passive statusline reports
+by default. This is historical scope, not a statement that the 4.1.0 transport
+is absent or that a project-authorized integration is impossible. Live `/usage`
+probing remains suspended. The CLI reader stays an independent default-off option with
 a quota-consumption warning, never an automatic fallback. Validate source
 isolation and report age with synthetic data; do not launch Claude or send a
 prompt merely to populate test data. Earlier green CI does not validate these
@@ -308,7 +345,7 @@ states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
 Wait for CI, every synthetic UI smoke required by the candidate, and
-Actions/Python/Swift CodeQL on the actual tested revision. The `4.0.2` candidate gate
+Actions/Python/Swift CodeQL on the actual tested revision. The `4.1.0` development gate
 includes five UI scenarios: Display, Recovery, Token usage, Floating, and
 Providers. Providers uses synthetic data; passing it does not verify real Claude
 account quota, ordinary App/web collection or a restored live CLI reader.
@@ -762,8 +799,9 @@ follow-ups do not move the release tag or replace its assets.
   The earlier interaction-inclusive 626-second CLI observation is historical
   and does not validate passive account data.
 
-Direct OAuth remains unimplemented because the proposal's official-authorization
-prerequisite was not established. Passive reports have no verified account ID;
+At the 4.0.1 release, direct OAuth was unimplemented because the proposal's
+official-authorization prerequisite had not been established. Passive reports
+have no verified account ID;
 report-stream selection is not authentication. The optional CLI reader remains
 default-off, with a quota-consumption warning and suspended live probing.
 Later documentation commits do not move either tag or replace release assets.

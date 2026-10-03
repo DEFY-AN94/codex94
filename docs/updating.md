@@ -15,6 +15,13 @@ notification callback fix and compact quota layouts do not add automatic
 update checks or installation. The separate official Claude Usage-page link
 is browser navigation, not an additional update or quota API.
 
+Development `4.1.0 (24)` also retains this manual update mechanism. Its separate
+Claude OAuth client/coordinator is separate from the unauthenticated GitHub
+checker; it shares neither credentials nor cached quota with it. Production OAuth connection remains unavailable pending authorized
+integration details and validation; this does not affect stable-release discovery.
+Neither the 4.0.2 candidate nor this branch changes the stable download until a
+new release is actually published.
+
 `v4.0.0` remains an unchanged candidate tag; its Draft Release was removed. A tag alone is not a public stable
 Release and does not change what the latest-release API returns.
 
@@ -41,7 +48,7 @@ still lead to browser-based, user-managed installation under this design.
 
 ## How the check works
 
-The only metadata endpoint is
+The update checker's only metadata endpoint is
 [`https://api.github.com/repos/DEFY-AN94/codex94/releases/latest`](https://api.github.com/repos/DEFY-AN94/codex94/releases/latest).
 GitHub documents this as the latest published full release and permits public
 resource access without authentication. See the
@@ -117,6 +124,10 @@ App。`0.2.2` 用户需先手动安装 `0.3.0` 或之后的正式稳定版本，
 
 尚未发布的 `4.0.2 (23)` 候选版继续沿用此更新机制。通知回调修复和紧凑额度布局
 不会新增自动检查或安装；“查看官方 Claude 用量”仅打开浏览器页面，不是新的额度 API。
+
+`4.1.0 (24)` 开发版也保留手动更新机制。新增 Claude OAuth 客户端／协调器与 GitHub
+更新检查、凭据和缓存相互独立；真实 OAuth 连接仍待获准接入信息及验证，不影响稳定版发现。
+4.0.2 候选版和本开发分支都不会在正式发布前改变稳定下载。
 
 检查不发送账号或用量数据，结果不落盘；GitHub 仍能看到普通网络连接信息。检查失败
 不等于“已是最新”。它也不代表安装包已完成签名、公证或安全审查。未来自动安装需在

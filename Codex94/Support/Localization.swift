@@ -731,6 +731,7 @@ extension ClaudeQuotaSource {
     var localizedKey: LocalizedStringKey { LocalizedStringKey(localizationKey) }
     var localizationKey: String {
         switch self {
+        case .oauth: "claude.source.oauth"
         case .statusline: "claude.source.statusline"
         case .cliUsage: "claude.source.cliUsage"
         }
@@ -751,6 +752,18 @@ extension ClaudeQuotaIssue {
         case .sourceChanged: "claude.issue.sourceChanged"
         case .configurationConflict: "claude.issue.configurationConflict"
         case .unavailable: "claude.issue.unavailable"
+        case .oauthNotReady: "claude.oauth.notReady"
+        case .oauthNotConnected: "claude.oauth.notConnected"
+        case .oauthCredentialsRestricted: "claude.oauth.credentialsRestricted"
+        case .oauthLoginRequired: "claude.oauth.loginRequired"
+        case .oauthScopeMissing: "claude.oauth.scopeMissing"
+        case .oauthAccessDenied: "claude.oauth.accessDenied"
+        case .oauthForbidden: "claude.oauth.forbidden"
+        case .oauthRateLimited: "claude.oauth.rateLimited"
+        case .oauthNetwork: "claude.oauth.network"
+        case .oauthServer: "claude.oauth.server"
+        case .oauthInvalidData: "claude.oauth.invalidData"
+        case .oauthTimedOut: "claude.oauth.timedOut"
         }
     }
 }

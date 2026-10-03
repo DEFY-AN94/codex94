@@ -6,7 +6,9 @@
 
 Codex94 is an unofficial, independent macOS app for **Codex and Claude Code
 quota monitoring**, with **Codex Token usage statistics**. Codex is on by default;
-Claude is optional and defaults to passive local reports. Remaining quota and
+Claude is optional and off by default. Published 4.0.1 uses passive local reports;
+the 4.1.0 development branch prepares OAuth as its preferred source, but real
+account connection is not yet available. Remaining quota and
 reset times stay in the menu bar without a Dock icon, with details in one
 popover and Dashboard.
 
@@ -21,8 +23,9 @@ The read-only **Manual quota resets** display shows the available reset count in
 the popover and Overview without redeeming a reset.
 
 Codex94 is an MIT-licensed source project. Codex monitoring uses the locally
-installed Codex CLI; Claude defaults to reading existing local status-line
-reports. No third-party runtime frameworks are bundled.
+installed Codex CLI. The published Claude path reads local status-line reports;
+the development OAuth boundary is described below. No third-party runtime
+frameworks are bundled.
 
 **Vibe-built with Codex.** Each release is still maintainer-reviewed, tested,
 and security-scanned before it is tagged.
@@ -31,10 +34,39 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
-## 4.0.2 candidate (unreleased)
+## 4.1.0 development (unreleased)
 
-The development version is **4.0.2 (23)**. Stable downloads below remain on
-4.0.1 until publication of the new release is confirmed.
+**Paused:** the current engineering preparation is preserved. Further OAuth integration is paused; it is not enabled in the installed 4.0.2 App.
+
+The current development version is **4.1.0 (24)**. Stable downloads, source tags
+and verification commands below still refer to **4.0.1 (22)**.
+
+- The source selector defaults to **OAuth preferred**; Claude monitoring itself
+  stays off by default. **Statusline only** and the separate, explicit legacy
+  `/usage` opt-in remain available. The default OAuth/fallback path never creates
+  a CLI client or starts a Claude session.
+- The bounded HTTP client, coordinator, account-isolated cache and source/identity
+  presentation are implemented with injectable credentials and synthetic tests.
+  Usage and profile reads are independent: quota can appear while identity is
+  pending, without borrowing the previous account's identity. Only a verified
+  account context permits OAuth cache writes and notification evaluation.
+- Eligible passive fallback is a frozen report awaiting explicit confirmation,
+  never an automatic account match. Adopted reports retain their source and
+  original local report time, remain account-unverified and do not send alerts.
+  Changed report streams require another confirmation; expired windows stay unknown.
+
+**Real OAuth connection is pending.** The production credential provider returns
+“integration unavailable” without reading credentials or sending OAuth requests.
+Project-specific authorized client, callback, scope and integration details are
+still to be supplied and validated. Browser authorization, Keychain storage and
+OAuth connect/disconnect UI are not implemented. These foundations do not yet
+provide live Claude App/web quota monitoring; a controlled real integration check
+remains pending. Existing screenshots and release evidence do not validate 4.1.0.
+
+## 4.0.2 candidate (separate, unreleased)
+
+**4.0.2 (23)** is a separate maintenance candidate. Its publication and evidence
+are independent of this 4.1.0 branch; it is not the stable download below.
 
 - Fix notification completion callbacks that may run on a background queue
   and previously could trigger a MainActor isolation crash.
@@ -62,11 +94,11 @@ release results below are not 4.0.2 validation.
 unpublished 4.0.0 candidate. The `v4.0.0` tag remains unchanged and its Draft
 Release was removed; its validation records below remain historical.
 
-Claude uses **passive local status-line reports by default**. Direct
-OAuth access is deferred: [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
+In published 4.0.1, Claude uses **passive local status-line reports by default**.
+That release deferred direct OAuth access: [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
 do not establish permission for this third-party app to reuse subscription
 credentials. No OAuth credential reader, token refresh or Claude HTTP client is
-included. Live `/usage` probing remains suspended; that reader is a separate,
+included in 4.0.1. Live `/usage` probing remains suspended; that reader is a separate,
 default-off option with a quota-consumption warning.
 
 Passive reports arrive when you normally use Claude Code; Codex94 does not start
@@ -172,7 +204,8 @@ is limited to its tested Mac and candidate.
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.
-These retained captures do not show the 4.0.2 candidate's revised presentation.
+These retained captures do not show the 4.0.2 candidate's revised presentation
+or the 4.1.0 development source/identity controls.
 The chart previews were captured during `0.3.0 (14)` candidate testing and
 show **Bar chart** and **Line chart** over the same seven reported days. These
 original synthetic captures remain unchanged, from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
@@ -246,10 +279,12 @@ trust status.
 - macOS 14 or later.
 - Codex monitoring requires a compatible Codex executable and a current Codex
   login.
-- Optional Claude monitoring requires the official Claude Code
-  CLI with its initial setup and login already completed in a terminal. Codex94
-  does not complete Claude login or onboarding for you. Status-line quota appears
-  only when Claude Code reports it; installing the connection cannot create data.
+- Published Claude monitoring and the development **Statusline only** mode
+  require normal use of the official Claude Code CLI, with its setup/login
+  completed by the user. Installing the connection cannot create quota data.
+  Legacy `/usage` additionally requires its separate opt-in. Development OAuth
+  connection remains unavailable until the authorized integration is completed;
+  it does not require or silently start the CLI.
 
 DMG installation does not require Xcode. Source installation additionally
 requires full Xcode 16.4 or later (Command Line Tools alone are insufficient)
@@ -521,7 +556,12 @@ their own provenance above.
 Version 4.0.1 adds a separate, default-off local Claude CLI reader and a
 status-line quota cache. Previewing setup is read-only; installing or removing
 the connection explicitly edits Claude Code's status-line setting and retains
-recovery material. The diagram below describes the existing Codex path.
+recovery material. Development 4.1.0 additionally accepts explicitly supplied,
+in-memory OAuth credentials at its fixed Anthropic HTTP boundary; the production
+provider is still unavailable. Verified account/organization UUIDs and normalized
+quota reports may enter a separate private OAuth cache, never tokens or raw bodies.
+See [PRIVACY.md](PRIVACY.md) for these development boundaries. The diagram below
+describes the existing Codex path.
 
 
 ```mermaid
@@ -539,10 +579,12 @@ The Codex provider starts its validated executable with fixed arguments:
 codex -s read-only -a never app-server --stdio
 ```
 
-Codex itself owns authentication and may contact OpenAI services. Codex94 does
-not implement OAuth, receive an access or refresh token, make a direct quota
-HTTP request, or read authentication files, browser cookies, Keychain entries,
-Codex session logs, or SQLite databases.
+Codex itself owns authentication and may contact OpenAI services. The Codex
+provider receives no access/refresh token and makes no direct quota HTTP request.
+Codex94 does not inspect authentication files, browser cookies, Keychain entries,
+Codex session logs or SQLite databases. The separate development Claude OAuth
+client accepts an explicit in-memory access credential; it does not discover one
+from those stores or implement a browser sign-in flow.
 
 The versioned local cache stores only quota-bucket identifiers and optional
 names, plan type, window duration and type, percentage, reset time, and fetch

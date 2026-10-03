@@ -389,7 +389,7 @@ final class ProviderViewTests: XCTestCase {
             let fixture = try makeFixture(directory: state, bothWindows: bothCodexWindows,
                                           allowsCodexSetupFetch: scenario.fresh)
             defer { fixture.cleanUp() }
-            fixture.preferences.claudeCLIUsageEnabled = false
+            fixture.preferences.claudeSourceMode = .statuslineOnly
             fixture.preferences.claudeMonitoringEnabled = true
             fixture.claude.start()
             XCTAssertNil(fixture.claude.snapshot)

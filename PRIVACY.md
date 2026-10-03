@@ -14,21 +14,85 @@ browser only when clicked. Codex94 does not inspect that page, its cookies or
 login state. Browser navigation is separate from Codex94's quota reader and
 is not telemetry uploaded by this project.
 
-## Optional Claude monitoring (4.0.1)
+## Claude OAuth development boundary (4.1.0, unreleased)
+
+Development version `4.1.0 (24)` adds a direct HTTP client and credential
+abstraction. This is distinct from published 4.0.1 and the separate 4.0.2
+maintenance candidate. Claude monitoring remains off by default; the new source
+selection defaults to `oauthPreferred`, with `statuslineOnly` and explicitly
+selected `legacyCLI` alternatives. A previously explicit CLI opt-in is retained.
+The OAuth path and its passive fallback never construct a CLI or run `/usage`.
+
+The production `UnavailableClaudeOAuthCredentialProvider` cannot obtain a
+credential and performs no file, Keychain, browser or CLI access. Project-specific
+authorized client, callback, scope and integration information is still pending;
+there is no implemented browser authorization, Keychain credential storage or
+OAuth connect/disconnect UI, and no controlled live integration result is claimed.
+This does not assert that a permitted project integration is impossible.
+
+The injectable client does accept an explicit access credential in process memory.
+It sends authenticated GET requests only to
+`https://api.anthropic.com/api/oauth/usage` and
+`https://api.anthropic.com/api/oauth/profile`, identifies itself as Codex94 and
+uses ordinary system TLS validation. Usage/profile requests have independent
+10/2-second limits and a 64 KiB response limit. Sessions are ephemeral with cookie,
+credential and HTTP cache storage disabled; redirects and ambient HTTP
+credentials are rejected. If an authorized provider is supplied, Anthropic receives
+the bearer credential and ordinary connection metadata. The default unavailable
+provider sends no such requests. No response body or credential is retained in
+logs, diagnostics or user-facing errors; no refresh-token field is stored in the
+credential model.
+
+A refresh can request at most one recovery operation from the injected provider:
+renew an application-owned credential, or reread an externally owned credential
+without refreshing, writing or deleting it. These are coordination interfaces,
+not implemented production token acquisition or renewal. Rejected credential
+contexts suspend quota requests; manual refresh cannot bypass them. A 429 applies
+a shared monotonic cooldown, and unavailable Retry-After information uses five
+minutes. Sleep-aware `ContinuousClock` scheduling and bounded recovery add no
+persistent request history.
+
+Quota may be displayed while profile identity is pending. A profile failure does
+not label it with an earlier account, cache it or produce alerts. Verified OAuth
+reports are stored separately at
+`~/Library/Application Support/Codex94/Claude/OAuth/<digest>.json`, where the name
+is a SHA-256 digest of the normalized account and organization UUIDs. The file
+contains only a schema version, normalized windows/percentages/reset times,
+source/query-completion times and those verified UUIDs. It is private (`0600`,
+owner-only directory), keyed and revalidated by that exact account context.
+It contains no email, access/refresh token, credential fingerprint, session ID
+or raw HTTP body. Query completion time is a local observation, not a claimed
+server measurement time. No cross-account history is merged.
+
+`claude.sourceMode.v1` and `claude.statuslineFallbackEnabled.v1` store source and
+fallback choices, not credentials or account IDs. When enabled, fallback only
+stages a fresh, identifiable Code report with valid reset times for explicit
+confirmation. Its session hash does not prove the OAuth account. The frozen
+candidate cannot silently change during confirmation; adopted data remains
+account-unverified with its original report time. Different producers require
+new confirmation, expired windows are removed, and source/credential changes
+clear the association. Unverified statusline data never evaluates notifications;
+the existing explicit legacy CLI notification path remains separate. OAuth
+recovery returns to the primary source and resets the notification baseline.
+
+## Local Claude sources (introduced in 4.0.1)
+
+The following describes the published 4.0.1 default and the local-only paths
+retained in 4.1.0. It does not override the development OAuth boundary above.
 
 Version 4.0.1 uses passive local reports by default and keeps the optional CLI
 reader separate. The `v4.0.0` tag is preserved as an unpublished candidate.
 
-Claude monitoring is off by default. Enabling monitoring alone reads existing
+In 4.0.1, Claude monitoring is off by default. Enabling it alone reads existing
 local status-line reports. A separate `/usage` option is also off by
 default; only explicit opt-in permits starting the locally installed official
 Claude Code program and its built-in `/usage` command. The option warns that
 these CLI sessions may consume subscription quota; no zero-consumption guarantee
-is made. Live `/usage` probing remains suspended. Direct OAuth integration is deferred under
-[Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use);
-Codex94 neither obtains nor refreshes Claude subscription tokens. Claude Code
-owns subscription authentication and any connection to Anthropic. The probe
-runs in a dedicated Codex94 directory, disables tools, hooks, MCP servers and
+is made. Live `/usage` probing remains suspended. Published 4.0.1 deferred direct
+OAuth integration under [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
+and neither obtains nor refreshes Claude subscription tokens. For these local
+sources, Claude Code owns subscription authentication and its connection to
+Anthropic. The probe runs in a dedicated Codex94 directory, disables tools, hooks, MCP servers and
 remote-control startup, and has bounded output, runtime and process cleanup.
 Its folder-trust handler accepts only the verified, app-owned
 `~/Library/Application Support/Codex94/Claude/UsageProbe` directory. Claude Code
@@ -76,7 +140,7 @@ that bridge, preventing a dangling statusline command.
 
 Codex and Claude keep separate quota state, preferences, notification baselines
 and refresh tasks. Menu-bar and floating-provider selection only change
-presentation. This release monitors one default Claude Code profile and does
+presentation. These local paths monitor one default Claude Code profile and do
 not merge accounts or infer subscription allowance from local Token counts.
 The existing Token statistics/export features remain Codex-only.
 
@@ -141,8 +205,9 @@ requests over the child process's standard input/output:
 
 The Codex child process may contact OpenAI services using the login it already
 owns. Codex94 does not receive, read, export, or persist that login, its cookies,
-or its access and refresh tokens. Codex94 does not implement an OAuth flow or
-make direct quota HTTP requests.
+or its access and refresh tokens. This Codex path does not implement OAuth or
+make direct quota HTTP requests; the development Claude client has the separate
+boundary described above.
 
 Version `0.1.9` may start the same quota read once for the earliest future Reset
 across displayable windows, strictly at `resetsAt + 5` seconds or later. This
@@ -293,8 +358,10 @@ optional recovery alerts.
 
 The app evaluates fresh successful snapshots. Its baseline and per-window-cycle
 deduplication state are memory-only and are discarded when the app exits;
-cached snapshots and failed requests are not new alert observations. Messages
-contain the bucket's display name, quota window, and percentage, without email,
+cached snapshots and failed requests are not new alert observations. In 4.1.0,
+OAuth observations also require verified profile identity; unverified statusline
+reports, including explicitly adopted fallback, do not send notifications.
+Messages contain the bucket's display name, quota window, and percentage, without email,
 account IDs, credentials, raw RPC, or executable paths.
 
 Delivery uses the local macOS notification service. Notification Center may
