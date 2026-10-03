@@ -2,6 +2,13 @@ import AppKit
 import Combine
 import SwiftUI
 
+struct MenuBarProviderRingInput: Equatable {
+    let provider: QuotaProviderID
+    let remainingPercent: Int?
+    let quotaLevel: QuotaLevel
+    let badge: ConnectionBadge
+}
+
 /// Equality describes pixels only. Bucket names, resets and fetch timestamps
 /// still update accessibility/tooltip text without rerendering an unchanged icon.
 struct MenuBarStatusImageInput: Equatable {
@@ -15,13 +22,25 @@ struct MenuBarStatusImageInput: Equatable {
     let scale: CGFloat
     var providerLabel: QuotaProviderID? = nil
     var preciseRemainingPercent: Double? = nil
+    var providerRings: [MenuBarProviderRingInput] = []
 
     var contentSize: CGSize {
-        CGSize(width: layout.metrics.contentSize.width + (providerLabel == nil ? 0 : 46),
+        if !providerRings.isEmpty {
+            return CGSize(width: CGFloat(providerRings.count) * 22 + CGFloat(providerRings.count - 1) * 4, height: 22)
+        }
+        return CGSize(width: layout.metrics.contentSize.width + (providerLabel == nil ? 0 : 46),
                height: layout.metrics.contentSize.height)
     }
 
+    var statusItemWidth: CGFloat {
+        contentSize.width + (providerRings.isEmpty ? 2 * layout.metrics.horizontalInset : 4)
+    }
+
     static func == (lhs: Self, rhs: Self) -> Bool {
+        if !lhs.providerRings.isEmpty || !rhs.providerRings.isEmpty {
+            return lhs.providerRings == rhs.providerRings && lhs.colorScheme == rhs.colorScheme
+                && lhs.accentOverrides == rhs.accentOverrides && lhs.scale == rhs.scale
+        }
         guard lhs.layout == rhs.layout, lhs.badge == rhs.badge,
               lhs.colorScheme == rhs.colorScheme, lhs.accentOverrides == rhs.accentOverrides,
               lhs.localeIdentifier == rhs.localeIdentifier, lhs.scale == rhs.scale,
@@ -57,15 +76,24 @@ enum MenuBarStatusImageRenderer {
         .environment(\.colorScheme, input.colorScheme)
         .environment(\.locale, Locale(identifier: input.localeIdentifier))
         let content = HStack(spacing: 0) {
-            if let provider = input.providerLabel {
-                Text(verbatim: provider.displayName)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(input.colorScheme == .dark ? Color.white : Color.black)
-                    .frame(width: 46, alignment: .leading)
+            if input.providerRings.isEmpty {
+                if let provider = input.providerLabel {
+                    Text(verbatim: provider.displayName)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(input.colorScheme == .dark ? Color.white : Color.black)
+                        .frame(width: 46, alignment: .leading)
+                }
+                quotaContent
+            } else {
+                HStack(spacing: 4) {
+                    ForEach(input.providerRings, id: \.provider) { ring in
+                        CompactProviderRing(input: ring, palette: palette)
+                    }
+                }
             }
-            quotaContent
         }
         .frame(width: size.width, height: size.height)
+        .environment(\.colorScheme, input.colorScheme)
         let renderer = ImageRenderer(content: content)
         renderer.proposedSize = ProposedViewSize(size)
         renderer.scale = input.scale
@@ -91,6 +119,26 @@ enum MenuBarStatusImageRenderer {
         // this image is not a monochrome template that the menu bar may tint.
         result.isTemplate = false
         return result
+    }
+}
+
+private struct CompactProviderRing: View {
+    let input: MenuBarProviderRingInput
+    let palette: Codex94Palette
+
+    var body: some View {
+        ZStack {
+            RingGaugeView(remainingPercent: input.remainingPercent,
+                          color: palette.quotaColor(for: input.quotaLevel), lineWidth: 2)
+                .frame(width: 18, height: 18)
+            Image(systemName: input.provider.systemImageName)
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(palette.quotaColor(for: input.quotaLevel))
+            ConnectionBadgeView(badge: input.badge,
+                                color: palette.connectionBadgeColor(for: input.badge), size: 6)
+                .offset(x: 7, y: -7)
+        }
+        .frame(width: 22, height: 22)
     }
 }
 
@@ -160,10 +208,19 @@ final class MenuBarStatusRenderer {
             dualWindowBucket: store.providerDualWindowBucket(for: provider),
             colorScheme: scheme, accentOverrides: store.preferences.statusAccentOverrides,
             localeIdentifier: store.preferences.language.locale.identifier, scale: scale,
-            providerLabel: provider == .claude || store.preferences.enabledProviders.count > 1 ? provider : nil,
-            preciseRemainingPercent: store.providerMenuBarQuota(for: provider)?.window.preciseRemainingPercent
+            providerLabel: store.preferences.menuBarServiceMode == .both
+                && store.preferences.enabledProviders.count > 1 ? provider : nil,
+            preciseRemainingPercent: store.providerMenuBarQuota(for: provider)?.window.preciseRemainingPercent,
+            providerRings: store.preferences.usesCompactProviderRings ? store.preferences.enabledProviders.map { service in
+                let window = store.providerMenuBarQuota(for: service)?.window
+                return MenuBarProviderRingInput(
+                    provider: service, remainingPercent: window?.remainingPercent,
+                    quotaLevel: QuotaLevel(preciseRemainingPercent: window?.preciseRemainingPercent),
+                    badge: store.providerStatusPresentation(for: service).connectionBadge
+                )
+            } : []
         )
-        let itemWidth = input.contentSize.width + 2 * input.layout.metrics.horizontalInset
+        let itemWidth = input.statusItemWidth
         if item.length != itemWidth { item.length = itemWidth }
         guard input != lastImageInput || button.image == nil else { return }
         guard let image = imageFactory(input) else { return }
@@ -190,10 +247,14 @@ final class MenuBarStatusRenderer {
             ? "Codex94 · " + StatusAccessibilityString.localized(
                 "monitoring.off", language: store.preferences.language, bundle: .main
             )
-            : MenuBarStatusView.accessibilityLabel(
-            store: store, resolvedQuota: store.providerMenuBarQuota(for: provider),
-            presentation: store.providerStatusPresentation(for: provider), now: now, provider: provider
-        )
+            : (store.preferences.usesCompactProviderRings ? store.preferences.enabledProviders : [provider]).map { service in
+                let summary = MenuBarStatusView.accessibilityLabel(
+                    store: store, resolvedQuota: store.providerMenuBarQuota(for: service),
+                    presentation: store.providerStatusPresentation(for: service), now: now, provider: service,
+                    usesSingleWindowSummary: store.preferences.usesCompactProviderRings
+                )
+                return store.preferences.usesCompactProviderRings ? service.displayName + ": " + summary : summary
+            }.joined(separator: "\n")
         if button.accessibilityLabel() != text { button.setAccessibilityLabel(text) }
         if button.toolTip != text { button.toolTip = text }
     }

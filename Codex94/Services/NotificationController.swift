@@ -14,7 +14,15 @@ protocol QuotaNotificationServing {
 }
 
 @MainActor
-final class SystemQuotaNotificationService: NSObject, QuotaNotificationServing, UNUserNotificationCenterDelegate {
+protocol UserNotificationCenterAccess: AnyObject {
+    func getAuthorizationStatus(completion: @escaping @Sendable (Int) -> Void)
+    func requestAuthorization(options: UNAuthorizationOptions, completion: @escaping @Sendable (Bool, Error?) -> Void)
+    func add(_ request: UNNotificationRequest, completion: @escaping @Sendable (Error?) -> Void)
+}
+
+@MainActor
+private final class SystemUserNotificationCenterAccess: NSObject, UserNotificationCenterAccess,
+    UNUserNotificationCenterDelegate {
     // Never touch the user's notification service merely by constructing a store.
     private lazy var center: UNUserNotificationCenter = {
         let center = UNUserNotificationCenter.current()
@@ -22,13 +30,51 @@ final class SystemQuotaNotificationService: NSObject, QuotaNotificationServing, 
         return center
     }()
 
+    func getAuthorizationStatus(completion: @escaping @Sendable (Int) -> Void) {
+        // UserNotifications calls these blocks on its own call-out queue. The
+        // explicit Sendable boundary prevents inherited MainActor checks on
+        // SDKs whose Objective-C completion parameters lack that annotation.
+        center.getNotificationSettings { @Sendable settings in
+            completion(settings.authorizationStatus.rawValue)
+        }
+    }
+
+    func requestAuthorization(options: UNAuthorizationOptions, completion: @escaping @Sendable (Bool, Error?) -> Void) {
+        center.requestAuthorization(options: options) { @Sendable granted, error in
+            completion(granted, error)
+        }
+    }
+
+    func add(_ request: UNNotificationRequest, completion: @escaping @Sendable (Error?) -> Void) {
+        center.add(request) { @Sendable error in
+            completion(error)
+        }
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .list]
+    }
+}
+
+@MainActor
+final class SystemQuotaNotificationService: QuotaNotificationServing {
+    private let center: any UserNotificationCenterAccess
+
+    init(center: (any UserNotificationCenterAccess)? = nil) {
+        self.center = center ?? SystemUserNotificationCenterAccess()
+    }
+
     func authorization() async -> NotificationAuthorization {
         await withCheckedContinuation { continuation in
-            center.getNotificationSettings { settings in
+            center.getAuthorizationStatus { @Sendable status in
                 let authorization: NotificationAuthorization
-                switch settings.authorizationStatus {
-                case .authorized, .provisional, .ephemeral: authorization = .authorized
-                case .notDetermined: authorization = .notDetermined
+                switch status {
+                case UNAuthorizationStatus.authorized.rawValue,
+                     UNAuthorizationStatus.provisional.rawValue: authorization = .authorized
+                case UNAuthorizationStatus.notDetermined.rawValue: authorization = .notDetermined
                 default: authorization = .denied
                 }
                 continuation.resume(returning: authorization)
@@ -38,7 +84,7 @@ final class SystemQuotaNotificationService: NSObject, QuotaNotificationServing, 
 
     func requestAuthorization() async throws -> Bool {
         try await withCheckedThrowingContinuation { continuation in
-            center.requestAuthorization(options: [.alert]) { granted, error in
+            center.requestAuthorization(options: [.alert]) { @Sendable granted, error in
                 if let error {
                     continuation.resume(throwing: error)
                 } else {
@@ -56,7 +102,7 @@ final class SystemQuotaNotificationService: NSObject, QuotaNotificationServing, 
             identifier: UUID().uuidString, content: content, trigger: nil
         )
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            center.add(request) { error in
+            center.add(request) { @Sendable error in
                 if let error {
                     continuation.resume(throwing: error)
                 } else {
@@ -64,13 +110,6 @@ final class SystemQuotaNotificationService: NSObject, QuotaNotificationServing, 
                 }
             }
         }
-    }
-
-    nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        [.banner, .list]
     }
 }
 

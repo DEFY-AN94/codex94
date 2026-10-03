@@ -9,7 +9,7 @@ struct DisplaySettingsView: View {
     var body: some View {
         SettingsPage(title: "dashboard.display") {
             SettingsRow("display.label") {
-                if store.preferences.menuBarLayout == .dualWindow {
+                if store.preferences.usesDualWindowMenuBarSelection {
                     VStack(alignment: .leading, spacing: 7) {
                         MenuBarBucketPicker(store: store)
                             .frame(maxWidth: 360)
@@ -27,17 +27,25 @@ struct DisplaySettingsView: View {
             SettingsDivider()
 
             SettingsRow("display.layout") {
-                Picker("display.layout", selection: Binding(
-                    get: { store.preferences.menuBarLayout },
-                    set: { store.preferences.menuBarLayout = $0 }
-                )) {
-                    ForEach(MenuBarLayout.allCases) { layout in
-                        Text(layout.localizedKey).tag(layout)
+                VStack(alignment: .leading, spacing: 7) {
+                    Picker("display.layout", selection: Binding(
+                        get: { store.preferences.menuBarLayout },
+                        set: { store.preferences.menuBarLayout = $0 }
+                    )) {
+                        ForEach(MenuBarLayout.allCases) { layout in
+                            Text(layout.localizedKey).tag(layout)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 300)
+                    .disabled(store.preferences.usesCompactProviderRings)
+                    .accessibilityIdentifier("menu-bar-layout")
+                    if store.preferences.usesCompactProviderRings {
+                        Text("display.layout.compactProviderHelp")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .labelsHidden()
-                .frame(maxWidth: 300)
-                .accessibilityIdentifier("menu-bar-layout")
             }
 
             SettingsDivider()

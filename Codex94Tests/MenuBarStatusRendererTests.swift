@@ -8,6 +8,81 @@ import XCTest
 final class MenuBarStatusRendererTests: XCTestCase {
     private let fetchedAt = Date(timeIntervalSince1970: 1_900_000_000)
 
+    func testCombinedProviderRingsHaveCompactColorManagedPixelsAndIndependentState() throws {
+        let output = try temporaryDirectory()
+        for scheme in [ColorScheme.light, .dark] {
+            for scale: CGFloat in [1, 2] {
+                var pair = input(scheme: scheme, scale: scale)
+                pair.providerRings = [
+                    .init(provider: .codex, remainingPercent: 85, quotaLevel: .healthy, badge: .none),
+                    .init(provider: .claude, remainingPercent: 20, quotaLevel: .warning, badge: .stale)
+                ]
+                let image = try XCTUnwrap(MenuBarStatusImageRenderer.render(pair))
+                let rep = try bitmap(image)
+                XCTAssertEqual(image.size, CGSize(width: 48, height: 22))
+                XCTAssertEqual(pair.statusItemWidth, 52)
+                XCTAssertEqual(rep.pixelsWide, Int(48 * scale))
+                XCTAssertEqual(rep.cgImage?.colorSpace?.name, CGColorSpace.sRGB)
+                XCTAssertFalse(image.isTemplate)
+                XCTAssertGreaterThan(opaquePixelCount(rep), 50)
+                try writePNG(rep, named: "compact-rings-\(scheme)-\(Int(scale))x", to: output)
+                var changed = pair
+                changed.providerRings[1] = .init(provider: .claude, remainingPercent: nil, quotaLevel: .unknown, badge: .unavailable)
+                XCTAssertNotEqual(pair, changed)
+                let unknownImage = try XCTUnwrap(MenuBarStatusImageRenderer.render(changed))
+                XCTAssertNotEqual(image.tiffRepresentation, unknownImage.tiffRepresentation)
+                changed.providerRings[1] = .init(provider: .claude, remainingPercent: 20, quotaLevel: .critical, badge: .stale)
+                XCTAssertNotEqual(pair, changed, "Fractional quota changing a band must invalidate pixels")
+            }
+        }
+        print("CODEX94_COMPACT_RINGS_DIR=\(output.path)")
+    }
+
+    func testSingleAndCombinedModesHideNamesAndUpdateBothProviderTooltipsWithoutFetching() async throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanUp() }
+        fixture.preferences.claudeMonitoringEnabled = true
+        let calls = RenderCalls()
+        let renderer = MenuBarStatusRenderer(store: fixture.store, statusItem: fixture.item) { input in
+            calls.inputs.append(input)
+            return MenuBarStatusImageRenderer.render(input)
+        }
+        defer { renderer.shutdown() }
+        XCTAssertNil(calls.inputs.last?.providerLabel)
+        XCTAssertEqual(fixture.item.length, 58)
+        fixture.preferences.menuBarServiceMode = .compactBoth
+        fixture.preferences.menuBarLayout = .dualWindow
+        renderer.update(now: fetchedAt)
+        XCTAssertEqual(fixture.item.length, 52)
+        XCTAssertEqual(calls.inputs.last?.providerRings.map(\.provider), [.codex, .claude])
+        let tooltip = try XCTUnwrap(fixture.item.button?.toolTip)
+        XCTAssertTrue(tooltip.contains("Codex:"))
+        XCTAssertTrue(tooltip.contains("Claude:"))
+        XCTAssertTrue(tooltip.contains("85%"))
+        XCTAssertFalse(tooltip.contains("5h"), "Compact rings describe the selected quota, not hidden dual-window layout")
+        XCTAssertEqual(tooltip, fixture.item.button?.accessibilityLabel())
+        fixture.preferences.menuBarServiceMode = .both
+        renderer.update()
+        XCTAssertEqual(calls.inputs.last?.providerLabel, .codex)
+        XCTAssertEqual(calls.inputs.last?.providerRings, [])
+        fixture.preferences.menuBarServiceMode = .single
+        let claudeItem = NSStatusBar.system.statusItem(withLength: 58)
+        defer { NSStatusBar.system.removeStatusItem(claudeItem) }
+        let claudeRenderer = MenuBarStatusRenderer(store: fixture.store, statusItem: claudeItem, provider: .claude) { input in
+            calls.inputs.append(input)
+            return MenuBarStatusImageRenderer.render(input)
+        }
+        defer { claudeRenderer.shutdown() }
+        XCTAssertNil(calls.inputs.last?.providerLabel)
+        fixture.preferences.menuBarServiceMode = .compactBoth
+        fixture.preferences.codexMonitoringEnabled = false
+        claudeRenderer.update()
+        XCTAssertNil(calls.inputs.last?.providerLabel)
+        XCTAssertEqual(calls.inputs.last?.providerRings, [])
+        let fetches = await fixture.fetcher.calls
+        XCTAssertEqual(fetches, 0)
+    }
+
     func testEveryLayoutKeepsLogicalSizeBackingPixelsAndTransparentNonTemplateImage() throws {
         for layout in MenuBarLayout.allCases {
             for scheme in [ColorScheme.light, .dark] {

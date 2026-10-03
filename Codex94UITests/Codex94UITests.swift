@@ -389,8 +389,8 @@ final class Codex94UITests: XCTestCase {
         _ = try providerStatusItems(expected: ["codex"])
         try assertProviderQuotaVisibility(in: popover, codexFiveHour: false, reportName: "providers-viewport-three.json")
 
-        // The original Codex model picker lives below both summary cards. Its
-        // two-window Spark fixture lets the top viewport prove four quota columns.
+        // The original Codex model picker lives below both provider summaries.
+        // The two-window Spark fixture proves four terminal quota rows fit above it.
         let beforeModel = try providerRequestCounts()
         let model = try picker(label: language.quotaModel,
                                values: ["Codex", fixture.sparkName], in: popover)
@@ -418,9 +418,44 @@ final class Codex94UITests: XCTestCase {
             try self.fixture.preference("primaryProvider.v1") as? String == "claude"
         }
         _ = try providerStatusItems(expected: ["claude"])
+        try setProviderMenuMode("compactBoth", in: dashboard)
+        let combined = try XCTUnwrap(providerStatusItems(expected: ["combined"])["combined"])
+        let compactWidth = combined.frame.width
+        try require((48...56).contains(compactWidth), "The two provider rings must share one compact native item")
+        try require(combined.identifier == "menu-bar-combined"
+                    && combined.label.contains("Codex:") && combined.label.contains("Claude:"),
+                    "The combined item's accessible quota summary must name both services")
+        XCTAssertEqual(try providerRequestCounts(), beforeSelection, "Menu-bar presentation choices must not refresh providers")
+
+        popover = try openProviderPopover(service: "combined", marker: "provider-quota-sections")
+        for (rightClick, horizontalPosition) in [(false, CGFloat(0.25)), (true, CGFloat(0.75))] {
+            // Each native close/reopen gets its own successful freshness
+            // baseline so prior AX work cannot age it past the 60-second gate.
+            try refreshProviders(in: popover)
+            let compactFreshCounts = try providerRequestCounts()
+            let compactFreshCache = try fixture.cacheFingerprint()
+            try closeProviderPopover(service: "combined", marker: "provider-quota-sections")
+            let item = try providerStatusItem("combined")
+            let point = item.coordinate(withNormalizedOffset: CGVector(dx: horizontalPosition, dy: 0.5))
+            if rightClick { point.rightClick() } else { point.click() }
+            try require(identified("provider-quota-sections", in: application).waitForExistence(timeout: 8),
+                        "Either mouse button on the combined item must open the shared provider popover")
+            popover = try currentProviderPopover(marker: "provider-quota-sections")
+            try waitForProviderCards(in: popover, codex: true)
+            try assertProviderMetric("provider-codex-quota-fiveHour", percent: "88%", in: popover)
+            try assertProviderMetric("provider-codex-quota-weekly", percent: "80%", in: popover)
+            XCTAssertEqual(try providerRequestCounts(), compactFreshCounts,
+                           "Fresh compact-ring close/reopen must not request either provider")
+            XCTAssertEqual(try fixture.cacheFingerprint(), compactFreshCache,
+                           "Fresh compact-ring close/reopen must not rewrite Codex quota cache")
+        }
+        try captureProviderPopover(popover, marker: "provider-quota-sections", named: "providers-compact-en.png")
+        dashboard = try openDashboard(from: popover)
+        try selectPage(.providers, in: dashboard)
+        let beforeBoth = try providerRequestCounts()
         try setProviderMenuMode("both", in: dashboard)
         _ = try providerStatusItems(expected: ["codex", "claude"])
-        XCTAssertEqual(try providerRequestCounts(), beforeSelection, "Menu-bar presentation choices must not refresh providers")
+        XCTAssertEqual(try providerRequestCounts(), beforeBoth, "Restoring separate native items must not refresh providers")
         let savedChoices = try fixture.preferenceSnapshot(keys: [
             "menuBarQuotaSelection.v2", "primaryProvider.v1", "menuBarServiceMode.v1"
         ])
@@ -439,7 +474,7 @@ final class Codex94UITests: XCTestCase {
                            "Either fresh native status item must open the same shared content without new reads")
             // Card backgrounds are decorative SwiftUI containers; macOS may
             // flatten or alias them. Prove the shared panel using the actual,
-            // uniquely identified quota columns for both services instead.
+            // uniquely identified quota rows for both services instead.
             try assertProviderQuotaVisibility(
                 in: popover, codexFiveHour: true,
                 reportName: "providers-reopen-\(service)-\(rightClick ? "right" : "left").json"
@@ -536,9 +571,13 @@ final class Codex94UITests: XCTestCase {
             "scenario": "providers", "completed": true, "language": "en",
             "defaultCodexOnlyVerified": true, "defaultClaudeUsageRequests": 0,
             "singlePrimaryProviderSwitchVerified": true, "twoNativeStatusItemsVerified": true,
+            "compactCombinedNativeItemVerified": true, "compactNativeWidth": Double(compactWidth),
+            "compactBothBrandsInAccessibilityLabelVerified": true, "compactBothMouseButtonsVerified": true,
+            "compactBothRingRegionsVerified": true, "compactFreshReopenPreservesRequestsAndCache": true,
+            "compactToSeparateItemsVerified": true,
             "distinctNativeProviderBrandsVerified": true, "sharedPopoverBothServicesVerified": true,
             "bothMouseButtonsBothItemsVerified": true, "freshReopenDoesNotFetch": true,
-            "initialViewportThreeQuotaColumnsVerified": true, "twoWindowProviderTopViewportFourColumnsVerified": true,
+            "initialViewportThreeQuotaRowsVerified": true, "twoWindowProviderTopViewportFourRowsVerified": true,
             "claudeFailurePreservesCodexAndCache": true, "claudeManualFailureAttempts": 1,
             "claudeOnlyAfterCodexDisableVerified": true, "codexDisabledTokenPageDoesNotRead": true,
             "allOffNeutralSettingsEntryVerified": true, "reenablePreservesSelections": true,
@@ -616,9 +655,9 @@ final class Codex94UITests: XCTestCase {
     }
 
     private func setProviderMenuMode(_ mode: String, in dashboard: XCUIElement) throws {
-        try require(mode == "both" || mode == "single", "Unknown provider status-item mode")
+        let titles = ["single": "One service", "compactBoth": "Compact rings", "both": "Both services"]
+        guard let title = titles[mode] else { throw UITestFailure("Unknown provider status-item mode") }
         let group = try uniqueIdentified("provider-menu-bar-mode", in: dashboard)
-        let title = mode == "both" ? "Both services" : "One service"
         let candidates = group.descendants(matching: .any).matching(NSPredicate(
             format: "label == %@ OR title == %@", title, title
         )).allElementsBoundByIndex.filter { $0.elementType == .radioButton || $0.elementType == .button }
@@ -633,13 +672,17 @@ final class Codex94UITests: XCTestCase {
 
     private func providerStatusItems(expected: Set<String>, neutral: Bool = false) throws -> [String: XCUIElement] {
         try require(fixture.scenario == "providers", "Native provider inspection is scenario-scoped")
+        try require(!expected.isEmpty && expected.isSubset(of: ["codex", "claude", "combined"])
+                    && (!expected.contains("combined") || (expected == ["combined"] && !neutral)),
+                    "Combined and separate native items must be inspected as distinct exact modes")
         var resolved: [String: XCUIElement] = [:]
         try waitUntil("The exact enabled native status items were not exposed", timeout: 10) {
             var items = self.application.statusItems.allElementsBoundByIndex
             if items.isEmpty {
                 items = self.application.menuBarItems.allElementsBoundByIndex.filter {
-                    ["menu-bar-codex", "menu-bar-claude"].contains($0.identifier)
+                    ["menu-bar-codex", "menu-bar-claude", "menu-bar-combined"].contains($0.identifier)
                         || $0.label.hasPrefix("Codex,") || $0.label.hasPrefix("Claude,")
+                        || $0.label.hasPrefix("Codex:")
                         || $0.label == "Codex94 · Monitoring off"
                 }
             }
@@ -648,14 +691,18 @@ final class Codex94UITests: XCTestCase {
             for service in expected {
                 let brand = service == "codex" ? "Codex" : "Claude"
                 let matches = items.filter {
-                    $0.identifier == "menu-bar-" + service
+                    if service == "combined" { return $0.identifier == "menu-bar-combined" }
+                    return $0.identifier == "menu-bar-" + service
                         || (neutral ? $0.label == "Codex94 · Monitoring off"
                             : $0.label.hasPrefix(brand + ",") || $0.title.hasPrefix(brand + ","))
                 }
                 guard matches.count == 1, matches[0].isHittable,
                       (20...220).contains(matches[0].frame.width), matches[0].frame.height > 0 else { return false }
                 let label = matches[0].label
-                guard neutral ? label == "Codex94 · Monitoring off" : label.hasPrefix(brand + ",") else { return false }
+                let labelMatches = service == "combined"
+                    ? label.contains("Codex:") && label.contains("Claude:")
+                    : (neutral ? label == "Codex94 · Monitoring off" : label.hasPrefix(brand + ","))
+                guard labelMatches else { return false }
                 found[service] = matches[0]
             }
             if let codex = found["codex"], let claude = found["claude"], codex.frame == claude.frame { return false }
@@ -666,12 +713,13 @@ final class Codex94UITests: XCTestCase {
     }
 
     private func providerStatusItem(_ service: String, neutral: Bool = false) throws -> XCUIElement {
-        let both = try fixture.preference("menuBarServiceMode.v1") as? String == "both"
+        let mode = try fixture.preference("menuBarServiceMode.v1") as? String
         let codex = try fixture.preference("codexMonitoringEnabled.v1") as? Bool == true
         let claude = try fixture.preference("claudeMonitoringEnabled.v1") as? Bool == true
         let expected: Set<String>
         if !codex && !claude { expected = ["codex"] }
-        else if both { expected = Set((codex ? ["codex"] : []) + (claude ? ["claude"] : [])) }
+        else if mode == "compactBoth", codex && claude { expected = ["combined"] }
+        else if mode == "both" { expected = Set((codex ? ["codex"] : []) + (claude ? ["claude"] : [])) }
         else { expected = [service] }
         let items = try providerStatusItems(expected: expected, neutral: neutral)
         guard let item = items[service] else { throw UITestFailure("The requested enabled provider has no native item") }
@@ -734,51 +782,95 @@ final class Codex94UITests: XCTestCase {
         let matches = Set([element.label, element.title, element.value as? String ?? ""].filter {
             $0.contains(percent) && $0.contains("remaining")
         })
-        try require(matches.count == 1, "The known synthetic quota column must expose its exact remaining percentage")
+        try require(matches.count == 1, "The known synthetic quota row must expose its exact remaining percentage")
     }
 
     private func assertProviderQuotaVisibility(in popover: XCUIElement, codexFiveHour: Bool, reportName: String) throws {
         let viewport = try uniqueIdentified("provider-quota-sections", in: popover).frame.intersection(popover.frame)
-        try require(abs(viewport.width - 500) <= 2 && abs(viewport.height - 480) <= 2,
-                    "Both-provider evidence requires the actual 500 × 480 viewport")
+        let viewportMatches = abs(viewport.width - 500) <= 2 && viewport.height.isFinite
+            && viewport.height > 0 && viewport.height <= 482
+        let inset: CGFloat = 14
+        let geometryTolerance: CGFloat = 1
+        let maximumPaintWidth = viewport.width - 2 * inset + geometryTolerance
+        func diagnosticNumber(_ value: CGFloat) -> Any { value.isFinite ? Double(value) : NSNull() }
+        // As with the original quota rows, merged AX encloses visible paint,
+        // not the unused space in SwiftUI's maxWidth layout frame. The actual
+        // production-row layout tests retain the logical full-width contract.
+        func rowMeetsGeometry(_ frame: CGRect) -> Bool {
+            [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
+                && frame.width > 0 && frame.width <= maximumPaintWidth
+                && frame.height > 25 && frame.height <= 80
+                && abs(frame.minX - viewport.minX - inset) <= geometryTolerance
+                && viewport.maxX - frame.maxX >= inset - geometryTolerance
+                && viewport.insetBy(dx: -geometryTolerance, dy: -geometryTolerance).contains(frame)
+        }
         var values = [("provider-codex-quota-weekly", codexFiveHour ? "80%" : "32%"),
                       ("claude-quota-fiveHour", "75.5%"), ("claude-quota-weekly", "38.8%")]
         if codexFiveHour { values.append(("provider-codex-quota-fiveHour", "88%")) }
         var geometry: [[String: Any]] = []
         var quotaFrames: [String: CGRect] = [:]
-        for (identifier, percent) in values {
+        for (identifier, _) in values {
             let element = try uniqueIdentified(identifier, in: popover)
             let frame = element.frame
-            try assertProviderMetric(identifier, percent: percent, in: popover)
-            try require(frame.width > 120 && frame.height > 40 && viewport.insetBy(dx: -1, dy: -1).contains(frame),
-                        "Every provider quota column must be fully visible at the top of the shared viewport")
             quotaFrames[identifier] = frame
-            geometry.append(["identifier": identifier, "insideViewport": true,
-                             "relativeX": Double(frame.minX - viewport.minX), "relativeY": Double(frame.minY - viewport.minY),
-                             "width": Double(frame.width), "height": Double(frame.height)])
+            geometry.append([
+                "identifier": identifier, "insideViewport": viewport.insetBy(dx: -1, dy: -1).contains(frame),
+                "finiteFrame": [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite),
+                "relativeX": diagnosticNumber(frame.minX - viewport.minX),
+                "relativeY": diagnosticNumber(frame.minY - viewport.minY),
+                "width": diagnosticNumber(frame.width), "height": diagnosticNumber(frame.height),
+                "widthMeetsContract": frame.width.isFinite && frame.width > 0 && frame.width <= maximumPaintWidth,
+                "heightMeetsContract": frame.height.isFinite && frame.height > 25 && frame.height <= 80,
+                "leadingInsetMeetsContract": abs(frame.minX - viewport.minX - inset) <= geometryTolerance,
+                "trailingInsetMeetsContract": viewport.maxX - frame.maxX >= inset - geometryTolerance
+            ])
         }
         let codexRegion = quotaFrames.filter { $0.key.hasPrefix("provider-codex-quota-") }
             .values.reduce(CGRect.null) { $0.union($1) }
         let claudeRegion = quotaFrames.filter { $0.key.hasPrefix("claude-quota-") }
             .values.reduce(CGRect.null) { $0.union($1) }
-        try require(!codexRegion.isNull && !claudeRegion.isNull && !codexRegion.intersects(claudeRegion),
-                    "The shared viewport must contain separate visible quota regions for both services")
-        for prefix in ["provider-codex-quota-", "claude-quota-"] {
-            if let first = quotaFrames[prefix + "fiveHour"], let second = quotaFrames[prefix + "weekly"] {
-                try require(!first.intersects(second), "A provider's two quota columns must not overlap")
-            }
+        let regionsAreDistinct = !codexRegion.isNull && !claudeRegion.isNull && !codexRegion.intersects(claudeRegion)
+        let rowPairsDoNotOverlap = ["provider-codex-quota-", "claude-quota-"].allSatisfy { prefix in
+            guard let first = quotaFrames[prefix + "fiveHour"], let second = quotaFrames[prefix + "weekly"] else { return true }
+            return !first.intersects(second)
         }
+        let rowsMeetGeometry = quotaFrames.values.allSatisfy(rowMeetsGeometry)
+        // Persist exact app-owned relative geometry before any geometry assertion
+        // can stop the scenario; no global coordinates or unbounded AX text.
         try fixture.writeReport(reportName, fields: [
             "scenario": "providers", "method": "external-aut-accessibility-geometry",
-            "quotaColumns": geometry, "viewportWidth": Double(viewport.width), "viewportHeight": Double(viewport.height),
-            "sharedViewportContainsBothProviders": true, "providerQuotaRegionsAreDistinct": true,
+            "quotaRows": geometry, "quotaRowCount": values.count,
+            "viewportWidth": diagnosticNumber(viewport.width), "viewportHeight": diagnosticNumber(viewport.height),
+            "viewportMeetsContract": viewportMatches, "viewportMaximumHeight": 480,
+            "rowsMeetGeometryContract": rowsMeetGeometry,
+            "sharedViewportContainsBothProviders": quotaFrames.values.allSatisfy { viewport.insetBy(dx: -1, dy: -1).contains($0) },
+            "providerQuotaRegionsAreDistinct": regionsAreDistinct, "providerRowsDoNotOverlap": rowPairsDoNotOverlap,
+            "recordedBeforeAssertions": true,
             "containerObservations": providerContainerObservations(in: popover),
             "globalCoordinatesIncluded": false, "rawAXTextIncluded": false, "allDataSynthetic": true
         ])
+        if !viewportMatches || !rowsMeetGeometry || !regionsAreDistinct || !rowPairsDoNotOverlap {
+            let imageName = (reportName as NSString).deletingPathExtension + "-geometry-failure.png"
+            try captureProviderPopover(popover, marker: "provider-quota-sections", named: imageName)
+        }
+        try require(viewportMatches,
+                    "Both-provider viewport must be 500pt wide and at most 480pt high (2pt native tolerance); actual width=\(viewport.width), height=\(viewport.height)")
+        for (identifier, percent) in values {
+            let frame = try XCTUnwrap(quotaFrames[identifier])
+            let relativeFrame = frame.offsetBy(dx: -viewport.minX, dy: -viewport.minY)
+            try require(rowMeetsGeometry(frame),
+                        "Terminal quota row \(identifier) has viewport-relative frame \(NSStringFromRect(relativeFrame)); "
+                        + "viewport width=\(viewport.width), height=\(viewport.height); "
+                        + "required finite nonempty paint width<=\(maximumPaintWidth), height>25 and <=80, "
+                        + "14pt leading/trailing insets (1pt native tolerance) and complete visibility")
+            try assertProviderMetric(identifier, percent: percent, in: popover)
+        }
+        try require(regionsAreDistinct, "The shared viewport must contain separate visible quota regions for both services")
+        try require(rowPairsDoNotOverlap, "A provider's two quota rows must not overlap")
     }
 
     /// Failure triage only. Container aliases are not the acceptance condition;
-    /// the unique real quota columns and their common viewport are checked above.
+    /// the unique real quota rows and their common viewport are checked above.
     private func providerContainerObservations(in popover: XCUIElement) -> [[String: Any]] {
         let identifiers = ["provider-quota-sections", "provider-quota-summaries",
                            "codex-quota-section", "claude-quota-section"]
@@ -3729,7 +3821,7 @@ private struct SyntheticFixture {
                   try preference("codexMonitoringEnabled.v1") is Bool,
                   try preference("claudeMonitoringEnabled.v1") is Bool,
                   let mode = try preference("menuBarServiceMode.v1") as? String,
-                  ["single", "both"].contains(mode) else {
+                  ["single", "compactBoth", "both"].contains(mode) else {
                 throw UITestFailure("Providers must retain the 30-minute fixture policy and explicit synthetic CLI opt-in")
             }
         }
@@ -4051,11 +4143,14 @@ private struct SyntheticFixture {
             "usage-token-selection-diagnostic.json", "usage-pending-retry-diagnostic.json"
         ] : []
         let providers: Set<String> = scenario == "providers" ? [
-            "providers-both-en.png", "providers-claude-error-en.png",
+            "providers-both-en.png", "providers-compact-en.png", "providers-claude-error-en.png",
             "providers-claude-only-en.png", "providers-disabled-en.png",
             "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
             "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
             "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",
+            "providers-viewport-three-geometry-failure.png", "providers-viewport-four-geometry-failure.png",
+            "providers-reopen-codex-left-geometry-failure.png", "providers-reopen-codex-right-geometry-failure.png",
+            "providers-reopen-claude-left-geometry-failure.png", "providers-reopen-claude-right-geometry-failure.png",
             "providers-settings-entry.json"
         ] : []
         let floating: Set<String> = scenario == "floating" ? [

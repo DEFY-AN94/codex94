@@ -14,6 +14,7 @@ struct QuotaBarView: View {
          + Text(String(repeating: "░", count: emptyCount)).foregroundStyle(.secondary.opacity(0.46)))
             .font(.system(size: 14, weight: .medium, design: .monospaced))
             .lineLimit(1)
+            .minimumScaleFactor(0.75)
             .frame(width: 170, alignment: .leading)
             .accessibilityLabel(
                 StatusAccessibilityText.remainingPercent(

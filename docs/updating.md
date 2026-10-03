@@ -10,6 +10,11 @@ manual-only update design. It adds no update polling, download, installation,
 relaunch, endpoint, or signing-policy change. Stable discovery continues to
 follow the latest published GitHub Release.
 
+The unreleased `4.0.2 (23)` candidate preserves this update mechanism. Its
+notification callback fix and compact quota layouts do not add automatic
+update checks or installation. The separate official Claude Usage-page link
+is browser navigation, not an additional update or quota API.
+
 `v4.0.0` remains an unchanged candidate tag; its Draft Release was removed. A tag alone is not a public stable
 Release and does not change what the latest-release API returns.
 
@@ -109,6 +114,9 @@ be proposed. This document does not claim that path already exists.
 用户点击后查询本仓库最新公开稳定 Release，显示版本和纯文本说明，并可通过系统
 浏览器打开经过验证的发布页面。下载、校验和安装仍由用户完成，不会自动替换或重启
 App。`0.2.2` 用户需先手动安装 `0.3.0` 或之后的正式稳定版本，才能使用检查入口。
+
+尚未发布的 `4.0.2 (23)` 候选版继续沿用此更新机制。通知回调修复和紧凑额度布局
+不会新增自动检查或安装；“查看官方 Claude 用量”仅打开浏览器页面，不是新的额度 API。
 
 检查不发送账号或用量数据，结果不落盘；GitHub 仍能看到普通网络连接信息。检查失败
 不等于“已是最新”。它也不代表安装包已完成签名、公证或安全审查。未来自动安装需在

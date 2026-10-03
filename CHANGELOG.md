@@ -2,6 +2,32 @@
 
 All notable changes to Codex94 are documented here.
 
+## Unreleased
+
+Version `4.0.2 (23)` is a release candidate; no publication date is assigned.
+
+### Fixed
+
+- Keep UserNotifications completion handlers safe when the system calls them
+  from a background queue, preventing the inherited MainActor isolation crash.
+
+### Changed
+
+- Use separate large service cards in Dashboard, compact terminal-style service
+  rows in the popover, and a smaller read-only manual-reset count.
+- Fit the shared popover to its actual content, removing unused space for short
+  reports while keeping longer content in a bounded scroll area.
+- Hide redundant provider names in single-service menu-bar items.
+- Add the `compactBoth` service-display choice: two independent quota rings in
+  one native menu-bar item. Preserve `single` and the legacy `both` mode with
+  two separate status items, including existing saved selections.
+- Explain that passive quota reports require Claude Code statusline data;
+  ordinary Claude App/web chats do not produce those reports. Add an explicit
+  system-browser link to the official Usage page.
+
+No new Claude quota API is added. The optional `/usage` reader remains default-off;
+this release does not claim automatic App/web quota collection has been restored.
+
 ## 4.0.1 - 2026-10-03
 
 Version `4.0.1 (22)`. Release dates use Australia/Melbourne.
