@@ -39,6 +39,13 @@ Release was removed. The published stable release and all download/clone links
 below remain **3.1.4 (20)**. New-candidate validation and publication are pending;
 prior 4.0.0 results below are historical evidence.
 
+**Development and publication are paused at the maintainer's request.** The
+Claude Code `/usage` reader is now a separate, default-off backup option in
+Services. Its warning explains that starting CLI sessions may consume subscription
+quota. With it off, startup, automatic refresh and manual refresh only read
+existing local status-line reports and never launch the CLI reader. The quota
+consumption concern and intermittent CLI timeout remain open for future review.
+
 - **Codex is on by default; Claude is off.** Enable Claude in Dashboard →
   **Services**. Each service has its own refresh tasks, quota selection, source,
   freshness, failures and opt-in notification settings. One service's failure
@@ -50,8 +57,8 @@ prior 4.0.0 results below are historical evidence.
 - Choose the floating window's service separately from the primary menu-bar
   service. Disabling a service stops its monitoring and reminders. With both
   off, a neutral status item keeps Services settings reachable.
-- Claude quota can come from the official CLI's **`/usage` screen** or an
-  optional **status-line connection**. The card identifies the source and
+- Claude quota can come from a **status-line connection**, or the official CLI's
+  **`/usage` screen** only after separately enabling the backup option. The card identifies the source and
   report time, preserves reported fractions, and leaves missing quota/reset
   values unknown. It does not combine Codex and Claude percentages.
 - A status-line report is local information emitted by Claude Code, not a new

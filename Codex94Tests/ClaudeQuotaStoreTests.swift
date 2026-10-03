@@ -5,6 +5,89 @@ import XCTest
 
 @MainActor
 final class ClaudeQuotaStoreTests: XCTestCase {
+    func testCLIUsageOffNeverCreatesOrCallsFetcherAndKeepsPassiveCacheReadable() async throws {
+        let fixture = try fixture(cliEnabled: false)
+        let payload = Data(#"{"rate_limits":{"five_hour":{"used_percentage":31.5,"resets_at":2000001000}}}"#.utf8)
+        try fixture.cache.capture(payload, at: fixture.clock.read())
+        let original = try Data(contentsOf: fixture.cache.fileURL)
+        fixture.store.start()
+        XCTAssertEqual(fixture.store.source, .statusline)
+        XCTAssertEqual(fixture.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 68.5)
+        for trigger in [RefreshTrigger.launch, .manual, .popover, .background, .quotaReset, .automaticRetry, .preferenceChange, .systemWake] {
+            fixture.store.refresh(trigger: trigger)
+        }
+        fixture.store.popoverWillOpen(now: fixture.clock.read().addingTimeInterval(120))
+        fixture.store.handleSystemWake(now: fixture.clock.read())
+        fixture.store.handleSystemClockChange(now: fixture.clock.read())
+        fixture.clock.advance(1_100)
+        try await poll(fixture)
+        XCTAssertEqual(fixture.factoryCalls.read(), 0)
+        let calls = await fixture.fetcher.count()
+        XCTAssertEqual(calls, 0)
+        XCTAssertNil(fixture.store.snapshot, "An expired passive report must not invent fresh quota")
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt)
+        XCTAssertFalse(fixture.store.isRefreshing)
+        XCTAssertEqual(try Data(contentsOf: fixture.cache.fileURL), original)
+    }
+
+    func testDisablingCLIUsageRetiresInflightReadAndFallsBackOnlyToStatusline() async throws {
+        let fixture = try fixture()
+        let payload = Data(#"{"rate_limits":{"five_hour":{"used_percentage":50,"resets_at":2000010000}}}"#.utf8)
+        try fixture.cache.capture(payload, at: fixture.clock.read())
+        let cachedAt = fixture.clock.read()
+        let original = try Data(contentsOf: fixture.cache.fileURL)
+        fixture.store.start()
+        try await wait { await fixture.fetcher.count() == 1 }
+        fixture.clock.advance(1)
+        await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 30)))
+        try await wait { !fixture.store.isRefreshing }
+        XCTAssertEqual(fixture.store.source, .cliUsage)
+        fixture.store.refresh()
+        try await wait { await fixture.fetcher.count() == 2 }
+        fixture.store.setCLIUsageEnabled(false)
+        XCTAssertFalse(fixture.preferences.claudeCLIUsageEnabled)
+        XCTAssertTrue(fixture.store.isEnabled)
+        XCTAssertFalse(fixture.store.isRefreshing)
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt)
+        XCTAssertEqual(fixture.store.source, .statusline)
+        XCTAssertEqual(fixture.store.reportedAt, cachedAt)
+        XCTAssertEqual(fixture.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 50)
+        try await wait { fixture.fetcher.shutdowns.read() == 1 }
+        await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 99)))
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(fixture.store.reportedAt, cachedAt)
+        XCTAssertEqual(fixture.store.source, .statusline)
+        XCTAssertEqual(try Data(contentsOf: fixture.cache.fileURL), original)
+        XCTAssertTrue(fixture.notifications.deliveries.isEmpty)
+        fixture.store.refresh()
+        let disabledCalls = await fixture.fetcher.count()
+        XCTAssertEqual(disabledCalls, 2)
+        fixture.store.setCLIUsageEnabled(true)
+        try await wait { await fixture.fetcher.count() == 3 }
+        XCTAssertEqual(fixture.factoryCalls.read(), 2)
+        fixture.clock.advance(1)
+        await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 20)))
+        try await wait { !fixture.store.isRefreshing }
+        XCTAssertEqual(fixture.store.source, .cliUsage)
+        XCTAssertEqual(fixture.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 80)
+    }
+
+    func testDisablingCLIUsageWithoutPassiveCacheClearsItsPreviousReport() async throws {
+        let fixture = try fixture()
+        fixture.store.start()
+        try await wait { await fixture.fetcher.count() == 1 }
+        await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 10)))
+        try await wait { !fixture.store.isRefreshing }
+        fixture.store.setCLIUsageEnabled(false)
+        XCTAssertNil(fixture.store.snapshot)
+        XCTAssertNil(fixture.store.source)
+        XCTAssertNil(fixture.store.reportedAt)
+        XCTAssertNil(fixture.store.lastIssue)
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt)
+        XCTAssertEqual(fixture.store.connectionState, .idle)
+        XCTAssertTrue(fixture.preferences.claudeMonitoringEnabled)
+    }
+
     func testResetUsesExistingPollingAfterGraceAndNeverInventsRecoveredQuota() async throws {
         let fixture = try fixture()
         fixture.preferences.claudeRefreshInterval = .thirtyMinutes
@@ -417,15 +500,17 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let sleeper: ClaudeStoreTestSleeper
         let clock: ClaudeStoreTestClock
         let notifications: ClaudeStoreTestNotifications
+        let factoryCalls: ClaudeStoreTestCounter
     }
 
-    private func fixture(fetcherFactory: (@Sendable (URL) -> any ClaudeQuotaFetching)? = nil) throws -> Fixture {
+    private func fixture(cliEnabled: Bool = true, fetcherFactory: (@Sendable (URL) -> any ClaudeQuotaFetching)? = nil) throws -> Fixture {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("ClaudeStoreTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let suite = "Codex94.ClaudeStoreTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         let preferences = PreferencesStore(defaults: defaults)
         preferences.claudeMonitoringEnabled = true
+        preferences.claudeCLIUsageEnabled = cliEnabled
         let cache = ClaudeStatuslineCache(fileURL: root.appendingPathComponent("support/statusline-quota.json"))
         let installer = ClaudeStatuslineInstaller(settingsURL: root.appendingPathComponent("settings.json"), cache: cache,
             executableURL: URL(fileURLWithPath: "/bin/echo"), supportDirectory: root.appendingPathComponent("support"))
@@ -433,7 +518,9 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let sleeper = ClaudeStoreTestSleeper()
         let clock = ClaudeStoreTestClock()
         let notifications = ClaudeStoreTestNotifications()
+        let factoryCalls = ClaudeStoreTestCounter()
         let factory: @Sendable () -> any ClaudeQuotaFetching = {
+            factoryCalls.increment()
             if let fetcherFactory { return fetcherFactory(root) }
             return fetcher
         }
@@ -448,7 +535,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
             try? FileManager.default.removeItem(at: root)
         }
         return Fixture(directory: root, store: store, preferences: preferences, cache: cache, fetcher: fetcher,
-                       sleeper: sleeper, clock: clock, notifications: notifications)
+                       sleeper: sleeper, clock: clock, notifications: notifications, factoryCalls: factoryCalls)
     }
 
     private func report(at date: Date, used: Double, resetAt: Date? = nil) -> ClaudeQuotaReport {
@@ -474,9 +561,11 @@ final class ClaudeQuotaStoreTests: XCTestCase {
 }
 
 private actor ClaudeStoreTestFetcher: ClaudeQuotaFetching {
+    nonisolated let shutdowns = ClaudeStoreTestCounter()
     private var total = 0
     private var pending: [CheckedContinuation<ClaudeQuotaReport, Error>] = []
     func count() -> Int { total }
+    nonisolated func shutdown() { shutdowns.increment() }
     func fetch() async throws -> ClaudeQuotaReport {
         total += 1
         return try await withCheckedThrowingContinuation { pending.append($0) }
@@ -489,6 +578,13 @@ private actor ClaudeStoreTestFetcher: ClaudeQuotaFetching {
         }
     }
     func finishAll() { let values = pending; pending.removeAll(); values.forEach { $0.resume(throwing: CancellationError()) } }
+}
+
+private final class ClaudeStoreTestCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+    func increment() { lock.withLock { value += 1 } }
+    func read() -> Int { lock.withLock { value } }
 }
 
 private actor ClaudeStoreTestSleeper {

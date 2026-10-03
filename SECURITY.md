@@ -17,6 +17,10 @@ The 4.0.1 candidate adds optional Claude subscription monitoring
 through official Claude Code `/usage` and an explicitly installed local
 statusline bridge. Authentication remains inside Claude Code. There is no
 direct Claude quota HTTP/OAuth implementation or credential-store access.
+The CLI reader has a separate, default-off opt-in with a quota-consumption
+warning. Enabling Claude monitoring does not opt into CLI sessions. While the
+backup reader is off, automatic and manual refreshes only inspect the local
+statusline cache. Disabling it cancels and retires an active reader.
 The CLI probe has an owned working directory, disabled tools/hooks/MCP and
 remote-control startup, bounded output and a deadline. Only a recognized
 built-in usage action is submitted; unexpected login/onboarding screens are

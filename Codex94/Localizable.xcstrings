@@ -1,6 +1,74 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "claude.cliUsage.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backup quota reader"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "备用额度读取"
+          }
+        }
+      }
+    },
+    "claude.cliUsage.enable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable Claude Code /usage backup"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启用 Claude Code /usage 备用读取"
+          }
+        }
+      }
+    },
+    "claude.cliUsage.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off by default. When off, Claude monitoring only reads existing status-line reports; refreshing does not launch Claude Code."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认关闭。关闭时仅读取已有的 Claude 状态栏报告，刷新不会启动 Claude Code。"
+          }
+        }
+      }
+    },
+    "claude.cliUsage.warning": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quota consumption risk: enabling this option allows automatic and manual refreshes to start Claude Code /usage sessions, which may consume subscription quota. Enable only when needed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "额度消耗风险：启用后，自动刷新和手动刷新会启动 Claude Code /usage 会话，可能消耗订阅额度。请仅在需要时开启。"
+          }
+        }
+      }
+    },
     "claude.setup.conflict": {
       "localizations": {
         "en": {
@@ -472,13 +540,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code /usage"
+            "value": "Claude Code /usage (backup)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code /usage"
+            "value": "Claude Code /usage（备用）"
           }
         }
       }
@@ -616,13 +684,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude refresh interval"
+            "value": "Backup reader refresh interval"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude 刷新间隔"
+            "value": "备用读取刷新间隔"
           }
         }
       }

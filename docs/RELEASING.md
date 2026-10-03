@@ -34,6 +34,12 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
+Release work is paused at the maintainer's request. Do not resume live `/usage`
+probes, merge, tag or publish until the maintainer provides new direction.
+The CLI reader is a separate default-off backup option with a quota-consumption
+warning. Earlier green CI does not resolve the subsequent runtime and consumption
+concerns, and does not validate this new opt-in boundary.
+
 The current target is `4.0.1 (22)`, dated 2026-10-03 (Australia/Melbourne), still
 unpublished. It carries forward dual-provider monitoring and fixes delayed
 `/usage` submission when the Claude input footer has right-aligned hints.

@@ -16,6 +16,11 @@ right-aligned hints after the complete mode footer, so the CLI reader can send
 and cache v2 stay compatible; new monitoring/display choices and Claude
 preferences have their own keys. Monitoring defaults to Codex only. A display
 selection never implicitly enables a provider or starts a request.
+`claude.cliUsageEnabled.v1` is a separate default-off opt-in for the backup
+CLI reader. Existing Claude monitoring preferences do not enable it during
+migration. Without it, no CLI client is created and refreshes only load the
+local statusline cache. Turning it off retires in-flight work and clears CLI
+reports while leaving statusline monitoring available.
 
 `AppStore` composes the existing Codex state, `ClaudeQuotaStore` and global app
 services. It routes enable/disable, wake, popover and shutdown events. Each

@@ -239,6 +239,7 @@ final class ProviderViewTests: XCTestCase {
         let domain = "Codex94ProviderViewTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
         let preferences = PreferencesStore(defaults: defaults)
+        preferences.claudeCLIUsageEnabled = true // This fixture injects a synthetic fetcher.
         preferences.hasChosenIdentityMode = true
         preferences.identityMode = .quotaOnly
         preferences.language = .english

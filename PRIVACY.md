@@ -13,8 +13,13 @@ This section describes the unpublished 4.0.1 (22) candidate. It retains the
 the published stable release remains 3.1.4. The `v4.0.0` tag is preserved and
 was not published as a stable Release.
 
-Claude monitoring is off by default. Enabling it uses the locally installed
-official Claude Code program and its built-in `/usage` command. Claude Code
+Claude monitoring is off by default. Enabling monitoring alone reads existing
+local status-line reports. A separate `/usage` backup option is also off by
+default; only explicit opt-in permits starting the locally installed official
+Claude Code program and its built-in `/usage` command. The option warns that
+these CLI sessions may consume subscription quota; no zero-consumption guarantee
+is made. Live `/usage` development and release work are paused at the maintainer's
+request while the consumption concern is unresolved. Claude Code
 owns subscription authentication and any connection to Anthropic. The probe
 runs in a dedicated Codex94 directory, disables tools, hooks, MCP servers and
 remote-control startup, and has bounded output, runtime and process cleanup.

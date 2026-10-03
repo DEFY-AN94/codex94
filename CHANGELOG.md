@@ -6,6 +6,16 @@ All notable changes to Codex94 are documented here.
 
 Version `4.0.1 (22)`. Release dates use Australia/Melbourne.
 
+Development and publication are paused at the maintainer's request pending
+further direction on Claude quota consumption and intermittent CLI timeouts.
+
+### Changed
+
+- Make Claude Code `/usage` a separate, default-off backup reader with a
+  subscription-quota consumption warning. Enabling Claude monitoring alone
+  reads only existing local statusline reports; disabling the backup cancels
+  active CLI work.
+
 ### Fixed
 
 - Recognize the complete Claude input screen when right-aligned effort or quota

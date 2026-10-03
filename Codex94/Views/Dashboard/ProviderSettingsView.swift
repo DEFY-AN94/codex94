@@ -55,6 +55,23 @@ struct ProviderSettingsView: View {
             SettingsRow("claude.setup.title") {
                 ClaudeStatuslineSetupView(store: store.claudeStore)
             }
+            SettingsDivider()
+            SettingsRow("claude.cliUsage.title") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle("claude.cliUsage.enable", isOn: Binding(
+                        get: { store.preferences.claudeCLIUsageEnabled },
+                        set: { store.setClaudeCLIUsageEnabled($0) }
+                    ))
+                    .accessibilityIdentifier("claude-cli-usage-enabled")
+                    Text("claude.cliUsage.help")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Label("claude.cliUsage.warning", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("claude-cli-usage-warning")
+                }
+            }
             if store.preferences.claudeMonitoringEnabled {
                 SettingsDivider()
                 SettingsRow("claude.refreshInterval") {
@@ -68,6 +85,7 @@ struct ProviderSettingsView: View {
                         }
                     }
                     .labelsHidden().frame(width: 180)
+                    .disabled(!store.preferences.claudeCLIUsageEnabled)
                     .accessibilityIdentifier("claude-refresh-interval")
                 }
                 SettingsDivider()

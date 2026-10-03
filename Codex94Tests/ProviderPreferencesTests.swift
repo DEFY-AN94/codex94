@@ -27,15 +27,34 @@ final class ProviderPreferencesTests: XCTestCase {
         XCTAssertEqual(preferences.theme, .terminalLight)
         XCTAssertEqual(preferences.language, .simplifiedChinese)
         XCTAssertFalse(preferences.claudeMonitoringEnabled)
+        XCTAssertFalse(preferences.claudeCLIUsageEnabled)
         XCTAssertFalse(preferences.claudeNotifications.isEnabled)
         XCTAssertEqual(preferences.claudeRefreshInterval, .fiveMinutes)
         XCTAssertEqual(preferences.claudeMenuBarQuotaSelection, .automatic)
         XCTAssertEqual(preferences.claudeDualWindowBucketSelection, .automatic)
         XCTAssertEqual(defaults.string(forKey: "displayMode"), "weekly")
-        for key in ["codexMonitoringEnabled.v1", "claudeMonitoringEnabled.v1", "claude.refreshInterval.v1",
+        for key in ["codexMonitoringEnabled.v1", "claudeMonitoringEnabled.v1", "claude.cliUsageEnabled.v1", "claude.refreshInterval.v1",
                     "claude.notifications.v1", "claude.menuBarQuotaSelection.v1", "claude.dualWindowBucketSelection.v1"] {
             XCTAssertNil(defaults.object(forKey: key), "Loading old preferences must not silently enable or configure Claude")
         }
+    }
+
+    func testCLIUsageRequiresIndependentExplicitOptInAndPersistsOnlyBooleans() throws {
+        let defaults = try isolatedDefaults()
+        defaults.set(true, forKey: "claudeMonitoringEnabled.v1")
+        let preferences = PreferencesStore(defaults: defaults)
+        XCTAssertTrue(preferences.claudeMonitoringEnabled)
+        XCTAssertFalse(preferences.claudeCLIUsageEnabled, "Existing monitoring must never opt into CLI reads")
+        XCTAssertNil(defaults.object(forKey: "claude.cliUsageEnabled.v1"))
+        preferences.claudeCLIUsageEnabled = true
+        XCTAssertTrue(PreferencesStore(defaults: defaults).claudeCLIUsageEnabled)
+        preferences.claudeCLIUsageEnabled = false
+        XCTAssertFalse(PreferencesStore(defaults: defaults).claudeCLIUsageEnabled)
+        for malformed in [1, "true"] as [Any] {
+            defaults.set(malformed, forKey: "claude.cliUsageEnabled.v1")
+            XCTAssertFalse(PreferencesStore(defaults: defaults).claudeCLIUsageEnabled)
+        }
+        XCTAssertTrue(PreferencesStore(defaults: defaults).claudeMonitoringEnabled)
     }
 
     func testClaudeSettingsRoundTripWithoutChangingCodexKeys() throws {

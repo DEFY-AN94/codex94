@@ -67,7 +67,8 @@ final class ClaudeQuotaStore: ObservableObject {
 
     func start() {
         guard !stopped, !isEnabled, preferences.claudeMonitoringEnabled else { return }
-        fetcher = fetcherFactory()
+        fetcher = preferences.claudeCLIUsageEnabled ? fetcherFactory() : nil
+        if !preferences.claudeCLIUsageEnabled { discardCLIReport() }
         isEnabled = true
         logger.info("monitor=started")
         notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
@@ -82,20 +83,14 @@ final class ClaudeQuotaStore: ObservableObject {
     /// Disable is reversible. Retired clients cannot complete into the next generation.
     func stop() {
         guard !stopped else { return }
-        generation += 1
-        requestTask?.cancel()
+        retireCLIRequest()
         pollingTask?.cancel()
-        requestTask = nil
         pollingTask = nil
         isEnabled = false
         logger.info("monitor=stopped")
-        isRefreshing = false
         nextBackgroundRefreshAt = nil
         clearResetSchedule()
         nextAutomaticRefreshAt = nil
-        let retired = fetcher
-        fetcher = nil
-        cleanup.async { retired?.shutdown() }
         policy.reset()
         notificationController.configure(enabled: false)
     }
@@ -109,7 +104,14 @@ final class ClaudeQuotaStore: ObservableObject {
     }
 
     func refresh(trigger: RefreshTrigger = .manual) {
-        guard isEnabled, !stopped, requestTask == nil, let currentFetcher = fetcher else { return }
+        guard isEnabled, !stopped else { return }
+        guard preferences.claudeCLIUsageEnabled else {
+            loadBridgeReport()
+            projectReport(at: now())
+            updateNextAutomaticRefresh()
+            return
+        }
+        guard requestTask == nil, let currentFetcher = fetcher else { return }
         let expectedGeneration = generation
         let startedAt = ProcessInfo.processInfo.systemUptime
         let requestStartedAt = now()
@@ -119,13 +121,17 @@ final class ClaudeQuotaStore: ObservableObject {
         coverResets(through: requestStartedAt)
         updateNextAutomaticRefresh()
         requestTask = Task { [weak self] in
+            guard !Task.isCancelled, self?.generation == expectedGeneration, self?.isEnabled == true,
+                  self?.preferences.claudeCLIUsageEnabled == true else { return }
             do {
                 let value = try await currentFetcher.fetch()
-                guard let self, !Task.isCancelled, generation == expectedGeneration, isEnabled, !stopped else { return }
+                guard let self, !Task.isCancelled, generation == expectedGeneration, isEnabled, !stopped,
+                      preferences.claudeCLIUsageEnabled else { return }
                 accept(value, requestStartedAt: requestStartedAt)
                 logRefresh(trigger: trigger, startedAt: startedAt, issue: lastIssue)
             } catch {
-                guard let self, !Task.isCancelled, generation == expectedGeneration, isEnabled, !stopped else { return }
+                guard let self, !Task.isCancelled, generation == expectedGeneration, isEnabled, !stopped,
+                      preferences.claudeCLIUsageEnabled else { return }
                 let issue = (error as? ClaudeQuotaIssue) ?? .unavailable
                 activeReadIssue = issue
                 if issue == .loginRequired {
@@ -165,7 +171,8 @@ final class ClaudeQuotaStore: ObservableObject {
     func handleSystemClockChange(now: Date = Date()) {
         guard isEnabled else { return }
         projectReport(at: now)
-        nextBackgroundRefreshAt = now.addingTimeInterval(preferences.claudeRefreshInterval.seconds)
+        nextBackgroundRefreshAt = preferences.claudeCLIUsageEnabled
+            ? now.addingTimeInterval(preferences.claudeRefreshInterval.seconds) : nil
         // A wall-clock rollback must not make an already attempted target new.
         updateNextAutomaticRefresh()
     }
@@ -173,6 +180,47 @@ final class ClaudeQuotaStore: ObservableObject {
     func setRefreshInterval(_ interval: RefreshInterval) {
         preferences.claudeRefreshInterval = interval
         if isEnabled { armPolling() }
+    }
+
+    func setCLIUsageEnabled(_ enabled: Bool) {
+        guard preferences.claudeCLIUsageEnabled != enabled else { return }
+        preferences.claudeCLIUsageEnabled = enabled
+        guard !stopped else { return }
+        retireCLIRequest()
+        activeReadIssue = nil
+        nextBackgroundRefreshAt = nil
+        clearResetSchedule()
+        discardCLIReport()
+        policy.reset()
+        notificationController.configure(enabled: isEnabled && preferences.claudeNotifications.isEnabled)
+        guard isEnabled else { updateNextAutomaticRefresh(); return }
+        loadBridgeReport()
+        projectReport(at: now())
+        if let report { updateResetSchedule(from: report) }
+        if enabled { fetcher = fetcherFactory() }
+        armPolling()
+        if enabled { refresh(trigger: .preferenceChange) }
+    }
+
+    private func retireCLIRequest() {
+        generation += 1
+        requestTask?.cancel()
+        requestTask = nil
+        isRefreshing = false
+        let retired = fetcher
+        fetcher = nil
+        cleanup.async { retired?.shutdown() }
+    }
+
+    private func discardCLIReport() {
+        activeReadIssue = nil
+        lastIssue = nil
+        connectionState = .idle
+        guard report?.source == .cliUsage else { return }
+        report = nil
+        snapshot = nil
+        source = nil
+        reportedAt = nil
     }
 
     func setNotificationPreferences(_ value: NotificationPreferences) {
@@ -215,7 +263,8 @@ final class ClaudeQuotaStore: ObservableObject {
     private func armPolling() {
         pollingTask?.cancel()
         let expectedGeneration = generation
-        nextBackgroundRefreshAt = now().addingTimeInterval(preferences.claudeRefreshInterval.seconds)
+        nextBackgroundRefreshAt = preferences.claudeCLIUsageEnabled
+            ? now().addingTimeInterval(preferences.claudeRefreshInterval.seconds) : nil
         updateNextAutomaticRefresh()
         pollingTask = Task { [weak self, sleep] in
             while !Task.isCancelled {
@@ -339,7 +388,7 @@ final class ClaudeQuotaStore: ObservableObject {
     }
 
     private func updateNextAutomaticRefresh() {
-        guard isEnabled, !stopped else { nextAutomaticRefreshAt = nil; return }
+        guard isEnabled, !stopped, preferences.claudeCLIUsageEnabled else { nextAutomaticRefreshAt = nil; return }
         // These are due times. The existing 15-second poll performs the read
         // after the earliest deadline; no additional reset timer is created.
         nextAutomaticRefreshAt = [nextBackgroundRefreshAt, nextResetRefreshAt].compactMap { $0 }.min()
