@@ -133,7 +133,10 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
                 sentUsage = true; output.removeAll(keepingCapacity: true); lastOutput = clock.now; continue
             }
             if sentUsage {
-                if let report = try? ClaudeUsageScreen.report(from: screen, at: Date()) {
+                // The usage panel can show cached windows while its own
+                // network refresh is still pending. Those are not fresh data.
+                if !ClaudeUsageScreen.isRefreshing(screen),
+                   let report = try? ClaudeUsageScreen.report(from: screen, at: Date()) {
                     if candidateWindows != report.windows {
                         candidateWindows = report.windows
                         candidateSince = clock.now
@@ -283,6 +286,10 @@ struct ClaudeTerminalQueries {
 }
 
 enum ClaudeUsageScreen {
+    static func isRefreshing(_ text: String) -> Bool {
+        text.range(of: #"\bRefreshing(?:…|\.{3})(?!\.)"#, options: .regularExpression) != nil
+    }
+
     static func isReadyForUsage(_ text: String) -> Bool {
         if text.lowercased().filter({ !$0.isWhitespace }).contains("?forshortcuts") { return true }
         let lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }

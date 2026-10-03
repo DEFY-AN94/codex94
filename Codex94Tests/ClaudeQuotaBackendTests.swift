@@ -404,6 +404,38 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         XCTAssertEqual(kill(child, 0), -1)
     }
 
+    func testRefreshingUsageFramesWaitForUpdatedWindows() async throws {
+        for marker in ["Refreshing…", "Refreshing..."] {
+            let cached = "Current session\\r\\n10%% used\\r\\nCurrent week (all models)\\r\\n40%% used\\r\\n\(marker)\\r\\n"
+            let updated = "\\033[2J\\033[HCurrent session\\r\\n23.5%% used\\r\\nCurrent week (all models)\\r\\n41%% used\\r\\n"
+            let fixture = try stagedCLI(firstFrame: cached, delayedFrame: updated, delay: 1.8)
+            defer { fixture.client.shutdown() }
+            let report = try await fixture.client.fetch()
+            XCTAssertEqual(report.windows.map(\.usedPercentage), [23.5, 41],
+                           "A cached panel must not become fresh while its refresh marker remains visible")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.secondFrameMarker.path))
+            XCTAssertEqual(try String(contentsOf: fixture.requestFile, encoding: .utf8), "/usage")
+            let child = try XCTUnwrap(Int32(try String(contentsOf: fixture.childPIDFile, encoding: .utf8)))
+            XCTAssertEqual(kill(child, 0), -1)
+        }
+    }
+
+    func testContinuouslyRefreshingUsagePanelTimesOutWithoutReturningCachedWindows() async throws {
+        for marker in ["Refreshing…", "Refreshing..."] {
+            let cached = "Current session\\r\\n10%% used\\r\\nCurrent week (all models)\\r\\n40%% used\\r\\n\(marker)\\r\\n"
+            let fixture = try stagedCLI(firstFrame: cached, delayedFrame: nil, timeout: 3)
+            defer { fixture.client.shutdown() }
+            let clock = ContinuousClock()
+            let started = clock.now
+            do { _ = try await fixture.client.fetch(); XCTFail("Refreshing cached quotas cannot complete the read") }
+            catch { XCTAssertEqual(error as? ClaudeQuotaIssue, .timedOut) }
+            XCTAssertLessThan(clock.now - started, .seconds(6))
+            XCTAssertEqual(try String(contentsOf: fixture.requestFile, encoding: .utf8), "/usage")
+            let child = try XCTUnwrap(Int32(try String(contentsOf: fixture.childPIDFile, encoding: .utf8)))
+            XCTAssertEqual(kill(child, 0), -1)
+        }
+    }
+
     func testProbeSuppressesUpdatesAndHistoryOnlyInItsChildEnvironment() async throws {
         let keys = ["DISABLE_AUTOUPDATER", "CLAUDE_CODE_SKIP_PROMPT_HISTORY", "USER"]
         let before = keys.map { ProcessInfo.processInfo.environment[$0] }
@@ -680,7 +712,8 @@ final class ClaudeQuotaBackendTests: XCTestCase {
     }
 
     private func stagedCLI(firstFrame: String, delayedFrame: String?, environment: [String: String]? = nil,
-                           requireProbeEnvironment: Bool = false) throws -> (
+                           requireProbeEnvironment: Bool = false, delay: TimeInterval = 0.4,
+                           timeout: TimeInterval = 5) throws -> (
         client: ClaudeCLIUsageClient, requestFile: URL, childPIDFile: URL, secondFrameMarker: URL
     ) {
         let root = try fixtureDirectory()
@@ -689,7 +722,7 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         let childPID = root.appendingPathComponent("child-pid")
         let marker = root.appendingPathComponent("second-frame")
         let later = delayedFrame.map { frame in
-            "sleep 0.4\nprintf '\(frame)'\nprintf ready > '\(marker.path)'"
+            "sleep \(delay)\nprintf '\(frame)'\nprintf ready > '\(marker.path)'"
         } ?? ""
         let environmentChecks = requireProbeEnvironment ? #"""
         [ "$DISABLE_AUTOUPDATER" = "1" ] || exit 70
@@ -712,7 +745,7 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         try script.write(to: executable, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
         return (ClaudeCLIUsageClient(executableURL: executable, runtimeDirectory: root.appendingPathComponent("runtime"),
-                                     environment: environment ?? ProcessInfo.processInfo.environment, timeout: 5),
+                                     environment: environment ?? ProcessInfo.processInfo.environment, timeout: timeout),
                 request, childPID, marker)
     }
 
