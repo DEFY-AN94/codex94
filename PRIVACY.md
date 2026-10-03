@@ -2,24 +2,21 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4),
-released on 2026-09-28 (Australia/Melbourne). It includes the user-triggered
+stable version is [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
+released on 2026-10-03 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
-## Optional Claude monitoring (4.0.1 candidate)
+## Optional Claude monitoring (4.0.1)
 
-This section describes the unpublished 4.0.1 (22) candidate. It retains the
-4.0.0 candidate's provider boundaries and fixes CLI input-screen recognition;
-the published stable release remains 3.1.4. The `v4.0.0` tag is preserved and
-was not published as a stable Release.
+Version 4.0.1 uses passive local reports by default and keeps the optional CLI
+reader separate. The `v4.0.0` tag is preserved as an unpublished candidate.
 
 Claude monitoring is off by default. Enabling monitoring alone reads existing
-local status-line reports. A separate `/usage` backup option is also off by
+local status-line reports. A separate `/usage` option is also off by
 default; only explicit opt-in permits starting the locally installed official
 Claude Code program and its built-in `/usage` command. The option warns that
 these CLI sessions may consume subscription quota; no zero-consumption guarantee
-is made. Live `/usage` probing remains suspended while passive-first development
-continues. Direct OAuth integration is deferred under
+is made. Live `/usage` probing remains suspended. Direct OAuth integration is deferred under
 [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use);
 Codex94 neither obtains nor refreshes Claude subscription tokens. Claude Code
 owns subscription authentication and any connection to Anthropic. The probe

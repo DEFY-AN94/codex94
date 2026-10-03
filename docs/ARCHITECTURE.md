@@ -1,14 +1,15 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints in the published stable
-[`3.1.4 (20)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4).
+[`4.0.1 (22)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
+published on 2026-10-03 (Australia/Melbourne).
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.0.1 candidate: independently enabled providers
+## 4.0.1: independently enabled providers
 
-The current candidate is `4.0.1 (22)`; stable remains 3.1.4. The `v4.0.0` tag
-is retained as an unpublished candidate. Passive statusline reports are the
+Version `4.0.1 (22)` is the stable release. The `v4.0.0` tag is retained as an
+unpublished candidate. Passive statusline reports are the
 default Claude data source. The earlier optional CLI input-footer compatibility
 fix is retained; it does not make that reader an automatic fallback.
 
@@ -16,7 +17,7 @@ fix is retained; it does not make that reader an automatic fallback.
 and cache v2 stay compatible; new monitoring/display choices and Claude
 preferences have their own keys. Monitoring defaults to Codex only. A display
 selection never implicitly enables a provider or starts a request.
-`claude.cliUsageEnabled.v1` is a separate default-off opt-in for the backup
+`claude.cliUsageEnabled.v1` is a separate default-off opt-in for the optional
 CLI reader. Existing Claude monitoring preferences do not enable it during
 migration. Without it, no CLI client is created and refreshes only load the
 local statusline cache. Turning it off retires in-flight work and clears CLI

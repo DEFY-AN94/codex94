@@ -4,10 +4,11 @@
 
 ## Overview
 
-Codex94 is an unofficial, independent macOS app for **Codex quota and Token
-usage statistics**. The 4.0.1 candidate adds optional **Claude Code
-quota monitoring** alongside Codex. It keeps remaining quota and reset times
-in the menu bar without a Dock icon, with details in one popover and Dashboard.
+Codex94 is an unofficial, independent macOS app for **Codex and Claude Code
+quota monitoring**, with **Codex Token usage statistics**. Codex is on by default;
+Claude is optional and defaults to passive local reports. Remaining quota and
+reset times stay in the menu bar without a Dock icon, with details in one
+popover and Dashboard.
 
 Version `0.3.0 (14)` adds Codex service-reported summary cards, switchable **bar
 and line charts**, and **CSV export** of daily Token records. A manual update check
@@ -19,8 +20,9 @@ configurable global shortcut. Either mouse button toggles the same popover.
 The read-only **Manual quota resets** card shows the available reset count in
 the popover and Overview without redeeming a reset.
 
-Codex94 is an MIT-licensed source project. It uses the locally installed CLI
-for each enabled service and bundles no third-party runtime frameworks.
+Codex94 is an MIT-licensed source project. Codex monitoring uses the locally
+installed Codex CLI; Claude defaults to reading existing local status-line
+reports. No third-party runtime frameworks are bundled.
 
 **Vibe-built with Codex.** Each release is still maintainer-reviewed, tested,
 and security-scanned before it is tagged.
@@ -29,16 +31,14 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
-## 4.0.1 candidate — not released
+## Version 4.0.1
 
-`4.0.1 (22)` carries forward the dual-provider features from the unpublished
-4.0.0 candidate and makes passive status-line reports the default Claude source.
-CLI `/usage` remains a separate, explicitly enabled option. The `v4.0.0` tag is retained unchanged; its Draft
-Release was removed. The published stable release and all download/clone links
-below remain **3.1.4 (20)**. New-candidate validation and publication are pending;
-prior 4.0.0 results below are historical evidence.
+`4.0.1 (22)` is the published stable release, dated **2026-10-03**
+(Australia/Melbourne). It carries forward the dual-provider features from the
+unpublished 4.0.0 candidate. The `v4.0.0` tag remains unchanged and its Draft
+Release was removed; its validation records below remain historical.
 
-The candidate now uses **passive local status-line reports by default**. Direct
+Claude uses **passive local status-line reports by default**. Direct
 OAuth access is deferred: [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
 do not establish permission for this third-party app to reuse subscription
 credentials. No OAuth credential reader, token refresh or Claude HTTP client is
@@ -65,7 +65,7 @@ become unknown rather than being reset to 100%.
   service. Disabling a service stops its monitoring and reminders. With both
   off, a neutral status item keeps Services settings reachable.
 - Claude quota can come from a **status-line connection**, or the official CLI's
-  **`/usage` screen** only after separately enabling the backup option. The card identifies the source and
+  **`/usage` screen** only after separately enabling the CLI option. The card identifies the source and
   report time, preserves reported fractions, and leaves missing quota/reset
   values unknown. It does not combine Codex and Claude percentages.
 - A status-line report is local information emitted by Claude Code, not a new
@@ -78,10 +78,10 @@ become unknown rather than being reset to 100%.
   only.** Disabling Codex monitoring disables that page's data reads. Claude
   token/cost analytics are not part of this implementation.
 
-## Version 3.1.4
+## Earlier 3.1.4 release
 
-`3.1.4 (20)` is the published stable release, dated **2026-09-28**
-(Australia/Melbourne). Quota reads now have more time to complete, and transient
+`3.1.4 (20)` was released on **2026-09-28** (Australia/Melbourne). It gave
+Codex quota reads more time to complete; these features remain. Transient
 failures retry after 5, 20 and 60 seconds. Between attempts, the last successful
 quota remains visible with an amber cached indicator and the failure reason.
 The popover, Connection page and menu-bar tooltip show the next automatic
@@ -188,8 +188,8 @@ statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4),
-  released on **2026-09-28** (Australia/Melbourne) as a Universal 2 DMG and
+  [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
+  released on **2026-10-03** (Australia/Melbourne) as a Universal 2 DMG and
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
   Later documentation commits do not move its tag or regenerate its assets.
@@ -207,7 +207,7 @@ statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `3.1.4` DMG itself is completely unsigned, has no Apple Developer ID
+The published `4.0.1` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -216,8 +216,8 @@ trust status.
 
 - macOS 14 or later.
 - Codex monitoring requires a compatible Codex executable and a current Codex
-  login. It is the only monitored service in the published 3.1.4 release.
-- Optional Claude monitoring in the 4.0.1 candidate requires the official Claude Code
+  login.
+- Optional Claude monitoring requires the official Claude Code
   CLI with its initial setup and login already completed in a terminal. Codex94
   does not complete Claude login or onboarding for you. Status-line quota appears
   only when Claude Code reports it; installing the connection cannot create data.
@@ -236,23 +236,23 @@ precedence; an invalid manual choice is not silently bypassed.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v3.1.4` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4):
+[`v4.0.1` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1):
 
-- `Codex94-3.1.4-macos-universal-unnotarized.dmg`
-- `Codex94-3.1.4-SHA256SUMS.txt`
+- `Codex94-4.0.1-macos-universal-unnotarized.dmg`
+- `Codex94-4.0.1-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-3.1.4-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.0.1-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-3.1.4-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.0.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -274,7 +274,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v3.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.0.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
@@ -485,11 +485,11 @@ their own provenance above.
   the separate manual update-check flow is described above.
 - Supports system, Terminal Dark, and Terminal Light themes plus English and
   Simplified Chinese.
-- Uses only the current Codex login. It does not manage multiple accounts or
+- Codex monitoring uses only the current Codex login. It does not manage multiple accounts or
   alternate `CODEX_HOME` directories, or collect a local quota-history ledger.
 
 ## Security and privacy
-The 4.0.1 candidate adds a separate local Claude CLI reader and optional
+Version 4.0.1 adds a separate, default-off local Claude CLI reader and a
 status-line quota cache. Previewing setup is read-only; installing or removing
 the connection explicitly edits Claude Code's status-line setting and retains
 recovery material. The diagram below describes the existing Codex path.
@@ -659,7 +659,7 @@ Actions, Python and Swift. The maintainer's Spaces color acceptance applies
 only to the reviewed CI candidate on the tested Mac; final-main assets and
 installation are separate records in [RELEASING.md](docs/RELEASING.md).
 
-Validation for `3.1.4 (20)`: **396 tests executed, 1 existing hosted-focus skip,
+Historical validation for `3.1.4 (20)`: **396 tests executed, 1 existing hosted-focus skip,
 0 failures**. Exact final-main checks, public asset verification and local background-refresh observation are recorded in
 [RELEASING.md](docs/RELEASING.md).
 
@@ -673,6 +673,12 @@ two Codex and one Claude background refreshes, plus one popover-triggered read
 per service, all succeeded with zero failures. This included interaction and
 does not establish long-term unattended stability. These are historical 4.0.0
 results, not validation of the 4.0.1 fix or its final release artifacts.
+
+Passive-mode runtime acceptance currently confirms the local connection is
+configured, but no naturally produced report has yet been observed. Live
+passive quota has therefore not been verified; synthetic tests do not establish
+real-account quota accuracy. Final release acceptance is recorded separately
+in [RELEASING.md](docs/RELEASING.md).
 
 SwiftUI owns views and state presentation; AppKit owns the native status items, popover,
 application appearance, and Dashboard window lifecycle. See the
