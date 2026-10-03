@@ -24,7 +24,10 @@ final class ManagedSubprocess: @unchecked Sendable {
         currentDirectoryURL: URL? = nil,
         environment: [String: String],
         standardInput: Pipe? = nil,
-        standardOutput: Pipe? = nil
+        standardOutput: Pipe? = nil,
+        standardInputHandle: FileHandle? = nil,
+        standardOutputHandle: FileHandle? = nil,
+        standardErrorHandle: FileHandle? = nil
     ) throws -> ManagedSubprocess {
         let executablePath = executableURL.path
         let environmentValues = environment
@@ -46,8 +49,11 @@ final class ManagedSubprocess: @unchecked Sendable {
         try requireSuccess(posix_spawn_file_actions_init(&fileActions))
         defer { posix_spawn_file_actions_destroy(&fileActions) }
 
-        let inputDescriptor = standardInput?.fileHandleForReading.fileDescriptor ?? nullDescriptor
-        let outputDescriptor = standardOutput?.fileHandleForWriting.fileDescriptor ?? nullDescriptor
+        let inputDescriptor = standardInputHandle?.fileDescriptor
+            ?? standardInput?.fileHandleForReading.fileDescriptor ?? nullDescriptor
+        let outputDescriptor = standardOutputHandle?.fileDescriptor
+            ?? standardOutput?.fileHandleForWriting.fileDescriptor ?? nullDescriptor
+        let errorDescriptor = standardErrorHandle?.fileDescriptor ?? nullDescriptor
         try requireSuccess(posix_spawn_file_actions_adddup2(
             &fileActions,
             inputDescriptor,
@@ -60,11 +66,11 @@ final class ManagedSubprocess: @unchecked Sendable {
         ))
         try requireSuccess(posix_spawn_file_actions_adddup2(
             &fileActions,
-            nullDescriptor,
+            errorDescriptor,
             STDERR_FILENO
         ))
 
-        var descriptorsToClose = Set([inputDescriptor, outputDescriptor, nullDescriptor])
+        var descriptorsToClose = Set([inputDescriptor, outputDescriptor, errorDescriptor, nullDescriptor])
         if let standardInput {
             descriptorsToClose.insert(standardInput.fileHandleForWriting.fileDescriptor)
         }
@@ -212,13 +218,21 @@ final class ManagedSubprocess: @unchecked Sendable {
 
 enum ManagedSubprocessLifecycleError: Error {
     case shutDown
+    case cancelled
     case processAlreadyActive
 }
 
 final class ManagedSubprocessLifecycle: @unchecked Sendable {
+    struct LaunchTicket: Sendable {
+        fileprivate let owner: UUID
+        fileprivate let generation: UInt64
+    }
+
     private let lock = NSLock()
+    private let ticketOwner = UUID()
     private var activeProcess: ManagedSubprocess?
     private var isShutDown = false
+    private var launchGeneration: UInt64 = 0
 
     var hasShutDown: Bool {
         lock.lock()
@@ -226,7 +240,16 @@ final class ManagedSubprocessLifecycle: @unchecked Sendable {
         return isShutDown
     }
 
+    /// Capture before queueing work. A later cancellation invalidates queued
+    /// work even when no subprocess existed at the instant of cancellation.
+    func captureLaunchTicket() -> LaunchTicket {
+        lock.lock()
+        defer { lock.unlock() }
+        return LaunchTicket(owner: ticketOwner, generation: launchGeneration)
+    }
+
     func launch(
+        ticket: LaunchTicket? = nil,
         _ operation: () throws -> ManagedSubprocess
     ) throws -> ManagedSubprocess {
         lock.lock()
@@ -234,6 +257,9 @@ final class ManagedSubprocessLifecycle: @unchecked Sendable {
 
         guard !isShutDown else {
             throw ManagedSubprocessLifecycleError.shutDown
+        }
+        if let ticket, ticket.owner != ticketOwner || ticket.generation != launchGeneration {
+            throw ManagedSubprocessLifecycleError.cancelled
         }
         guard activeProcess == nil else {
             throw ManagedSubprocessLifecycleError.processAlreadyActive
@@ -262,6 +288,18 @@ final class ManagedSubprocessLifecycle: @unchecked Sendable {
         guard !isShutDown else { return }
 
         isShutDown = true
+        launchGeneration &+= 1
+        guard let activeProcess else { return }
+        ProcessTerminator.stop(activeProcess, gracePeriod: gracePeriod)
+        self.activeProcess = nil
+    }
+
+    /// Stop the current probe without retiring the service. Monitoring may be
+    /// enabled again later; a permanent shutdown is reserved for app teardown.
+    func cancelActive(gracePeriod: TimeInterval) {
+        lock.lock()
+        defer { lock.unlock() }
+        launchGeneration &+= 1
         guard let activeProcess else { return }
         ProcessTerminator.stop(activeProcess, gracePeriod: gracePeriod)
         self.activeProcess = nil

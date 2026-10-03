@@ -35,7 +35,7 @@ final class StatusPresentationTests: XCTestCase {
         XCTAssertEqual(ConnectionRecoveryDestination.diagnostics.dashboardSection, .diagnostics)
         XCTAssertEqual(
             DashboardSection.primarySections,
-            [.overview, .usage, .connection, .display, .startup, .diagnostics]
+            [.overview, .usage, .providers, .connection, .display, .startup, .diagnostics]
         )
     }
 

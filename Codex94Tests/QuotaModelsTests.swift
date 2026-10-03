@@ -18,6 +18,99 @@ final class QuotaModelsTests: XCTestCase {
         XCTAssertEqual(window(.weekly, used: Int.max).remainingPercent, 0)
     }
 
+    func testFractionalWindowsPreserveAuthoritativeValuesAndRejectInvalidPercentages() throws {
+        let fractional = try XCTUnwrap(QuotaWindowSnapshot(
+            kind: .weekly, fractionalUsedPercent: 37.25, windowMinutes: 10_080, resetsAt: nil
+        ))
+        XCTAssertEqual(fractional.preciseUsedPercent, 37.25)
+        XCTAssertEqual(fractional.preciseRemainingPercent, 62.75)
+        XCTAssertEqual(fractional.usedPercent, 37, "Legacy integer consumers retain a bounded projection")
+        XCTAssertEqual(fractional.remainingPercent, 63)
+        let decoded = try JSONDecoder().decode(QuotaWindowSnapshot.self, from: JSONEncoder().encode(fractional))
+        XCTAssertEqual(decoded, fractional)
+        for invalid in [Double.nan, .infinity, -.infinity, -0.1, 100.1] {
+            XCTAssertNil(QuotaWindowSnapshot(kind: .fiveHour, fractionalUsedPercent: invalid, windowMinutes: 300, resetsAt: nil))
+        }
+        for valid in [0.0, 0.01, 99.99, 100] {
+            let value = try XCTUnwrap(QuotaWindowSnapshot(kind: .fiveHour, fractionalUsedPercent: valid, windowMinutes: 300, resetsAt: nil))
+            XCTAssertEqual(value.preciseRemainingPercent, 100 - valid, accuracy: 0.000_000_001)
+        }
+    }
+
+    func testLegacyWindowEncodingAndStrictFractionalDecodingStaySeparate() throws {
+        let legacy = window(.weekly, used: Int.max)
+        let encoded = try JSONEncoder().encode(legacy)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        XCTAssertNil(json["preciseUsedPercent"])
+        XCTAssertEqual(try JSONDecoder().decode(QuotaWindowSnapshot.self, from: encoded), legacy)
+        for value in [
+            #"{"kind":"weekly","usedPercent":1,"preciseUsedPercent":1.5}"#,
+            #"{"kind":"weekly","usedPercent":101,"preciseUsedPercent":101}"#,
+            #"{"kind":"weekly","usedPercent":0,"preciseUsedPercent":-0.1}"#,
+            #"{"kind":"weekly","usedPercent":1.5}"#
+        ] {
+            XCTAssertThrowsError(try JSONDecoder().decode(QuotaWindowSnapshot.self, from: Data(value.utf8)))
+        }
+    }
+
+    func testFractionalSelectionDoesNotLoseOrderingToIntegerRounding() throws {
+        let first = try XCTUnwrap(QuotaWindowSnapshot(kind: .fiveHour, fractionalUsedPercent: 89.6, windowMinutes: 300, resetsAt: nil))
+        let lower = try XCTUnwrap(QuotaWindowSnapshot(kind: .weekly, fractionalUsedPercent: 89.8, windowMinutes: 10_080, resetsAt: nil))
+        XCTAssertEqual(first.remainingPercent, lower.remainingPercent)
+        let defaultBucket = QuotaBucketSnapshot(limitID: "default", limitName: nil, planType: nil, windows: [first])
+        let additional = QuotaBucketSnapshot(limitID: "model", limitName: "Model", planType: nil, windows: [lower])
+        let snapshot = QuotaSnapshot(
+            buckets: [defaultBucket, additional], defaultLimitID: "default", fetchedAt: Date(timeIntervalSince1970: 1_900_000_000),
+            account: nil, codex: nil, provider: .claude
+        )
+        XCTAssertEqual(snapshot.automaticResolvedWindow?.bucket.limitID, "model")
+        XCTAssertEqual(snapshot.displayName(for: defaultBucket), "Claude")
+        XCTAssertEqual(snapshot.removingAccount().provider, .claude)
+        XCTAssertNil(defaultBucket.window(.weekly), "An absent window must not become a manufactured zero")
+        let combined = QuotaBucketSnapshot(limitID: "same", limitName: nil, planType: nil, windows: [first, lower])
+        XCTAssertEqual(combined.mostConstrainedWindow?.kind, .weekly)
+        let codexSnapshot = QuotaSnapshot(buckets: [defaultBucket], defaultLimitID: "default", fetchedAt: snapshot.fetchedAt, account: nil, codex: nil)
+        XCTAssertEqual(codexSnapshot.provider, .codex)
+        XCTAssertEqual(codexSnapshot.displayName(for: defaultBucket), "Codex")
+    }
+
+    func testFractionalFormattingAndSeverityDoNotUseRoundedThresholds() {
+        XCTAssertEqual(QuotaFormatting.percent(precise: 74.75), "74.8%")
+        XCTAssertEqual(QuotaFormatting.percent(precise: 74.75, language: .simplifiedChinese), "74.8%")
+        XCTAssertEqual(QuotaFormatting.percent(precise: 50), "50%")
+        XCTAssertEqual(QuotaFormatting.percent(precise: nil), "--")
+        XCTAssertEqual(QuotaFormatting.percent(precise: .nan), "--")
+        XCTAssertEqual(QuotaLevel(preciseRemainingPercent: 49.9), .warning)
+        XCTAssertEqual(QuotaLevel(preciseRemainingPercent: 19.9), .critical)
+        XCTAssertEqual(QuotaLevel(preciseRemainingPercent: nil), .unknown)
+        let presentation = StatusPresentation(
+            remainingPercent: 50, connectionState: .connected, isRefreshing: false,
+            lastSuccessfulFetch: nil, preciseRemainingPercent: 49.9
+        )
+        XCTAssertEqual(presentation.quotaLevel, .warning)
+    }
+
+    func testFractionalAccessibilitySummaryKeepsProviderAndDetailedPercentage() throws {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let window = try XCTUnwrap(QuotaWindowSnapshot(
+            kind: .weekly, fractionalUsedPercent: 37.5, windowMinutes: 10_080, resetsAt: nil
+        ))
+        let presentation = StatusPresentation(
+            remainingPercent: window.remainingPercent, connectionState: .connected,
+            isRefreshing: false, lastSuccessfulFetch: now,
+            preciseRemainingPercent: window.preciseRemainingPercent
+        )
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let text = StatusAccessibilityString.quotaSummary(
+                bucketName: "Claude", window: window, presentation: presentation,
+                now: now, language: language
+            )
+            XCTAssertTrue(text.hasPrefix("Claude"))
+            XCTAssertTrue(text.contains("62.5%"), "Detailed accessibility must not use the rounded compatibility field")
+            XCTAssertFalse(text.contains("Codex"))
+        }
+    }
+
     func testParserPreservesExtremePercentagesWhileProjectionClampsSafely() throws {
         for used in [Int.min, -1, 0, 100, 101, Int.max] {
             let parsed = try parse([

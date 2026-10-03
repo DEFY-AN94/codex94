@@ -16,6 +16,7 @@ final class AppStore: ObservableObject {
 
     let preferences: PreferencesStore
     let usageStore: TokenUsageStore
+    let claudeStore: ClaudeQuotaStore
     let updates = AppUpdateController()
     let launchAtLogin: LaunchAtLoginController
     let hotKeyController: GlobalHotKeyController
@@ -37,6 +38,8 @@ final class AppStore: ObservableObject {
     private(set) var consumedResetRefreshDate: Date?
     private(set) var activeRefreshStartedAt: Date?
     private var preferencesObservation: AnyCancellable?
+    private var claudeObservation: AnyCancellable?
+    private var codexStopTask: Task<Void, Never>?
     private var isShuttingDown = false
     private var connectionGeneration = 0
     private var automaticRetryTask: Task<Void, Never>?
@@ -54,11 +57,13 @@ final class AppStore: ObservableObject {
         hotKeyController: GlobalHotKeyController = GlobalHotKeyController(),
         notificationController: NotificationController = NotificationController(),
         usageStore: TokenUsageStore? = nil,
+        claudeStore: ClaudeQuotaStore? = nil,
         retrySleep: (@Sendable (TimeInterval) async throws -> Void)? = nil,
         backgroundSleep: (@Sendable (TimeInterval) async throws -> Void)? = nil
     ) {
         self.preferences = preferences
         self.usageStore = usageStore ?? TokenUsageStore(preferences: preferences)
+        self.claudeStore = claudeStore ?? ClaudeQuotaStore(preferences: preferences)
         self.launchAtLogin = launchAtLogin
         self.locator = locator
         self.fetcher = fetcher
@@ -75,6 +80,9 @@ final class AppStore: ObservableObject {
         }
 
         preferencesObservation = preferences.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+        claudeObservation = self.claudeStore.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }
     }
@@ -95,7 +103,8 @@ final class AppStore: ObservableObject {
     /// Scheduled wall-clock estimates, not a guarantee of execution while the
     /// system is asleep or delaying this process. Reading this never starts work.
     var nextAutomaticRefreshAt: Date? {
-        guard !isShuttingDown, preferences.hasChosenIdentityMode else { return nil }
+        guard !isShuttingDown, preferences.codexMonitoringEnabled,
+              preferences.hasChosenIdentityMode else { return nil }
         // After a wall-clock change an armed relative sleep may have an unknown
         // wall date. Another known deadline cannot honestly be called "next".
         guard automaticRetryTask == nil || nextRetryAt != nil,
@@ -164,68 +173,85 @@ final class AppStore: ObservableObject {
     }
 
     var menuBarQuotaOptions: [MenuBarQuotaOption] {
-        var options = [
-            MenuBarQuotaOption(
-                selection: .automatic,
-                bucketName: nil,
-                kind: nil,
-                isAvailable: true
-            )
-        ]
-
-        guard let snapshot else {
-            let preferred = preferences.menuBarQuotaSelection
-            if preferred != .automatic, let kind = Self.kind(in: preferred) {
-                options.append(MenuBarQuotaOption(
-                    selection: preferred,
-                    bucketName: nil,
-                    kind: kind,
-                    isAvailable: false
-                ))
-            }
-            return options
-        }
-
-        for bucket in snapshot.displayableBuckets {
-            for window in bucket.windows.sorted(by: { $0.kind.sortOrder < $1.kind.sortOrder }) {
-                let selection: MenuBarQuotaSelection = bucket.limitID == snapshot.defaultLimitID
-                    ? .defaultBucket(window.kind)
-                    : .bucket(limitID: bucket.limitID, kind: window.kind)
-                options.append(MenuBarQuotaOption(
-                    selection: selection,
-                    bucketName: snapshot.displayName(for: bucket),
-                    kind: window.kind,
-                    isAvailable: true
-                ))
-            }
-        }
-
-        let preferred = preferences.menuBarQuotaSelection
-        if !options.contains(where: { $0.selection == preferred }),
-           let kind = Self.kind(in: preferred) {
-            options.append(MenuBarQuotaOption(
-                selection: preferred,
-                bucketName: unavailableBucketName(for: preferred, snapshot: snapshot),
-                kind: kind,
-                isAvailable: false
-            ))
-        }
-        return options
+        ProviderQuotaSelection.options(snapshot: snapshot, preferred: preferences.menuBarQuotaSelection)
     }
 
     func start() {
         guard !isShuttingDown else { return }
-        notificationController.configure(enabled: preferences.notifications.isEnabled)
+        if preferences.claudeMonitoringEnabled { claudeStore.start() }
+        notificationController.configure(enabled: preferences.codexMonitoringEnabled && preferences.notifications.isEnabled)
         configureBackgroundRefresh()
-        guard preferences.hasChosenIdentityMode else { return }
+        guard preferences.codexMonitoringEnabled, preferences.hasChosenIdentityMode else { return }
         let now = Date()
         configureQuotaResetRefresh(now: now)
         refresh(trigger: .launch, startedAt: now)
     }
 
+    func setMonitoringEnabled(_ enabled: Bool, for provider: QuotaProviderID) {
+        guard !isShuttingDown else { return }
+        if provider == .claude {
+            guard preferences.claudeMonitoringEnabled != enabled else { return }
+            preferences.claudeMonitoringEnabled = enabled
+            enabled ? claudeStore.start() : claudeStore.stop()
+            return
+        }
+        guard preferences.codexMonitoringEnabled != enabled else { return }
+        preferences.codexMonitoringEnabled = enabled
+        if enabled {
+            if let snapshot {
+                connectionState = .stale(lastSuccess: snapshot.fetchedAt, issue: .unknown)
+            }
+            notificationController.configure(enabled: preferences.notifications.isEnabled)
+            configureBackgroundRefresh()
+            configureQuotaResetRefresh()
+            refresh(trigger: .preferenceChange)
+        } else {
+            // Invalidate before cancelling so even a late transport result
+            // cannot repopulate state, cache, notifications or Token statistics.
+            invalidateConnectionContext()
+            pendingRefreshTrigger = nil
+            cancelBackgroundRefresh()
+            clearQuotaResetRefreshState()
+            let retiringRefresh = refreshTask
+            retiringRefresh?.cancel()
+            refreshTask = nil
+            activeRefreshStartedAt = nil
+            isRefreshing = false
+            hasFetchedLiveSnapshot = false
+            connectionState = .idle
+            lastIssue = nil
+            notificationController.configure(enabled: false)
+            // Transport teardown is bounded, but must not freeze the menu bar.
+            let fetcher = fetcher
+            let locator = locator
+            let previousStop = codexStopTask
+            codexStopTask = Task {
+                await previousStop?.value
+                await Task.detached(priority: .utility) {
+                    fetcher.cancelCurrentRequest()
+                    locator.cancelCurrentRequest()
+                }.value
+                await retiringRefresh?.value
+            }
+        }
+    }
+
+    func refreshAll(trigger: RefreshTrigger = .manual) {
+        if preferences.codexMonitoringEnabled { refresh(trigger: trigger) }
+        if preferences.claudeMonitoringEnabled { claudeStore.refresh(trigger: trigger) }
+    }
+
+    func setClaudeRefreshInterval(_ interval: RefreshInterval) {
+        claudeStore.setRefreshInterval(interval)
+    }
+
+    func setClaudeNotificationPreferences(_ value: NotificationPreferences) {
+        setNotificationPreferences(value, for: .claude)
+    }
+
     func refresh(trigger: RefreshTrigger, startedAt: Date = Date()) {
         guard !isShuttingDown else { return }
-        guard preferences.hasChosenIdentityMode else { return }
+        guard preferences.codexMonitoringEnabled, preferences.hasChosenIdentityMode else { return }
         guard refreshTask == nil else {
             if trigger == .preferenceChange {
                 pendingRefreshTrigger = trigger
@@ -249,9 +275,12 @@ final class AppStore: ObservableObject {
         let manualPath = preferences.manualCodexPath
         let identityMode = preferences.identityMode
         let requestGeneration = connectionGeneration
+        let pendingStop = codexStopTask
 
         refreshTask = Task { [weak self] in
+            await pendingStop?.value
             guard let self, !isShuttingDown else { return }
+            guard !Task.isCancelled else { return }
             guard requestGeneration == connectionGeneration else {
                 finishRefresh(successfulFetchedAt: nil, now: Date())
                 return
@@ -298,6 +327,8 @@ final class AppStore: ObservableObject {
     }
 
     func popoverWillOpen(now: Date = Date()) {
+        if preferences.claudeMonitoringEnabled { claudeStore.popoverWillOpen(now: now) }
+        guard preferences.codexMonitoringEnabled else { return }
         guard RefreshPolicy.shouldRefreshOnPopover(
             connectionState: connectionState,
             lastSuccessfulFetch: snapshot?.fetchedAt,
@@ -311,8 +342,9 @@ final class AppStore: ObservableObject {
 
     func handleSystemWake(now: Date = Date()) {
         guard !isShuttingDown else { return }
+        if preferences.claudeMonitoringEnabled { claudeStore.handleSystemWake(now: now) }
         configureBackgroundRefresh()
-        guard preferences.hasChosenIdentityMode else { return }
+        guard preferences.codexMonitoringEnabled, preferences.hasChosenIdentityMode else { return }
         if reconcileQuotaResetRefresh(now: now) {
             return
         }
@@ -326,11 +358,12 @@ final class AppStore: ObservableObject {
 
     func handleSystemClockChange(now: Date = Date()) {
         guard !isShuttingDown else { return }
+        if preferences.claudeMonitoringEnabled { claudeStore.handleSystemClockChange(now: now) }
         // Relative sleeps keep their existing budget. The old wall-clock
         // estimates are no longer reliable; publish a date when next armed.
         nextRetryAt = nil
         nextBackgroundRefreshAt = nil
-        guard preferences.hasChosenIdentityMode else { return }
+        guard preferences.codexMonitoringEnabled, preferences.hasChosenIdentityMode else { return }
         _ = reconcileQuotaResetRefresh(now: now)
     }
 
@@ -354,6 +387,7 @@ final class AppStore: ObservableObject {
         fetcher.shutdown()
         locator.shutdown()
         notificationController.shutdown()
+        claudeStore.shutdown()
         usageStore.shutdown()
         updates.shutdown()
         notificationPolicy.reset()
@@ -370,19 +404,18 @@ final class AppStore: ObservableObject {
         refresh(trigger: .preferenceChange, startedAt: now)
     }
 
-    func setMenuBarQuotaSelection(_ selection: MenuBarQuotaSelection) {
-        guard menuBarQuotaOptions.contains(where: {
+    func setMenuBarQuotaSelection(_ selection: MenuBarQuotaSelection, for provider: QuotaProviderID = .codex) {
+        guard menuBarQuotaOptions(for: provider).contains(where: {
             $0.selection == selection && $0.isAvailable
         }) else { return }
-        preferences.menuBarQuotaSelection = selection
+        if provider == .codex { preferences.menuBarQuotaSelection = selection }
+        else { preferences.claudeMenuBarQuotaSelection = selection }
     }
 
-    func setDualWindowBucketSelection(_ selection: MenuBarBucketSelection) {
-        if selection == .automatic {
-            preferences.dualWindowBucketSelection = selection
-        } else if let snapshot, selection.resolved(in: snapshot) != nil {
-            preferences.dualWindowBucketSelection = selection
-        }
+    func setDualWindowBucketSelection(_ selection: MenuBarBucketSelection, for provider: QuotaProviderID = .codex) {
+        guard selection == .automatic || providerSnapshot(for: provider).flatMap({ selection.resolved(in: $0) }) != nil else { return }
+        if provider == .codex { preferences.dualWindowBucketSelection = selection }
+        else { preferences.claudeDualWindowBucketSelection = selection }
     }
 
     @discardableResult
@@ -392,24 +425,36 @@ final class AppStore: ObservableObject {
         return true
     }
 
-    func setNotificationPreferences(_ value: NotificationPreferences) {
+    func setNotificationPreferences(_ value: NotificationPreferences, for provider: QuotaProviderID = .codex) {
+        if provider == .claude {
+            claudeStore.setNotificationPreferences(value)
+            return
+        }
         let previous = preferences.notifications
         let value = value.validated
         guard value != previous else { return }
         preferences.notifications = value
         notificationPolicy.reset()
         notificationController.configure(
-            enabled: value.isEnabled,
-            requestPermission: value.isEnabled && !previous.isEnabled
+            enabled: preferences.codexMonitoringEnabled && value.isEnabled,
+            requestPermission: preferences.codexMonitoringEnabled && value.isEnabled && !previous.isEnabled
         )
     }
 
-    func requestNotificationPermission() {
-        guard preferences.notifications.isEnabled else { return }
+    func requestNotificationPermission(for provider: QuotaProviderID = .codex) {
+        if provider == .claude {
+            claudeStore.requestNotificationPermission()
+            return
+        }
+        guard preferences.codexMonitoringEnabled, preferences.notifications.isEnabled else { return }
         notificationController.configure(enabled: true, requestPermission: true)
     }
 
-    func refreshNotificationAuthorization() {
+    func refreshNotificationAuthorization(for provider: QuotaProviderID = .codex) {
+        if provider == .claude {
+            claudeStore.notificationController.refreshAuthorization()
+            return
+        }
         notificationController.refreshAuthorization()
     }
 
@@ -461,7 +506,14 @@ final class AppStore: ObservableObject {
             displayMode: preferences.menuBarQuotaSelection.diagnosticValue,
             refreshMinutes: preferences.refreshInterval.rawValue,
             lastSuccess: snapshot?.fetchedAt,
-            lastError: lastIssue?.rawValue
+            lastError: lastIssue?.rawValue,
+            enabledProviders: preferences.enabledProviders,
+            menuBarServices: preferences.menuBarServiceMode,
+            claudeConnection: preferences.claudeMonitoringEnabled
+                ? Self.connectionLabel(claudeStore.connectionState) : "disabled",
+            claudeSource: preferences.claudeMonitoringEnabled ? claudeStore.source : nil,
+            claudeIssue: preferences.claudeMonitoringEnabled ? claudeStore.lastIssue : nil,
+            claudeLastReport: preferences.claudeMonitoringEnabled ? claudeStore.reportedAt : nil
         )
     }
 
@@ -536,6 +588,7 @@ final class AppStore: ObservableObject {
 
     func configureQuotaResetRefresh(now: Date = Date()) {
         guard !isShuttingDown,
+              preferences.codexMonitoringEnabled,
               preferences.hasChosenIdentityMode,
               snapshot != nil else {
             clearQuotaResetRefreshState()
@@ -558,6 +611,7 @@ final class AppStore: ObservableObject {
         now: Date = Date()
     ) -> Bool {
         guard !isShuttingDown,
+              preferences.codexMonitoringEnabled,
               preferences.hasChosenIdentityMode,
               snapshot != nil,
               resetRefreshTask != nil,
@@ -622,7 +676,7 @@ final class AppStore: ObservableObject {
     }
 
     private func scheduleAutomaticRetry(for issue: ConnectionIssue, generation: Int, now: Date) {
-        guard !isShuttingDown, generation == automaticRetryGeneration,
+        guard !isShuttingDown, preferences.codexMonitoringEnabled, generation == automaticRetryGeneration,
               let delay = RefreshPolicy.automaticRetryDelay(
                 for: issue, completedRetries: automaticRetryAttempt
               ) else { return }
@@ -722,6 +776,7 @@ final class AppStore: ObservableObject {
         resetRefreshTask = nil
         scheduledResetRefreshDate = targetDate
         guard !isShuttingDown,
+              preferences.codexMonitoringEnabled,
               preferences.hasChosenIdentityMode,
               targetDate > now else {
             return
@@ -762,7 +817,7 @@ final class AppStore: ObservableObject {
 
     private func configureBackgroundRefresh() {
         cancelBackgroundRefresh()
-        guard !isShuttingDown else { return }
+        guard !isShuttingDown, preferences.codexMonitoringEnabled else { return }
         let interval = preferences.refreshInterval.seconds
         let generation = backgroundGeneration
         backgroundTask = Task { [weak self, backgroundSleep] in
@@ -811,33 +866,6 @@ final class AppStore: ObservableObject {
             return nil
         }
         return resolved
-    }
-
-    private func unavailableBucketName(
-        for selection: MenuBarQuotaSelection,
-        snapshot: QuotaSnapshot
-    ) -> String? {
-        switch selection {
-        case .automatic:
-            return nil
-        case .defaultBucket:
-            return "Codex"
-        case let .bucket(limitID, _):
-            guard let bucket = snapshot.displayableBuckets.first(where: {
-                $0.limitID == limitID
-            }) else {
-                return nil
-            }
-            return snapshot.displayName(for: bucket)
-        }
-    }
-
-    private static func kind(in selection: MenuBarQuotaSelection) -> QuotaWindowKind? {
-        switch selection {
-        case .automatic: nil
-        case let .defaultBucket(kind): kind
-        case let .bucket(_, kind): kind
-        }
     }
 
     private static func connectionLabel(_ state: ConnectionState) -> String {

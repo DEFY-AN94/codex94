@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OverviewView: View {
     @ObservedObject var store: AppStore
+    var openProviderSettings: () -> Void = {}
     var referenceDate: Date? = nil
     var resetLocale: Locale? = nil
     var resetCalendar = Calendar(identifier: .gregorian)
@@ -11,22 +12,35 @@ struct OverviewView: View {
 
     var body: some View {
         SettingsPage(title: "dashboard.overview") {
-            statusGroup
-                .padding(.bottom, 18)
+            if store.preferences.enabledProviders.isEmpty {
+                ProvidersDisabledView(openSettings: openProviderSettings)
+            }
+            if store.preferences.codexMonitoringEnabled {
+                statusGroup
+                    .padding(.bottom, 18)
 
-            if let snapshot = store.snapshot {
-                let buckets = snapshot.displayableBuckets
-                if buckets.isEmpty {
-                    emptyState("overview.noQuotaData", systemImage: "chart.bar.xaxis")
-                } else {
-                    ForEach(buckets.indices, id: \.self) { index in
-                        let bucket = buckets[index]
-                        bucketGroup(snapshot: snapshot, bucket: bucket, index: index)
-                            .padding(.bottom, 14)
+                if let snapshot = store.snapshot {
+                    let buckets = snapshot.displayableBuckets
+                    if buckets.isEmpty {
+                        emptyState("overview.noQuotaData", systemImage: "chart.bar.xaxis")
+                    } else {
+                        ForEach(buckets.indices, id: \.self) { index in
+                            let bucket = buckets[index]
+                            bucketGroup(snapshot: snapshot, bucket: bucket, index: index)
+                                .padding(.bottom, 14)
+                        }
                     }
+                } else {
+                    emptyState("overview.noSnapshot", systemImage: "exclamationmark.triangle")
                 }
-            } else {
-                emptyState("overview.noSnapshot", systemImage: "exclamationmark.triangle")
+            }
+            if store.preferences.claudeMonitoringEnabled {
+                ClaudeQuotaCard(
+                    store: store.claudeStore, language: store.preferences.language,
+                    openSetup: openProviderSettings, referenceDate: referenceDate,
+                    accentOverrides: store.preferences.statusAccentOverrides
+                )
+                .padding(.bottom, 14)
             }
         }
         .accessibilityIdentifier("overview-page")

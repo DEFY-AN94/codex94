@@ -19,6 +19,20 @@ enum QuotaLevel: Equatable, Sendable {
             self = .critical
         }
     }
+
+    init(preciseRemainingPercent: Double?) {
+        guard let preciseRemainingPercent, preciseRemainingPercent.isFinite else {
+            self = .unknown
+            return
+        }
+        if preciseRemainingPercent >= 50 {
+            self = .healthy
+        } else if preciseRemainingPercent >= 20 {
+            self = .warning
+        } else {
+            self = .critical
+        }
+    }
 }
 
 enum ConnectionBadge: Equatable, Sendable {
@@ -55,9 +69,14 @@ struct StatusPresentation: Equatable, Sendable {
         remainingPercent: Int?,
         connectionState: ConnectionState,
         isRefreshing: Bool,
-        lastSuccessfulFetch: Date?
+        lastSuccessfulFetch: Date?,
+        preciseRemainingPercent: Double? = nil
     ) {
-        quotaLevel = QuotaLevel(remainingPercent: remainingPercent)
+        if let preciseRemainingPercent {
+            quotaLevel = QuotaLevel(preciseRemainingPercent: preciseRemainingPercent)
+        } else {
+            quotaLevel = QuotaLevel(remainingPercent: remainingPercent)
+        }
 
         if case let .stale(stateLastSuccess, _) = connectionState {
             assert(

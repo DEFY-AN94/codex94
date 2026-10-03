@@ -49,10 +49,22 @@ struct DashboardView: View {
             Group {
                 switch windowState.resolvedSelection {
                 case .overview:
-                    OverviewView(store: store)
+                    OverviewView(store: store, openProviderSettings: { windowState.select(section: .providers) })
                 case .usage:
-                    TokenUsageView(store: store.usageStore, preferences: store.preferences,
-                                   language: store.preferences.language)
+                    if store.preferences.codexMonitoringEnabled {
+                        TokenUsageView(store: store.usageStore, preferences: store.preferences,
+                                       language: store.preferences.language)
+                    } else {
+                        VStack(spacing: 12) {
+                            Text("providers.usageCodexOnly").foregroundStyle(.secondary)
+                            ProvidersDisabledView(
+                                openSettings: { windowState.select(section: .providers) },
+                                titleKey: "providers.codexDisabled"
+                            )
+                        }
+                    }
+                case .providers:
+                    ProviderSettingsView(store: store)
                 case .connection:
                     ConnectionSettingsView(
                         store: store,
@@ -95,12 +107,14 @@ struct DashboardView: View {
                 }
                 if windowState.resolvedSelection != .usage {
                     Button {
-                        store.refresh(trigger: .manual)
+                        store.refreshAll(trigger: .manual)
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
                     .help("command.refresh")
-                    .disabled(store.isRefreshing || !store.preferences.hasChosenIdentityMode)
+                    .disabled(store.preferences.enabledProviders.isEmpty
+                        || (store.preferences.enabledProviders == [.codex]
+                            && (store.isRefreshing || !store.preferences.hasChosenIdentityMode)))
                 }
 
                 Button(action: quit) {

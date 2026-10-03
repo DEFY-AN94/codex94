@@ -111,6 +111,9 @@ jobs:
           - scenario: floating
             method: testFloatingWindowSmoke
             artifact: codex94-ui-floating
+          - scenario: providers
+            method: testProvidersSmoke
+            artifact: codex94-ui-providers
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -2,6 +2,32 @@ import XCTest
 @testable import Codex94
 
 final class NotificationPolicyTests: XCTestCase {
+    func testFractionalQuotaCrossingsUseExactValuesBeforeFormatting() throws {
+        func snapshot(_ remaining: Double, tick: TimeInterval) throws -> QuotaSnapshot {
+            let window = try XCTUnwrap(QuotaWindowSnapshot(
+                kind: .weekly, fractionalUsedPercent: 100 - remaining,
+                windowMinutes: 10_080, resetsAt: nil
+            ))
+            return QuotaSnapshot(
+                buckets: [QuotaBucketSnapshot(limitID: "claude", limitName: nil, planType: nil, windows: [window])],
+                defaultLimitID: "claude", fetchedAt: Date(timeIntervalSince1970: 20_000 + tick),
+                account: nil, codex: nil, provider: .claude
+            )
+        }
+        var policy = QuotaNotificationPolicy()
+        var preferences = NotificationPreferences()
+        preferences.isEnabled = true
+        preferences.recoveryEnabled = true
+        XCTAssertTrue(policy.events(for: try snapshot(20.4, tick: 0), preferences: preferences).isEmpty)
+        XCTAssertTrue(policy.events(for: try snapshot(20.1, tick: 1), preferences: preferences).isEmpty)
+        let warning = policy.events(for: try snapshot(19.9, tick: 2), preferences: preferences)
+        XCTAssertEqual(warning.map(\.kind), [.low(threshold: 20)])
+        XCTAssertEqual(warning.first?.bucketName, "Claude")
+        XCTAssertEqual(policy.events(for: try snapshot(20.1, tick: 3), preferences: preferences).map(\.kind), [.recovered])
+        XCTAssertTrue(policy.events(for: try snapshot(10.1, tick: 4), preferences: preferences).isEmpty)
+        XCTAssertEqual(policy.events(for: try snapshot(9.9, tick: 5), preferences: preferences).map(\.kind), [.low(threshold: 10)])
+    }
+
     func testDisabledAndFirstLiveSnapshotDoNotNotify() {
         var policy = QuotaNotificationPolicy()
         var preferences = NotificationPreferences()

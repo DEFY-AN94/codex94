@@ -5,10 +5,12 @@ import OSLog
 protocol QuotaFetching: Sendable {
     func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot
     func shutdown()
+    func cancelCurrentRequest()
 }
 
 extension QuotaFetching {
     func shutdown() {}
+    func cancelCurrentRequest() {}
 }
 
 struct AppServerTimeouts: Sendable {
@@ -28,7 +30,10 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
     private let timeouts: AppServerTimeouts
     private let environment: [String: String]
     private let clientVersion: String
-    private let workerQueue = DispatchQueue(label: "com.defyan94.codex94.app-server")
+    private let workerQueue: DispatchQueue
+    // Internal queue acknowledgement permits deterministic cancellation tests;
+    // production leaves it nil and always uses the owned serial queue.
+    private let requestEnqueued: (@Sendable () -> Void)?
     private let processLifecycle = ManagedSubprocessLifecycle()
     private let logger = Logger(subsystem: "com.defyan94.codex94", category: "rpc")
 
@@ -36,7 +41,9 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
         runtimeDirectory: URL? = nil,
         timeouts: AppServerTimeouts = AppServerTimeouts(),
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        clientVersion: String = AppMetadata.current.version
+        clientVersion: String = AppMetadata.current.version,
+        workerQueue: DispatchQueue? = nil,
+        requestEnqueued: (@Sendable () -> Void)? = nil
     ) {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         self.runtimeDirectory = runtimeDirectory
@@ -44,37 +51,50 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
         self.timeouts = timeouts
         self.environment = environment
         self.clientVersion = clientVersion
+        self.workerQueue = workerQueue ?? DispatchQueue(label: "com.defyan94.codex94.app-server")
+        self.requestEnqueued = requestEnqueued
     }
 
     func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot {
-        try await withCheckedThrowingContinuation { continuation in
+        try Task.checkCancellation()
+        let ticket = processLifecycle.captureLaunchTicket()
+        return try await withCheckedThrowingContinuation { continuation in
             workerQueue.async { [self] in
                 do {
                     continuation.resume(returning: try fetchSynchronously(
                         executable: executable,
-                        identityMode: identityMode
+                        identityMode: identityMode,
+                        ticket: ticket
                     ))
                 } catch {
                     continuation.resume(throwing: error)
                 }
             }
+            requestEnqueued?()
         }
     }
 
     func fetchUsage(executable: LocatedCodex) async throws -> TokenUsageSnapshot {
-        try await withCheckedThrowingContinuation { continuation in
+        try Task.checkCancellation()
+        let ticket = processLifecycle.captureLaunchTicket()
+        return try await withCheckedThrowingContinuation { continuation in
             workerQueue.async { [self] in
                 do {
-                    continuation.resume(returning: try fetchUsageSynchronously(executable: executable))
+                    continuation.resume(returning: try fetchUsageSynchronously(executable: executable, ticket: ticket))
                 } catch {
                     continuation.resume(throwing: error)
                 }
             }
+            requestEnqueued?()
         }
     }
 
     func shutdown() {
         processLifecycle.shutdown(gracePeriod: timeouts.terminationGrace)
+    }
+
+    func cancelCurrentRequest() {
+        processLifecycle.cancelActive(gracePeriod: timeouts.terminationGrace)
     }
 
     private func checkNotShutDown() throws {
@@ -83,6 +103,7 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
 
     private func withInitializedServer<Result>(
         executable: LocatedCodex,
+        ticket: ManagedSubprocessLifecycle.LaunchTicket,
         totalTimeout: TimeInterval,
         operation: (FileHandle, JSONLineChannel, Date) throws -> Result
     ) throws -> Result {
@@ -105,7 +126,7 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
 
         let process: ManagedSubprocess
         do {
-            process = try processLifecycle.launch {
+            process = try processLifecycle.launch(ticket: ticket) {
                 try ManagedSubprocess.launch(
                     executableURL: executable.executableURL,
                     arguments: ["-s", "read-only", "-a", "never", "app-server", "--stdio"],
@@ -117,6 +138,8 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
             }
         } catch ManagedSubprocessLifecycleError.shutDown {
             throw ConnectionIssue.serverExited
+        } catch ManagedSubprocessLifecycleError.cancelled {
+            throw CancellationError()
         } catch {
             logger.error("stage=launch result=failed")
             throw ConnectionIssue.processLaunchFailed
@@ -173,10 +196,11 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
 
     private func fetchSynchronously(
         executable: LocatedCodex,
-        identityMode: IdentityMode
+        identityMode: IdentityMode,
+        ticket: ManagedSubprocessLifecycle.LaunchTicket
     ) throws -> QuotaSnapshot {
         try withInitializedServer(
-            executable: executable, totalTimeout: timeouts.quotaTotal
+            executable: executable, ticket: ticket, totalTimeout: timeouts.quotaTotal
         ) { input, channel, totalDeadline in
             // Validate quota before spending any time on optional account metadata.
             let (limitsResult, quota) = try measuredStage(.rateLimits) {
@@ -244,9 +268,12 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
         }
     }
 
-    private func fetchUsageSynchronously(executable: LocatedCodex) throws -> TokenUsageSnapshot {
+    private func fetchUsageSynchronously(
+        executable: LocatedCodex,
+        ticket: ManagedSubprocessLifecycle.LaunchTicket
+    ) throws -> TokenUsageSnapshot {
         try withInitializedServer(
-            executable: executable, totalTimeout: timeouts.total
+            executable: executable, ticket: ticket, totalTimeout: timeouts.total
         ) { input, channel, totalDeadline in
             try measuredStage(.usage) {
                 try write(["id": 2, "method": "account/usage/read"], to: input)

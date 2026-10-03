@@ -44,7 +44,8 @@ final class TokenUsageStore: ObservableObject {
     }
 
     func refresh() {
-        guard !stopped, task == nil, preferences.hasChosenIdentityMode else { return }
+        guard !stopped, task == nil, preferences.codexMonitoringEnabled,
+              preferences.hasChosenIdentityMode else { return }
         let requestGeneration = generation
         let manualPath = preferences.manualCodexPath
         let requestFetcher = fetcher

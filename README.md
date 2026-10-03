@@ -4,13 +4,13 @@
 
 ## Overview
 
-Codex94 is an unofficial, independent macOS app for OpenAI Codex quota
-monitoring and **Token usage statistics**. It keeps remaining quota and reset
-times in the menu bar without a Dock icon, with details in the popover and
-Dashboard.
+Codex94 is an unofficial, independent macOS app for **Codex quota and Token
+usage statistics**. The 4.0.0 development branch adds optional **Claude Code
+quota monitoring** alongside Codex. It keeps remaining quota and reset times
+in the menu bar without a Dock icon, with details in one popover and Dashboard.
 
-Version `0.3.0 (14)` adds service-reported summary cards, switchable **bar and
-line charts**, and **CSV export** of daily Token records. A manual update check
+Version `0.3.0 (14)` adds Codex service-reported summary cards, switchable **bar
+and line charts**, and **CSV export** of daily Token records. A manual update check
 shows newer stable GitHub Releases; downloading and installing remain manual.
 
 The quota features introduced in `0.2.2 (13)` remain: four menu-bar layouts,
@@ -19,15 +19,47 @@ configurable global shortcut. Either mouse button toggles the same popover.
 The read-only **Manual quota resets** card shows the available reset count in
 the popover and Overview without redeeming a reset.
 
-Codex94 is an MIT-licensed source project. It uses the Codex executable already
-installed on the Mac and has no third-party runtime dependencies.
+Codex94 is an MIT-licensed source project. It uses the locally installed CLI
+for each enabled service and bundles no third-party runtime frameworks.
 
 **Vibe-built with Codex.** Each release is still maintainer-reviewed, tested,
 and security-scanned before it is tagged.
 
-> Codex94 is not affiliated with, endorsed by, or sponsored by OpenAI. Codex
-> `app-server` is an experimental interface and may change in future Codex
-> releases.
+> Codex94 is not affiliated with, endorsed by, or sponsored by OpenAI or
+> Anthropic. Codex `app-server` is experimental; CLI and status-line formats
+> may change between upstream releases.
+
+## 4.0.0 development — not released
+
+These features are implemented on the development branch. The published stable
+release and all download/clone links below remain **3.1.4 (20)**. Authenticated
+Claude CLI compatibility and native end-to-end acceptance are still pending;
+no particular Claude Code version is claimed as verified yet.
+
+- **Codex is on by default; Claude is off.** Enable Claude in Dashboard →
+  **Services**. Each service has its own refresh tasks, quota selection, source,
+  freshness, failures and opt-in notification settings. One service's failure
+  does not replace the other's quota.
+- Choose **one menu-bar service** or **two independent status items**. Either
+  item opens the same scrollable popover containing all enabled services as
+  separate sections. Overview also shows the enabled services. The Codex group
+  picker, account options and read-only reset-credit display remain available.
+- Choose the floating window's service separately from the primary menu-bar
+  service. Disabling a service stops its monitoring and reminders. With both
+  off, a neutral status item keeps Services settings reachable.
+- Claude quota can come from the official CLI's **`/usage` screen** or an
+  optional **status-line connection**. The card identifies the source and
+  report time, preserves reported fractions, and leaves missing quota/reset
+  values unknown. It does not combine Codex and Claude percentages.
+- A status-line report is local information emitted by Claude Code, not a new
+  cloud quota sample. Rereading an unchanged report does not update its report
+  time. Services settings can preview and install a wrapper that preserves the
+  existing status-line command; removal restores it only if the configuration
+  still matches. Turning monitoring off leaves that connection installed but
+  stops quota capture; removing it is a separate action.
+- **Token statistics, charts, CSV/PNG export and chart copying remain Codex
+  only.** Disabling Codex monitoring disables that page's data reads. Claude
+  token/cost analytics are not part of this implementation.
 
 ## Version 3.1.4
 
@@ -65,6 +97,8 @@ and explicit manual-path precedence. Its original record remains
 
 ## Features
 
+The service controls above extend these existing Codex and display features.
+
 - The floating quota strip targets **480 × 90 logical points** for weekly-only
   or cold data and **680 × 90** when a 5-hour window is reported. It supports
   pin, drag, hide, and expand controls. It reuses existing quota data; hovering or focusing
@@ -79,10 +113,10 @@ and explicit manual-path precedence. Its original record remains
   language, and theme. The image contains the chart, date range, fetch time,
   coverage, and any stale-data notice, without identity. Copying writes to the
   system clipboard only when clicked; CSV export remains available.
-- Floating preferences save only pin state and position. Adaptive width is
-  derived from quota data and adds no saved field. There is no statistics
-  history database, new permission, network endpoint, or change to signing and
-  manual installation.
+- Floating preferences save pin state and position; 4.0 also saves the selected
+  service. Adaptive width is still derived from quota data. The app has no
+  statistics history database, and distribution signing and manual installation
+  remain unchanged.
 
 Validation includes a fourth synthetic **Floating** UI scenario and Token
 controls/image checks. Evidence is listed below. Native keyboard focus,
@@ -164,7 +198,12 @@ trust status.
 ## Requirements
 
 - macOS 14 or later.
-- A compatible Codex executable and a current Codex login for live quota data.
+- Codex monitoring requires a compatible Codex executable and a current Codex
+  login. It is the only monitored service in the published 3.1.4 release.
+- Optional Claude monitoring in 4.0 development requires the official Claude Code
+  CLI with its initial setup and login already completed in a terminal. Codex94
+  does not complete Claude login or onboarding for you. Status-line quota appears
+  only when Claude Code reports it; installing the connection cannot create data.
 
 DMG installation does not require Xcode. Source installation additionally
 requires full Xcode 16.4 or later (Command Line Tools alone are insufficient)
@@ -433,6 +472,11 @@ their own provenance above.
   alternate `CODEX_HOME` directories, or collect a local quota-history ledger.
 
 ## Security and privacy
+The 4.0 development branch adds a separate local Claude CLI reader and optional
+status-line quota cache. Previewing setup is read-only; installing or removing
+the connection explicitly edits Claude Code's status-line setting and retains
+recovery material. The diagram below describes the existing Codex path.
+
 
 ```mermaid
 flowchart LR
@@ -443,7 +487,7 @@ flowchart LR
     A -->|"0.3.0: user-initiated update check"| F["GitHub public latest-release API"]
 ```
 
-Codex94 starts the validated executable with fixed arguments:
+The Codex provider starts its validated executable with fixed arguments:
 
 ```text
 codex -s read-only -a never app-server --stdio

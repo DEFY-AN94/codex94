@@ -2,6 +2,27 @@
 
 All notable changes to Codex94 are documented here.
 
+## Unreleased — 4.0.0
+
+### Added
+
+- Opt-in Claude Code Pro/Max subscription quota monitoring alongside Codex.
+  Codex remains enabled by default; each provider owns its connection, refresh
+  tasks, notifications and quota selection independently.
+- Choose one or two native menu-bar entries. The shared popover presents all
+  enabled providers in separate sections, and the floating strip can switch
+  providers without changing which monitors are running.
+- Read-only Claude quota reporting with fractional percentages, optional
+  windows, explicit source/freshness and a reversible statusline integration
+  that preserves an existing command and its output.
+
+### Preserved
+
+- Existing Codex Token statistics, chart styles, CSV/PNG exports, quota groups,
+  reset-count display, four menu-bar layouts, shortcut and bounded recovery.
+- Existing Codex preferences and quota-cache compatibility. Claude Token/cost
+  analytics and multi-account aggregation are outside this release.
+
 ## 3.1.4 - 2026-09-28
 
 Version `3.1.4 (20)`. Release dates use Australia/Melbourne.

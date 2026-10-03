@@ -6,8 +6,12 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private lazy var preferences = PreferencesStore()
     private lazy var store = makeStore()
-    private var statusItem: NSStatusItem?
-    private var statusRenderer: MenuBarStatusRenderer?
+    private var statusItems: [QuotaProviderID: NSStatusItem] = [:]
+    private var statusRenderers: [QuotaProviderID: MenuBarStatusRenderer] = [:]
+    private var statusItemsObservation: AnyCancellable?
+    private var statusItem: NSStatusItem? {
+        statusItems[preferences.resolvedPrimaryProvider ?? .codex] ?? statusItems.values.first
+    }
     private let popover = NSPopover()
     private var dashboardController: DashboardWindowController?
     private var floatingController: FloatingWindowController?
@@ -31,12 +35,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         configureWorkspaceWakeObservation()
         configureSystemClockObservation()
         configureThemeObservation()
-        configureStatusItem()
+        configureStatusItems()
+        statusItemsObservation = preferences.objectWillChange.receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.configureStatusItems() }
         configurePopover()
         configureGlobalHotKey()
         store.start()
 
-        if !preferences.hasChosenIdentityMode
+        if (preferences.codexMonitoringEnabled && !preferences.hasChosenIdentityMode)
             || ProcessInfo.processInfo.arguments.contains("--show-popover") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
                 self?.showPopover()
@@ -69,7 +75,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         floatingController?.shutdown()
         store.shutdown()
         themeObservation?.cancel()
-        statusRenderer?.shutdown()
+        statusItemsObservation?.cancel()
+        statusRenderers.values.forEach { $0.shutdown() }
+        statusItems.values.forEach { NSStatusBar.system.removeStatusItem($0) }
+        statusRenderers.removeAll()
+        statusItems.removeAll()
         stopOutsideClickMonitoring()
     }
 
@@ -81,23 +91,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         stopOutsideClickMonitoring()
     }
 
-    @objc private func togglePopover() {
+    @objc private func togglePopover(_ sender: Any? = nil) {
         if popover.isShown {
             popover.performClose(nil)
         } else {
-            showPopover()
+            showPopover(anchoredAt: sender as? NSStatusBarButton)
         }
     }
 
-    private func configureStatusItem() {
-        let metrics = preferences.menuBarLayout.metrics
-        let item = NSStatusBar.system.statusItem(withLength: metrics.statusItemWidth)
-        guard let button = item.button else { return }
-        button.target = self
-        button.action = #selector(togglePopover)
-        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        statusItem = item
-        statusRenderer = MenuBarStatusRenderer(store: store, statusItem: item)
+    private func configureStatusItems() {
+        // Keep a settings entry reachable even when both monitors are disabled.
+        let providers = preferences.menuBarProviders.isEmpty ? [.codex] : preferences.menuBarProviders
+        for provider in Array(statusItems.keys) where !providers.contains(provider) {
+            if popover.isShown { popover.performClose(nil) }
+            statusRenderers.removeValue(forKey: provider)?.shutdown()
+            if let item = statusItems.removeValue(forKey: provider) {
+                NSStatusBar.system.removeStatusItem(item)
+            }
+        }
+        for provider in providers where statusItems[provider] == nil {
+            let item = NSStatusBar.system.statusItem(withLength: preferences.menuBarLayout.metrics.statusItemWidth)
+            guard let button = item.button else {
+                NSStatusBar.system.removeStatusItem(item)
+                continue
+            }
+            button.target = self
+            button.action = #selector(togglePopover(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.setAccessibilityIdentifier("menu-bar-" + provider.rawValue)
+            statusItems[provider] = item
+            statusRenderers[provider] = MenuBarStatusRenderer(store: store, statusItem: item, provider: provider)
+        }
+        applyAppearance(preferences.theme)
     }
 
     private func configureWorkspaceWakeObservation() {
@@ -165,6 +190,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             popoverView: popover.contentViewController?.view,
             dashboardWindow: dashboardController?.window
         )
+        for item in statusItems.values {
+            item.button?.appearance = theme.appAppearanceName.flatMap(NSAppearance.init(named:))
+        }
     }
 
     private func configurePopover() {
@@ -183,8 +211,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         contentViewController.install(in: popover)
     }
 
-    private func showPopover() {
-        guard let button = statusItem?.button else { return }
+    private func showPopover(anchoredAt anchor: NSStatusBarButton? = nil) {
+        guard let button = anchor ?? statusItem?.button else { return }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         startOutsideClickMonitoring()
     }
@@ -228,14 +256,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if popover.contentViewController?.view.window?.frame.contains(screenPoint) == true {
             return
         }
-        if statusButtonFrameOnScreen()?.contains(screenPoint) == true {
+        if statusItems.values.contains(where: { statusButtonFrameOnScreen($0)?.contains(screenPoint) == true }) {
             return
         }
         popover.performClose(nil)
     }
 
-    private func statusButtonFrameOnScreen() -> NSRect? {
-        guard let button = statusItem?.button, let window = button.window else { return nil }
+    private func statusButtonFrameOnScreen(_ item: NSStatusItem) -> NSRect? {
+        guard let button = item.button, let window = button.window else { return nil }
         let frameInWindow = button.convert(button.bounds, to: nil)
         return window.convertToScreen(frameInWindow)
     }
