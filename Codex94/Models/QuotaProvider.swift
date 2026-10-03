@@ -23,6 +23,7 @@ enum QuotaProviderID: String, Codable, CaseIterable, Identifiable, Sendable {
 
 enum MenuBarServiceMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case single
+    case compactBoth
     case both
 
     var id: String { rawValue }

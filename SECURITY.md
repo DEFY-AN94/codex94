@@ -179,6 +179,12 @@ boundaries remain unchanged.
 
 ## Supported versions
 
+The unreleased `4.0.2 (23)` candidate repairs a notification callback actor
+boundary and changes presentation. It adds no quota API, credential access or
+automatic installer. The fixed official Claude Usage link is opened only by an
+explicit user action in the system browser; Codex94 does not read the resulting
+page or browser session. Claude Code `/usage` remains independently default-off.
+
 Version `4.0.1 (22)` uses passive Claude reports by default with explicit
 report-stream adoption and a separate default-off CLI reader. The retained
 `v4.0.0` tag identifies an unpublished candidate, not a supported stable release.

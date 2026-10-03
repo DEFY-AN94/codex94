@@ -1,6 +1,125 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "display.layout.compactProviderHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layout applies in single-service or separate-icon mode. Combined rings use their own compact layout."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "布局用于单服务或独立图标模式；合并双圈使用固定紧凑布局。"
+          }
+        }
+      }
+    },
+    "resetCredits.readOnly": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read-only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只读"
+          }
+        }
+      }
+    },
+    "claude.passive.waitingShort": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for Claude Code reports"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待 Claude Code 报告"
+          }
+        }
+      }
+    },
+    "claude.passive.codeRequired": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passive reports require the Claude Code status line. Claude chat apps and the website do not report quota here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "被动读取需要 Claude Code 状态栏；Claude 聊天 App 和网页不会在此上报额度。"
+          }
+        }
+      }
+    },
+    "claude.officialUsage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View official usage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看官方用量"
+          }
+        }
+      }
+    },
+    "providers.menuBar.compactBoth": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compact rings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "紧凑双圈"
+          }
+        }
+      }
+    },
+    "providers.menuBar.compactBoth.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex is on the left and Claude on the right. Hover for each quota and reset time. With one service enabled, its usual layout is shown."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "左侧是 Codex，右侧是 Claude；悬停查看各自额度与重置时间。仅启用一个服务时使用原有布局。"
+          }
+        }
+      }
+    },
     "claude.passive.title": {
       "extractionState": "manual",
       "localizations": {
@@ -603,13 +722,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Both shows one item for each enabled service. Either item opens the same panel with all enabled services."
+            "value": "Choose one service, compact rings, or separate items for both services. Every item opens the same panel with all enabled services."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "两个服务模式为每个已启用服务显示独立图标。点击任一图标都会打开包含全部已启用服务的同一面板。"
+            "value": "可以选择单个服务、紧凑双圈或两个服务的独立图标。点击任一图标都会打开包含全部已启用服务的同一面板。"
           }
         }
       }

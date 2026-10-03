@@ -94,6 +94,187 @@ final class ProviderViewTests: XCTestCase {
         XCTAssertEqual(waiting.sourceTimeText, "No quota report yet")
     }
 
+    func testTerminalRowsRetainFractionalQuotaAndPassiveSourceMeaning() throws {
+        let window = try XCTUnwrap(claudeSnapshot(used: 24.5).defaultBucket?.window(.fiveHour))
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let row = QuotaWindowMainRow(window: window, palette: .resolve(.system, scheme: .light),
+                                         countdown: "2h 10m", language: language)
+            XCTAssertEqual(row.remainingPercentText, "75.5%", "The compact row must not round Claude quota to 76%")
+        }
+        var passive = card(snapshot: nil, source: .statusline, now: reportedAt, issue: .noData)
+        passive.statuslineSetupState = .installed
+        XCTAssertEqual(passive.style, .card, "Dashboard remains the default card presentation")
+        passive.style = .terminal
+        XCTAssertEqual(passive.emptyStateKey, "claude.passive.waitingShort")
+        XCTAssertEqual(passive.sourceTitleKey, "claude.source.statusline")
+        XCTAssertEqual(passive.refreshTitleKey, "claude.passive.reread")
+        XCTAssertEqual(passive.sourceTimeText, "No quota report yet")
+        XCTAssertEqual(ProviderQuotaCardContent.officialClaudeUsageURL.absoluteString,
+                       "https://claude.ai/settings/usage")
+    }
+
+    func testMenuTerminalRowsAndDashboardCardsRenderWithoutNewRequests() async throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let state = directory.appendingPathComponent("isolated-state")
+        try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        let fixture = try makeFixture(directory: state, bothWindows: true)
+        defer { fixture.cleanUp() }
+        fixture.preferences.claudeMonitoringEnabled = true
+        fixture.claude.start()
+        let deadline = Date().addingTimeInterval(2)
+        while fixture.claude.isRefreshing && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertNotNil(fixture.claude.snapshot)
+        let before = await fixture.claudeFetcher.calls
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            fixture.preferences.language = language
+            for dark in [false, true] {
+                fixture.preferences.theme = dark ? .terminalDark : .terminalLight
+                let suffix = "\(language.rawValue)-\(dark ? "dark" : "light")"
+                _ = try render(
+                    QuotaPopoverView(store: fixture.store,
+                                     openDashboard: { _ in XCTFail("Rendering cannot navigate") },
+                                     quit: { XCTFail("Rendering cannot quit") }, referenceDate: reportedAt),
+                    width: 500, dark: dark, language: language,
+                    name: "style-swap-menu-\(suffix)", output: directory
+                )
+                _ = try render(
+                    OverviewView(store: fixture.store,
+                                 openProviderSettings: { XCTFail("Rendering cannot open settings") },
+                                 referenceDate: reportedAt)
+                        .frame(width: 900, height: 900).codex94Environment(fixture.preferences),
+                    width: 900, dark: dark, language: language,
+                    name: "style-swap-overview-\(suffix)", output: directory
+                )
+                let passive = ClaudeQuotaCardContent(
+                    snapshot: nil, source: .statusline, reportedAt: nil, issue: .noData,
+                    isRefreshing: false, isEnabled: true, language: language, now: reportedAt,
+                    palette: .resolve(.system, scheme: dark ? .dark : .light),
+                    refresh: { XCTFail("Rendering cannot reread a report") },
+                    openSetup: { XCTFail("Rendering cannot navigate") },
+                    statuslineSetupState: .installed, style: .terminal
+                )
+                _ = try render(passive.padding(14), width: 500, dark: dark, language: language,
+                               name: "style-swap-passive-menu-\(suffix)", output: directory)
+            }
+        }
+        let after = await fixture.claudeFetcher.calls
+        let codexCalls = await fixture.codexFetcher.calls
+        XCTAssertEqual(after, before)
+        XCTAssertEqual(codexCalls, 0)
+        XCTAssertEqual(fixture.notificationService.permissionRequests, 0)
+    }
+
+    func testReadOnlyResetRowStaysSmallForKnownZeroCachedAndUnknownCounts() throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let states: [(Int?, Bool, Bool)] = [(3, true, false), (0, true, false),
+                                          (3, true, true), (nil, false, false), (nil, true, false)]
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            for (index, state) in states.enumerated() {
+                let rowSize = try render(
+                    ResetCreditsRow(count: state.0, hasFetchedLiveSnapshot: state.1,
+                                    isCached: state.2, accent: .cyan),
+                    width: 472, dark: true, language: language,
+                    name: "reset-row-\(index)-\(language.rawValue)", output: directory
+                )
+                XCTAssertLessThanOrEqual(rowSize.height, 40, "Popover reset information must remain a compact row")
+                let host = NSHostingController(rootView:
+                    ResetCreditsCard(count: state.0, hasFetchedLiveSnapshot: state.1,
+                                     isCached: state.2, accent: .cyan)
+                        .environment(\.locale, language.locale))
+                let cardSize = host.sizeThatFits(in: NSSize(width: 472, height: CGFloat.greatestFiniteMagnitude))
+                XCTAssertGreaterThanOrEqual(cardSize.height, rowSize.height + 40,
+                                            "Overview retains the prominent read-only card")
+            }
+        }
+    }
+
+    func testCompactRingsUseWindowPickerBindingsWhilePreservingSavedDualBuckets() async throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let state = directory.appendingPathComponent("isolated-state")
+        try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        let fixture = try makeFixture(directory: state, bothWindows: true)
+        defer { fixture.cleanUp() }
+        fixture.preferences.claudeMonitoringEnabled = true
+        fixture.claude.start()
+        let deadline = Date().addingTimeInterval(2)
+        while fixture.claude.isRefreshing && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertNotNil(fixture.claude.snapshot)
+        fixture.preferences.menuBarLayout = .dualWindow
+        fixture.preferences.dualWindowBucketSelection = .bucket(limitID: "codex")
+        fixture.preferences.claudeDualWindowBucketSelection = .bucket(limitID: "claude")
+        fixture.preferences.menuBarServiceMode = .compactBoth
+        XCTAssertTrue(fixture.preferences.usesCompactProviderRings)
+        XCTAssertFalse(fixture.preferences.usesDualWindowMenuBarSelection)
+
+        let callsBefore = await fixture.claudeFetcher.calls
+        let codexPicker = MenuBarQuotaPicker(store: fixture.store)
+        let claudePicker = MenuBarQuotaPicker(store: fixture.store, provider: .claude)
+        // Exercise the exact Bindings used by the production window selectors,
+        // not a separate test setter or a native click in the hosted process.
+        codexPicker.selectionBinding.wrappedValue = .defaultBucket(.fiveHour)
+        claudePicker.selectionBinding.wrappedValue = .defaultBucket(.weekly)
+        XCTAssertEqual(fixture.preferences.menuBarQuotaSelection, .defaultBucket(.fiveHour))
+        XCTAssertEqual(fixture.preferences.claudeMenuBarQuotaSelection, .defaultBucket(.weekly))
+        XCTAssertEqual(fixture.preferences.dualWindowBucketSelection, .bucket(limitID: "codex"))
+        XCTAssertEqual(fixture.preferences.claudeDualWindowBucketSelection, .bucket(limitID: "claude"))
+        let selected = try XCTUnwrap(fixture.store.menuBarQuotaOptions(for: .codex).first {
+            $0.selection == .defaultBucket(.fiveHour)
+        })
+        XCTAssertTrue(codexPicker.optionLabel(selected).contains("5h"),
+                      "The visible quota selector describes a window, not only a bucket")
+
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            fixture.preferences.language = language
+            _ = try render(
+                QuotaPopoverView(store: fixture.store, openDashboard: { _ in }, quit: {}, referenceDate: reportedAt),
+                width: 500, dark: true, language: language,
+                name: "compact-dual-saved-popover-\(language.rawValue)", output: directory
+            )
+            _ = try render(
+                OverviewView(store: fixture.store, referenceDate: reportedAt)
+                    .frame(width: 900, height: 900).codex94Environment(fixture.preferences),
+                width: 900, dark: true, language: language,
+                name: "compact-dual-saved-overview-\(language.rawValue)", output: directory
+            )
+            _ = try render(
+                DisplaySettingsView(store: fixture.store, windowState: DashboardWindowState())
+                    .frame(width: 900, height: 1_100).codex94Environment(fixture.preferences),
+                width: 900, dark: true, language: language,
+                name: "compact-dual-saved-display-\(language.rawValue)", output: directory
+            )
+            _ = try render(
+                ProviderSettingsView(store: fixture.store)
+                    .frame(width: 900, height: 1_800).codex94Environment(fixture.preferences),
+                width: 900, dark: true, language: language,
+                name: "compact-dual-saved-providers-\(language.rawValue)", output: directory
+            )
+        }
+        fixture.preferences.menuBarServiceMode = .both
+        XCTAssertTrue(fixture.preferences.usesDualWindowMenuBarSelection)
+        XCTAssertEqual(fixture.preferences.menuBarLayout, .dualWindow)
+        XCTAssertEqual(fixture.preferences.dualWindowBucketSelection, .bucket(limitID: "codex"))
+        XCTAssertEqual(fixture.preferences.claudeDualWindowBucketSelection, .bucket(limitID: "claude"))
+        XCTAssertEqual(codexPicker.selectionBinding.wrappedValue, .defaultBucket(.fiveHour))
+        XCTAssertEqual(claudePicker.selectionBinding.wrappedValue, .defaultBucket(.weekly))
+        fixture.preferences.menuBarServiceMode = .compactBoth
+        fixture.preferences.claudeMonitoringEnabled = false
+        XCTAssertTrue(fixture.preferences.usesDualWindowMenuBarSelection,
+                      "A single remaining provider falls back to its saved dual-window layout")
+        let callsAfter = await fixture.claudeFetcher.calls
+        let codexCalls = await fixture.codexFetcher.calls
+        XCTAssertEqual(callsAfter, callsBefore)
+        XCTAssertEqual(codexCalls, 0)
+    }
+
     func testClaudeCardsRenderReportedUnknownCachedAndZeroStatesInBothLanguages() throws {
         let directory = try temporaryDirectory()
         print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")

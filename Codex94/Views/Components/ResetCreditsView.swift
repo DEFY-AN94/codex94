@@ -2,15 +2,22 @@ import SwiftUI
 
 struct ResetCreditsView: View {
     @ObservedObject var store: AppStore
+    var compact = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        ResetCreditsCard(
-            count: store.snapshot?.resetCreditsAvailableCount,
-            hasFetchedLiveSnapshot: store.hasFetchedLiveSnapshot,
-            isCached: isCached,
-            accent: Codex94Palette.resolve(store.preferences.theme, scheme: colorScheme).connectionAccent
-        )
+        let accent = Codex94Palette.resolve(store.preferences.theme, scheme: colorScheme).connectionAccent
+        Group {
+            if compact {
+                ResetCreditsRow(count: store.snapshot?.resetCreditsAvailableCount,
+                                hasFetchedLiveSnapshot: store.hasFetchedLiveSnapshot,
+                                isCached: isCached, accent: accent)
+            } else {
+                ResetCreditsCard(count: store.snapshot?.resetCreditsAvailableCount,
+                                 hasFetchedLiveSnapshot: store.hasFetchedLiveSnapshot,
+                                 isCached: isCached, accent: accent)
+            }
+        }
     }
 
     private var isCached: Bool {
@@ -21,7 +28,42 @@ struct ResetCreditsView: View {
     }
 }
 
-/// A static information card, shared by the popover and Overview.
+/// A compact read-only popover row. It intentionally has no action or hover fill.
+struct ResetCreditsRow: View {
+    let count: Int?
+    let hasFetchedLiveSnapshot: Bool
+    let isCached: Bool
+    let accent: Color
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "arrow.counterclockwise").foregroundStyle(accent).accessibilityHidden(true)
+            Text("resetCredits.title").fontWeight(.medium)
+            Spacer(minLength: 4)
+            if isCached, count != nil {
+                Label("status.cached", systemImage: "clock").foregroundStyle(.secondary)
+            }
+            Text(verbatim: count.map(String.init) ?? "—")
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .foregroundStyle(count == nil ? Color.secondary : accent)
+                .monospacedDigit()
+            Text("resetCredits.readOnly").foregroundStyle(.secondary)
+        }
+        .font(.system(size: 11))
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+        .help(Text(detailKey))
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(Text(detailKey))
+        .accessibilityIdentifier("reset-credits")
+    }
+
+    private var detailKey: LocalizedStringKey {
+        resetCreditsDetailKey(count: count, hasFetchedLiveSnapshot: hasFetchedLiveSnapshot, isCached: isCached)
+    }
+}
+
+/// The prominent static card remains available in Dashboard Overview.
 struct ResetCreditsCard: View {
     let count: Int?
     let hasFetchedLiveSnapshot: Bool
@@ -84,10 +126,14 @@ struct ResetCreditsCard: View {
     }
 
     private var detailKey: LocalizedStringKey {
-        if count != nil {
-            if isCached { return "resetCredits.cachedDetail" }
-            return count == 0 ? "resetCredits.emptyDetail" : "resetCredits.detail"
-        }
-        return hasFetchedLiveSnapshot ? "resetCredits.unavailable" : "resetCredits.notFetched"
+        resetCreditsDetailKey(count: count, hasFetchedLiveSnapshot: hasFetchedLiveSnapshot, isCached: isCached)
     }
+}
+
+private func resetCreditsDetailKey(count: Int?, hasFetchedLiveSnapshot: Bool, isCached: Bool) -> LocalizedStringKey {
+    if count != nil {
+        if isCached { return "resetCredits.cachedDetail" }
+        return count == 0 ? "resetCredits.emptyDetail" : "resetCredits.detail"
+    }
+    return hasFetchedLiveSnapshot ? "resetCredits.unavailable" : "resetCredits.notFetched"
 }

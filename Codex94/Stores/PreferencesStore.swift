@@ -202,8 +202,23 @@ final class PreferencesStore: ObservableObject {
         guard let primary = resolvedPrimaryProvider else { return [] }
         switch menuBarServiceMode {
         case .single: return [primary]
+        case .compactBoth: return enabledProviders
         case .both: return [primary] + enabledProviders.filter { $0 != primary }
         }
+    }
+
+    var usesCompactProviderRings: Bool {
+        menuBarServiceMode == .compactBoth && enabledProviders.count > 1
+    }
+
+    var usesDualWindowMenuBarSelection: Bool {
+        menuBarLayout == .dualWindow && !usesCompactProviderRings
+    }
+
+    /// A combined item keeps a stable Codex/Claude order, independent of the
+    /// saved primary service used by single-item mode.
+    var menuBarStatusItemProviders: [QuotaProviderID] {
+        usesCompactProviderRings ? Array(menuBarProviders.prefix(1)) : menuBarProviders
     }
 
     func isMonitoringEnabled(for provider: QuotaProviderID) -> Bool {

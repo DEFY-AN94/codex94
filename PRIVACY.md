@@ -6,6 +6,14 @@ stable version is [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/
 released on 2026-10-03 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
+The unreleased `4.0.2 (23)` candidate changes notification callback handling and
+quota presentation. Its compact dual-ring mode uses the existing service-mode
+preference and does not combine provider percentages or add quota collection.
+The official Claude Usage-page button hands a fixed HTTPS URL to the system
+browser only when clicked. Codex94 does not inspect that page, its cookies or
+login state. Browser navigation is separate from Codex94's quota reader and
+is not telemetry uploaded by this project.
+
 ## Optional Claude monitoring (4.0.1)
 
 Version 4.0.1 uses passive local reports by default and keeps the optional CLI
@@ -44,6 +52,9 @@ JSON, directory/transcript paths and raw session IDs are not written to the
 quota cache. Reading the same report again does not renew its data timestamp.
 Reports can remain old while Claude Code is idle or closed. The interface
 distinguishes a statusline report from an active CLI usage query.
+Ordinary Claude App or web chat does not emit this Code statusline report.
+Installing the connection or signing into the chat app alone cannot populate
+the cache; no new quota API or automatic App/web reader is introduced in 4.0.2.
 The selected passive producer fingerprint is also saved in preferences. It
 pins one reporting stream across App restarts, not an authenticated account.
 Reports from a different or unidentified producer require explicit adoption;

@@ -1,10 +1,40 @@
 # Component ownership and reuse
 
-This describes ownership and reuse constraints in the published stable
+This describes ownership and reuse constraints, including the unreleased
+`4.0.2 (23)` candidate below. The published stable version remains the
 [`4.0.1 (22)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
 published on 2026-10-03 (Australia/Melbourne).
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
+
+## 4.0.2 candidate: callback safety and compact presentation
+
+The system notification adapter accepts callbacks on the system's call-out
+queue through an explicit `@Sendable` boundary. It passes transferable status
+values and resumes continuations; it must not inherit a MainActor requirement
+inside a UserNotifications completion block. The notification controller and
+its published state remain on MainActor. Test authorization lookup, permission
+completion and delivery completion from a background fake adapter, preserving
+disabled defaults and cancellation/generation rules.
+
+Dashboard and the popover reuse the same provider snapshots with different
+presentations: large service cards in Dashboard, terminal-style compact rows
+and a smaller reset-count display in the popover. This adds no quota request
+or reset-consumption path.
+
+`MenuBarServiceMode.compactBoth` renders two separate provider rings in one
+native item. `single` retains one provider item; the saved `both` value retains
+two independent native items. The existing `menuBarServiceMode.v1` key stores
+the choice without migrating `both`. Single-provider items omit redundant
+name labels. Keep provider values and stale/error states independent, and
+retain the existing image-cache and shared-popover ownership.
+
+The passive Claude source remains **Claude Code statusline output**. Ordinary
+Claude App/web chat does not emit that local report, so a configured connection
+without data is not evidence of a failed login. The official Usage-page action
+opens a fixed HTTPS URL in the system browser; it does not scrape the page or
+read cookies, credentials or quota JSON. No quota API is added, and the CLI
+reader remains a separate default-off option.
 
 ## 4.0.1: independently enabled providers
 
@@ -37,7 +67,8 @@ persists the selected producer fingerprint; another or unknown producer requires
 explicit adoption and resets notification comparisons. This is report-stream
 isolation, not account authentication, and cannot detect an account change inside
 the same session. Cached values are always labelled accordingly. Normal Claude
-use must supply reports; the monitor never sends a model prompt to populate them.
+Code use must supply reports; ordinary App/web chat is not this source. The
+monitor never sends a model prompt to populate reports.
 
 `AppStore` composes the existing Codex state, `ClaudeQuotaStore` and global app
 services. It routes enable/disable, wake, popover and shutdown events. Each

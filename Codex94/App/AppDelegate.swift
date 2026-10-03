@@ -101,7 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func configureStatusItems() {
         // Keep a settings entry reachable even when both monitors are disabled.
-        let providers = preferences.menuBarProviders.isEmpty ? [.codex] : preferences.menuBarProviders
+        let providers = preferences.menuBarStatusItemProviders.isEmpty ? [.codex] : preferences.menuBarStatusItemProviders
         for provider in Array(statusItems.keys) where !providers.contains(provider) {
             if popover.isShown { popover.performClose(nil) }
             statusRenderers.removeValue(forKey: provider)?.shutdown()
@@ -121,6 +121,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.setAccessibilityIdentifier("menu-bar-" + provider.rawValue)
             statusItems[provider] = item
             statusRenderers[provider] = MenuBarStatusRenderer(store: store, statusItem: item, provider: provider)
+        }
+        for provider in providers {
+            statusItems[provider]?.button?.setAccessibilityIdentifier(
+                preferences.usesCompactProviderRings ? "menu-bar-combined" : "menu-bar-" + provider.rawValue
+            )
         }
         applyAppearance(preferences.theme)
     }
