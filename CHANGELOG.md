@@ -2,7 +2,9 @@
 
 All notable changes to Codex94 are documented here.
 
-## Unreleased — 4.0.0
+## 4.0.0 - 2026-10-03
+
+Version `4.0.0 (21)`. Release dates use Australia/Melbourne.
 
 ### Added
 
@@ -15,6 +17,15 @@ All notable changes to Codex94 are documented here.
 - Read-only Claude quota reporting with fractional percentages, optional
   windows, explicit source/freshness and a reversible statusline integration
   that preserves an existing command and its output.
+
+### Reliability
+
+- Recognize current Claude Code terminal prompts as well as the older shortcut
+  hint, while keeping login and folder-trust dialogs separate from command input.
+- Wait for the official usage screen to finish refreshing before accepting its
+  displayed quotas; cached values do not become fresh while `Refreshing` remains.
+- Refresh Claude quota after reported reset deadlines through the existing poll,
+  with independent cancellation, source freshness and request coverage.
 
 ### Preserved
 

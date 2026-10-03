@@ -34,8 +34,9 @@ and security-scanned before it is tagged.
 These features are implemented on the development branch. The published stable
 release and all download/clone links below remain **3.1.4 (20)**. The production
 reader has fetched authenticated 5-hour and weekly quotas from native Claude
-Code **2.1.286** with a default Max profile. Remaining native App interaction
-and unattended dual-provider acceptance are still pending.
+Code **2.1.286** with a default Max profile. Native App interaction and the
+maintainer-requested ten-minute runtime observation are complete; final
+publication remains pending.
 
 - **Codex is on by default; Claude is off.** Enable Claude in Dashboard →
   **Services**. Each service has its own refresh tasks, quota selection, source,
@@ -647,7 +648,16 @@ Validation for `3.1.4 (20)`: **396 tests executed, 1 existing hosted-focus skip,
 0 failures**. Exact final-main checks, public asset verification and local background-refresh observation are recorded in
 [RELEASING.md](docs/RELEASING.md).
 
-SwiftUI owns views and state presentation; AppKit owns the status item, popover,
+The `4.0.0 (21)` product candidate `c9e7c01` passed **486 tests executed,
+1 existing hosted-focus skip, 0 failures**, Universal packaging, all five
+synthetic UI scenarios and Actions/Python/Swift CodeQL. The maintainer accepted
+the real dual-provider popover, menu items and Claude floating strip. A requested
+ten-minute observation recorded two Codex and one Claude background refreshes,
+all successful; two additional popover-triggered reads were counted separately.
+This short observation does not establish long-term unattended stability.
+Final-main artifacts and publication remain separate release records.
+
+SwiftUI owns views and state presentation; AppKit owns the native status items, popover,
 application appearance, and Dashboard window lifecycle. See the
 [component ownership and reuse rules](docs/ARCHITECTURE.md),
 [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/RELEASING.md](docs/RELEASING.md)
@@ -655,7 +665,9 @@ for contribution and release workflows.
 
 ## Uninstall
 
-First disable **Launch at login** in Dashboard and quit every Codex94 copy.
+If you installed the Claude statusline connection, disconnect it in **Services**
+while Codex94 is still installed. This restores the previous command before its
+helper executable is removed. Then disable **Launch at login** in Dashboard and quit every Codex94 copy.
 Remove only the App locations that you actually installed; neither installer
 automatically removes the other copy:
 
