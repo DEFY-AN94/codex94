@@ -52,10 +52,27 @@ struct ProviderSettingsView: View {
                 )
             }
             SettingsDivider()
-            SettingsRow("claude.setup.title") {
+            SettingsRow("claude.passive.title") {
                 ClaudeStatuslineSetupView(store: store.claudeStore)
             }
-            if store.preferences.claudeMonitoringEnabled {
+            SettingsDivider()
+            SettingsRow("claude.cliUsage.title") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle("claude.cliUsage.enable", isOn: Binding(
+                        get: { store.preferences.claudeCLIUsageEnabled },
+                        set: { store.setClaudeCLIUsageEnabled($0) }
+                    ))
+                    .accessibilityIdentifier("claude-cli-usage-enabled")
+                    Text("claude.cliUsage.help")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Label("claude.cliUsage.warning", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("claude-cli-usage-warning")
+                }
+            }
+            if store.preferences.claudeMonitoringEnabled && store.preferences.claudeCLIUsageEnabled {
                 SettingsDivider()
                 SettingsRow("claude.refreshInterval") {
                     Picker("claude.refreshInterval", selection: Binding(
@@ -70,6 +87,8 @@ struct ProviderSettingsView: View {
                     .labelsHidden().frame(width: 180)
                     .accessibilityIdentifier("claude-refresh-interval")
                 }
+            }
+            if store.preferences.claudeMonitoringEnabled {
                 SettingsDivider()
                 SettingsRow("claude.menuBarQuota") {
                     if store.preferences.menuBarLayout == .dualWindow {

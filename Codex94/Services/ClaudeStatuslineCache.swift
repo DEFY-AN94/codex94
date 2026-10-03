@@ -5,6 +5,14 @@ import Foundation
 
 enum ClaudeStatuslineParser {
     static let maximumInputBytes = 1_048_576
+    static let legacyUnknownProducerID = ClaudeLocalFile.digest(Data("Codex94.ClaudeStatusline.v1:unknown-session".utf8))
+
+    /// The legacy anonymous discriminator deduplicates reports but cannot bind
+    /// a stream: unrelated sessions without IDs all share that same value.
+    static func identifiableProducerID(_ value: String?) -> String? {
+        guard let normalized = ClaudePassiveProducerID.normalized(value), normalized != legacyUnknownProducerID else { return nil }
+        return normalized
+    }
 
     static func producerID(from data: Data) throws -> String {
         guard data.count <= maximumInputBytes,

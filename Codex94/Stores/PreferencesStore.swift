@@ -23,6 +23,8 @@ final class PreferencesStore: ObservableObject {
         static let floatingWindowPosition = "floatingWindowPosition.v1"
         static let codexMonitoringEnabled = "codexMonitoringEnabled.v1"
         static let claudeMonitoringEnabled = "claudeMonitoringEnabled.v1"
+        static let claudeCLIUsageEnabled = "claude.cliUsageEnabled.v1"
+        static let claudePassiveProducerID = "claude.passiveProducerID.v1"
         static let menuBarServiceMode = "menuBarServiceMode.v1"
         static let primaryProvider = "primaryProvider.v1"
         static let floatingProvider = "floatingProvider.v1"
@@ -45,6 +47,15 @@ final class PreferencesStore: ObservableObject {
     }
     @Published var claudeMonitoringEnabled: Bool {
         didSet { defaults.set(claudeMonitoringEnabled, forKey: Key.claudeMonitoringEnabled) }
+    }
+    @Published var claudeCLIUsageEnabled: Bool {
+        didSet { defaults.set(claudeCLIUsageEnabled, forKey: Key.claudeCLIUsageEnabled) }
+    }
+    @Published private(set) var claudePassiveProducerID: String? {
+        didSet {
+            if let claudePassiveProducerID { defaults.set(claudePassiveProducerID, forKey: Key.claudePassiveProducerID) }
+            else { defaults.removeObject(forKey: Key.claudePassiveProducerID) }
+        }
     }
     @Published var menuBarServiceMode: MenuBarServiceMode {
         didSet { defaults.set(menuBarServiceMode.rawValue, forKey: Key.menuBarServiceMode) }
@@ -127,6 +138,8 @@ final class PreferencesStore: ObservableObject {
         self.defaults = defaults
         codexMonitoringEnabled = Self.loadBoolean(from: defaults, key: Key.codexMonitoringEnabled, fallback: true)
         claudeMonitoringEnabled = Self.loadBoolean(from: defaults, key: Key.claudeMonitoringEnabled, fallback: false)
+        claudeCLIUsageEnabled = Self.loadBoolean(from: defaults, key: Key.claudeCLIUsageEnabled, fallback: false)
+        claudePassiveProducerID = ClaudePassiveProducerID.normalized(defaults.string(forKey: Key.claudePassiveProducerID))
         menuBarServiceMode = MenuBarServiceMode(rawValue: defaults.string(forKey: Key.menuBarServiceMode) ?? "") ?? .single
         primaryProvider = QuotaProviderID(rawValue: defaults.string(forKey: Key.primaryProvider) ?? "") ?? .codex
         floatingProvider = QuotaProviderID(rawValue: defaults.string(forKey: Key.floatingProvider) ?? "") ?? .codex
@@ -212,6 +225,10 @@ final class PreferencesStore: ObservableObject {
 
     func restoreDefaultColors() {
         statusAccentOverrides = StatusAccentOverrides()
+    }
+
+    func setClaudePassiveProducerID(_ value: String?) {
+        claudePassiveProducerID = ClaudePassiveProducerID.normalized(value)
     }
 
     private func persist<Value: Encodable>(_ value: Value, key: String) {

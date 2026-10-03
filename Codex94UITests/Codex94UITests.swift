@@ -3697,11 +3697,13 @@ private struct SyntheticFixture {
             }
         }
         if scenario == "providers" {
-            guard try preference("codexMonitoringEnabled.v1") as? Bool == true,
+            guard let syntheticCLIEnabled = try preference("claude.cliUsageEnabled.v1") as? NSNumber,
+                  CFGetTypeID(syntheticCLIEnabled) == CFBooleanGetTypeID(), syntheticCLIEnabled.boolValue,
+                  try preference("codexMonitoringEnabled.v1") as? Bool == true,
                   try preference("claudeMonitoringEnabled.v1") as? Bool == false,
                   try preference("menuBarServiceMode.v1") as? String == "single",
                   try preference("primaryProvider.v1") as? String == "codex" else {
-                throw UITestFailure("Providers must start with Codex-only monitoring and one Codex status item")
+                throw UITestFailure("Providers must start Codex-only with one status item and explicit synthetic CLI opt-in")
             }
         }
         try assertSafePreferences()
@@ -3721,12 +3723,14 @@ private struct SyntheticFixture {
             throw UITestFailure("Synthetic quota-only/manual-path/30-minute fixture boundaries changed")
         }
         if scenario == "providers" {
-            guard try preference("claude.refreshInterval.v1") as? Int == 30,
+            guard let syntheticCLIEnabled = try preference("claude.cliUsageEnabled.v1") as? NSNumber,
+                  CFGetTypeID(syntheticCLIEnabled) == CFBooleanGetTypeID(), syntheticCLIEnabled.boolValue,
+                  try preference("claude.refreshInterval.v1") as? Int == 30,
                   try preference("codexMonitoringEnabled.v1") is Bool,
                   try preference("claudeMonitoringEnabled.v1") is Bool,
                   let mode = try preference("menuBarServiceMode.v1") as? String,
                   ["single", "both"].contains(mode) else {
-                throw UITestFailure("Provider monitoring must retain its bounded 30-minute synthetic fixture policy")
+                throw UITestFailure("Providers must retain the 30-minute fixture policy and explicit synthetic CLI opt-in")
             }
         }
         guard let style = try preference("tokenUsageChartStyle.v1") as? String,
@@ -3747,7 +3751,7 @@ private struct SyntheticFixture {
         if scenario == "providers" {
             allowed.formUnion(["codexMonitoringEnabled.v1", "claudeMonitoringEnabled.v1",
                                "menuBarServiceMode.v1", "primaryProvider.v1", "floatingProvider.v1",
-                               "claude.refreshInterval.v1"])
+                               "claude.refreshInterval.v1", "claude.cliUsageEnabled.v1"])
         }
         guard allowed.contains(key) else { throw UITestFailure("Refuse to read a non-allowlisted preference key") }
         // Exact AUT/current-user/any-host domain only; no runner-container,

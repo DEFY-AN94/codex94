@@ -415,6 +415,7 @@ def main():
     if scenario == "providers":
         initial_preferences.update({
             "codexMonitoringEnabled.v1": True, "claudeMonitoringEnabled.v1": False,
+            "claude.cliUsageEnabled.v1": True,  # Explicit opt-in for the synthetic CLI fixture only.
             "menuBarServiceMode.v1": "single", "primaryProvider.v1": "codex",
             "floatingProvider.v1": "codex", "claude.refreshInterval.v1": 30,
         })

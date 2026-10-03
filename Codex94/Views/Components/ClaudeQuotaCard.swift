@@ -24,7 +24,10 @@ struct ClaudeQuotaCard: View {
                 palette: .resolve(.system, scheme: colorScheme, overrides: accentOverrides),
                 refresh: { store.refresh(trigger: .manual) },
                 openSetup: openSetup,
-                compact: compact
+                compact: compact,
+                isCLIUsageEnabled: store.isCLIUsageEnabled,
+                statuslineSetupState: store.statuslineSetupState,
+                passiveReportNeedsConfirmation: store.passiveReportNeedsConfirmation
             )
         }
     }
@@ -47,27 +50,83 @@ struct ClaudeQuotaCardContent: View {
     var timeZone: TimeZone = .autoupdatingCurrent
 
     var compact = false
+    var isCLIUsageEnabled = false
+    var statuslineSetupState: ClaudeStatuslineSetupState = .notInstalled
+    var passiveReportNeedsConfirmation = false
 
-    private var badge: ConnectionBadge {
-        if isRefreshing { return .refreshing }
-        if issue != nil { return snapshot == nil ? .unavailable : .stale }
+    var badge: ConnectionBadge {
+        guard isEnabled else { return .none }
+        if isCLIUsageEnabled && isRefreshing { return .refreshing }
+        if needsSourceConfirmation || issue == .staleData || passiveWindowsExpired { return .stale }
+        if visibleIssue != nil { return snapshot == nil ? .unavailable : .stale }
         return .none
     }
 
-    private var statusText: Text? {
-        if isRefreshing { return Text("claude.refreshing") }
-        if let issue { return Text(issue.localizedKey) }
+    private var needsSourceConfirmation: Bool {
+        !isCLIUsageEnabled && (passiveReportNeedsConfirmation || issue == .sourceChanged)
+    }
+
+    private var passiveWindowsExpired: Bool {
+        !isCLIUsageEnabled && source == .statusline && reportedAt != nil
+            && snapshot == nil && issue == .noData
+    }
+
+    private var visibleIssue: ClaudeQuotaIssue? {
+        guard isEnabled, let issue else { return nil }
+        if !isCLIUsageEnabled {
+            switch issue {
+            case .setupRequired, .noData, .cliUnavailable, .loginRequired, .timedOut:
+                // Waiting for a local report is not a login or network failure.
+                return nil
+            default: break
+            }
+        }
+        return issue
+    }
+
+    var statusKey: String? {
+        guard isEnabled else { return nil }
+        if isCLIUsageEnabled && isRefreshing { return "claude.refreshing" }
+        if needsSourceConfirmation { return "claude.issue.sourceChanged" }
+        if let issue = visibleIssue {
+            // The empty-state line already describes a missing report.
+            return issue == .noData ? nil : issue.localizationKey
+        }
         return nil
+    }
+
+    var sourceTitleKey: String {
+        if let source { return source.localizationKey }
+        return isCLIUsageEnabled ? "claude.source.waiting" : "claude.source.statusline"
+    }
+
+    var refreshTitleKey: String {
+        isCLIUsageEnabled ? "claude.refresh" : "claude.passive.reread"
+    }
+
+    var emptyStateKey: String {
+        guard isEnabled else { return "claude.monitoring.off" }
+        if needsSourceConfirmation { return "claude.passive.confirmationRequired" }
+        if !isCLIUsageEnabled {
+            if issue == .staleData || passiveWindowsExpired { return "claude.passive.expiredEmpty" }
+            return statuslineSetupState == .notInstalled
+                ? "claude.passive.notConfigured" : "claude.passive.waiting"
+        }
+        return "claude.quota.empty"
+    }
+
+    private var statusText: Text? {
+        statusKey.map { Text(LocalizedStringKey($0)) }
     }
 
     var body: some View {
         ProviderQuotaCardContent(
-            provider: .claude, title: "Claude", sourceTitle: source?.localizedKey ?? "claude.source.waiting",
+            provider: .claude, title: "Claude", sourceTitle: LocalizedStringKey(sourceTitleKey),
             windows: snapshot?.defaultBucket?.windows ?? [], badge: badge,
-            usesCachedData: snapshot != nil && issue != nil,
+            usesCachedData: snapshot != nil && badge == .stale,
             statusText: statusText, sourceTimeText: sourceTimeText,
-            emptyText: isEnabled ? "claude.quota.empty" : "claude.monitoring.off",
-            refreshLabel: "claude.refresh", detailsLabel: "claude.openSetup",
+            emptyText: LocalizedStringKey(emptyStateKey),
+            refreshLabel: LocalizedStringKey(refreshTitleKey), detailsLabel: "claude.openSetup",
             canRefresh: isEnabled && !isRefreshing, showsDetails: snapshot == nil || issue != nil,
             language: language, now: now, palette: palette,
             refresh: refresh, openDetails: openSetup, timeZone: timeZone, compact: compact
@@ -82,7 +141,8 @@ struct ClaudeQuotaCardContent: View {
             return StatusAccessibilityString.localized("claude.sourceTime.unavailable", language: language, bundle: .main)
         }
         return StatusAccessibilityString.localized(
-            "claude.sourceTime %@", arguments: [timestamp], language: language, bundle: .main
+            source == .statusline ? "claude.localReportTime %@" : "claude.sourceTime %@",
+            arguments: [timestamp], language: language, bundle: .main
         )
     }
 

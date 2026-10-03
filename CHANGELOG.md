@@ -2,9 +2,43 @@
 
 All notable changes to Codex94 are documented here.
 
-## 4.0.0 - 2026-10-03
+## 4.0.1 - 2026-10-03 (candidate, not yet published)
 
-Version `4.0.0 (21)`. Release dates use Australia/Melbourne.
+Version `4.0.1 (22)`. Release dates use Australia/Melbourne.
+
+Passive-first development has resumed under the maintainer's conditional
+data-source plan. Direct OAuth remains deferred pending an officially permitted
+integration; live `/usage` probing remains suspended.
+
+### Changed
+
+- Use local statusline reports as the default Claude source. Clearly identify
+  unverified account identity, preserve report age, and require explicit adoption
+  when the reporting session changes instead of silently replacing quota.
+- Isolate passive and optional CLI modes; CLI failures cannot automatically
+  replace their result with an account-unverified statusline report.
+- Make Claude Code `/usage` a separate, default-off backup reader with a
+  subscription-quota consumption warning. Enabling Claude monitoring alone
+  reads only existing local statusline reports; disabling the backup cancels
+  active CLI work.
+
+### Fixed
+
+- Read the installed statusline helper's monitoring preference from the App's
+  standard defaults, so an enabled passive connection actually captures reports.
+  A packaged-entry-point regression covers enabled, disabled and malformed values.
+- Recognize the complete Claude input screen when right-aligned effort or quota
+  hints appear beside the mode footer. This allows `/usage` to be sent promptly
+  instead of waiting until the read times out.
+- Carry forward the dual-provider features below from the unpublished 4.0.0
+  candidate. The `v4.0.0` tag is retained unchanged; its Draft Release was removed.
+  The current published stable release remains 3.1.4 until 4.0.1 is verified and
+  published.
+
+## 4.0.0 - 2026-10-03 (unpublished candidate; tag retained)
+
+Version `4.0.0 (21)` was not published as a stable Release. Its tag remains for
+history. Release dates use Australia/Melbourne.
 
 ### Added
 

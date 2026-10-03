@@ -7,7 +7,18 @@ enum ClaudeQuotaSource: String, Codable, Sendable {
 
 enum ClaudeQuotaIssue: String, Error, Equatable, Sendable {
     case cliUnavailable, loginRequired, setupRequired, timedOut, invalidData
-    case noData, staleData, configurationConflict, unavailable
+    case noData, staleData, sourceChanged, configurationConflict, unavailable
+}
+
+/// An opaque report-stream selection, never proof of account identity.
+enum ClaudePassiveProducerID {
+    static func normalized(_ value: String?) -> String? {
+        guard let value, value.utf8.count == 64,
+              value.utf8.allSatisfy({ (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) }) else {
+            return nil
+        }
+        return value.lowercased()
+    }
 }
 
 struct ClaudeQuotaWindow: Codable, Equatable, Sendable {

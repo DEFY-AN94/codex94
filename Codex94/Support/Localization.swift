@@ -748,6 +748,7 @@ extension ClaudeQuotaIssue {
         case .invalidData: "claude.issue.invalidData"
         case .noData: "claude.quota.empty"
         case .staleData: "claude.issue.staleData"
+        case .sourceChanged: "claude.issue.sourceChanged"
         case .configurationConflict: "claude.issue.configurationConflict"
         case .unavailable: "claude.issue.unavailable"
         }

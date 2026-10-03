@@ -245,6 +245,11 @@ final class AppStore: ObservableObject {
         claudeStore.setRefreshInterval(interval)
     }
 
+    func setClaudeCLIUsageEnabled(_ enabled: Bool) {
+        guard !isShuttingDown else { return }
+        claudeStore.setCLIUsageEnabled(enabled)
+    }
+
     func setClaudeNotificationPreferences(_ value: NotificationPreferences) {
         setNotificationPreferences(value, for: .claude)
     }

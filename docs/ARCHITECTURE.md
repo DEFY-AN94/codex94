@@ -5,12 +5,38 @@ This describes ownership and reuse constraints in the published stable
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.0.0 development: independently enabled providers
+## 4.0.1 candidate: independently enabled providers
+
+The current candidate is `4.0.1 (22)`; stable remains 3.1.4. The `v4.0.0` tag
+is retained as an unpublished candidate. Passive statusline reports are the
+default Claude data source. The earlier optional CLI input-footer compatibility
+fix is retained; it does not make that reader an automatic fallback.
 
 `QuotaProviderID` identifies Codex and Claude. Existing Codex preference keys
 and cache v2 stay compatible; new monitoring/display choices and Claude
 preferences have their own keys. Monitoring defaults to Codex only. A display
 selection never implicitly enables a provider or starts a request.
+`claude.cliUsageEnabled.v1` is a separate default-off opt-in for the backup
+CLI reader. Existing Claude monitoring preferences do not enable it during
+migration. Without it, no CLI client is created and refreshes only load the
+local statusline cache. Turning it off retires in-flight work and clears CLI
+reports while leaving statusline monitoring available.
+
+Passive statusline is the default data path. The conditional OAuth proposal was
+reviewed against [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
+on 2026-10-03; its authorization prerequisite is not met, so no OAuth transport,
+credential reader or refresh-token flow is added. Consequently, OAuth-specific
+401/429 handling and automatic sign-in recovery are not claimed as implemented.
+
+The [official statusline schema](https://code.claude.com/docs/en/statusline#available-data)
+provides quota windows and a session identifier, but no verified account identity.
+CLI mode therefore never loads passive reports as automatic fallback. Explicit
+mode switches clear visible data from the previous source. Passive monitoring
+persists the selected producer fingerprint; another or unknown producer requires
+explicit adoption and resets notification comparisons. This is report-stream
+isolation, not account authentication, and cannot detect an account change inside
+the same session. Cached values are always labelled accordingly. Normal Claude
+use must supply reports; the monitor never sends a model prompt to populate them.
 
 `AppStore` composes the existing Codex state, `ClaudeQuotaStore` and global app
 services. It routes enable/disable, wake, popover and shutdown events. Each

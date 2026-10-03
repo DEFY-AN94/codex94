@@ -10,6 +10,10 @@ manual-only update design. It adds no update polling, download, installation,
 relaunch, endpoint, or signing-policy change. Stable discovery continues to
 follow the latest published GitHub Release.
 
+The `4.0.1 (22)` candidate is not yet published. `v4.0.0` remains an unchanged
+candidate tag; its Draft Release was removed. A tag alone is not a public stable
+Release and does not change what the latest-release API returns.
+
 ## User flow
 
 1. Open Dashboard → About and select **Check for updates**.

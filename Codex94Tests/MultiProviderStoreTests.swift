@@ -5,6 +5,31 @@ import XCTest
 
 @MainActor
 final class MultiProviderStoreTests: XCTestCase {
+    func testAppStoreCLIUsageSwitchRequiresOptInAndDoesNotDisableStatuslineMonitoring() async throws {
+        let fixture = try makeFixture(codexEnabled: false, claudeEnabled: true, claudeCLIEnabled: false)
+        fixture.store.start()
+        fixture.store.refreshAll()
+        let initialCalls = await fixture.claude.requestCount()
+        XCTAssertEqual(initialCalls, 0)
+        XCTAssertFalse(fixture.preferences.claudeCLIUsageEnabled)
+        fixture.store.setClaudeCLIUsageEnabled(true)
+        try await waitFor("Explicit CLI opt-in starts one isolated request") {
+            await fixture.claude.requestCount() == 1
+        }
+        await fixture.claude.completeNext(claudeReport(used: 25.5))
+        try await waitFor("The opted-in fake response is accepted") { !fixture.store.claudeStore.isRefreshing }
+        XCTAssertNotNil(fixture.store.providerSnapshot(for: .claude))
+        fixture.store.setClaudeCLIUsageEnabled(false)
+        fixture.store.refreshProvider(.claude)
+        XCTAssertNil(fixture.store.providerSnapshot(for: .claude))
+        XCTAssertTrue(fixture.preferences.claudeMonitoringEnabled)
+        XCTAssertTrue(fixture.store.claudeStore.isEnabled)
+        XCTAssertNil(fixture.store.claudeStore.nextAutomaticRefreshAt)
+        let finalCalls = await fixture.claude.requestCount()
+        XCTAssertEqual(finalCalls, 1)
+        XCTAssertEqual(fixture.codex.requestCount, 0)
+    }
+
     func testDisablingCodexCancelsSchedulesAndTokenButKeepsClaudeState() async throws {
         let fixture = try makeFixture(claudeEnabled: true, cached: codexSnapshot(used: 40))
         fixture.store.start()
@@ -213,7 +238,7 @@ final class MultiProviderStoreTests: XCTestCase {
     }
 
     private func makeFixture(
-        codexEnabled: Bool = true, claudeEnabled: Bool = false,
+        codexEnabled: Bool = true, claudeEnabled: Bool = false, claudeCLIEnabled: Bool = true,
         cached: QuotaSnapshot? = nil, holdCodexCancellation: Bool = false
     ) throws -> Fixture {
         let directory = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
@@ -231,6 +256,7 @@ final class MultiProviderStoreTests: XCTestCase {
         let preferences = PreferencesStore(defaults: defaults)
         preferences.codexMonitoringEnabled = codexEnabled
         preferences.claudeMonitoringEnabled = claudeEnabled
+        preferences.claudeCLIUsageEnabled = claudeCLIEnabled
         preferences.hasChosenIdentityMode = true
         preferences.identityMode = .quotaOnly
         preferences.manualCodexPath = executable.path

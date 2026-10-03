@@ -13,10 +13,18 @@ Codex itself owns authentication. Codex94 does not implement OAuth or a direct
 HTTP client for quota or Token usage and does not directly inspect authentication
 stores, browser state, session logs, or local usage databases.
 
-The 4.0.0 development branch adds optional Claude subscription monitoring
+The 4.0.1 candidate adds optional Claude subscription monitoring
 through official Claude Code `/usage` and an explicitly installed local
 statusline bridge. Authentication remains inside Claude Code. There is no
 direct Claude quota HTTP/OAuth implementation or credential-store access.
+The CLI reader has a separate, default-off opt-in with a quota-consumption
+warning. Enabling Claude monitoring does not opt into CLI sessions. While the
+backup reader is off, automatic and manual refreshes only inspect the local
+statusline cache. Disabling it cancels and retires an active reader.
+Source modes are isolated: a CLI failure does not adopt an account-unverified
+statusline report. Passive monitoring pins its selected report stream and asks
+for explicit adoption when a different session reports; a session fingerprint
+never proves account identity. No OAuth token access or refresh is implemented.
 The CLI probe has an owned working directory, disabled tools/hooks/MCP and
 remote-control startup, bounded output and a deadline. Only a recognized
 built-in usage action is submitted; unexpected login/onboarding screens are
@@ -170,6 +178,10 @@ The existing subprocess, fixed GitHub endpoint, and distribution-signing
 boundaries remain unchanged.
 
 ## Supported versions
+
+The current development target is `4.0.1 (22)`, including the Claude input-footer
+recognition fix. It is not yet a published release. The retained `v4.0.0` tag
+identifies an unpublished candidate, not a supported stable release.
 
 The supported published stable version is [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4),
 released on 2026-09-28 (Australia/Melbourne).

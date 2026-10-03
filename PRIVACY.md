@@ -6,10 +6,22 @@ stable version is [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/
 released on 2026-09-28 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
-## Optional Claude monitoring (4.0.0 development)
+## Optional Claude monitoring (4.0.1 candidate)
 
-Claude monitoring is off by default. Enabling it uses the locally installed
-official Claude Code program and its built-in `/usage` command. Claude Code
+This section describes the unpublished 4.0.1 (22) candidate. It retains the
+4.0.0 candidate's provider boundaries and fixes CLI input-screen recognition;
+the published stable release remains 3.1.4. The `v4.0.0` tag is preserved and
+was not published as a stable Release.
+
+Claude monitoring is off by default. Enabling monitoring alone reads existing
+local status-line reports. A separate `/usage` backup option is also off by
+default; only explicit opt-in permits starting the locally installed official
+Claude Code program and its built-in `/usage` command. The option warns that
+these CLI sessions may consume subscription quota; no zero-consumption guarantee
+is made. Live `/usage` probing remains suspended while passive-first development
+continues. Direct OAuth integration is deferred under
+[Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use);
+Codex94 neither obtains nor refreshes Claude subscription tokens. Claude Code
 owns subscription authentication and any connection to Anthropic. The probe
 runs in a dedicated Codex94 directory, disables tools, hooks, MCP servers and
 remote-control startup, and has bounded output, runtime and process cleanup.
@@ -35,6 +47,11 @@ JSON, directory/transcript paths and raw session IDs are not written to the
 quota cache. Reading the same report again does not renew its data timestamp.
 Reports can remain old while Claude Code is idle or closed. The interface
 distinguishes a statusline report from an active CLI usage query.
+The selected passive producer fingerprint is also saved in preferences. It
+pins one reporting stream across App restarts, not an authenticated account.
+Reports from a different or unidentified producer require explicit adoption;
+their raw session identifier is still never persisted. CLI mode does not
+automatically consume the passive cache after a request failure.
 
 Connecting the statusline explicitly previews a change to the user's Claude
 settings. It preserves other settings, forwards the original command's stdin
@@ -57,7 +74,8 @@ The existing Token statistics/export features remain Codex-only.
 
 New preference keys are `codexMonitoringEnabled.v1`,
 `claudeMonitoringEnabled.v1`, `menuBarServiceMode.v1`, `primaryProvider.v1`,
-`floatingProvider.v1`, `claude.refreshInterval.v1`,
+`floatingProvider.v1`, `claude.cliUsageEnabled.v1`, `claude.passiveProducerID.v1`,
+`claude.refreshInterval.v1`,
 `claude.menuBarQuotaSelection.v1`, `claude.dualWindowBucketSelection.v1` and
 `claude.notifications.v1`. The passive report is stored separately at
 `~/Library/Application Support/Codex94/Claude/statusline-quota.json`; active CLI
