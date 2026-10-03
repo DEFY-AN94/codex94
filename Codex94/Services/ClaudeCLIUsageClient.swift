@@ -164,16 +164,9 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
         let lines = screen.components(separatedBy: "\n").map {
             $0.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "│")))
         }
-        var paths = Set([runtimeDirectory.path])
-        // These are only the root-owned aliases already checked when creating
-        // the private runtime. No arbitrary path prefix or descendant qualifies.
-        for prefix in ["/var/", "/tmp/"] where runtimeDirectory.path.hasPrefix(prefix) {
-            paths.insert("/private" + runtimeDirectory.path)
+        guard lines.contains(where: { Self.matchesOwnedRuntimePath($0, runtimeDirectory: runtimeDirectory) }) else {
+            throw ClaudeQuotaIssue.setupRequired
         }
-        for prefix in ["/private/var/", "/private/tmp/"] where runtimeDirectory.path.hasPrefix(prefix) {
-            paths.insert(String(runtimeDirectory.path.dropFirst("/private".count)))
-        }
-        guard lines.contains(where: paths.contains) else { throw ClaudeQuotaIssue.setupRequired }
         var yesRows: [Int] = []
         var selectedRows: [Int] = []
         for (index, line) in lines.enumerated() {
@@ -191,6 +184,23 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
               let yes = yesRows.first, let selected = selectedRows.first else { throw ClaudeQuotaIssue.setupRequired }
         if selected == yes { return "\r" }
         return selected < yes ? "\u{1b}[B" : "\u{1b}[A"
+    }
+
+    /// The runtime has already passed the root-owned alias/symlink guard.
+    /// Compare complete lexical components, never arbitrary string prefixes.
+    static func matchesOwnedRuntimePath(_ displayedPath: String, runtimeDirectory: URL) -> Bool {
+        func components(_ path: String) -> [String]? {
+            guard path.hasPrefix("/"),
+                  !path.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { return nil }
+            var result = path.split(separator: "/").map(String.init)
+            guard !result.contains("."), !result.contains("..") else { return nil }
+            if result.count >= 2, result[0] == "private", result[1] == "var" || result[1] == "tmp" {
+                result.removeFirst()
+            }
+            return result
+        }
+        guard let displayed = components(displayedPath), let owned = components(runtimeDirectory.path) else { return false }
+        return displayed == owned
     }
 
     private func validateVersion(of executable: URL) throws {

@@ -69,22 +69,28 @@ struct ClaudeStatuslineCache: Sendable {
         let data = try ClaudeLocalFile.read(fileURL, maximumBytes: Self.maximumCacheBytes)
         guard let record = try? JSONDecoder().decode(Record.self, from: data), record.version == 1,
               record.report.source == .statusline,
-              record.report.reportedAt.timeIntervalSince1970.isFinite,
-              record.report.receivedAt.timeIntervalSince1970.isFinite,
+              Self.isSupportedTimestamp(record.report.reportedAt),
+              Self.isSupportedTimestamp(record.report.receivedAt),
               record.report.reportedAt <= record.report.receivedAt,
               record.producers.count <= 128,
               record.producers.allSatisfy({ key, value in
                   key.count == 64 && key.allSatisfy(\.isHexDigit)
                     && value.fingerprint.count == 64 && value.fingerprint.allSatisfy(\.isHexDigit)
-                    && value.reportedAt.timeIntervalSince1970.isFinite && value.validUntil.timeIntervalSince1970.isFinite
+                    && Self.isSupportedTimestamp(value.reportedAt) && Self.isSupportedTimestamp(value.validUntil)
+                    && value.reportedAt <= value.validUntil && value.reportedAt <= record.report.receivedAt
               }),
               record.report.windows.count <= 2,
               Set(record.report.windows.map(\.kind)).count == record.report.windows.count,
               record.report.windows.allSatisfy({ window in
                   window.usedPercentage.isFinite && (0...100).contains(window.usedPercentage)
-                    && window.resetsAt.map { $0.timeIntervalSince1970.isFinite && $0.timeIntervalSince1970 >= 0 } == true
+                    && window.resetsAt.map(Self.isSupportedTimestamp) == true
               }) else { throw ClaudeQuotaIssue.invalidData }
         return record
+    }
+
+    private static func isSupportedTimestamp(_ date: Date) -> Bool {
+        let seconds = date.timeIntervalSince1970
+        return seconds.isFinite && (0...253_402_300_799).contains(seconds)
     }
 
     func capture(_ data: Data, at now: Date = Date()) throws {

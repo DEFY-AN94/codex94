@@ -49,6 +49,49 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         XCTAssertThrowsError(try ClaudeStatuslineParser.windows(from: Data(repeating: 32, count: 1_048_577)))
     }
 
+    func testCacheRejectsOutOfRangeDatesAtEveryPersistenceBoundary() throws {
+        let cache = ClaudeStatuslineCache(fileURL: try fixtureDirectory().appendingPathComponent("quota.json"))
+        for field in ["report.reportedAt", "report.receivedAt", "producer.reportedAt", "producer.validUntil", "resetsAt"] {
+            for seconds: TimeInterval in [-1e300, -1, 253_402_300_800, 1e300] {
+                try writeTimestampCache(cache, overrides: [field: seconds])
+                XCTAssertThrowsError(try cache.load(), "\(field): \(seconds)") { error in
+                    XCTAssertEqual(error as? ClaudeQuotaIssue, .invalidData)
+                }
+            }
+        }
+    }
+
+    func testCacheRejectsInconsistentObservationAndProducerTimes() throws {
+        let cache = ClaudeStatuslineCache(fileURL: try fixtureDirectory().appendingPathComponent("quota.json"))
+        for overrides: [String: TimeInterval] in [
+            ["report.reportedAt": 2_000_000_001],
+            ["producer.reportedAt": 2_000_000_001],
+            ["producer.validUntil": 1_999_999_999]
+        ] {
+            try writeTimestampCache(cache, overrides: overrides)
+            XCTAssertThrowsError(try cache.load()) { error in
+                XCTAssertEqual(error as? ClaudeQuotaIssue, .invalidData)
+            }
+        }
+    }
+
+    func testCacheAcceptsSupportedDateEndpointsAndRetainsExpiredEvidence() throws {
+        let cache = ClaudeStatuslineCache(fileURL: try fixtureDirectory().appendingPathComponent("quota.json"))
+        for seconds: TimeInterval in [0, 253_402_300_799] {
+            try writeTimestampCache(cache, overrides: [
+                "report.reportedAt": seconds, "report.receivedAt": seconds,
+                "producer.reportedAt": seconds, "producer.validUntil": seconds, "resetsAt": seconds
+            ])
+            let report = try XCTUnwrap(cache.load())
+            XCTAssertEqual(report.reportedAt, Date(timeIntervalSince1970: seconds))
+            XCTAssertEqual(report.windows.first?.resetsAt, Date(timeIntervalSince1970: seconds))
+        }
+        try writeTimestampCache(cache, overrides: ["resetsAt": 0])
+        let expired = try XCTUnwrap(cache.load())
+        XCTAssertEqual(expired.windows.count, 1)
+        XCTAssertNil(expired.snapshot(at: first))
+    }
+
     func testRepeatedAndAlternatingCachedProducersDoNotAdvanceReportAge() throws {
         let cache = ClaudeStatuslineCache(fileURL: try fixtureDirectory().appendingPathComponent("quota.json"))
         let a = payload(session: "00000000-0000-0000-0000-000000000001", used: "10")
@@ -436,6 +479,25 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         }
     }
 
+    func testTrustMatchesOnlyCompleteKnownSystemAliasComponents() {
+        for name in ["tmp", "var"] {
+            let alias = "/\(name)/Codex94-owned/runtime"
+            let physical = "/private/\(name)/Codex94-owned/runtime"
+            XCTAssertTrue(ClaudeCLIUsageClient.matchesOwnedRuntimePath(
+                physical, runtimeDirectory: URL(fileURLWithPath: alias)))
+            XCTAssertTrue(ClaudeCLIUsageClient.matchesOwnedRuntimePath(
+                alias, runtimeDirectory: URL(fileURLWithPath: physical)))
+            for unowned in [alias + "-other", alias + "/child", physical + "/../runtime",
+                            "/private/\(name)-other/Codex94-owned/runtime", "prefix " + alias,
+                            alias + " suffix", "\(name)/Codex94-owned/runtime"] {
+                XCTAssertFalse(ClaudeCLIUsageClient.matchesOwnedRuntimePath(
+                    unowned, runtimeDirectory: URL(fileURLWithPath: alias)), unowned)
+            }
+        }
+        XCTAssertFalse(ClaudeCLIUsageClient.matchesOwnedRuntimePath(
+            "/private/Users/synthetic/runtime", runtimeDirectory: URL(fileURLWithPath: "/Users/synthetic/runtime")))
+    }
+
     func testCancellingCLIReadStopsItsOwnedProcessGroup() async throws {
         let root = try fixtureDirectory()
         let executable = root.appendingPathComponent("claude")
@@ -498,6 +560,28 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         Data("""
         {"session_id":"\(session)","cwd":"PRIVATE_CWD","transcript_path":"PRIVATE_TRANSCRIPT","email":"private@example.com","token":"PRIVATE_TOKEN","rate_limits":{"five_hour":{"used_percentage":\(used),"resets_at":2000001000},"spend_limit":{"used_percentage":150,"resets_at":2000002000}}}
         """.utf8)
+    }
+
+    private func writeTimestampCache(_ cache: ClaudeStatuslineCache, overrides: [String: TimeInterval]) throws {
+        func date(_ key: String, fallback: TimeInterval = 2_000_000_000) -> Date {
+            Date(timeIntervalSince1970: overrides[key] ?? fallback)
+        }
+        let producerID = String(repeating: "a", count: 64)
+        let report = ClaudeQuotaReport(
+            source: .statusline, reportedAt: date("report.reportedAt"), receivedAt: date("report.receivedAt"),
+            windows: [.init(kind: .fiveHour, usedPercentage: 23.5, resetsAt: date("resetsAt", fallback: 2_000_001_000))],
+            producerID: producerID
+        )
+        // Match Codable's reference-date encoding while supplying damaged, finite dates.
+        let record: [String: Any] = [
+            "version": 1, "report": try JSONSerialization.jsonObject(with: JSONEncoder().encode(report)),
+            "producers": [producerID: [
+                "fingerprint": String(repeating: "b", count: 64),
+                "reportedAt": date("producer.reportedAt").timeIntervalSinceReferenceDate,
+                "validUntil": date("producer.validUntil", fallback: 2_000_604_800).timeIntervalSinceReferenceDate
+            ]]
+        ]
+        try JSONSerialization.data(withJSONObject: record).write(to: cache.fileURL)
     }
 
     private func stagedCLI(firstFrame: String, delayedFrame: String?, environment: [String: String]? = nil,
