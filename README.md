@@ -5,7 +5,7 @@
 ## Overview
 
 Codex94 is an unofficial, independent macOS app for **Codex quota and Token
-usage statistics**. The 4.0.0 development branch adds optional **Claude Code
+usage statistics**. The 4.0.1 candidate adds optional **Claude Code
 quota monitoring** alongside Codex. It keeps remaining quota and reset times
 in the menu bar without a Dock icon, with details in one popover and Dashboard.
 
@@ -29,14 +29,15 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
-## 4.0.0 development — not released
+## 4.0.1 candidate — not released
 
-These features are implemented on the development branch. The published stable
-release and all download/clone links below remain **3.1.4 (20)**. The production
-reader has fetched authenticated 5-hour and weekly quotas from native Claude
-Code **2.1.286** with a default Max profile. Native App interaction and the
-maintainer-requested ten-minute runtime observation are complete; final
-publication remains pending.
+`4.0.1 (22)` carries forward the dual-provider features from the unpublished
+4.0.0 candidate and fixes Claude input-screen recognition when right-aligned
+hints share its mode footer. The fix sends `/usage` promptly rather than waiting
+until the read times out. The `v4.0.0` tag is retained unchanged; its Draft
+Release was removed. The published stable release and all download/clone links
+below remain **3.1.4 (20)**. New-candidate validation and publication are pending;
+prior 4.0.0 results below are historical evidence.
 
 - **Codex is on by default; Claude is off.** Enable Claude in Dashboard →
   **Services**. Each service has its own refresh tasks, quota selection, source,
@@ -202,7 +203,7 @@ trust status.
 - macOS 14 or later.
 - Codex monitoring requires a compatible Codex executable and a current Codex
   login. It is the only monitored service in the published 3.1.4 release.
-- Optional Claude monitoring in 4.0 development requires the official Claude Code
+- Optional Claude monitoring in the 4.0.1 candidate requires the official Claude Code
   CLI with its initial setup and login already completed in a terminal. Codex94
   does not complete Claude login or onboarding for you. Status-line quota appears
   only when Claude Code reports it; installing the connection cannot create data.
@@ -474,7 +475,7 @@ their own provenance above.
   alternate `CODEX_HOME` directories, or collect a local quota-history ledger.
 
 ## Security and privacy
-The 4.0 development branch adds a separate local Claude CLI reader and optional
+The 4.0.1 candidate adds a separate local Claude CLI reader and optional
 status-line quota cache. Previewing setup is read-only; installing or removing
 the connection explicitly edits Claude Code's status-line setting and retains
 recovery material. The diagram below describes the existing Codex path.
@@ -648,14 +649,16 @@ Validation for `3.1.4 (20)`: **396 tests executed, 1 existing hosted-focus skip,
 0 failures**. Exact final-main checks, public asset verification and local background-refresh observation are recorded in
 [RELEASING.md](docs/RELEASING.md).
 
-The `4.0.0 (21)` product candidate `c9e7c01` passed **486 tests executed,
+The unpublished `4.0.0 (21)` product candidate `c9e7c01` passed **486 tests executed,
 1 existing hosted-focus skip, 0 failures**, Universal packaging, all five
 synthetic UI scenarios and Actions/Python/Swift CodeQL. The maintainer accepted
-the real dual-provider popover, menu items and Claude floating strip. A requested
-ten-minute observation recorded two Codex and one Claude background refreshes,
-all successful; two additional popover-triggered reads were counted separately.
-This short observation does not establish long-term unattended stability.
-Final-main artifacts and publication remain separate release records.
+the real dual-provider popover, menu items and Claude floating strip for that
+candidate. Its reader fetched real quotas using native Claude Code 2.1.286 with
+a default Max profile. The requested ten-minute observation lasted 626 seconds:
+two Codex and one Claude background refreshes, plus one popover-triggered read
+per service, all succeeded with zero failures. This included interaction and
+does not establish long-term unattended stability. These are historical 4.0.0
+results, not validation of the 4.0.1 fix or its final release artifacts.
 
 SwiftUI owns views and state presentation; AppKit owns the native status items, popover,
 application appearance, and Dashboard window lifecycle. See the

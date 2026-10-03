@@ -34,6 +34,20 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
+The current target is `4.0.1 (22)`, dated 2026-10-03 (Australia/Melbourne), still
+unpublished. It carries forward dual-provider monitoring and fixes delayed
+`/usage` submission when the Claude input footer has right-aligned hints.
+The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
+do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
+records do not establish validation of this fix. Keep public stable links at
+3.1.4 until the new release is verified and published.
+
+For this release, the maintainer approved a ten-minute live-observation scope.
+The earlier 4.0.0 candidate observation lasted 626 seconds: two Codex and one
+Claude background refreshes, plus one popover read per service, all succeeded
+with zero failures. It included interaction and is neither an unattended run
+nor evidence for the new fix. Record the new candidate's outcome separately.
+
 Start from a clean, freshly fetched baseline. Review changes since the published
 tag and any branch/tag/Release name conflicts. Preserve unknown worktree
 changes and existing tags; do not stash/reset/clean or force-push as preparation.
@@ -255,7 +269,7 @@ states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
 Wait for CI, every synthetic UI smoke required by the candidate, and
-Actions/Python/Swift CodeQL on the actual tested revision. The `4.0.0` gate
+Actions/Python/Swift CodeQL on the actual tested revision. The `4.0.1` gate
 includes five UI scenarios: Display, Recovery, Token usage, Floating, and
 Providers. Providers uses only synthetic CLI data; its success does not replace
 separate acceptance of the installed Claude Code version and authenticated profile.

@@ -13,7 +13,7 @@ Codex itself owns authentication. Codex94 does not implement OAuth or a direct
 HTTP client for quota or Token usage and does not directly inspect authentication
 stores, browser state, session logs, or local usage databases.
 
-The 4.0.0 development branch adds optional Claude subscription monitoring
+The 4.0.1 candidate adds optional Claude subscription monitoring
 through official Claude Code `/usage` and an explicitly installed local
 statusline bridge. Authentication remains inside Claude Code. There is no
 direct Claude quota HTTP/OAuth implementation or credential-store access.
@@ -170,6 +170,10 @@ The existing subprocess, fixed GitHub endpoint, and distribution-signing
 boundaries remain unchanged.
 
 ## Supported versions
+
+The current development target is `4.0.1 (22)`, including the Claude input-footer
+recognition fix. It is not yet a published release. The retained `v4.0.0` tag
+identifies an unpublished candidate, not a supported stable release.
 
 The supported published stable version is [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.1.4),
 released on 2026-09-28 (Australia/Melbourne).

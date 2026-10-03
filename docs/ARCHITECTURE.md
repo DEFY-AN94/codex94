@@ -5,7 +5,12 @@ This describes ownership and reuse constraints in the published stable
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.0.0 development: independently enabled providers
+## 4.0.1 candidate: independently enabled providers
+
+The current candidate is `4.0.1 (22)`; stable remains 3.1.4. The `v4.0.0` tag
+is retained as an unpublished candidate. The input-screen fix accepts optional
+right-aligned hints after the complete mode footer, so the CLI reader can send
+`/usage` promptly while retaining its input-frame and login/trust checks.
 
 `QuotaProviderID` identifies Codex and Claude. Existing Codex preference keys
 and cache v2 stay compatible; new monitoring/display choices and Claude

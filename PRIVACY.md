@@ -6,7 +6,12 @@ stable version is [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/
 released on 2026-09-28 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
-## Optional Claude monitoring (4.0.0 development)
+## Optional Claude monitoring (4.0.1 candidate)
+
+This section describes the unpublished 4.0.1 (22) candidate. It retains the
+4.0.0 candidate's provider boundaries and fixes CLI input-screen recognition;
+the published stable release remains 3.1.4. The `v4.0.0` tag is preserved and
+was not published as a stable Release.
 
 Claude monitoring is off by default. Enabling it uses the locally installed
 official Claude Code program and its built-in `/usage` command. Claude Code

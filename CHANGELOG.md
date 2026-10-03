@@ -2,9 +2,24 @@
 
 All notable changes to Codex94 are documented here.
 
-## 4.0.0 - 2026-10-03
+## 4.0.1 - 2026-10-03 (candidate, not yet published)
 
-Version `4.0.0 (21)`. Release dates use Australia/Melbourne.
+Version `4.0.1 (22)`. Release dates use Australia/Melbourne.
+
+### Fixed
+
+- Recognize the complete Claude input screen when right-aligned effort or quota
+  hints appear beside the mode footer. This allows `/usage` to be sent promptly
+  instead of waiting until the read times out.
+- Carry forward the dual-provider features below from the unpublished 4.0.0
+  candidate. The `v4.0.0` tag is retained unchanged; its Draft Release was removed.
+  The current published stable release remains 3.1.4 until 4.0.1 is verified and
+  published.
+
+## 4.0.0 - 2026-10-03 (unpublished candidate; tag retained)
+
+Version `4.0.0 (21)` was not published as a stable Release. Its tag remains for
+history. Release dates use Australia/Melbourne.
 
 ### Added
 
