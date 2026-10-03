@@ -25,6 +25,27 @@ METADATA_HELPER = "script/release_metadata.py"
 # Only these tracked build inputs may enter the disposable recovery source copy.
 # No repository metadata, documentation, scripts, local state or directory copy.
 BUILD_INPUTS = (
+    "Codex94Tests/ClaudeExecutableLocatorTests.swift",
+    "Codex94/Services/ClaudeExecutableLocator.swift",
+    "Codex94Tests/ClaudeStatuslineInstallerRecoveryTests.swift",
+    "Codex94Tests/ClaudeQuotaStoreTests.swift",
+    "Codex94Tests/ClaudeResetTextParserTests.swift",
+    "Codex94Tests/ClaudeQuotaBackendTests.swift",
+    "Codex94/Support/ClaudeResetTextParser.swift",
+    "Codex94Tests/ProviderViewTests.swift",
+    "Codex94Tests/MultiProviderStoreTests.swift",
+    "Codex94/Services/ClaudeCLIUsageClient.swift",
+    "Codex94/Services/ClaudeStatuslineInstaller.swift",
+    "Codex94/Services/ClaudeStatuslineBridge.swift",
+    "Codex94Tests/ProviderPreferencesTests.swift",
+    "Codex94/Views/Dashboard/ProviderSettingsView.swift",
+    "Codex94/Views/Components/ClaudeStatuslineSetupView.swift",
+    "Codex94/Views/Components/ClaudeQuotaCard.swift",
+    "Codex94/Stores/ProviderPresentation.swift",
+    "Codex94/Stores/ClaudeQuotaStore.swift",
+    "Codex94/Services/ClaudeStatuslineCache.swift",
+    "Codex94/Models/QuotaProvider.swift",
+    "Codex94/Models/ClaudeQuotaModels.swift",
     "Codex94/Views/Dashboard/TokenUsageImageExportControls.swift",
     "Codex94Tests/TokenUsageImageExportTests.swift",
     "Codex94Tests/FloatingWindowTests.swift",
@@ -286,7 +307,7 @@ def main():
     require(os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted", "A fresh hosted runner is required")
     require(os.environ.get("RUNNER_OS") == "macOS", "A hosted Mac is required")
     scenario = os.environ.get("CODEX94_UI_SCENARIO")
-    require(scenario in ("display", "recovery", "usage", "floating"), "Unknown UI scenario")
+    require(scenario in ("display", "recovery", "usage", "floating", "providers"), "Unknown UI scenario")
     require(os.getuid() != 0, "Do not prepare UI fixtures as root")
     source_revision = os.environ.get("GITHUB_SHA", "")
     require(re.fullmatch(r"[0-9a-f]{40}", source_revision) is not None, "A tested source revision is required")
@@ -314,6 +335,17 @@ def main():
         library / "Caches" / BUNDLE_ID,
     ]
     require(all(not os.path.lexists(path) for path in protected), "Existing AUT data: refuse to overwrite it")
+    if scenario == "providers":
+        # No real Claude account or installed CLI can be selected ahead of the
+        # exact PATH fixture. Never run this preparation on a personal/reused Mac.
+        claude_paths = [
+            Path.home() / ".claude", Path.home() / ".claude.json",
+            Path.home() / ".local/bin/claude",
+            library / "Application Support" / "Claude",
+            Path("/opt/homebrew/bin/claude"), Path("/usr/local/bin/claude"),
+        ]
+        require(all(not os.path.lexists(path) for path in claude_paths),
+                "Existing Claude installation/configuration: refuse providers fixture")
     by_host = library / "Preferences" / "ByHost"
     require(
         not any(by_host.glob(BUNDLE_ID + ".*.plist")),
@@ -380,6 +412,12 @@ def main():
     }
     if scenario == "floating":
         initial_preferences["floatingWindowPinned.v1"] = True
+    if scenario == "providers":
+        initial_preferences.update({
+            "codexMonitoringEnabled.v1": True, "claudeMonitoringEnabled.v1": False,
+            "menuBarServiceMode.v1": "single", "primaryProvider.v1": "codex",
+            "floatingProvider.v1": "codex", "claude.refreshInterval.v1": 30,
+        })
     manifest = {
         "schemaVersion": 1,
         "scenario": scenario,
@@ -432,6 +470,24 @@ def main():
         "initialPreferences": initial_preferences,
         "runner": {"environment": "github-hosted", "os": "macOS"},
     }
+    if scenario == "providers":
+        claude_source = Path(__file__).resolve().with_name("claude_usage.py")
+        require(claude_source.is_file() and not claude_source.is_symlink(), "Missing synthetic Claude source")
+        claude_bytes = claude_source.read_bytes()
+        claude_executable = root / "claude"
+        claude_log = root / "claude-request-log.jsonl"
+        claude_mode = control / "claude-mode.json"
+        write_new(claude_executable, claude_bytes, 0o700)
+        write_new(claude_log, b"")
+        write_new(claude_mode, json_bytes({"mode": "normal"}))
+        version = subprocess.run([str(claude_executable), "--version"], capture_output=True, timeout=3, check=True)
+        require(version.stdout == b"2.1.999 (Claude Code)\n", "Synthetic Claude self-check failed")
+        manifest.update({
+            "claudeExecutable": str(claude_executable),
+            "claudeExecutableSHA256": hashlib.sha256(claude_bytes).hexdigest(),
+            "claudeRequestLogPath": str(claude_log), "claudeModePath": str(claude_mode),
+            "claudeIsolation": {"realConfigurationAbsent": True, "knownExecutablesAbsent": True},
+        })
     write_new(root / "manifest.json", json_bytes(manifest))
     seed = root / "initial-preferences.plist"
     write_new(seed, plistlib.dumps(initial_preferences, fmt=plistlib.FMT_XML, sort_keys=True))
@@ -508,6 +564,7 @@ def main():
         "runnerWriteScope": ["synthetic-control", "synthetic-artifacts"],
         "runnerPreferenceAccess": "read-only-synthetic-app-domain",
         "rawTestResultsUploaded": False,
+        "claudeFakeOnly": scenario == "providers",
     }))
 
     descriptor = os.open(output_path, os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW)

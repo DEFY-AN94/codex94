@@ -1,0 +1,401 @@
+import AppKit
+import SwiftUI
+import XCTest
+@testable import Codex94
+
+@MainActor
+final class ProviderViewTests: XCTestCase {
+    private let reportedAt = Date(timeIntervalSince1970: 1_900_000_000)
+
+    func testClaudeCardKeepsSourceReportTimeWhenTheViewRendersLater() throws {
+        let snapshot = try claudeSnapshot()
+        let first = card(snapshot: snapshot, source: .statusline, now: reportedAt.addingTimeInterval(10))
+        let later = card(snapshot: snapshot, source: .statusline, now: reportedAt.addingTimeInterval(500))
+        XCTAssertEqual(first.sourceTimeText, later.sourceTimeText,
+                       "Rendering or reading the same report must not label it freshly updated")
+        XCTAssertTrue(first.sourceTimeText.hasPrefix("Quota report: "))
+        let empty = card(snapshot: nil, source: nil, now: reportedAt)
+        XCTAssertEqual(empty.sourceTimeText, "No quota report yet")
+        XCTAssertEqual(snapshot.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 95.4)
+    }
+
+    func testClaudeCardsRenderReportedUnknownCachedAndZeroStatesInBothLanguages() throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let complete = try claudeSnapshot()
+        let zero = try claudeSnapshot(weeklyOnly: true, used: 100)
+        let scenarios: [(String, QuotaSnapshot?, ClaudeQuotaSource?, ClaudeQuotaIssue?, Bool)] = [
+            ("live", complete, .cliUsage, nil, false),
+            ("cached-zero", zero, .statusline, .staleData, false),
+            ("unknown", nil, nil, .setupRequired, false),
+            ("refreshing", complete, .statusline, .timedOut, true)
+        ]
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            for dark in [false, true] {
+                for scenario in scenarios {
+                    let content = ClaudeQuotaCardContent(
+                        snapshot: scenario.1, source: scenario.2,
+                        reportedAt: scenario.1?.fetchedAt, issue: scenario.3,
+                        isRefreshing: scenario.4, isEnabled: true, language: language,
+                        now: reportedAt.addingTimeInterval(90),
+                        palette: .resolve(.system, scheme: dark ? .dark : .light),
+                        refresh: { XCTFail("Rendering must not refresh Claude") },
+                        openSetup: { XCTFail("Rendering must not open settings") },
+                        timeZone: TimeZone(secondsFromGMT: 0)!
+                    )
+                    let size = try render(
+                        content, width: 500, dark: dark, language: language,
+                        name: "claude-\(scenario.0)-\(language.rawValue)-\(dark ? "dark" : "light")",
+                        output: directory
+                    )
+                    XCTAssertEqual(size.width, 500, accuracy: 1)
+                    XCTAssertGreaterThan(size.height, 130)
+                    XCTAssertLessThan(size.height, 420)
+                }
+            }
+        }
+    }
+
+    func testProviderCombinationsKeepPopoverBoundedAndDoNotRefreshFromRendering() async throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let stateDirectory = directory.appendingPathComponent("isolated-state")
+        try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        let fixture = try makeFixture(directory: stateDirectory)
+        defer { fixture.cleanUp() }
+        fixture.preferences.claudeMonitoringEnabled = true
+        fixture.claude.start()
+        let deadline = Date().addingTimeInterval(2)
+        while fixture.claude.isRefreshing && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertNotNil(fixture.claude.snapshot)
+        XCTAssertFalse(fixture.claude.isRefreshing)
+        let before = await fixture.claudeFetcher.calls
+        for (name, codex, claude) in [("both", true, true), ("claude-only", false, true),
+                                      ("off", false, false), ("codex-only", true, false)] {
+            fixture.preferences.codexMonitoringEnabled = codex
+            fixture.preferences.claudeMonitoringEnabled = claude
+            let size = try render(
+                QuotaPopoverView(store: fixture.store,
+                                 openDashboard: { _ in XCTFail("Rendering must not navigate") },
+                                 quit: { XCTFail("Rendering must not quit") }, referenceDate: reportedAt),
+                width: 500, dark: true, language: .english,
+                name: "providers-\(name)", output: directory
+            )
+            XCTAssertEqual(size.width, 500, accuracy: 1)
+            XCTAssertLessThan(size.height, 700, "Enabled services must fit a scrollable compact popover")
+        }
+        let after = await fixture.claudeFetcher.calls
+        XCTAssertEqual(after, before)
+        let codexCalls = await fixture.codexFetcher.calls
+        XCTAssertEqual(codexCalls, 0)
+        XCTAssertEqual(fixture.notificationService.permissionRequests, 0)
+        XCTAssertEqual(fixture.notificationService.deliveries, 0)
+    }
+
+    func testBothProviderSummaryLayoutsFitTheFirstViewport() async throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let state = directory.appendingPathComponent("isolated-state")
+        try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        // Two real windows in each provider, with stale Claude data as the
+        // taller failure case. All clients, preferences and files are synthetic.
+        let fixture = try makeFixture(directory: state, bothWindows: true, claudeReportAge: 900)
+        defer { fixture.cleanUp() }
+        fixture.preferences.claudeMonitoringEnabled = true
+        fixture.claude.start()
+        let deadline = Date().addingTimeInterval(2)
+        while fixture.claude.isRefreshing && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(fixture.claude.lastIssue, .staleData)
+        let fetches = await fixture.claudeFetcher.calls
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            fixture.preferences.language = language
+            for dark in [false, true] {
+                fixture.preferences.theme = dark ? .terminalDark : .terminalLight
+                try assertSummaryLayout(
+                    fixture: fixture, language: language, dark: dark, output: directory
+                )
+            }
+        }
+        let after = await fixture.claudeFetcher.calls
+        XCTAssertEqual(after, fetches, "Layout measurement must never refresh either provider")
+        let codexCalls = await fixture.codexFetcher.calls
+        XCTAssertEqual(codexCalls, 0)
+    }
+
+    func testSetupPreviewRenderingDoesNotInstallOrAlterSyntheticSettings() throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let settings = directory.appendingPathComponent("settings.json")
+        let bytes = Data(#"{"statusLine":{"type":"command","command":"printf synthetic-status"},"unrelated":true}"#.utf8)
+        try bytes.write(to: settings)
+        defer { try? FileManager.default.removeItem(at: settings) }
+        let support = directory.appendingPathComponent("support")
+        let installer = ClaudeStatuslineInstaller(
+            settingsURL: settings,
+            cache: ClaudeStatuslineCache(fileURL: support.appendingPathComponent("quota.json")),
+            executableURL: directory.appendingPathComponent("SyntheticCodex94"),
+            supportDirectory: support
+        )
+        let preview = try installer.previewInstall()
+        XCTAssertTrue(preview.preservesExistingStatusline)
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let size = try render(
+                ClaudeStatuslinePreviewView(
+                    preview: preview,
+                    install: { XCTFail("Preview rendering must never install") },
+                    cancel: {}
+                ), width: 568, dark: false, language: language,
+                name: "setup-preview-\(language.rawValue)", output: directory
+            )
+            XCTAssertLessThan(size.height, 680)
+        }
+        XCTAssertEqual(try Data(contentsOf: settings), bytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: support.path))
+    }
+
+    func testConflictSetupRenderingKeepsCurrentCommandAndRecoveryFiles() throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let state = directory.appendingPathComponent("isolated-state")
+        try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        let fixture = try makeFixture(directory: state)
+        defer { fixture.cleanUp() }
+        let settings = state.appendingPathComponent("settings.json")
+        let executable = state.appendingPathComponent("SyntheticCodex94")
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        try Data(#"{"statusLine":{"type":"command","command":"printf original"},"unrelated":true}"#.utf8).write(to: settings)
+        let preview = try fixture.claude.previewStatuslineInstall()
+        try fixture.claude.installStatusline(preview)
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .installed)
+        let current = Data(#"{"statusLine":{"type":"command","command":"printf user-changed"},"unrelated":true}"#.utf8)
+        try current.write(to: settings)
+        fixture.claude.refreshSetupState()
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .conflict)
+        let support = state.appendingPathComponent("bridge")
+        let recoveryFiles = try FileManager.default.contentsOfDirectory(at: support, includingPropertiesForKeys: nil)
+        let before = try Dictionary(uniqueKeysWithValues: recoveryFiles.map { ($0.lastPathComponent, try Data(contentsOf: $0)) })
+        XCTAssertTrue(before.keys.contains("statusline-installation.json"))
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let size = try render(
+                ClaudeStatuslineSetupView(store: fixture.claude), width: 360, dark: false,
+                language: language, name: "setup-conflict-\(language.rawValue)", output: directory
+            )
+            XCTAssertLessThan(size.height, 420)
+            XCTAssertEqual(fixture.claude.statuslineSetupState, .conflict)
+            XCTAssertEqual(try Data(contentsOf: settings), current,
+                           "Showing conflict UI cannot modify the user's replacement command")
+            for file in recoveryFiles {
+                XCTAssertEqual(try Data(contentsOf: file), before[file.lastPathComponent],
+                               "Showing the confirmation entry cannot release a record or remove backups")
+            }
+        }
+        // Exercise the synthetic backend transition separately; this is not a
+        // claim that a native confirmation dialog was clicked by the test.
+        try fixture.claude.forgetConflictingStatuslineInstallation()
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .notInstalled)
+        XCTAssertEqual(try Data(contentsOf: settings), current)
+        let next = try fixture.claude.previewStatuslineInstall()
+        XCTAssertEqual(next.originalCommand, "printf user-changed")
+        XCTAssertTrue(next.preservesExistingStatusline)
+        for file in recoveryFiles where file.lastPathComponent != "statusline-installation.json" {
+            XCTAssertEqual(try Data(contentsOf: file), before[file.lastPathComponent])
+        }
+        _ = try render(ClaudeStatuslineSetupView(store: fixture.claude), width: 360, dark: false,
+                       language: .english, name: "setup-after-forgetting-record", output: directory)
+    }
+
+    private func card(snapshot: QuotaSnapshot?, source: ClaudeQuotaSource?, now: Date) -> ClaudeQuotaCardContent {
+        ClaudeQuotaCardContent(
+            snapshot: snapshot, source: source, reportedAt: snapshot?.fetchedAt, issue: nil,
+            isRefreshing: false, isEnabled: true, language: .english, now: now,
+            palette: .resolve(.system, scheme: .light), refresh: {}, openSetup: {},
+            timeZone: TimeZone(secondsFromGMT: 0)!
+        )
+    }
+
+    private func claudeSnapshot(weeklyOnly: Bool = false, used: Double = 4.6) throws -> QuotaSnapshot {
+        let windows = try (weeklyOnly ? [QuotaWindowKind.weekly] : [.fiveHour, .weekly]).map { kind in
+            try XCTUnwrap(QuotaWindowSnapshot(
+                kind: kind, fractionalUsedPercent: used, windowMinutes: kind == .fiveHour ? 300 : 10_080,
+                resetsAt: reportedAt.addingTimeInterval(20_000)
+            ))
+        }
+        return QuotaSnapshot(
+            buckets: [QuotaBucketSnapshot(limitID: "claude", limitName: nil, planType: nil, windows: windows)],
+            defaultLimitID: "claude", fetchedAt: reportedAt, account: nil, codex: nil, provider: .claude
+        )
+    }
+
+    private func makeFixture(directory: URL, bothWindows: Bool = false,
+                             claudeReportAge: TimeInterval = 10) throws -> ProviderFixture {
+        let domain = "Codex94ProviderViewTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
+        let preferences = PreferencesStore(defaults: defaults)
+        preferences.hasChosenIdentityMode = true
+        preferences.identityMode = .quotaOnly
+        preferences.language = .english
+        let notifications = ProviderViewNotificationService()
+        let report = ClaudeQuotaReport(
+            source: .statusline, reportedAt: reportedAt, receivedAt: reportedAt,
+            windows: (bothWindows ? [ClaudeQuotaWindow(kind: .fiveHour, usedPercentage: 4.6,
+                                                       resetsAt: reportedAt.addingTimeInterval(12_000))] : [])
+                + [ClaudeQuotaWindow(kind: .weekly, usedPercentage: 47.5,
+                                     resetsAt: reportedAt.addingTimeInterval(20_000))]
+        )
+        let claudeFetcher = ProviderViewClaudeFetcher(report: report)
+        let cache = ClaudeStatuslineCache(fileURL: directory.appendingPathComponent("claude-quota.json"))
+        let claude = ClaudeQuotaStore(
+            preferences: preferences, cache: cache,
+            installer: ClaudeStatuslineInstaller(settingsURL: directory.appendingPathComponent("settings.json"),
+                                                 cache: cache, executableURL: directory.appendingPathComponent("SyntheticCodex94"),
+                                                 supportDirectory: directory.appendingPathComponent("bridge")),
+            fetcherFactory: { claudeFetcher },
+            notificationController: NotificationController(service: notifications),
+            now: { report.reportedAt.addingTimeInterval(claudeReportAge) },
+            sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
+        )
+        let codexFetcher = ProviderViewCodexFetcher()
+        let codexCache = SnapshotCache(fileURL: directory.appendingPathComponent("codex-quota.json"))
+        let codex = QuotaSnapshot(
+            buckets: [QuotaBucketSnapshot(limitID: "codex", limitName: nil, planType: "pro", windows:
+                (bothWindows ? [QuotaWindowSnapshot(kind: .fiveHour, usedPercent: 14, windowMinutes: 300,
+                                                    resetsAt: reportedAt.addingTimeInterval(12_000))] : [])
+                + [QuotaWindowSnapshot(kind: .weekly, usedPercent: 68, windowMinutes: 10_080,
+                                       resetsAt: reportedAt.addingTimeInterval(20_000))]
+            )], defaultLimitID: "codex", fetchedAt: reportedAt, account: nil, codex: nil,
+            resetCreditsAvailableCount: 3
+        )
+        try codexCache.save(codex)
+        let store = AppStore(
+            preferences: preferences,
+            launchAtLogin: LaunchAtLoginController(readStatus: { .notRegistered }, register: {}, unregister: {}, stableInstall: { false }),
+            fetcher: codexFetcher, cache: codexCache,
+            hotKeyController: GlobalHotKeyController(service: ProviderViewHotKeyService()),
+            notificationController: NotificationController(service: ProviderViewNotificationService()),
+            claudeStore: claude
+        )
+        return ProviderFixture(store: store, preferences: preferences, claude: claude,
+                               claudeFetcher: claudeFetcher, codexFetcher: codexFetcher,
+                               notificationService: notifications, domain: domain, directory: directory)
+    }
+
+    private func assertSummaryLayout(fixture: ProviderFixture, language: LanguagePreference,
+                                     dark: Bool, output: URL) throws {
+        let summaries = ProviderQuotaSummaries(
+            store: fixture.store, openDashboard: { _ in XCTFail("Measuring summaries must not navigate") },
+            referenceDate: reportedAt.addingTimeInterval(900)
+        ).codex94Environment(fixture.preferences)
+        let host = NSHostingController(rootView: summaries)
+        // Measure the actual production summary block at the scroll content's
+        // 500 minus two 14pt insets, not the overall fixed popover height.
+        let size = host.sizeThatFits(in: NSSize(width: 472, height: CGFloat.greatestFiniteMagnitude))
+        XCTAssertEqual(size.width, 472, accuracy: 1)
+        XCTAssertGreaterThan(size.height, 180)
+        XCTAssertLessThanOrEqual(size.height + 28, 480,
+                                "Both complete summaries and their outer insets must fit before any details")
+        let name = "first-viewport-\(language.rawValue)-\(dark ? "dark" : "light")"
+        let report: [String: Any] = [
+            "method": "production-summary-stack-fitting-size", "summaryCount": 2,
+            "contentWidth": Double(size.width), "summaryHeight": Double(size.height),
+            "outerVerticalInsets": 28, "viewportHeight": 480,
+            "bothSummariesFit": size.height + 28 <= 480,
+            "nativeAXMeasured": false, "externalAUTAXVerificationRequired": true,
+            "allDataSynthetic": true
+        ]
+        try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+            .write(to: output.appendingPathComponent(name + ".json"))
+        _ = try render(
+            QuotaPopoverView(store: fixture.store,
+                             openDashboard: { _ in XCTFail("Rendering must not navigate") }, quit: {},
+                             referenceDate: reportedAt.addingTimeInterval(900)),
+            width: 500, dark: dark, language: language, name: name, output: output
+        )
+    }
+
+    private func temporaryDirectory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("Codex94ProviderRendering-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        return url
+    }
+
+    @discardableResult
+    private func render<Content: View>(_ content: Content, width: CGFloat, dark: Bool,
+                                       language: LanguagePreference, name: String, output: URL) throws -> NSSize {
+        let host = NSHostingView(rootView: content
+            .frame(width: width).fixedSize(horizontal: true, vertical: true)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .environment(\.locale, language.locale)
+            .environment(\.colorScheme, dark ? .dark : .light))
+        host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        let size = host.fittingSize
+        XCTAssertTrue(size.width.isFinite && size.height.isFinite)
+        XCTAssertGreaterThan(size.height, 0)
+        host.frame = NSRect(origin: .zero, size: size)
+        host.layoutSubtreeIfNeeded()
+        let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        let data = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+        try data.write(to: output.appendingPathComponent(name + ".png"))
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.png")
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        return size
+    }
+}
+
+@MainActor
+private struct ProviderFixture {
+    let store: AppStore
+    let preferences: PreferencesStore
+    let claude: ClaudeQuotaStore
+    let claudeFetcher: ProviderViewClaudeFetcher
+    let codexFetcher: ProviderViewCodexFetcher
+    let notificationService: ProviderViewNotificationService
+    let domain: String
+    let directory: URL
+    func cleanUp() {
+        store.shutdown()
+        UserDefaults(suiteName: domain)?.removePersistentDomain(forName: domain)
+        try? FileManager.default.removeItem(at: directory)
+    }
+}
+
+private actor ProviderViewClaudeFetcher: ClaudeQuotaFetching {
+    let report: ClaudeQuotaReport
+    private(set) var calls = 0
+    init(report: ClaudeQuotaReport) { self.report = report }
+    func fetch() async throws -> ClaudeQuotaReport { calls += 1; return report }
+}
+private actor ProviderViewCodexFetcher: QuotaFetching {
+    private(set) var calls = 0
+    func fetch(executable: LocatedCodex, identityMode: IdentityMode) async throws -> QuotaSnapshot {
+        calls += 1
+        XCTFail("Provider rendering must not fetch Codex")
+        throw ConnectionIssue.unknown
+    }
+}
+@MainActor
+private final class ProviderViewNotificationService: QuotaNotificationServing {
+    var permissionRequests = 0
+    var deliveries = 0
+    func authorization() async -> NotificationAuthorization { .notDetermined }
+    func requestAuthorization() async throws -> Bool { permissionRequests += 1; return false }
+    func deliver(title: String, body: String) async throws { deliveries += 1 }
+}
+@MainActor
+private final class ProviderViewHotKeyService: GlobalHotKeyServing {
+    func start(handler: @escaping @MainActor (GlobalHotKeyEvent) -> Void) -> Bool { XCTFail("No real hotkey registration"); return false }
+    func register(_ hotKey: GlobalHotKey, identifier: UInt32) -> GlobalHotKeyIssue? { XCTFail("No real hotkey registration"); return .unavailable }
+    func unregister(identifier: UInt32) -> Bool { true }
+    func stop() {}
+}

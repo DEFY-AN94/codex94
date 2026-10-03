@@ -107,13 +107,25 @@ final class DiagnosticsRedactorTests: XCTestCase {
             ).diagnosticValue,
             refreshMinutes: 5,
             lastSuccess: Date(timeIntervalSince1970: 900),
-            lastError: nil
+            lastError: nil,
+            enabledProviders: [.codex, .claude],
+            menuBarServices: .both,
+            claudeConnection: "stale",
+            claudeSource: .cliUsage,
+            claudeIssue: .timedOut,
+            claudeLastReport: Date(timeIntervalSince1970: 800)
         ).text
 
         XCTAssertTrue(diagnostics.contains("connection: connected"))
         XCTAssertTrue(diagnostics.contains("codexPath: <redacted-path>/codex"))
         XCTAssertTrue(diagnostics.contains("codexVersion: codex-cli <redacted-version>"))
         XCTAssertTrue(diagnostics.contains("displayMode: bucket.weekly"))
+        XCTAssertTrue(diagnostics.contains("enabledProviders: codex,claude"))
+        XCTAssertTrue(diagnostics.contains("menuBarServices: both"))
+        XCTAssertTrue(diagnostics.contains("claudeConnection: stale"))
+        XCTAssertTrue(diagnostics.contains("claudeSource: cliUsage"))
+        XCTAssertTrue(diagnostics.contains("claudeIssue: timedOut"))
+        XCTAssertTrue(diagnostics.contains("claudeLastReport: 1970-01-01T00:13:20Z"))
         XCTAssertFalse(diagnostics.contains("private-model-identifier"))
         XCTAssertFalse(diagnostics.contains("/Users/private"))
         XCTAssertFalse(diagnostics.contains("@"))

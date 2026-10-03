@@ -13,11 +13,37 @@ Codex itself owns authentication. Codex94 does not implement OAuth or a direct
 HTTP client for quota or Token usage and does not directly inspect authentication
 stores, browser state, session logs, or local usage databases.
 
+The 4.0.0 development branch adds optional Claude subscription monitoring
+through official Claude Code `/usage` and an explicitly installed local
+statusline bridge. Authentication remains inside Claude Code. There is no
+direct Claude quota HTTP/OAuth implementation or credential-store access.
+The CLI probe has an owned working directory, disabled tools/hooks/MCP and
+remote-control startup, bounded output and a deadline. Only a recognized
+built-in usage action is submitted; unexpected login/onboarding screens are
+reported rather than interpreted as a prompt.
+The child requests disabled automatic updates and prompt/session-history
+writes through documented process-local flags. Older Claude Code releases may
+not implement the history flag. Version-output validation establishes expected
+CLI compatibility, not publisher identity; installed executables remain part
+of the user's trust boundary.
+
+Statusline JSON is untrusted input. The bridge bounds parsing and stores a
+small allowlist of quota windows, source/timestamps and opaque producer hashes.
+It preserves an existing user-supplied statusline command and its stdout;
+that command retains its original local execution authority. Installation
+previews the change, preserves unrelated settings, backs up only the previous
+statusline key and checks for conflicting changes before restoration. The
+manifest and cache use private local files; neither is included in releases.
+See [PRIVACY.md](PRIVACY.md) for the new configuration and cache inventory.
+
 The app is intentionally not App Sandboxed because the child Codex process must
 access its own existing login state. Hardened Runtime is enabled for installed
-artifacts. The child receives only `HOME`, an absolute-entry-only `PATH`,
+artifacts. The Codex child receives only `HOME`, an absolute-entry-only `PATH`,
 `TMPDIR`, and locale values. RPC responses and version output are bounded, all
 requests have deadlines, and child processes are terminated after use.
+The Claude child also receives the current OS username for its own login lookup,
+a fixed terminal/locale, and the process-local update/history controls above.
+The app does not forward arbitrary authentication variables from its environment.
 
 Codex94 validates that an executable produces a bounded, single-line
 `codex-cli` version response. This checks compatibility; it is not a code-signing

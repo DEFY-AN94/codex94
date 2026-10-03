@@ -21,7 +21,7 @@ struct QuotaNotificationPolicy {
     }
 
     private struct WindowState {
-        var remaining: Int
+        var remaining: Double
         var reset: Date?
         var alertedThresholds: Set<Int>
         var recoverySent = false
@@ -49,7 +49,7 @@ struct QuotaNotificationPolicy {
 
         let clockMovedBack = lastFetch.map { snapshot.fetchedAt < $0 } ?? false
         lastFetch = snapshot.fetchedAt
-        let recoveryBoundary = preferences.thresholds.max() ?? 0
+        let recoveryBoundary = Double(preferences.thresholds.max() ?? 0)
         var current: [Key: WindowState] = [:]
         var events: [QuotaNotificationEvent] = []
 
@@ -58,12 +58,12 @@ struct QuotaNotificationPolicy {
                 bucket: bucket, defaultLimitID: snapshot.defaultLimitID, kind: window.kind
             ) {
                 let key = Key(bucketID: bucket.limitID, window: window.kind)
-                let remaining = window.remainingPercent
+                let remaining = window.preciseRemainingPercent
                 guard var state = windows[key] else {
                     current[key] = WindowState(
                         remaining: remaining,
                         reset: window.resetsAt,
-                        alertedThresholds: Set(preferences.thresholds.filter { remaining <= $0 })
+                        alertedThresholds: Set(preferences.thresholds.filter { remaining <= Double($0) })
                     )
                     continue
                 }
@@ -91,20 +91,20 @@ struct QuotaNotificationPolicy {
                             kind: .recovered,
                             bucketName: snapshot.displayName(for: bucket),
                             window: window.kind,
-                            remainingPercent: remaining
+                            remainingPercent: window.remainingPercent
                         ))
                         state.recoverySent = true
                     }
 
                     let crossed = preferences.thresholds.filter {
-                        state.remaining > $0 && remaining <= $0 && !state.alertedThresholds.contains($0)
+                        state.remaining > Double($0) && remaining <= Double($0) && !state.alertedThresholds.contains($0)
                     }
                     if let mostUrgent = crossed.min() {
                         events.append(QuotaNotificationEvent(
                             kind: .low(threshold: mostUrgent),
                             bucketName: snapshot.displayName(for: bucket),
                             window: window.kind,
-                            remainingPercent: remaining
+                            remainingPercent: window.remainingPercent
                         ))
                         state.alertedThresholds.formUnion(crossed)
                     }

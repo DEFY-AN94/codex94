@@ -4,6 +4,7 @@ extension DashboardSection {
     var titleKey: LocalizedStringKey {
         switch self {
         case .overview: "dashboard.overview"
+        case .providers: "dashboard.providers"
         case .usage: "usage.title"
         case .connection: "dashboard.connection"
         case .display: "dashboard.display"
@@ -300,7 +301,7 @@ enum StatusAccessibilityString {
             ))
             components.append(localized(
                 "accessibility.remainingPercent %@",
-                arguments: [QuotaFormatting.percent(window.remainingPercent)],
+                arguments: [QuotaFormatting.percent(precise: window.preciseRemainingPercent, language: language)],
                 language: language,
                 bundle: bundle
             ))
@@ -722,5 +723,33 @@ struct QuotaResetPresentation: Equatable {
 extension View {
     func codex94Environment(_ preferences: PreferencesStore) -> some View {
         environment(\.locale, preferences.language.locale)
+    }
+}
+
+
+extension ClaudeQuotaSource {
+    var localizedKey: LocalizedStringKey { LocalizedStringKey(localizationKey) }
+    var localizationKey: String {
+        switch self {
+        case .statusline: "claude.source.statusline"
+        case .cliUsage: "claude.source.cliUsage"
+        }
+    }
+}
+
+extension ClaudeQuotaIssue {
+    var localizedKey: LocalizedStringKey { LocalizedStringKey(localizationKey) }
+    var localizationKey: String {
+        switch self {
+        case .cliUnavailable: "claude.issue.cliUnavailable"
+        case .loginRequired: "claude.issue.loginRequired"
+        case .setupRequired: "claude.issue.setupRequired"
+        case .timedOut: "claude.issue.timedOut"
+        case .invalidData: "claude.issue.invalidData"
+        case .noData: "claude.quota.empty"
+        case .staleData: "claude.issue.staleData"
+        case .configurationConflict: "claude.issue.configurationConflict"
+        case .unavailable: "claude.issue.unavailable"
+        }
     }
 }

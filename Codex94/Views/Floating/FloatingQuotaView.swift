@@ -28,19 +28,23 @@ struct FloatingQuotaView: View {
     }
 
     private func content(now: Date) -> some View {
-        let bucket = store.activeMenuBarQuotas.first?.bucket
-        let name = bucket.flatMap { store.snapshot?.displayName(for: $0) } ?? "Codex"
+        let provider = store.floatingProvider ?? .codex
+        let bucket = store.floatingBucket
+        let snapshot = store.providerSnapshot(for: provider)
+        let name = bucket.flatMap { snapshot?.displayName(for: $0) } ?? provider.displayName
         return FloatingQuotaContent(
             bucketName: name, fiveHour: bucket?.window(.fiveHour), weekly: bucket?.window(.weekly),
-            presentation: store.menuBarStatusPresentation,
-            resetCredits: store.snapshot?.resetCreditsAvailableCount,
-            hasFetchedLiveSnapshot: store.hasFetchedLiveSnapshot,
+            presentation: store.providerStatusPresentation(for: provider),
+            resetCredits: provider == .codex ? snapshot?.resetCreditsAvailableCount : nil,
+            hasFetchedLiveSnapshot: provider == .codex ? store.hasFetchedLiveSnapshot : snapshot != nil,
             language: store.preferences.language, theme: store.preferences.theme,
             accentOverrides: store.preferences.statusAccentOverrides,
             now: now, isPinned: store.preferences.floatingWindowPinned,
             isExpanded: state.isExpanded, width: state.contentWidth,
             reduceMotion: reduceMotion, reduceTransparency: reduceTransparency,
-            refresh: { store.refresh(trigger: .manual) }, togglePin: togglePin,
+            provider: provider, availableProviders: store.preferences.enabledProviders,
+            selectProvider: { store.preferences.floatingProvider = $0 },
+            refresh: { store.refreshProvider(provider) }, togglePin: togglePin,
             toggleExpanded: toggleExpanded, hide: hide,
             openDashboard: openDashboard, finishDrag: finishDrag
         )
@@ -65,6 +69,9 @@ struct FloatingQuotaContent: View {
     var isActive = true
     var reduceMotion = false
     var reduceTransparency = false
+    var provider: QuotaProviderID = .codex
+    var availableProviders: [QuotaProviderID] = [.codex]
+    var selectProvider: (QuotaProviderID) -> Void = { _ in }
     var refresh: () -> Void = {}
     var togglePin: () -> Void = {}
     var toggleExpanded: () -> Void = {}
@@ -83,8 +90,10 @@ struct FloatingQuotaContent: View {
                     separator
                     quotaColumn(.fiveHour, window: fiveHour)
                 }
-                separator
-                quotaColumn(.weekly, window: weekly)
+                if provider == .codex || weekly != nil || fiveHour == nil {
+                    separator
+                    quotaColumn(.weekly, window: weekly)
+                }
                 separator
                 controls.padding(.leading, 10)
             }
@@ -138,7 +147,9 @@ struct FloatingQuotaContent: View {
 
     private var isDark: Bool { theme == .terminalDark || (theme == .system && colorScheme == .dark) }
 
-    private var layout: FloatingQuotaLayout { FloatingQuotaLayout(fiveHour: fiveHour) }
+    private var layout: FloatingQuotaLayout {
+        provider == .claude && weekly == nil ? .weeklyOnly : FloatingQuotaLayout(fiveHour: fiveHour)
+    }
     private var resolvedWidth: CGFloat { width ?? layout.preferredWidth }
     private var isCompact: Bool { layout.usesCompactMetrics(at: resolvedWidth) }
 
@@ -148,7 +159,10 @@ struct FloatingQuotaContent: View {
 
     private var brand: some View {
         HStack(spacing: 10) {
-            Text(verbatim: ">_")
+            Group {
+                if provider == .codex { Text(verbatim: ">_") }
+                else { Image(systemName: provider.systemImageName) }
+            }
                 .font(.system(size: 22, weight: .semibold, design: .monospaced))
                 .foregroundStyle(palette.terminalGreen)
                 .frame(width: 38, height: 40)
@@ -161,10 +175,23 @@ struct FloatingQuotaContent: View {
                 }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(verbatim: "Codex94")
-                    .font(.system(size: 15, weight: .semibold))
-                    .overlay { FloatingDragRegion(onDragEnded: finishDrag) }
-                if bucketName != "Codex" {
+                if availableProviders.count > 1 {
+                    Menu {
+                        ForEach(availableProviders) { option in
+                            Button(option.displayName) { selectProvider(option) }
+                        }
+                    } label: {
+                        Text(verbatim: provider.displayName).font(.system(size: 15, weight: .semibold))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .accessibilityIdentifier("floating-provider-picker")
+                } else {
+                    Text(verbatim: provider == .codex ? "Codex94" : provider.displayName)
+                        .font(.system(size: 15, weight: .semibold))
+                        .overlay { FloatingDragRegion(onDragEnded: finishDrag) }
+                }
+                if bucketName != provider.displayName {
                     Text(verbatim: QuotaFormatting.shortBucketName(bucketName, limit: 18))
                         .font(.system(size: 8))
                         .foregroundStyle(.secondary)
@@ -198,7 +225,7 @@ struct FloatingQuotaContent: View {
     }
 
     private func quotaColor(kind: QuotaWindowKind, window: QuotaWindowSnapshot?) -> Color {
-        let level = QuotaLevel(remainingPercent: window?.remainingPercent)
+        let level = QuotaLevel(preciseRemainingPercent: window?.preciseRemainingPercent)
         if level == .healthy, kind == .weekly, accentOverrides[.healthy] == nil {
             return palette.connectionAccent
         }
@@ -227,6 +254,7 @@ struct FloatingQuotaContent: View {
     private var expandedRow: some View {
         HStack(spacing: 12) {
             HStack(spacing: 7) {
+                if provider == .codex {
                 Text("floating.resetCredits")
                 if let resetCredits {
                     Text(verbatim: String(resetCredits))
@@ -242,12 +270,16 @@ struct FloatingQuotaContent: View {
                     Text(hasFetchedLiveSnapshot ? LocalizedStringKey("resetCredits.unavailable") : "resetCredits.notFetched")
                         .foregroundStyle(.secondary)
                 }
+                } else {
+                    Label("Claude Code", systemImage: provider.systemImageName)
+                    if presentation.usesCachedData { Text("status.cached").foregroundStyle(.secondary) }
+                }
             }
             .font(.system(size: 11))
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("floating-reset-credits")
+            .accessibilityIdentifier(provider == .codex ? "floating-reset-credits" : "floating-claude-source")
             .overlay { FloatingDragRegion(onDragEnded: finishDrag) }
             Spacer(minLength: 4)
             Button(action: openDashboard) {
@@ -281,7 +313,7 @@ private struct FloatingQuotaColumn: View {
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(verbatim: QuotaFormatting.percent(window?.remainingPercent))
+                Text(verbatim: QuotaFormatting.percent(precise: window?.preciseRemainingPercent))
                     .font(.system(size: compact ? 22 : 25, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .lineLimit(1)
@@ -291,7 +323,7 @@ private struct FloatingQuotaColumn: View {
                     Text("floating.remaining").font(.system(size: 9)).foregroundStyle(.secondary)
                 }
             }
-            FloatingProgressBar(remaining: window?.remainingPercent, color: color,
+            FloatingProgressBar(remaining: window?.preciseRemainingPercent, color: color,
                                 isActive: isActive, reduceMotion: reduceMotion)
                 .frame(height: 6)
             (window?.resetsAt == nil
@@ -302,13 +334,13 @@ private struct FloatingQuotaColumn: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .animation(isActive && !reduceMotion ? .easeInOut(duration: 0.3) : nil, value: window?.remainingPercent)
+        .animation(isActive && !reduceMotion ? .easeInOut(duration: 0.3) : nil, value: window?.preciseRemainingPercent)
         .help(Text(verbatim: reset.absolute))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             StatusAccessibilityText.quotaWindow(kind)
                 + Text(verbatim: ", ")
-                + StatusAccessibilityText.remainingPercent(QuotaFormatting.percent(window?.remainingPercent))
+                + StatusAccessibilityText.remainingPercent(QuotaFormatting.percent(precise: window?.preciseRemainingPercent))
                 + Text(verbatim: ", " + reset.accessibilityLabel)
         )
         .accessibilityIdentifier("floating-quota-" + kind.rawValue)
@@ -316,7 +348,7 @@ private struct FloatingQuotaColumn: View {
 }
 
 private struct FloatingProgressBar: View {
-    let remaining: Int?
+    let remaining: Double?
     let color: Color
     let isActive: Bool
     let reduceMotion: Bool

@@ -1,4 +1,5 @@
 import Combine
+import CoreFoundation
 import Foundation
 
 @MainActor
@@ -20,6 +21,15 @@ final class PreferencesStore: ObservableObject {
         static let tokenUsageChartStyle = "tokenUsageChartStyle.v1"
         static let floatingWindowPinned = "floatingWindowPinned.v1"
         static let floatingWindowPosition = "floatingWindowPosition.v1"
+        static let codexMonitoringEnabled = "codexMonitoringEnabled.v1"
+        static let claudeMonitoringEnabled = "claudeMonitoringEnabled.v1"
+        static let menuBarServiceMode = "menuBarServiceMode.v1"
+        static let primaryProvider = "primaryProvider.v1"
+        static let floatingProvider = "floatingProvider.v1"
+        static let claudeRefreshInterval = "claude.refreshInterval.v1"
+        static let claudeMenuBarQuotaSelection = "claude.menuBarQuotaSelection.v1"
+        static let claudeDualWindowBucketSelection = "claude.dualWindowBucketSelection.v1"
+        static let claudeNotifications = "claude.notifications.v1"
     }
 
     private enum LegacyDisplayMode: String {
@@ -29,6 +39,34 @@ final class PreferencesStore: ObservableObject {
     }
 
     private let defaults: UserDefaults
+
+    @Published var codexMonitoringEnabled: Bool {
+        didSet { defaults.set(codexMonitoringEnabled, forKey: Key.codexMonitoringEnabled) }
+    }
+    @Published var claudeMonitoringEnabled: Bool {
+        didSet { defaults.set(claudeMonitoringEnabled, forKey: Key.claudeMonitoringEnabled) }
+    }
+    @Published var menuBarServiceMode: MenuBarServiceMode {
+        didSet { defaults.set(menuBarServiceMode.rawValue, forKey: Key.menuBarServiceMode) }
+    }
+    @Published var primaryProvider: QuotaProviderID {
+        didSet { defaults.set(primaryProvider.rawValue, forKey: Key.primaryProvider) }
+    }
+    @Published var floatingProvider: QuotaProviderID {
+        didSet { defaults.set(floatingProvider.rawValue, forKey: Key.floatingProvider) }
+    }
+    @Published var claudeRefreshInterval: RefreshInterval {
+        didSet { defaults.set(claudeRefreshInterval.rawValue, forKey: Key.claudeRefreshInterval) }
+    }
+    @Published var claudeMenuBarQuotaSelection: MenuBarQuotaSelection {
+        didSet { persist(claudeMenuBarQuotaSelection, key: Key.claudeMenuBarQuotaSelection) }
+    }
+    @Published var claudeDualWindowBucketSelection: MenuBarBucketSelection {
+        didSet { persist(claudeDualWindowBucketSelection, key: Key.claudeDualWindowBucketSelection) }
+    }
+    @Published var claudeNotifications: NotificationPreferences {
+        didSet { persist(claudeNotifications, key: Key.claudeNotifications) }
+    }
 
     @Published var menuBarQuotaSelection: MenuBarQuotaSelection {
         didSet { persistMenuBarQuotaSelection() }
@@ -87,6 +125,21 @@ final class PreferencesStore: ObservableObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        codexMonitoringEnabled = Self.loadBoolean(from: defaults, key: Key.codexMonitoringEnabled, fallback: true)
+        claudeMonitoringEnabled = Self.loadBoolean(from: defaults, key: Key.claudeMonitoringEnabled, fallback: false)
+        menuBarServiceMode = MenuBarServiceMode(rawValue: defaults.string(forKey: Key.menuBarServiceMode) ?? "") ?? .single
+        primaryProvider = QuotaProviderID(rawValue: defaults.string(forKey: Key.primaryProvider) ?? "") ?? .codex
+        floatingProvider = QuotaProviderID(rawValue: defaults.string(forKey: Key.floatingProvider) ?? "") ?? .codex
+        claudeRefreshInterval = RefreshInterval(rawValue: defaults.integer(forKey: Key.claudeRefreshInterval)) ?? .fiveMinutes
+        claudeMenuBarQuotaSelection = Self.decode(
+            MenuBarQuotaSelection.self, key: Key.claudeMenuBarQuotaSelection, from: defaults
+        ) ?? .automatic
+        claudeDualWindowBucketSelection = Self.decode(
+            MenuBarBucketSelection.self, key: Key.claudeDualWindowBucketSelection, from: defaults
+        ) ?? .automatic
+        claudeNotifications = Self.decode(
+            NotificationPreferences.self, key: Key.claudeNotifications, from: defaults
+        )?.validated ?? NotificationPreferences()
         menuBarQuotaSelection = Self.loadMenuBarQuotaSelection(from: defaults)
         menuBarLayout = MenuBarLayout(storedValue: defaults.object(forKey: Key.menuBarLayout))
         statusAccentOverrides = StatusAccentOverrides(
@@ -120,6 +173,43 @@ final class PreferencesStore: ObservableObject {
         persistMenuBarQuotaSelection()
     }
 
+    var enabledProviders: [QuotaProviderID] {
+        QuotaProviderID.allCases.filter { isMonitoringEnabled(for: $0) }
+    }
+
+    var resolvedPrimaryProvider: QuotaProviderID? {
+        isMonitoringEnabled(for: primaryProvider) ? primaryProvider : enabledProviders.first
+    }
+
+    var resolvedFloatingProvider: QuotaProviderID? {
+        isMonitoringEnabled(for: floatingProvider) ? floatingProvider : resolvedPrimaryProvider
+    }
+
+    var menuBarProviders: [QuotaProviderID] {
+        guard let primary = resolvedPrimaryProvider else { return [] }
+        switch menuBarServiceMode {
+        case .single: return [primary]
+        case .both: return [primary] + enabledProviders.filter { $0 != primary }
+        }
+    }
+
+    func isMonitoringEnabled(for provider: QuotaProviderID) -> Bool {
+        switch provider {
+        case .codex: codexMonitoringEnabled
+        case .claude: claudeMonitoringEnabled
+        }
+    }
+
+    /// Selection fallbacks are projections; disabling a service does not erase
+    /// the user's saved primary/floating choice or either service's settings.
+    func setMonitoringEnabled(_ enabled: Bool, for provider: QuotaProviderID) {
+        guard isMonitoringEnabled(for: provider) != enabled else { return }
+        switch provider {
+        case .codex: codexMonitoringEnabled = enabled
+        case .claude: claudeMonitoringEnabled = enabled
+        }
+    }
+
     func restoreDefaultColors() {
         statusAccentOverrides = StatusAccentOverrides()
     }
@@ -132,6 +222,12 @@ final class PreferencesStore: ObservableObject {
     private static func decode<Value: Decodable>(_ type: Value.Type, key: String, from defaults: UserDefaults) -> Value? {
         guard let data = defaults.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
+    }
+
+    private static func loadBoolean(from defaults: UserDefaults, key: String, fallback: Bool) -> Bool {
+        guard let value = defaults.object(forKey: key) as? NSNumber,
+              CFGetTypeID(value) == CFBooleanGetTypeID() else { return fallback }
+        return value.boolValue
     }
 
     private func persistStatusAccentOverrides() {

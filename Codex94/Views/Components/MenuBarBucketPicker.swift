@@ -2,14 +2,18 @@ import SwiftUI
 
 struct MenuBarBucketPicker: View {
     @ObservedObject var store: AppStore
+    var provider: QuotaProviderID = .codex
+    private var snapshot: QuotaSnapshot? { store.providerSnapshot(for: provider) }
+    private var selection: MenuBarBucketSelection {
+        provider == .codex ? store.preferences.dualWindowBucketSelection : store.preferences.claudeDualWindowBucketSelection
+    }
 
     var body: some View {
-        let selection = store.preferences.dualWindowBucketSelection
-        let options = MenuBarBucketOption.options(in: store.snapshot, selected: selection)
+        let options = MenuBarBucketOption.options(in: snapshot, selected: selection)
         HStack(spacing: 8) {
             Picker("display.dualWindow.bucket", selection: Binding(
-                get: { store.preferences.dualWindowBucketSelection },
-                set: { store.setDualWindowBucketSelection($0) }
+                get: { selection },
+                set: { store.setDualWindowBucketSelection($0, for: provider) }
             )) {
                 ForEach(options) { option in
                     Text(verbatim: optionLabel(option))
@@ -21,7 +25,7 @@ struct MenuBarBucketPicker: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .accessibilityIdentifier("dual-window-bucket-picker")
+            .accessibilityIdentifier(provider == .codex ? "dual-window-bucket-picker" : "claude-dual-window-bucket-picker")
 
             if options.contains(where: { $0.selection == selection && !$0.isAvailable }) {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -42,11 +46,11 @@ struct MenuBarBucketPicker: View {
         guard abbreviated else { return fullName + suffix }
 
         let limit = max(1, 30 - suffix.count)
-        let names = store.snapshot.map { QuotaFormatting.bucketMenuNames(in: $0, limit: limit) } ?? [:]
+        let names = snapshot.map { QuotaFormatting.bucketMenuNames(in: $0, limit: limit) } ?? [:]
         let bucketID: String?
         switch option.selection {
         case .automatic: bucketID = nil
-        case .defaultBucket: bucketID = store.snapshot?.defaultLimitID
+        case .defaultBucket: bucketID = snapshot?.defaultLimitID
         case let .bucket(limitID): bucketID = limitID
         }
         let name = bucketID.flatMap { names[$0] } ?? QuotaFormatting.shortBucketName(fullName, limit: limit)

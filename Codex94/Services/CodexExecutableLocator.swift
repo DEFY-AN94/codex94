@@ -29,6 +29,10 @@ struct CodexExecutableLocator: Sendable {
         processLifecycle.shutdown(gracePeriod: 0.5)
     }
 
+    func cancelCurrentRequest() {
+        processLifecycle.cancelActive(gracePeriod: 0.5)
+    }
+
     func locate(manualPath: String?) throws -> LocatedCodex {
         if let manualPath,
            !manualPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

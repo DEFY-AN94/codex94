@@ -159,7 +159,10 @@ final class FloatingWindowController: NSObject, NSWindowDelegate {
     }
 
     private var quotaLayout: FloatingQuotaLayout {
-        FloatingQuotaLayout(fiveHour: store.activeMenuBarQuotas.first?.bucket.window(.fiveHour))
+        if store.floatingProvider == .claude, store.floatingBucket?.window(.weekly) == nil {
+            return .weeklyOnly
+        }
+        return FloatingQuotaLayout(fiveHour: store.floatingBucket?.window(.fiveHour))
     }
 
     private func synchronizeQuotaLayout() {

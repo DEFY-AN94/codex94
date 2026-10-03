@@ -4,6 +4,7 @@ import Combine
 enum DashboardSection: String, CaseIterable, Identifiable, Sendable {
     case overview
     case usage
+    case providers
     case connection
     case display
     case startup
@@ -15,6 +16,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Sendable {
     static let primarySections: [DashboardSection] = [
         .overview,
         .usage,
+        .providers,
         .connection,
         .display,
         .startup,
@@ -25,6 +27,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .overview: "square.grid.2x2"
         case .usage: "chart.bar.xaxis"
+        case .providers: "square.stack.3d.up"
         case .connection: "point.3.connected.trianglepath.dotted"
         case .display: "rectangle.on.rectangle"
         case .startup: "power.circle"

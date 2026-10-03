@@ -13,16 +13,30 @@ struct MenuBarStatusImageInput: Equatable {
     let accentOverrides: StatusAccentOverrides
     let localeIdentifier: String
     let scale: CGFloat
+    var providerLabel: QuotaProviderID? = nil
+    var preciseRemainingPercent: Double? = nil
+
+    var contentSize: CGSize {
+        CGSize(width: layout.metrics.contentSize.width + (providerLabel == nil ? 0 : 46),
+               height: layout.metrics.contentSize.height)
+    }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         guard lhs.layout == rhs.layout, lhs.badge == rhs.badge,
               lhs.colorScheme == rhs.colorScheme, lhs.accentOverrides == rhs.accentOverrides,
-              lhs.localeIdentifier == rhs.localeIdentifier, lhs.scale == rhs.scale else { return false }
+              lhs.localeIdentifier == rhs.localeIdentifier, lhs.scale == rhs.scale,
+              lhs.providerLabel == rhs.providerLabel,
+              QuotaLevel(preciseRemainingPercent: lhs.preciseRemainingPercent)
+                == QuotaLevel(preciseRemainingPercent: rhs.preciseRemainingPercent) else { return false }
         if lhs.layout == .dualWindow {
             return lhs.dualWindowBucket?.window(.fiveHour)?.remainingPercent
                 == rhs.dualWindowBucket?.window(.fiveHour)?.remainingPercent
                 && lhs.dualWindowBucket?.window(.weekly)?.remainingPercent
                 == rhs.dualWindowBucket?.window(.weekly)?.remainingPercent
+                && QuotaLevel(preciseRemainingPercent: lhs.dualWindowBucket?.window(.fiveHour)?.preciseRemainingPercent)
+                == QuotaLevel(preciseRemainingPercent: rhs.dualWindowBucket?.window(.fiveHour)?.preciseRemainingPercent)
+                && QuotaLevel(preciseRemainingPercent: lhs.dualWindowBucket?.window(.weekly)?.preciseRemainingPercent)
+                == QuotaLevel(preciseRemainingPercent: rhs.dualWindowBucket?.window(.weekly)?.preciseRemainingPercent)
         }
         return lhs.remainingPercent == rhs.remainingPercent
     }
@@ -32,15 +46,26 @@ struct MenuBarStatusImageInput: Equatable {
 enum MenuBarStatusImageRenderer {
     static func render(_ input: MenuBarStatusImageInput) -> NSImage? {
         guard input.scale.isFinite, input.scale > 0 else { return nil }
-        let size = input.layout.metrics.contentSize
+        let size = input.contentSize
         let palette = Codex94Palette.resolve(.system, scheme: input.colorScheme, overrides: input.accentOverrides)
-        let content = MenuBarStatusContent(
+        let quotaContent = MenuBarStatusContent(
             layout: input.layout, remainingPercent: input.remainingPercent,
-            quotaLevel: QuotaLevel(remainingPercent: input.remainingPercent),
+            quotaLevel: input.preciseRemainingPercent.map { QuotaLevel(preciseRemainingPercent: $0) }
+                ?? QuotaLevel(remainingPercent: input.remainingPercent),
             badge: input.badge, palette: palette, dualWindowBucket: input.dualWindowBucket
         )
         .environment(\.colorScheme, input.colorScheme)
         .environment(\.locale, Locale(identifier: input.localeIdentifier))
+        let content = HStack(spacing: 0) {
+            if let provider = input.providerLabel {
+                Text(verbatim: provider.displayName)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(input.colorScheme == .dark ? Color.white : Color.black)
+                    .frame(width: 46, alignment: .leading)
+            }
+            quotaContent
+        }
+        .frame(width: size.width, height: size.height)
         let renderer = ImageRenderer(content: content)
         renderer.proposedSize = ProposedViewSize(size)
         renderer.scale = input.scale
@@ -76,6 +101,7 @@ final class MenuBarStatusRenderer {
     typealias ImageFactory = @MainActor (MenuBarStatusImageInput) -> NSImage?
 
     private let store: AppStore
+    private let provider: QuotaProviderID
     private weak var statusItem: NSStatusItem?
     private let imageFactory: ImageFactory
     private let appearanceObserver = MenuBarAppearanceObserverView(frame: .zero)
@@ -85,8 +111,10 @@ final class MenuBarStatusRenderer {
     private var lastImageInput: MenuBarStatusImageInput?
     private var isStopped = false
 
-    init(store: AppStore, statusItem: NSStatusItem, imageFactory: @escaping ImageFactory = MenuBarStatusImageRenderer.render) {
+    init(store: AppStore, statusItem: NSStatusItem, provider: QuotaProviderID = .codex,
+         imageFactory: @escaping ImageFactory = MenuBarStatusImageRenderer.render) {
         self.store = store
+        self.provider = provider
         self.statusItem = statusItem
         self.imageFactory = imageFactory
         if let button = statusItem.button {
@@ -127,13 +155,16 @@ final class MenuBarStatusRenderer {
         let scale = button.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
         let input = MenuBarStatusImageInput(
             layout: store.preferences.menuBarLayout,
-            remainingPercent: store.menuBarQuota?.window.remainingPercent,
-            badge: store.menuBarStatusPresentation.connectionBadge,
-            dualWindowBucket: store.dualWindowBucket,
+            remainingPercent: store.providerMenuBarQuota(for: provider)?.window.remainingPercent,
+            badge: store.providerStatusPresentation(for: provider).connectionBadge,
+            dualWindowBucket: store.providerDualWindowBucket(for: provider),
             colorScheme: scheme, accentOverrides: store.preferences.statusAccentOverrides,
-            localeIdentifier: store.preferences.language.locale.identifier, scale: scale
+            localeIdentifier: store.preferences.language.locale.identifier, scale: scale,
+            providerLabel: provider == .claude || store.preferences.enabledProviders.count > 1 ? provider : nil,
+            preciseRemainingPercent: store.providerMenuBarQuota(for: provider)?.window.preciseRemainingPercent
         )
-        if item.length != input.layout.metrics.statusItemWidth { item.length = input.layout.metrics.statusItemWidth }
+        let itemWidth = input.contentSize.width + 2 * input.layout.metrics.horizontalInset
+        if item.length != itemWidth { item.length = itemWidth }
         guard input != lastImageInput || button.image == nil else { return }
         guard let image = imageFactory(input) else { return }
         button.image = image
@@ -155,9 +186,13 @@ final class MenuBarStatusRenderer {
 
     private func updateAccessibility(now: Date) {
         guard !isStopped, let button = statusItem?.button else { return }
-        let text = MenuBarStatusView.accessibilityLabel(
-            store: store, resolvedQuota: store.menuBarQuota,
-            presentation: store.menuBarStatusPresentation, now: now
+        let text = store.preferences.enabledProviders.isEmpty
+            ? "Codex94 · " + StatusAccessibilityString.localized(
+                "monitoring.off", language: store.preferences.language, bundle: .main
+            )
+            : MenuBarStatusView.accessibilityLabel(
+            store: store, resolvedQuota: store.providerMenuBarQuota(for: provider),
+            presentation: store.providerStatusPresentation(for: provider), now: now, provider: provider
         )
         if button.accessibilityLabel() != text { button.setAccessibilityLabel(text) }
         if button.toolTip != text { button.toolTip = text }

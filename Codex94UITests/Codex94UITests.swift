@@ -372,6 +372,444 @@ final class Codex94UITests: XCTestCase {
         ])
     }
 
+    func testProvidersSmoke() throws {
+        try prepare(scenario: "providers")
+        try launchPopover(expectedRequestDelta: 1)
+        let applicationPID = try ownedApplicationPID()
+        XCTAssertEqual(try fixture.claudeUsageRequestCount(), 0)
+        _ = try providerStatusItems(expected: ["codex"])
+        let savedCodexSelection = try selectedQuotaPreference()
+        var dashboard = try openDashboard(from: currentPopover())
+        try selectPage(.providers, in: dashboard)
+        try setProviderEnabled("claude", enabled: true, in: dashboard)
+        var popover = try openProviderPopover(service: "codex", marker: "provider-quota-sections")
+        try waitForProviderCards(in: popover, codex: true)
+        XCTAssertEqual(try fixture.claudeUsageRequestCount(), 1,
+                       "Enabling Claude must perform one coalesced synthetic read")
+        _ = try providerStatusItems(expected: ["codex"])
+        try assertProviderQuotaVisibility(in: popover, codexFiveHour: false, reportName: "providers-viewport-three.json")
+
+        // The original Codex model picker lives below both summary cards. Its
+        // two-window Spark fixture lets the top viewport prove four quota columns.
+        let beforeModel = try providerRequestCounts()
+        let model = try picker(label: language.quotaModel,
+                               values: ["Codex", fixture.sparkName], in: popover)
+        try choose(fixture.sparkName, in: model, container: popover)
+        try waitUntil("Choosing Spark must add Codex's reported five-hour window") {
+            self.identified("provider-codex-quota-fiveHour", in: popover).exists
+        }
+        let viewport = try uniqueIdentified("provider-quota-sections", in: popover)
+        let scrolls = popover.scrollViews.allElementsBoundByIndex.filter {
+            abs($0.frame.width - viewport.frame.width) <= 2 && abs($0.frame.height - viewport.frame.height) <= 2
+        }
+        try require(scrolls.count == 1, "The shared provider panel must expose one bounded quota scroll view")
+        scrolls[0].scroll(byDeltaX: 0, deltaY: 2_000)
+        XCTAssertEqual(try providerRequestCounts(), beforeModel, "Browsing and scrolling must not request either provider")
+        XCTAssertEqual(try selectedQuotaPreference(), savedCodexSelection)
+        try assertProviderQuotaVisibility(in: popover, codexFiveHour: true, reportName: "providers-viewport-four.json")
+        try captureProviderPopover(popover, marker: "provider-quota-sections", named: "providers-both-en.png")
+
+        dashboard = try openDashboard(from: popover)
+        try selectPage(.providers, in: dashboard)
+        let beforeSelection = try providerRequestCounts()
+        try choose("Claude", in: picker(id: "provider-primary", label: "Primary service",
+                                        values: ["Codex", "Claude"], in: dashboard), container: dashboard)
+        try waitUntil("The primary service selection was not saved") {
+            try self.fixture.preference("primaryProvider.v1") as? String == "claude"
+        }
+        _ = try providerStatusItems(expected: ["claude"])
+        try setProviderMenuMode("both", in: dashboard)
+        _ = try providerStatusItems(expected: ["codex", "claude"])
+        XCTAssertEqual(try providerRequestCounts(), beforeSelection, "Menu-bar presentation choices must not refresh providers")
+        let savedChoices = try fixture.preferenceSnapshot(keys: [
+            "menuBarQuotaSelection.v2", "primaryProvider.v1", "menuBarServiceMode.v1"
+        ])
+
+        popover = try openProviderPopover(service: "claude", marker: "provider-quota-sections")
+        try waitForProviderCards(in: popover, codex: true)
+        for (service, rightClick) in [("codex", false), ("claude", false), ("codex", true), ("claude", true)] {
+            // Explicit successful reads establish freshness immediately before
+            // the close/open gate. No range of request counts is accepted.
+            try refreshProviders(in: popover)
+            let freshCounts = try providerRequestCounts()
+            try closeProviderPopover(service: service, marker: "provider-quota-sections")
+            popover = try openProviderPopover(service: service, marker: "provider-quota-sections", rightClick: rightClick)
+            try waitForProviderCards(in: popover, codex: true)
+            XCTAssertEqual(try providerRequestCounts(), freshCounts,
+                           "Either fresh native status item must open the same shared content without new reads")
+            // Card backgrounds are decorative SwiftUI containers; macOS may
+            // flatten or alias them. Prove the shared panel using the actual,
+            // uniquely identified quota columns for both services instead.
+            try assertProviderQuotaVisibility(
+                in: popover, codexFiveHour: true,
+                reportName: "providers-reopen-\(service)-\(rightClick ? "right" : "left").json"
+            )
+        }
+
+        let codexBeforeFailure = try fixture.requestCount()
+        let cacheBeforeFailure = try fixture.cacheFingerprint()
+        let claudeBeforeFailure = try fixture.claudeUsageRequestCount()
+        try fixture.setClaudeMode("error")
+        try uniqueIdentified("claude-refresh", in: popover).click()
+        try waitUntil("The synthetic Claude login failure did not reach its own card", timeout: 30) {
+            let issue = self.identified("claude-issue", in: popover)
+            return issue.exists && [issue.label, issue.title, issue.value as? String ?? ""]
+                .contains("Sign in to Claude Code, then refresh here.")
+        }
+        XCTAssertEqual(try fixture.claudeUsageRequestCount(), claudeBeforeFailure + 1)
+        XCTAssertEqual(try fixture.requestCount(), codexBeforeFailure)
+        XCTAssertEqual(try fixture.cacheFingerprint(), cacheBeforeFailure)
+        try assertProviderMetric("provider-codex-quota-fiveHour", percent: "88%", in: popover)
+        try assertProviderMetric("provider-codex-quota-weekly", percent: "80%", in: popover)
+        try captureProviderPopover(popover, marker: "provider-quota-sections", named: "providers-claude-error-en.png")
+        try fixture.setClaudeMode("normal")
+        let claudeBeforeRecovery = try fixture.claudeUsageRequestCount()
+        try uniqueIdentified("claude-refresh", in: popover).click()
+        try waitForProviderCards(in: popover, codex: true)
+        XCTAssertEqual(try fixture.claudeUsageRequestCount(), claudeBeforeRecovery + 1)
+        XCTAssertEqual(try fixture.requestCount(), codexBeforeFailure)
+        XCTAssertEqual(try fixture.cacheFingerprint(), cacheBeforeFailure)
+
+        dashboard = try openDashboard(from: popover)
+        try selectPage(.providers, in: dashboard)
+        let disabledCodexCount = try fixture.requestCount()
+        try setProviderEnabled("codex", enabled: false, in: dashboard)
+        _ = try providerStatusItems(expected: ["claude"])
+        popover = try openProviderPopover(service: "claude", marker: "claude-quota-section")
+        try waitForProviderCards(in: popover, codex: false)
+        try require(!identified("provider-codex-quota-fiveHour", in: popover).exists
+                    && !identified("provider-codex-quota-weekly", in: popover).exists
+                    && !identified("provider-codex-refresh", in: popover).exists
+                    && !identified("quota-popover-header", in: popover).exists,
+                    "Disabling Codex must leave a Claude-only quota panel")
+        try captureProviderPopover(popover, marker: "claude-quota-section", named: "providers-claude-only-en.png")
+        dashboard = try openDashboard(from: popover)
+        try selectPage(.usage, in: dashboard)
+        try require(identified("providers-disabled", in: dashboard).exists
+                    && !identified("token-usage-page", in: dashboard).exists,
+                    "The Codex-only Token page must not load when Codex monitoring is off")
+        XCTAssertEqual(try fixture.tokenUsageRequestCount(), fixture.selfCheckTokenUsage)
+        XCTAssertEqual(try fixture.requestCount(), disabledCodexCount)
+
+        try selectPage(.providers, in: dashboard)
+        let beforeAllOff = try providerRequestCounts()
+        try setProviderEnabled("claude", enabled: false, in: dashboard)
+        _ = try providerStatusItems(expected: ["codex"], neutral: true)
+        // Start from another page so the button must actually navigate to
+        // Services, rather than passing because that page was already open.
+        try selectPage(.display, in: dashboard)
+        try require(!identified("provider-settings-page", in: dashboard).exists,
+                    "The settings-entry precondition must be a different Dashboard page")
+        popover = try openProviderPopover(service: "codex", marker: "providers-disabled", neutral: true)
+        try require(!identified("claude-quota-fiveHour", in: popover).exists
+                    && !identified("claude-quota-weekly", in: popover).exists
+                    && !identified("claude-refresh", in: popover).exists
+                    && !identified("provider-codex-quota-fiveHour", in: popover).exists
+                    && !identified("provider-codex-quota-weekly", in: popover).exists
+                    && !identified("quota-popover-header", in: popover).exists,
+                    "Both-off state must expose settings rather than old provider data")
+        try captureProviderPopover(popover, marker: "providers-disabled", named: "providers-disabled-en.png")
+        XCTAssertEqual(try providerRequestCounts(), beforeAllOff)
+        try disabledProviderSettingsButton(in: popover).click()
+        try waitUntil("Choosing Services must close the neutral popover") {
+            !self.identified("providers-disabled", in: self.application).exists
+        }
+        dashboard = try dashboardWindow()
+        try require(identified("provider-settings-page", in: dashboard).waitForExistence(timeout: 5),
+                    "The neutral state must keep Services settings reachable")
+        XCTAssertEqual(try providerRequestCounts(), beforeAllOff,
+                       "Opening Services while both monitors are off must not request either provider")
+        let beforeReenable = try fixture.requestCount()
+        let claudeBeforeReenable = try fixture.claudeUsageRequestCount()
+        try setProviderEnabled("codex", enabled: true, in: dashboard)
+        try waitForRequestCompletion(after: beforeReenable, delta: 1)
+        _ = try providerStatusItems(expected: ["codex"])
+        XCTAssertEqual(try fixture.claudeUsageRequestCount(), claudeBeforeReenable)
+        XCTAssertEqual(try fixture.preferenceSnapshot(keys: [
+            "menuBarQuotaSelection.v2", "primaryProvider.v1", "menuBarServiceMode.v1"
+        ]), savedChoices, "Disabling and reenabling must preserve both raw presentation choices and Codex quota selection")
+        XCTAssertEqual(try selectedQuotaPreference(), savedCodexSelection)
+        XCTAssertEqual(try ownedApplicationPID(), applicationPID)
+        try fixture.assertSafePreferences()
+        try quitNormally()
+        try fixture.writeReport("providers-result.json", fields: [
+            "scenario": "providers", "completed": true, "language": "en",
+            "defaultCodexOnlyVerified": true, "defaultClaudeUsageRequests": 0,
+            "singlePrimaryProviderSwitchVerified": true, "twoNativeStatusItemsVerified": true,
+            "distinctNativeProviderBrandsVerified": true, "sharedPopoverBothServicesVerified": true,
+            "bothMouseButtonsBothItemsVerified": true, "freshReopenDoesNotFetch": true,
+            "initialViewportThreeQuotaColumnsVerified": true, "twoWindowProviderTopViewportFourColumnsVerified": true,
+            "claudeFailurePreservesCodexAndCache": true, "claudeManualFailureAttempts": 1,
+            "claudeOnlyAfterCodexDisableVerified": true, "codexDisabledTokenPageDoesNotRead": true,
+            "allOffNeutralSettingsEntryVerified": true, "reenablePreservesSelections": true,
+            "sameApplicationProcess": true, "productionAUTUnmodified": true,
+            "onlyFixedSyntheticClaudeUsed": true, "statuslineInstallAttempted": false,
+            "authenticationUIOperated": false, "realAccountDataUsed": false,
+            "keyboardAcceptance": "not-tested", "spacesAndFullscreenAcceptance": "not-tested",
+            "rawTestResultsUploaded": false
+        ])
+    }
+
+    /// SwiftUI can propagate the disabled-state container identifier onto its
+    /// button on macOS 15. Select the actual visible, localized native action
+    /// within this known popover, never a decorative container or a fallback click.
+    private func disabledProviderSettingsButton(in popover: XCUIElement) throws -> XCUIElement {
+        try require(fixture.scenario == "providers"
+                    && (try fixture.preference("codexMonitoringEnabled.v1") as? Bool) == false
+                    && (try fixture.preference("claudeMonitoringEnabled.v1") as? Bool) == false,
+                    "The settings-entry query is limited to the synthetic both-disabled state")
+        let owned = try currentProviderPopover(marker: "providers-disabled")
+        try require(owned.frame == popover.frame, "The settings action must belong to the known neutral popover")
+        let title = language.openProviderSettings
+        let query = popover.buttons.matching(NSPredicate(format: "label == %@ OR title == %@", title, title))
+        let appeared = query.firstMatch.waitForExistence(timeout: 5)
+        let count = query.count
+        let observations: [[String: Any]] = (0..<min(count, 4)).map { index in
+            let element = query.element(boundBy: index)
+            guard element.exists else { return ["stillExists": false] }
+            let frame = element.frame
+            let finite = [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
+            let identifierClass: String = switch element.identifier {
+            case "providers-open-settings": "action"
+            case "providers-disabled": "disabled-state"
+            case "": "empty"
+            default: "other"
+            }
+            return ["stillExists": true, "role": element.elementType.rawValue,
+                    "enabled": element.isEnabled, "hittable": element.isHittable,
+                    "insideOwnedPopover": finite && !frame.isEmpty && popover.frame.contains(frame),
+                    "labelMatchesCaption": element.label == title, "titleMatchesCaption": element.title == title,
+                    "identifierClass": identifierClass]
+        }
+        try fixture.writeReport("providers-settings-entry.json", fields: [
+            "scenario": "providers", "selectionMethod": "exact-localized-native-button-in-neutral-popover",
+            "requestedIdentifierCount": popover.descendants(matching: .any).matching(identifier: "providers-open-settings").count,
+            "disabledStateIdentifierCount": popover.descendants(matching: .any).matching(identifier: "providers-disabled").count,
+            "exactCaptionButtonCount": count, "sampledCandidates": observations, "samplesTruncated": count > 4,
+            "rawAXTextIncluded": false, "globalCoordinatesIncluded": false
+        ])
+        try require(appeared && count == 1, "The neutral popover must expose exactly one native Choose Services action")
+        let button = query.element(boundBy: 0)
+        let frame = button.frame
+        try require(button.elementType == .button && button.isEnabled && button.isHittable
+                    && [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
+                    && !frame.isEmpty && popover.frame.contains(frame),
+                    "The exact localized settings action must be enabled, clickable and inside its own popover")
+        return button
+    }
+
+    private func providerRequestCounts() throws -> [Int] {
+        [try fixture.requestCount(), try fixture.claudeUsageRequestCount()]
+    }
+
+    private func setProviderEnabled(_ service: String, enabled: Bool, in dashboard: XCUIElement) throws {
+        try require(fixture.scenario == "providers" && ["codex", "claude"].contains(service), "Unknown provider toggle")
+        let key = service + "MonitoringEnabled.v1"
+        try require((try fixture.preference(key) as? Bool) != enabled, "The toggle precondition must differ from its target")
+        let toggle = try uniqueIdentified("provider-" + service + "-enabled", in: dashboard)
+        try reveal(toggle, in: dashboard)
+        try require(toggle.isEnabled && toggle.isHittable, "The real monitoring control must be interactive")
+        toggle.click()
+        try waitUntil("The monitoring toggle did not persist") {
+            try self.fixture.preference(key) as? Bool == enabled
+        }
+    }
+
+    private func setProviderMenuMode(_ mode: String, in dashboard: XCUIElement) throws {
+        try require(mode == "both" || mode == "single", "Unknown provider status-item mode")
+        let group = try uniqueIdentified("provider-menu-bar-mode", in: dashboard)
+        let title = mode == "both" ? "Both services" : "One service"
+        let candidates = group.descendants(matching: .any).matching(NSPredicate(
+            format: "label == %@ OR title == %@", title, title
+        )).allElementsBoundByIndex.filter { $0.elementType == .radioButton || $0.elementType == .button }
+        try require(candidates.count == 1, "The provider mode must have one native segmented choice")
+        try reveal(candidates[0], in: dashboard)
+        try require(candidates[0].isEnabled && candidates[0].isHittable, "The provider mode choice must be visible")
+        candidates[0].click()
+        try waitUntil("The menu-bar service mode did not persist") {
+            try self.fixture.preference("menuBarServiceMode.v1") as? String == mode
+        }
+    }
+
+    private func providerStatusItems(expected: Set<String>, neutral: Bool = false) throws -> [String: XCUIElement] {
+        try require(fixture.scenario == "providers", "Native provider inspection is scenario-scoped")
+        var resolved: [String: XCUIElement] = [:]
+        try waitUntil("The exact enabled native status items were not exposed", timeout: 10) {
+            var items = self.application.statusItems.allElementsBoundByIndex
+            if items.isEmpty {
+                items = self.application.menuBarItems.allElementsBoundByIndex.filter {
+                    ["menu-bar-codex", "menu-bar-claude"].contains($0.identifier)
+                        || $0.label.hasPrefix("Codex,") || $0.label.hasPrefix("Claude,")
+                        || $0.label == "Codex94 · Monitoring off"
+                }
+            }
+            guard items.count == expected.count else { return false }
+            var found: [String: XCUIElement] = [:]
+            for service in expected {
+                let brand = service == "codex" ? "Codex" : "Claude"
+                let matches = items.filter {
+                    $0.identifier == "menu-bar-" + service
+                        || (neutral ? $0.label == "Codex94 · Monitoring off"
+                            : $0.label.hasPrefix(brand + ",") || $0.title.hasPrefix(brand + ","))
+                }
+                guard matches.count == 1, matches[0].isHittable,
+                      (20...220).contains(matches[0].frame.width), matches[0].frame.height > 0 else { return false }
+                let label = matches[0].label
+                guard neutral ? label == "Codex94 · Monitoring off" : label.hasPrefix(brand + ",") else { return false }
+                found[service] = matches[0]
+            }
+            if let codex = found["codex"], let claude = found["claude"], codex.frame == claude.frame { return false }
+            resolved = found
+            return true
+        }
+        return resolved
+    }
+
+    private func providerStatusItem(_ service: String, neutral: Bool = false) throws -> XCUIElement {
+        let both = try fixture.preference("menuBarServiceMode.v1") as? String == "both"
+        let codex = try fixture.preference("codexMonitoringEnabled.v1") as? Bool == true
+        let claude = try fixture.preference("claudeMonitoringEnabled.v1") as? Bool == true
+        let expected: Set<String>
+        if !codex && !claude { expected = ["codex"] }
+        else if both { expected = Set((codex ? ["codex"] : []) + (claude ? ["claude"] : [])) }
+        else { expected = [service] }
+        let items = try providerStatusItems(expected: expected, neutral: neutral)
+        guard let item = items[service] else { throw UITestFailure("The requested enabled provider has no native item") }
+        return item
+    }
+
+    private func currentProviderPopover(marker: String) throws -> XCUIElement {
+        try require(["provider-quota-sections", "claude-quota-section", "providers-disabled", "quota-popover-header"].contains(marker),
+                    "Only known provider popover markers may be queried")
+        let popovers = application.popovers.containing(.any, identifier: marker)
+        if popovers.count == 1 { return popovers.element(boundBy: 0) }
+        let windows = application.windows.containing(.any, identifier: marker)
+        try require(windows.count == 1, "The known provider marker must belong to exactly one popover surface")
+        return windows.element(boundBy: 0)
+    }
+
+    private func openProviderPopover(service: String, marker: String, rightClick: Bool = false,
+                                     neutral: Bool = false) throws -> XCUIElement {
+        try require(!identified(marker, in: application).exists, "A closed provider popover is required before opening")
+        let item = try providerStatusItem(service, neutral: neutral)
+        if rightClick { item.rightClick() } else { item.click() }
+        try require(identified(marker, in: application).waitForExistence(timeout: 8), "The native provider item did not open its content")
+        return try currentProviderPopover(marker: marker)
+    }
+
+    private func closeProviderPopover(service: String, marker: String) throws {
+        _ = try currentProviderPopover(marker: marker)
+        try providerStatusItem(service).click()
+        try waitUntil("The shared provider popover did not close") { !self.identified(marker, in: self.application).exists }
+    }
+
+    private func waitForProviderCards(in popover: XCUIElement, codex: Bool) throws {
+        try waitUntil("Claude's synthetic quota read did not finish", timeout: 30) {
+            let refresh = self.identified("claude-refresh", in: popover)
+            return refresh.exists && refresh.isEnabled
+                && self.identified("claude-quota-fiveHour", in: popover).exists
+                && self.identified("claude-quota-weekly", in: popover).exists
+                && !self.identified("claude-issue", in: popover).exists
+                && (!codex || self.identified("provider-codex-refresh", in: popover).isEnabled)
+        }
+        try assertProviderMetric("claude-quota-fiveHour", percent: "75.5%", in: popover)
+        try assertProviderMetric("claude-quota-weekly", percent: "38.8%", in: popover)
+    }
+
+    private func refreshProviders(in popover: XCUIElement) throws {
+        try waitForProviderCards(in: popover, codex: true)
+        let before = try providerRequestCounts()
+        try commandButton("Refresh all services", in: popover).click()
+        try waitUntil("An explicit Refresh all must issue one read per enabled service", timeout: 30) {
+            try self.fixture.requestCount() == before[0] + 1
+                && self.fixture.claudeUsageRequestCount() == before[1] + 1
+                && self.fixture.requestsHaveExited()
+        }
+        try waitForProviderCards(in: popover, codex: true)
+        XCTAssertEqual(try providerRequestCounts(), [before[0] + 1, before[1] + 1])
+    }
+
+    private func assertProviderMetric(_ identifier: String, percent: String, in popover: XCUIElement) throws {
+        let element = try uniqueIdentified(identifier, in: popover)
+        let matches = Set([element.label, element.title, element.value as? String ?? ""].filter {
+            $0.contains(percent) && $0.contains("remaining")
+        })
+        try require(matches.count == 1, "The known synthetic quota column must expose its exact remaining percentage")
+    }
+
+    private func assertProviderQuotaVisibility(in popover: XCUIElement, codexFiveHour: Bool, reportName: String) throws {
+        let viewport = try uniqueIdentified("provider-quota-sections", in: popover).frame.intersection(popover.frame)
+        try require(abs(viewport.width - 500) <= 2 && abs(viewport.height - 480) <= 2,
+                    "Both-provider evidence requires the actual 500 × 480 viewport")
+        var values = [("provider-codex-quota-weekly", codexFiveHour ? "80%" : "32%"),
+                      ("claude-quota-fiveHour", "75.5%"), ("claude-quota-weekly", "38.8%")]
+        if codexFiveHour { values.append(("provider-codex-quota-fiveHour", "88%")) }
+        var geometry: [[String: Any]] = []
+        var quotaFrames: [String: CGRect] = [:]
+        for (identifier, percent) in values {
+            let element = try uniqueIdentified(identifier, in: popover)
+            let frame = element.frame
+            try assertProviderMetric(identifier, percent: percent, in: popover)
+            try require(frame.width > 120 && frame.height > 40 && viewport.insetBy(dx: -1, dy: -1).contains(frame),
+                        "Every provider quota column must be fully visible at the top of the shared viewport")
+            quotaFrames[identifier] = frame
+            geometry.append(["identifier": identifier, "insideViewport": true,
+                             "relativeX": Double(frame.minX - viewport.minX), "relativeY": Double(frame.minY - viewport.minY),
+                             "width": Double(frame.width), "height": Double(frame.height)])
+        }
+        let codexRegion = quotaFrames.filter { $0.key.hasPrefix("provider-codex-quota-") }
+            .values.reduce(CGRect.null) { $0.union($1) }
+        let claudeRegion = quotaFrames.filter { $0.key.hasPrefix("claude-quota-") }
+            .values.reduce(CGRect.null) { $0.union($1) }
+        try require(!codexRegion.isNull && !claudeRegion.isNull && !codexRegion.intersects(claudeRegion),
+                    "The shared viewport must contain separate visible quota regions for both services")
+        for prefix in ["provider-codex-quota-", "claude-quota-"] {
+            if let first = quotaFrames[prefix + "fiveHour"], let second = quotaFrames[prefix + "weekly"] {
+                try require(!first.intersects(second), "A provider's two quota columns must not overlap")
+            }
+        }
+        try fixture.writeReport(reportName, fields: [
+            "scenario": "providers", "method": "external-aut-accessibility-geometry",
+            "quotaColumns": geometry, "viewportWidth": Double(viewport.width), "viewportHeight": Double(viewport.height),
+            "sharedViewportContainsBothProviders": true, "providerQuotaRegionsAreDistinct": true,
+            "containerObservations": providerContainerObservations(in: popover),
+            "globalCoordinatesIncluded": false, "rawAXTextIncluded": false, "allDataSynthetic": true
+        ])
+    }
+
+    /// Failure triage only. Container aliases are not the acceptance condition;
+    /// the unique real quota columns and their common viewport are checked above.
+    private func providerContainerObservations(in popover: XCUIElement) -> [[String: Any]] {
+        let identifiers = ["provider-quota-sections", "provider-quota-summaries",
+                           "codex-quota-section", "claude-quota-section"]
+        return identifiers.map { identifier in
+            let query = popover.descendants(matching: .any).matching(identifier: identifier)
+            let count = query.count
+            let nodes: [[String: Any]] = (0..<min(count, 4)).map { index in
+                let element = query.element(boundBy: index)
+                guard element.exists else { return ["stillExists": false] }
+                let frame = element.frame
+                let finite = [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
+                return ["stillExists": true, "role": element.elementType.rawValue,
+                        "nonemptyFrame": finite && !frame.isEmpty,
+                        "insidePopoverFrame": finite && popover.frame.insetBy(dx: -1, dy: -1).contains(frame)]
+            }
+            return ["identifier": identifier, "count": count, "sampledNodes": nodes,
+                    "samplesTruncated": count > 4, "diagnosticOnly": true]
+        }
+    }
+
+    private func captureProviderPopover(_ popover: XCUIElement, marker: String, named filename: String) throws {
+        try require(fixture.scenario == "providers" && !fixture.readOnlyFocusProbeEnabled,
+                    "Provider pictures require the unmodified synthetic Providers AUT")
+        let owned = try currentProviderPopover(marker: marker)
+        try require(owned.frame == popover.frame && identified(marker, in: popover).exists
+                    && !identified("provider-settings-page", in: popover).exists
+                    && !identified("connection-menu-bar-reset", in: popover).exists,
+                    "Provider pictures must contain only the exact known quota popover")
+        try fixture.writeArtifact(popover.screenshot().pngRepresentation, named: filename)
+    }
+
     func testFloatingWindowSmoke() throws {
         try prepare(scenario: "floating")
         try require(!fixture.readOnlyFocusProbeEnabled, "Floating smoke must use the unmodified production AUT")
@@ -1554,6 +1992,11 @@ final class Codex94UITests: XCTestCase {
         // Do not copy the runner environment: the AUT must not receive XCTest's
         // hosted-test guard or any credential/path-discovery overrides.
         application.launchEnvironment = [:]
+        if scenario == "providers" {
+            try require(fixture.claudeExecutable != nil && !fixture.readOnlyFocusProbeEnabled,
+                        "Providers must use the manifest-validated fake Claude and unmodified AUT")
+            application.launchEnvironment = ["PATH": fixture.root.path + ":/usr/bin:/bin"]
+        }
         if fixture.readOnlyFocusProbeEnabled {
             // These five nonsecret values enable only the observer compiled
             // into this exact CI source copy, never ordinary Debug/Release.
@@ -2004,7 +2447,11 @@ final class Codex94UITests: XCTestCase {
             let marker: XCUIElement
             switch page {
             case .overview: marker = identified("overview-page", in: dashboard)
-            case .usage: marker = identified("token-usage-page", in: dashboard)
+            case .usage:
+                marker = identified(fixture.scenario == "providers"
+                    && (try? fixture.preference("codexMonitoringEnabled.v1") as? Bool) == false
+                    ? "providers-disabled" : "token-usage-page", in: dashboard)
+            case .providers: marker = identified("provider-settings-page", in: dashboard)
             case .connection: marker = identified("connection-menu-bar-reset", in: dashboard)
             case .display: marker = identified("menu-bar-layout", in: dashboard)
             case .startup: marker = identified("launch-at-login-toggle", in: dashboard)
@@ -2033,6 +2480,7 @@ final class Codex94UITests: XCTestCase {
         switch page {
         case .overview: report["expectedPage"] = "overview"
         case .usage: report["expectedPage"] = "usage"
+        case .providers: report["expectedPage"] = "providers"
         case .connection: report["expectedPage"] = "connection"
         case .display: report["expectedPage"] = "display"
         case .startup: report["expectedPage"] = "startup"
@@ -2900,7 +3348,7 @@ private enum ReadOnlyFocusStage: String, CaseIterable {
         "focusedElementIdentityUnknown": true, "focusedElementIsRecoveryButton": false,
     ]
 }
-private enum UIPage { case overview, usage, connection, display, startup, diagnostics, about }
+private enum UIPage { case overview, usage, providers, connection, display, startup, diagnostics, about }
 private enum UITheme: String, CaseIterable { case system, terminalDark, terminalLight }
 private enum UITokenRange { case sevenDays, thirtyDays, all, custom }
 private enum UITokenChartStyle: String { case bar, line }
@@ -2917,6 +3365,7 @@ private enum UILanguage: String, CaseIterable {
     var connectionFailed: String { chinese ? "无法读取额度" : "Could not read quota" }
     var cachedStatus: String { chinese ? "缓存数据" : "Cached data" }
     var nextAttemptPrefix: String { chinese ? "下次自动尝试：" : "Next automatic attempt: " }
+    var openProviderSettings: String { chinese ? "选择监控服务…" : "Choose services…" }
     var choose: String { chinese ? "选择…" : "Choose…" }
     var quotaModel: String { chinese ? "额度模型" : "Quota model" }
     var menuBarQuota: String { chinese ? "菜单栏额度" : "Menu bar quota" }
@@ -2936,6 +3385,7 @@ private enum UILanguage: String, CaseIterable {
         switch page {
         case .overview: chinese ? "总览" : "Overview"
         case .usage: chinese ? "Token 统计" : "Token usage"
+        case .providers: chinese ? "服务" : "Services"
         case .connection: chinese ? "连接" : "Connection"
         case .display: chinese ? "显示" : "Display"
         case .startup: chinese ? "启动" : "Startup"
@@ -3003,6 +3453,9 @@ private struct SyntheticFixture {
     let invalidExecutable: URL
     let modeURL: URL
     let requestLogURL: URL
+    let claudeExecutable: URL?
+    let claudeModeURL: URL?
+    let claudeRequestLogURL: URL?
     let artifacts: URL
     let applicationURL: URL
     let applicationBinaryURL: URL
@@ -3048,7 +3501,7 @@ private struct SyntheticFixture {
         let manifest = try readJSON(manifestURL, maximumBytes: 131_072)
         guard manifest["schemaVersion"] as? Int == 1,
               manifest["scenario"] as? String == expectedScenario,
-              ["display", "recovery", "usage", "floating"].contains(expectedScenario),
+              ["display", "recovery", "usage", "floating", "providers"].contains(expectedScenario),
               manifest["initialQuotaMode"] as? String == (expectedScenario == "floating" ? "serverError" : "normal"),
               manifest["fixtureRoot"] as? String == root.path,
               manifest["bundleID"] as? String == "com.defyan94.codex94",
@@ -3082,6 +3535,37 @@ private struct SyntheticFixture {
         let invalidExecutable = try child("invalidExecutable", "invalid-codex")
         let modeURL = try child("modePath", "control/mode.json")
         let requestLogURL = try child("requestLogPath", "request-log.jsonl")
+        var claudeExecutable: URL?
+        var claudeModeURL: URL?
+        var claudeRequestLogURL: URL?
+        if expectedScenario == "providers" {
+            let fake = try child("claudeExecutable", "claude")
+            try validate(fake, type: .typeRegular, mode: 0o700)
+            guard FileManager.default.isExecutableFile(atPath: fake.path),
+                  let expectedHash = manifest["claudeExecutableSHA256"] as? String,
+                  let isolation = manifest["claudeIsolation"] as? [String: Any],
+                  Set(isolation.keys) == Set(["realConfigurationAbsent", "knownExecutablesAbsent"]),
+                  isolation.values.allSatisfy({ value in
+                      guard let number = value as? NSNumber else { return false }
+                      return CFGetTypeID(number) == CFBooleanGetTypeID() && number.boolValue
+                  }) else {
+                throw UITestFailure("Providers require a private fake Claude and proven empty native Claude state")
+            }
+            let bytes = try read(fake, maximumBytes: 131_072)
+            let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+            guard hash == expectedHash else { throw UITestFailure("The fake Claude differs from its prepared hash") }
+            claudeExecutable = fake
+            claudeModeURL = try child("claudeModePath", "control/claude-mode.json")
+            claudeRequestLogURL = try child("claudeRequestLogPath", "claude-request-log.jsonl")
+            try validate(claudeModeURL!, type: .typeRegular, mode: 0o600)
+            try validate(claudeRequestLogURL!, type: .typeRegular, mode: 0o600)
+            guard try read(claudeRequestLogURL!, maximumBytes: 1_048_576).isEmpty else {
+                throw UITestFailure("Claude usage must not run during fixture preparation")
+            }
+        } else if ["claudeExecutable", "claudeExecutableSHA256", "claudeModePath", "claudeRequestLogPath", "claudeIsolation"]
+            .contains(where: { manifest[$0] != nil }) {
+            throw UITestFailure("Claude fixture paths are restricted to the Providers scenario")
+        }
         let artifacts = try child("artifactDirectory", "artifacts", directory: true)
         let testEntitlements = try child("testEntitlements", "ui-test.entitlements")
         try validateRunnerPermissions(
@@ -3155,7 +3639,8 @@ private struct SyntheticFixture {
             expectedVersion: expectedVersion, expectedBuild: expectedBuild,
             sourceRevision: sourceRevision,
             executable: executable, invalidExecutable: invalidExecutable, modeURL: modeURL,
-            requestLogURL: requestLogURL, artifacts: artifacts,
+            requestLogURL: requestLogURL, claudeExecutable: claudeExecutable,
+            claudeModeURL: claudeModeURL, claudeRequestLogURL: claudeRequestLogURL, artifacts: artifacts,
             applicationURL: applicationURL, applicationBinaryURL: applicationBinaryURL,
             candidateBinarySHA256: candidateBinarySHA256, readOnlyFocusProbeEnabled: readOnlyFocusProbeEnabled,
             quotaCacheURL: quotaCacheURL,
@@ -3211,6 +3696,14 @@ private struct SyntheticFixture {
                 throw UITestFailure("Floating smoke requires the default pinned state and no prior saved position")
             }
         }
+        if scenario == "providers" {
+            guard try preference("codexMonitoringEnabled.v1") as? Bool == true,
+                  try preference("claudeMonitoringEnabled.v1") as? Bool == false,
+                  try preference("menuBarServiceMode.v1") as? String == "single",
+                  try preference("primaryProvider.v1") as? String == "codex" else {
+                throw UITestFailure("Providers must start with Codex-only monitoring and one Codex status item")
+            }
+        }
         try assertSafePreferences()
     }
 
@@ -3227,6 +3720,15 @@ private struct SyntheticFixture {
               registered else {
             throw UITestFailure("Synthetic quota-only/manual-path/30-minute fixture boundaries changed")
         }
+        if scenario == "providers" {
+            guard try preference("claude.refreshInterval.v1") as? Int == 30,
+                  try preference("codexMonitoringEnabled.v1") is Bool,
+                  try preference("claudeMonitoringEnabled.v1") is Bool,
+                  let mode = try preference("menuBarServiceMode.v1") as? String,
+                  ["single", "both"].contains(mode) else {
+                throw UITestFailure("Provider monitoring must retain its bounded 30-minute synthetic fixture policy")
+            }
+        }
         guard let style = try preference("tokenUsageChartStyle.v1") as? String,
               UITokenChartStyle(rawValue: style) != nil else {
             throw UITestFailure("The synthetic chart style must remain bar or line")
@@ -3241,6 +3743,11 @@ private struct SyntheticFixture {
         ]
         if scenario == "floating" {
             allowed.formUnion(["floatingWindowPinned.v1", "floatingWindowPosition.v1"])
+        }
+        if scenario == "providers" {
+            allowed.formUnion(["codexMonitoringEnabled.v1", "claudeMonitoringEnabled.v1",
+                               "menuBarServiceMode.v1", "primaryProvider.v1", "floatingProvider.v1",
+                               "claude.refreshInterval.v1"])
         }
         guard allowed.contains(key) else { throw UITestFailure("Refuse to read a non-allowlisted preference key") }
         // Exact AUT/current-user/any-host domain only; no runner-container,
@@ -3318,6 +3825,35 @@ private struct SyntheticFixture {
     func requestCount() throws -> Int { try requestEvents().filter { $0 == "rateLimits" }.count }
 
     func tokenUsageRequestCount() throws -> Int { try requestEvents().filter { $0 == "tokenUsage" }.count }
+
+    func claudeUsageRequestCount() throws -> Int {
+        guard scenario == "providers", let claudeRequestLogURL else {
+            throw UITestFailure("Claude request accounting is Providers-only")
+        }
+        let data = try Self.read(claudeRequestLogURL, maximumBytes: 1_048_576)
+        guard let text = String(data: data, encoding: .utf8) else { throw UITestFailure("Invalid bounded Claude log") }
+        // Ignore an unfinished last line until its newline is appended. Empty
+        // complete lines and unknown fields are rejected, not counted as usage.
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).dropLast()
+        for line in lines {
+            guard !line.isEmpty, let value = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                  Set(value.keys) == Set(["event", "mode"]), value["event"] as? String == "usage",
+                  let mode = value["mode"] as? String, ["normal", "error", "slow"].contains(mode) else {
+                throw UITestFailure("The fake Claude log violated its fixed usage/mode schema")
+            }
+        }
+        return lines.count
+    }
+
+    func setClaudeMode(_ mode: String) throws {
+        guard scenario == "providers", let claudeModeURL, ["normal", "error", "slow"].contains(mode) else {
+            throw UITestFailure("Claude mode writes are limited to the Providers control file")
+        }
+        try Self.validate(claudeModeURL, type: .typeRegular, mode: 0o600)
+        try JSONSerialization.data(withJSONObject: ["mode": mode], options: [.sortedKeys])
+            .write(to: claudeModeURL, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: claudeModeURL.path)
+    }
 
     func setTokenUsageMode(_ mode: String) throws {
         guard scenario == "usage", ["complete", "partial", "missing", "unsupported", "slow"].contains(mode) else {
@@ -3510,6 +4046,14 @@ private struct SyntheticFixture {
             "usage-png-export-query-diagnostic.json", "usage-csv-export-query-diagnostic.json",
             "usage-token-selection-diagnostic.json", "usage-pending-retry-diagnostic.json"
         ] : []
+        let providers: Set<String> = scenario == "providers" ? [
+            "providers-both-en.png", "providers-claude-error-en.png",
+            "providers-claude-only-en.png", "providers-disabled-en.png",
+            "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
+            "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
+            "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",
+            "providers-settings-entry.json"
+        ] : []
         let floating: Set<String> = scenario == "floating" ? [
             "floating-cold-en.png", "floating-compact-en.png", "floating-expanded-en.png",
             "floating-single-window-en.png", "floating-dual-window-en.png",
@@ -3522,7 +4066,7 @@ private struct SyntheticFixture {
         let keyboardProbe = Set((0...6).map { "popover-keyboard-focus-\($0).png" })
             .union(["keyboard-navigation-probe.json", "keyboard-activation-probe.json"])
         let layoutMeasurements = Set((0..<32).map { "quota-layout-\($0).json" })
-        guard fixed.union(display).union(variants).union(keyboardProbe).union(layoutMeasurements).union(usage).union(floating)
+        guard fixed.union(display).union(variants).union(keyboardProbe).union(layoutMeasurements).union(usage).union(floating).union(providers)
             .contains(filename) else {
             throw UITestFailure("Artifact filename is outside the explicit allowlist")
         }

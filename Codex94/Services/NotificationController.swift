@@ -132,7 +132,7 @@ final class NotificationController: ObservableObject {
         }
     }
 
-    func deliver(_ events: [QuotaNotificationEvent], language: LanguagePreference) {
+    func deliver(_ events: [QuotaNotificationEvent], language: LanguagePreference, provider: QuotaProviderID = .codex) {
         guard isEnabled, !events.isEmpty else { return }
         let currentGeneration = generation
         deliveryTask?.cancel()
@@ -145,9 +145,10 @@ final class NotificationController: ObservableObject {
             // One successful refresh produces at most one banner, even if several
             // independent windows cross a threshold together.
             let body = events.map { Self.message(for: $0, language: language) }.joined(separator: "\n")
-            let title = StatusAccessibilityString.localized(
+            let applicationTitle = StatusAccessibilityString.localized(
                 "notifications.title", language: language, bundle: .main
             )
+            let title = provider == .codex ? applicationTitle : applicationTitle + " · " + provider.displayName
             do {
                 try await service.deliver(title: title, body: body)
             } catch {

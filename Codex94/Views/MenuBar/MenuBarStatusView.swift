@@ -52,13 +52,15 @@ struct MenuBarStatusView: View {
         store: AppStore,
         resolvedQuota: ResolvedQuotaWindow?,
         presentation: StatusPresentation,
-        now: Date
+        now: Date,
+        provider: QuotaProviderID = .codex
     ) -> String {
         let summary: String
         if store.preferences.menuBarLayout == .dualWindow {
-            let bucket = store.dualWindowBucket
+            let bucket = store.providerDualWindowBucket(for: provider)
             summary = dualWindowAccessibilityLabel(
-                bucketName: bucket.flatMap { store.snapshot?.displayName(for: $0) } ?? "Codex",
+                bucketName: bucket.flatMap { store.providerSnapshot(for: provider)?.displayName(for: $0) }
+                    ?? provider.displayName,
                 bucket: bucket,
                 presentation: presentation,
                 now: now,
@@ -66,10 +68,10 @@ struct MenuBarStatusView: View {
             )
         } else {
             let bucketName: String
-            if let snapshot = store.snapshot, let bucket = resolvedQuota?.bucket {
+            if let snapshot = store.providerSnapshot(for: provider), let bucket = resolvedQuota?.bucket {
                 bucketName = snapshot.displayName(for: bucket)
             } else {
-                bucketName = "Codex"
+                bucketName = provider.displayName
             }
             summary = StatusAccessibilityString.quotaSummary(
                 bucketName: bucketName,
@@ -79,14 +81,37 @@ struct MenuBarStatusView: View {
                 language: store.preferences.language
             )
         }
+        if provider == .claude {
+            let context = claudeAccessibilityContext(
+                source: store.claudeStore.source, issue: store.claudeStore.lastIssue,
+                nextAttempt: store.providerNextAutomaticRefreshAt(for: provider),
+                language: store.preferences.language
+            )
+            return context.isEmpty ? summary : summary + ", " + context
+        }
         if let recovery = ConnectionRecoveryText.context(
             presentation: presentation,
-            nextAutomaticRefreshAt: store.nextAutomaticRefreshAt,
+            nextAutomaticRefreshAt: store.providerNextAutomaticRefreshAt(for: provider),
             language: store.preferences.language
         ) {
             return summary + ", " + recovery
         }
         return summary
+    }
+
+    static func claudeAccessibilityContext(source: ClaudeQuotaSource?, issue: ClaudeQuotaIssue?,
+                                           nextAttempt: Date?, language: LanguagePreference) -> String {
+        var components: [String] = []
+        if let source {
+            components.append(StatusAccessibilityString.localized(source.localizationKey, language: language, bundle: .main))
+        }
+        if let issue {
+            components.append(StatusAccessibilityString.localized(issue.localizationKey, language: language, bundle: .main))
+            if let next = ConnectionRecoveryText.nextAttempt(at: nextAttempt, language: language) {
+                components.append(next)
+            }
+        }
+        return components.joined(separator: ", ")
     }
 
     static func dualWindowAccessibilityLabel(
@@ -109,7 +134,7 @@ struct MenuBarStatusView: View {
             if let window = bucket?.window(kind) {
                 components.append(localized(
                     "accessibility.remainingPercent %@",
-                    arguments: [QuotaFormatting.percent(window.remainingPercent)]
+                    arguments: [QuotaFormatting.percent(precise: window.preciseRemainingPercent, language: language)]
                 ))
                 components.append(QuotaResetPresentation(
                     resetsAt: window.resetsAt, now: now, language: language, bundle: bundle
@@ -146,6 +171,7 @@ struct MenuBarStatusContent: View {
                 DualWindowMenuBarColumn(
                     title: "display.dualWindow.fiveHourShort",
                     remainingPercent: dualWindowBucket?.window(.fiveHour)?.remainingPercent,
+                    preciseRemainingPercent: dualWindowBucket?.window(.fiveHour)?.preciseRemainingPercent,
                     palette: palette
                 )
                 .frame(width: fiveHourFrame.width, height: fiveHourFrame.height)
@@ -159,6 +185,7 @@ struct MenuBarStatusContent: View {
                 DualWindowMenuBarColumn(
                     title: "display.dualWindow.weeklyShort",
                     remainingPercent: dualWindowBucket?.window(.weekly)?.remainingPercent,
+                    preciseRemainingPercent: dualWindowBucket?.window(.weekly)?.preciseRemainingPercent,
                     palette: palette
                 )
                 .frame(width: weeklyFrame.width, height: weeklyFrame.height)
@@ -210,6 +237,7 @@ struct MenuBarStatusContent: View {
 private struct DualWindowMenuBarColumn: View {
     let title: LocalizedStringKey
     let remainingPercent: Int?
+    var preciseRemainingPercent: Double? = nil
     let palette: Codex94Palette
 
     var body: some View {
@@ -221,7 +249,9 @@ private struct DualWindowMenuBarColumn: View {
                 .monospacedDigit()
                 .frame(width: 32, alignment: .trailing)
         }
-        .foregroundStyle(palette.quotaColor(for: QuotaLevel(remainingPercent: remainingPercent)))
+        .foregroundStyle(palette.quotaColor(for: preciseRemainingPercent.map {
+            QuotaLevel(preciseRemainingPercent: $0)
+        } ?? QuotaLevel(remainingPercent: remainingPercent)))
         .lineLimit(1)
         .fixedSize(horizontal: true, vertical: false)
     }

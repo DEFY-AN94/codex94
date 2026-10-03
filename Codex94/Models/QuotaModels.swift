@@ -26,9 +26,54 @@ struct QuotaWindowSnapshot: Codable, Equatable, Identifiable, Sendable {
     let usedPercent: Int
     let windowMinutes: Int?
     let resetsAt: Date?
+    /// Codex keeps its original integer field and cache contract. Providers
+    /// reporting fractions use this value for comparison and detailed display.
+    let preciseUsedPercent: Double?
+
+    init(kind: QuotaWindowKind, usedPercent: Int, windowMinutes: Int?, resetsAt: Date?) {
+        self.kind = kind
+        self.usedPercent = usedPercent
+        self.windowMinutes = windowMinutes
+        self.resetsAt = resetsAt
+        preciseUsedPercent = nil
+    }
+
+    init?(kind: QuotaWindowKind, fractionalUsedPercent: Double, windowMinutes: Int?, resetsAt: Date?) {
+        guard fractionalUsedPercent.isFinite, (0...100).contains(fractionalUsedPercent) else { return nil }
+        self.kind = kind
+        usedPercent = Int(fractionalUsedPercent.rounded())
+        self.windowMinutes = windowMinutes
+        self.resetsAt = resetsAt
+        preciseUsedPercent = fractionalUsedPercent
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, usedPercent, windowMinutes, resetsAt, preciseUsedPercent
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try values.decode(QuotaWindowKind.self, forKey: .kind)
+        usedPercent = try values.decode(Int.self, forKey: .usedPercent)
+        windowMinutes = try values.decodeIfPresent(Int.self, forKey: .windowMinutes)
+        resetsAt = try values.decodeIfPresent(Date.self, forKey: .resetsAt)
+        preciseUsedPercent = try values.decodeIfPresent(Double.self, forKey: .preciseUsedPercent)
+        if let preciseUsedPercent {
+            guard preciseUsedPercent.isFinite, (0...100).contains(preciseUsedPercent),
+                  usedPercent == Int(preciseUsedPercent.rounded()) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .preciseUsedPercent, in: values,
+                    debugDescription: "Fractional quota must be finite, within 0...100 and match its integer projection"
+                )
+            }
+        }
+    }
 
     var id: QuotaWindowKind { kind }
     var remainingPercent: Int { 100 - min(100, max(0, usedPercent)) }
+    var preciseRemainingPercent: Double {
+        100 - min(100, max(0, preciseUsedPercent ?? Double(usedPercent)))
+    }
 }
 
 struct AccountSummary: Equatable, Sendable {
@@ -74,8 +119,8 @@ struct QuotaBucketSnapshot: Codable, Equatable, Identifiable, Sendable {
 
     var mostConstrainedWindow: QuotaWindowSnapshot? {
         windows.sorted {
-            if $0.remainingPercent != $1.remainingPercent {
-                return $0.remainingPercent < $1.remainingPercent
+            if $0.preciseRemainingPercent != $1.preciseRemainingPercent {
+                return $0.preciseRemainingPercent < $1.preciseRemainingPercent
             }
             return $0.kind.sortOrder < $1.kind.sortOrder
         }.first
@@ -161,6 +206,7 @@ struct MenuBarQuotaOption: Equatable, Identifiable, Sendable {
 }
 
 struct QuotaSnapshot: Equatable, Sendable {
+    let provider: QuotaProviderID
     let buckets: [QuotaBucketSnapshot]
     let defaultLimitID: String
     let fetchedAt: Date
@@ -176,8 +222,10 @@ struct QuotaSnapshot: Equatable, Sendable {
         account: AccountSummary?,
         codex: LocatedCodex?,
         resetCreditsAvailableCount: Int? = nil,
-        accountReadIssue: ConnectionIssue? = nil
+        accountReadIssue: ConnectionIssue? = nil,
+        provider: QuotaProviderID = .codex
     ) {
+        self.provider = provider
         self.buckets = buckets
         self.defaultLimitID = defaultLimitID
         self.fetchedAt = fetchedAt
@@ -214,7 +262,7 @@ struct QuotaSnapshot: Equatable, Sendable {
     }
 
     func displayName(for bucket: QuotaBucketSnapshot) -> String {
-        if bucket.limitID == defaultLimitID { return "Codex" }
+        if bucket.limitID == defaultLimitID { return provider.displayName }
         guard let name = bucket.normalizedLimitName else { return bucket.limitID }
 
         let duplicates = buckets
@@ -262,7 +310,8 @@ struct QuotaSnapshot: Equatable, Sendable {
             fetchedAt: fetchedAt,
             account: nil,
             codex: codex,
-            resetCreditsAvailableCount: resetCreditsAvailableCount
+            resetCreditsAvailableCount: resetCreditsAvailableCount,
+            provider: provider
         )
     }
 
@@ -282,8 +331,8 @@ struct QuotaSnapshot: Equatable, Sendable {
         _ lhs: ResolvedQuotaWindow,
         _ rhs: ResolvedQuotaWindow
     ) -> Bool {
-        if lhs.window.remainingPercent != rhs.window.remainingPercent {
-            return lhs.window.remainingPercent < rhs.window.remainingPercent
+        if lhs.window.preciseRemainingPercent != rhs.window.preciseRemainingPercent {
+            return lhs.window.preciseRemainingPercent < rhs.window.preciseRemainingPercent
         }
         if bucketPrecedes(lhs.bucket, rhs.bucket) { return true }
         if bucketPrecedes(rhs.bucket, lhs.bucket) { return false }
@@ -383,6 +432,12 @@ struct RedactedDiagnostics: Equatable, Sendable {
     let refreshMinutes: Int
     let lastSuccess: Date?
     let lastError: String?
+    var enabledProviders: [QuotaProviderID] = [.codex]
+    var menuBarServices: MenuBarServiceMode = .single
+    var claudeConnection: String = "disabled"
+    var claudeSource: ClaudeQuotaSource? = nil
+    var claudeIssue: ClaudeQuotaIssue? = nil
+    var claudeLastReport: Date? = nil
 
     var text: String {
         let iso = ISO8601DateFormatter()
@@ -397,7 +452,13 @@ struct RedactedDiagnostics: Equatable, Sendable {
             "displayMode: \(displayMode)",
             "refreshMinutes: \(refreshMinutes)",
             "lastSuccess: \(lastSuccess.map(iso.string(from:)) ?? "none")",
-            "lastError: \(lastError ?? "none")"
+            "lastError: \(lastError ?? "none")",
+            "enabledProviders: \(enabledProviders.map(\.rawValue).joined(separator: ","))",
+            "menuBarServices: \(menuBarServices.rawValue)",
+            "claudeConnection: \(claudeConnection)",
+            "claudeSource: \(claudeSource?.rawValue ?? "none")",
+            "claudeIssue: \(claudeIssue?.rawValue ?? "none")",
+            "claudeLastReport: \(claudeLastReport.map(iso.string(from:)) ?? "none")"
         ].joined(separator: "\n")
     }
 }

@@ -6,6 +6,70 @@ stable version is [`v3.1.4 (20)`](https://github.com/DEFY-AN94/codex94/releases/
 released on 2026-09-28 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
+## Optional Claude monitoring (4.0.0 development)
+
+Claude monitoring is off by default. Enabling it uses the locally installed
+official Claude Code program and its built-in `/usage` command. Claude Code
+owns subscription authentication and any connection to Anthropic. The probe
+runs in a dedicated Codex94 directory, disables tools, hooks, MCP servers and
+remote-control startup, and has bounded output, runtime and process cleanup.
+Its folder-trust handler accepts only the verified, app-owned
+`~/Library/Application Support/Codex94/Claude/UsageProbe` directory. Claude Code
+may consult its own local state when rendering `/usage`; Codex94 extracts only
+quota windows and reset labels from that terminal output.
+It does not send a conversation prompt. Codex94 does not read Claude tokens,
+browser cookies, Keychain entries or conversation transcripts.
+The probe sets `DISABLE_AUTOUPDATER=1` and
+`CLAUDE_CODE_SKIP_PROMPT_HISTORY=1` only in its child environment, requesting
+that Claude Code skip updater work and prompt/session-history writes. These
+are [official CLI controls](https://code.claude.com/docs/en/env-vars); older CLI
+versions may not support the history control. Codex94 does not delete or scan
+existing Claude conversation files, and does not alter the parent environment
+or saved settings to apply these probe flags.
+
+An optional statusline integration receives Claude Code's JSON through standard
+input. Only 5-hour/weekly percentages and reset times enter the quota cache.
+Source, observation times and opaque hashes for duplicate-report detection are
+also stored locally; a session hash is not treated as account identity. Raw
+JSON, directory/transcript paths and raw session IDs are not written to the
+quota cache. Reading the same report again does not renew its data timestamp.
+Reports can remain old while Claude Code is idle or closed. The interface
+distinguishes a statusline report from an active CLI usage query.
+
+Connecting the statusline explicitly previews a change to the user's Claude
+settings. It preserves other settings, forwards the original command's stdin
+and output, and stores only the previous statusline setting for restoration.
+The local installation manifest includes the settings, cache and executable
+paths and the original statusline command. These are configuration needed to
+run and undo the integration, not quota telemetry. A modified statusline is
+not silently overwritten during removal. Disabling Claude monitoring stops
+its app tasks and quota capture; the original statusline still runs.
+A conflicting installation has an explicit recovery action that forgets only
+the verified old installation record while preserving current settings and
+backups. It refuses to forget a record if the current command still references
+that bridge, preventing a dangling statusline command.
+
+Codex and Claude keep separate quota state, preferences, notification baselines
+and refresh tasks. Menu-bar and floating-provider selection only change
+presentation. This release monitors one default Claude Code profile and does
+not merge accounts or infer subscription allowance from local Token counts.
+The existing Token statistics/export features remain Codex-only.
+
+New preference keys are `codexMonitoringEnabled.v1`,
+`claudeMonitoringEnabled.v1`, `menuBarServiceMode.v1`, `primaryProvider.v1`,
+`floatingProvider.v1`, `claude.refreshInterval.v1`,
+`claude.menuBarQuotaSelection.v1`, `claude.dualWindowBucketSelection.v1` and
+`claude.notifications.v1`. The passive report is stored separately at
+`~/Library/Application Support/Codex94/Claude/statusline-quota.json`; active CLI
+snapshots remain in memory. Redacted diagnostics add only enabled-provider,
+display-mode, Claude source/connection/error and report-time fields, not quota
+values, usernames, session hashes or settings contents.
+
+Before uninstalling Codex94 or reverting to a version before 4.0, disconnect an
+installed statusline bridge from Services settings while the current App is
+still available. This restores the previous command and avoids leaving a
+command pointing to a removed or incompatible executable. Backups remain local.
+
 ## Quota recovery and status presentation (3.1.3–3.1.4)
 
 Quota is requested before optional account details. An account-detail timeout

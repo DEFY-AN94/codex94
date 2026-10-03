@@ -39,6 +39,49 @@ final class MenuBarStatusRendererTests: XCTestCase {
         }
     }
 
+    func testProviderLabelsHaveIndependentPixelsAndKeepNativeColorSpace() throws {
+        for provider in QuotaProviderID.allCases {
+            for scheme in [ColorScheme.light, .dark] {
+                var labeled = input(scheme: scheme, scale: 2)
+                labeled.providerLabel = provider
+                let image = try XCTUnwrap(MenuBarStatusImageRenderer.render(labeled))
+                let bitmap = try bitmap(image)
+                XCTAssertEqual(image.size.width, labeled.layout.metrics.contentSize.width + 46)
+                XCTAssertEqual(bitmap.pixelsWide, Int(image.size.width * 2))
+                XCTAssertEqual(bitmap.cgImage?.colorSpace?.name, CGColorSpace.sRGB)
+                XCTAssertFalse(image.isTemplate)
+                XCTAssertGreaterThan(opaquePixelCount(bitmap), 10)
+                var other = labeled
+                other.providerLabel = provider == .codex ? .claude : .codex
+                XCTAssertNotEqual(labeled, other)
+            }
+        }
+    }
+
+    func testFractionalQuotaLevelChangesInvalidateCompactImageWithoutDiscardingPrecision() {
+        var above = input()
+        above.preciseRemainingPercent = 50.1
+        var below = above
+        below.preciseRemainingPercent = 49.9
+        XCTAssertNotEqual(above, below, "Identical rounded digits can still have a different warning color")
+        var sameBand = above
+        sameBand.preciseRemainingPercent = 50.2
+        XCTAssertEqual(above, sameBand, "Precision that changes neither pixels nor color need not rerender")
+    }
+
+    func testClaudeRecoveryTooltipUsesClaudeLoginAndSourceTextInBothLanguages() {
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let text = MenuBarStatusView.claudeAccessibilityContext(
+                source: .cliUsage, issue: .loginRequired,
+                nextAttempt: Date(timeIntervalSince1970: 1_900_000_000), language: language
+            )
+            XCTAssertTrue(text.contains("Claude Code"))
+            XCTAssertTrue(text.contains("/usage"))
+            XCTAssertFalse(text.contains("Codex"))
+            XCTAssertTrue(text.contains(language == .english ? "Next automatic attempt" : "下次自动尝试"))
+        }
+    }
+
     func testRefreshStaleAndUnavailableHaveIndependentBlueAmberAndErrorPixels() throws {
         let overrides = StatusAccentOverrides(storedValue: ["healthy": "15A03D", "warning": "FF00FF", "error": "FFFFFF"])
         for scheme in [ColorScheme.light, .dark] {

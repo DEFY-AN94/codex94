@@ -72,10 +72,14 @@ struct QuotaPopoverView: View {
 
     var body: some View {
         Group {
-            if store.preferences.hasChosenIdentityMode {
-                quotaContent
+            if store.preferences.enabledProviders == [.codex] {
+                if store.preferences.hasChosenIdentityMode {
+                    quotaContent
+                } else {
+                    IdentityChoiceView(store: store)
+                }
             } else {
-                IdentityChoiceView(store: store)
+                providerContent
             }
         }
         .frame(width: QuotaPopoverLayout.contentWidth, alignment: .top)
@@ -98,25 +102,95 @@ struct QuotaPopoverView: View {
 
     private var quotaContent: some View {
         VStack(spacing: 0) {
-            header
-            if browsableBuckets.count > 1 {
-                Divider()
-                modelPicker
-            }
-            Divider()
-            quotaRows
-
-            stateBanner
-
-            ResetCreditsView(store: store)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-
-            Divider()
-            menuBarQuotaPicker
+            codexDataContent
             Divider()
             commandRows
         }
+    }
+
+    @ViewBuilder
+    private var codexDataContent: some View {
+        header
+        if browsableBuckets.count > 1 {
+            Divider()
+            modelPicker
+        }
+        Divider()
+        quotaRows
+        stateBanner
+        ResetCreditsView(store: store)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        Divider()
+        menuBarQuotaPicker
+    }
+
+    private var providerContent: some View {
+        VStack(spacing: 0) {
+            if store.preferences.enabledProviders.isEmpty {
+                ProvidersDisabledView { openDashboard(.providers) }
+            } else if store.preferences.codexMonitoringEnabled {
+                ScrollView {
+                    VStack(spacing: 14) {
+                        ProviderQuotaSummaries(
+                            store: store, openDashboard: openDashboard,
+                            referenceDate: referenceDate, resetTimeZone: resetTimeZone
+                        )
+                        providerDetails
+                    }
+                    .padding(14)
+                }
+                .frame(height: 480)
+                .accessibilityIdentifier("provider-quota-sections")
+            } else {
+                claudeSection
+            }
+            Divider()
+            commandRows
+        }
+    }
+
+    private var providerDetails: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("providers.codexDetails").font(.headline).padding(.bottom, 8)
+            if store.preferences.hasChosenIdentityMode {
+                if browsableBuckets.count > 1 { modelPicker }
+                stateBanner
+                ResetCreditsView(store: store).padding(.vertical, 10)
+                menuBarQuotaPicker
+            } else {
+                IdentityChoiceView(store: store)
+            }
+            Divider().padding(.vertical, 10)
+            Text("claude.menuBarQuota").font(.headline).padding(.bottom, 8)
+            claudeMenuBarPicker
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("provider-quota-details")
+    }
+
+    @ViewBuilder
+    private var claudeMenuBarPicker: some View {
+        if store.preferences.menuBarLayout == .dualWindow {
+            MenuBarBucketPicker(store: store, provider: .claude)
+        } else {
+            MenuBarQuotaPicker(store: store, provider: .claude)
+        }
+    }
+
+    private var claudeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ClaudeQuotaCard(
+                store: store.claudeStore, language: store.preferences.language,
+                openSetup: { openDashboard(.providers) }, referenceDate: referenceDate,
+                accentOverrides: store.preferences.statusAccentOverrides
+            )
+            HStack(spacing: 12) {
+                Text("display.label").font(.caption).foregroundStyle(.secondary)
+                claudeMenuBarPicker
+            }
+        }
+        .padding(14)
     }
 
     private var header: some View {
@@ -333,11 +407,12 @@ struct QuotaPopoverView: View {
     private var commandRows: some View {
         VStack(spacing: 2) {
             CommandRow(
-                title: Text("command.refresh"),
+                title: Text(store.preferences.enabledProviders.count > 1 ? "providers.refreshAll" : "command.refresh"),
                 systemImage: "arrow.clockwise",
                 shortcut: "⌘R",
-                action: { store.refresh(trigger: .manual) }
+                action: { store.refreshAll(trigger: .manual) }
             )
+            .disabled(store.preferences.enabledProviders.isEmpty)
             .keyboardShortcut("r", modifiers: .command)
 
             CommandRow(
@@ -373,16 +448,75 @@ struct QuotaPopoverView: View {
     }
 }
 
+/// The complete first block of the multi-service scroll view. Sharing this
+/// view lets layout tests measure the same two summaries that users see.
+struct ProviderQuotaSummaries: View {
+    @ObservedObject var store: AppStore
+    let openDashboard: (DashboardSection?) -> Void
+    var referenceDate: Date? = nil
+    var resetTimeZone: TimeZone = .autoupdatingCurrent
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(spacing: 14) {
+            codexSummary
+            ClaudeQuotaCard(
+                store: store.claudeStore, language: store.preferences.language,
+                openSetup: { openDashboard(.providers) }, referenceDate: referenceDate,
+                accentOverrides: store.preferences.statusAccentOverrides, compact: true
+            )
+        }
+        .accessibilityIdentifier("provider-quota-summaries")
+    }
+
+    private var palette: Codex94Palette {
+        .resolve(store.preferences.theme, scheme: colorScheme,
+                 overrides: store.preferences.statusAccentOverrides)
+    }
+
+    private var codexSummary: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let now = referenceDate ?? context.date
+            let presentation = store.viewedStatusPresentation
+            let issue = presentation.issue
+            let bucketName = store.viewedBucket.flatMap { store.snapshot?.displayName(for: $0) } ?? "Codex"
+            let title = bucketName == "Codex" ? "Codex" : "Codex · " + bucketName
+            ProviderQuotaCardContent(
+                provider: .codex, title: title, sourceTitle: "providers.codexSource",
+                windows: store.viewedBucket?.windows ?? [], badge: presentation.connectionBadge,
+                usesCachedData: presentation.usesCachedData,
+                statusText: store.isRefreshing ? Text("status.refreshing") : issue.map { Text($0.localizedKey) },
+                sourceTimeText: StatusAccessibilityString.statusContext(
+                    presentation, now: now, language: store.preferences.language, bundle: .main
+                ),
+                emptyText: store.preferences.hasChosenIdentityMode ? "overview.noQuotaData" : "providers.codexNeedsSetup",
+                refreshLabel: "providers.refreshCodex", detailsLabel: "providers.codexDetails",
+                canRefresh: store.preferences.hasChosenIdentityMode && !store.isRefreshing, showsDetails: true,
+                language: store.preferences.language, now: now, palette: palette,
+                refresh: { store.refresh(trigger: .manual) }, openDetails: { openDashboard(.connection) },
+                timeZone: resetTimeZone, compact: true
+            )
+        }
+    }
+
+}
+
 struct MenuBarQuotaPicker: View {
     @ObservedObject var store: AppStore
+    var provider: QuotaProviderID = .codex
+
+    private var snapshot: QuotaSnapshot? { store.providerSnapshot(for: provider) }
+    private var selection: MenuBarQuotaSelection {
+        provider == .codex ? store.preferences.menuBarQuotaSelection : store.preferences.claudeMenuBarQuotaSelection
+    }
 
     var body: some View {
         HStack(spacing: 8) {
             Picker("display.label", selection: Binding(
-                get: { store.preferences.menuBarQuotaSelection },
-                set: { store.setMenuBarQuotaSelection($0) }
+                get: { selection },
+                set: { store.setMenuBarQuotaSelection($0, for: provider) }
             )) {
-                ForEach(store.menuBarQuotaOptions) { option in
+                ForEach(store.menuBarQuotaOptions(for: provider)) { option in
                     Text(verbatim: optionLabel(option))
                         .help(Text(verbatim: optionLabel(option, abbreviated: false)))
                         .accessibilityLabel(Text(verbatim: optionLabel(option, abbreviated: false)))
@@ -393,7 +527,7 @@ struct MenuBarQuotaPicker: View {
             .labelsHidden()
             .pickerStyle(.menu)
 
-            if store.menuBarSelectionUsesFallback {
+            if selection != .automatic && snapshot?.resolved(selection) == nil {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .help("display.selectionUnavailable")
@@ -416,12 +550,12 @@ struct MenuBarQuotaPicker: View {
 
         let limit = 30 - suffix.count
         let names = option.isAvailable
-            ? store.snapshot.map { QuotaFormatting.bucketMenuNames(in: $0, limit: limit) } ?? [:]
+            ? snapshot.map { QuotaFormatting.bucketMenuNames(in: $0, limit: limit) } ?? [:]
             : [:]
         let bucketID: String?
         switch option.selection {
         case .automatic: bucketID = nil
-        case .defaultBucket: bucketID = store.snapshot?.defaultLimitID
+        case .defaultBucket: bucketID = snapshot?.defaultLimitID
         case let .bucket(limitID, _): bucketID = limitID
         }
         let name = bucketID.flatMap { names[$0] } ?? QuotaFormatting.shortBucketName(fullName, limit: limit)

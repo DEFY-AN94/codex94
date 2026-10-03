@@ -5,9 +5,66 @@ This describes ownership and reuse constraints in the published stable
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
+## 4.0.0 development: independently enabled providers
+
+`QuotaProviderID` identifies Codex and Claude. Existing Codex preference keys
+and cache v2 stay compatible; new monitoring/display choices and Claude
+preferences have their own keys. Monitoring defaults to Codex only. A display
+selection never implicitly enables a provider or starts a request.
+
+`AppStore` composes the existing Codex state, `ClaudeQuotaStore` and global app
+services. It routes enable/disable, wake, popover and shutdown events. Each
+provider owns its request generation, single-flight operation, background task,
+cached data and notification controller/policy. Disabled Codex also invalidates
+its Token store. Old results cannot update the next enabled generation.
+
+`ProviderPresentation` shares pure selection/options and snapshot projections
+between native status items and the floating panel. `AppDelegate` owns one or
+two native status items and one shared popover showing all enabled providers.
+All-disabled mode retains a neutral settings entry. `MenuBarStatusRenderer`
+keeps the existing sRGB non-template path and includes provider labels in its
+image cache key. The floating window follows its saved provider selection and
+resizes from the actual available windows.
+
+`ClaudeCLIUsageClient` runs only official Claude Code's built-in `/usage` in an
+owned directory. It uses bounded PTY output with screen replay, terminal-query
+responses and the shared process-group lifecycle. Unknown terminal/login
+screens fail explicitly. `ClaudeResetTextParser` parses supported displayed
+dates without fabricating a reset at fetch time plus five hours.
+
+`ClaudeStatuslineBridge` is selected before SwiftUI application startup. It
+accepts stdin, forwards the user's previous statusline command and writes only
+whitelisted quota data. `ClaudeStatuslineInstaller` owns preview, opt-in
+configuration, key backup and conflict-aware removal. The Claude store owns
+report freshness: cache reads and duplicate statusline reports cannot renew
+quota age, reset-expired windows disappear, and unknown data is never 100%.
+
+Claude reset reads reuse the store's existing 15-second poll; they add no timer.
+Raw reported reset dates produce sorted, distinct `resetsAt + 5` targets, even
+after their windows disappear from the display. A refresh accepted by the
+single-flight path records its start time for due-target coverage. A request begun before a target that
+finishes afterward leaves one follow-up read pending, while simultaneous manual,
+background and reset reads remain single-flight. A failed reset attempt consumes
+that target instead of retrying it every poll; normal refreshes and other due
+targets remain eligible. Coverage belongs to the report source/producer context;
+passive reports do not inherit a CLI request's coverage. Authentication failure and disable clear
+the reset context, and clock rollback does not repeat a consumed target.
+`nextAutomaticRefreshAt` is the earlier normal/reset due time, not a guarantee of
+execution at that instant: the next poll and any in-flight read can delay it.
+
+Shared quota models preserve Codex's strict integer wire/cache contract while
+carrying an optional validated fractional percentage for Claude. Auto selection,
+warning colors and notification thresholds compare precise values. Compact
+menu-bar percentages are rounded; expanded quota text preserves one decimal.
+
+Validation must cover both enabled services, either service alone, all disabled,
+late results, quick re-enable, missing/fractional windows, source changes,
+statusline restoration and process cleanup. Synthetic UI/render tests and
+unattended live monitoring are separate release evidence.
+
 | Owner | Responsibility |
 | --- | --- |
-| `AppDelegate` | Compose the running app, own the status item and popover, retain Dashboard and floating-window controllers, route mouse/hotkey actions, and register/remove platform observers. Forward wake and clock events to the store. |
+| `AppDelegate` | Compose the running app, own one or two native status items and the shared popover, retain Dashboard and floating-window controllers, route mouse/hotkey actions, and register/remove platform observers. Forward wake and clock events to the store. |
 | `DashboardWindowController` / `DashboardWindowState` | Own the reusable window lifecycle, size/restoration behavior, visibility, and selected page. Opening a page must not recreate application services. |
 | `FloatingWindowController` / `FloatingWindowState` | Own the reusable native panel, placement/screen fitting, pinning, visibility, and expansion. Receive the existing store; do not own another quota fetcher or polling timer. |
 | `AppStore` | Own quota state, cache writes, selection reconciliation, notification observations, freshness-gated popover reads, and single-flight/background/Reset coordination. Own and cancel the bounded transient retry budget; isolate unverified identity from child features. |

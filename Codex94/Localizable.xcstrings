@@ -1,6 +1,1064 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "claude.setup.conflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude status-line settings changed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 状态栏设置已更改"
+          }
+        }
+      }
+    },
+    "claude.setup.conflictHelp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The saved Codex94 connection no longer matches your current settings. Keep your current command and release the old record before previewing a new connection."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存的 Codex94 连接与当前设置不再一致。保留当前命令，解除旧记录后可重新预览安装。"
+          }
+        }
+      }
+    },
+    "claude.setup.forgetRecord": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove old record…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解除旧连接记录…"
+          }
+        }
+      }
+    },
+    "claude.setup.forgetConfirm": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the old Codex94 connection record?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解除旧的 Codex94 连接记录？"
+          }
+        }
+      }
+    },
+    "claude.setup.forgetHelp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only Codex94’s old installation record will be removed. Your current status-line command and backup files stay unchanged. You can then preview a new connection."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅移除 Codex94 的旧安装记录，不修改当前状态栏命令，也不删除备份文件。完成后可重新预览安装连接。"
+          }
+        }
+      }
+    },
+    "claude.setup.forgetFailed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The old record could not be released safely. If your current status line still calls the Codex94 bridge, first restore or remove that configuration in Claude Code."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法安全解除旧记录。如果当前状态栏仍调用 Codex94 桥接程序，请先在 Claude Code 设置中恢复或移除该配置。"
+          }
+        }
+      }
+    },
+    "claude.setup.recordForgotten": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Old connection record removed. Your current status line and backups are unchanged; a new setup can now be previewed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "旧连接记录已解除。当前状态栏与备份保持不变，现在可以重新预览安装。"
+          }
+        }
+      }
+    },
+    "providers.codexDetails" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Codex details" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Codex 详情" } }
+      }
+    },
+    "providers.codexNeedsSetup" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose a Codex data mode in the details below." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请在下方详情中选择 Codex 数据模式。" } }
+      }
+    },
+    "claude.setup.installed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connection installed. Values appear when Claude Code reports quota." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接已安装。Claude Code 报告额度后即可显示数值。" } }
+      }
+    },
+    "dashboard.providers": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Services"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务"
+          }
+        }
+      }
+    },
+    "monitoring.off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitoring off"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "监控已关闭"
+          }
+        }
+      }
+    },
+    "providers.monitoring": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitoring"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "监控服务"
+          }
+        }
+      }
+    },
+    "providers.monitorCodex": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitor Codex"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "监控 Codex"
+          }
+        }
+      }
+    },
+    "providers.monitorClaude": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitor Claude"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "监控 Claude"
+          }
+        }
+      }
+    },
+    "providers.monitoring.help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Each service has its own quota, source and refresh state. Claude monitoring is optional."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "各服务分别显示自己的额度、数据来源和刷新状态。Claude 监控可按需启用。"
+          }
+        }
+      }
+    },
+    "providers.menuBar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menu bar services"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "菜单栏服务"
+          }
+        }
+      }
+    },
+    "providers.menuBar.single": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One service"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "单个服务"
+          }
+        }
+      }
+    },
+    "providers.menuBar.both": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Both services"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "两个服务"
+          }
+        }
+      }
+    },
+    "providers.menuBar.help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Both shows one item for each enabled service. Either item opens the same panel with all enabled services."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "两个服务模式为每个已启用服务显示独立图标。点击任一图标都会打开包含全部已启用服务的同一面板。"
+          }
+        }
+      }
+    },
+    "providers.primary": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Primary service"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主要服务"
+          }
+        }
+      }
+    },
+    "providers.floating": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Floating window service"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "悬浮窗服务"
+          }
+        }
+      }
+    },
+    "providers.service": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Service"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务"
+          }
+        }
+      }
+    },
+    "providers.noneEnabled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitoring is off"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "监控已关闭"
+          }
+        }
+      }
+    },
+    "providers.openSettings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose services…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择监控服务…"
+          }
+        }
+      }
+    },
+    "providers.codexDisabled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex monitoring is off"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex 监控已关闭"
+          }
+        }
+      }
+    },
+    "providers.usageCodexOnly": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token statistics are currently available for Codex only."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token 统计目前仅支持 Codex。"
+          }
+        }
+      }
+    },
+    "providers.codexSource": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local app-server"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地 app-server"
+          }
+        }
+      }
+    },
+    "providers.refreshCodex": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Codex"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新 Codex"
+          }
+        }
+      }
+    },
+    "providers.refreshAll": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh all services"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新全部服务"
+          }
+        }
+      }
+    },
+    "claude.source.statusline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code status line"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 状态栏"
+          }
+        }
+      }
+    },
+    "claude.source.cliUsage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code /usage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code /usage"
+          }
+        }
+      }
+    },
+    "claude.source.waiting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local Claude Code data"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地 Claude Code 数据"
+          }
+        }
+      }
+    },
+    "claude.sourceTime %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quota report: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "额度报告时间：%@"
+          }
+        }
+      }
+    },
+    "claude.sourceTime.unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No quota report yet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无额度报告"
+          }
+        }
+      }
+    },
+    "claude.refresh": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Claude"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新 Claude"
+          }
+        }
+      }
+    },
+    "claude.refreshing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading Claude quota…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在读取 Claude 额度…"
+          }
+        }
+      }
+    },
+    "claude.quota.empty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code has not reported quota yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 尚未报告额度。"
+          }
+        }
+      }
+    },
+    "claude.monitoring.off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude monitoring is off."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 监控已关闭。"
+          }
+        }
+      }
+    },
+    "claude.openSetup": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude setup…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 连接设置…"
+          }
+        }
+      }
+    },
+    "claude.refreshInterval": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude refresh interval"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 刷新间隔"
+          }
+        }
+      }
+    },
+    "claude.menuBarQuota": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude menu bar quota"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 菜单栏额度"
+          }
+        }
+      }
+    },
+    "claude.notifications.settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude quota reminders"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 额度提醒"
+          }
+        }
+      }
+    },
+    "claude.notifications.defaultBucket": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitors the quota windows reported by Claude."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "监控 Claude 实际报告的额度窗口。"
+          }
+        }
+      }
+    },
+    "claude.issue.cliUnavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code was not found."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到 Claude Code。"
+          }
+        }
+      }
+    },
+    "claude.issue.loginRequired": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in to Claude Code, then refresh here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先在 Claude Code 中登录，再回来刷新。"
+          }
+        }
+      }
+    },
+    "claude.issue.setupRequired": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect Claude Code to receive quota reports."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接 Claude Code 以接收额度报告。"
+          }
+        }
+      }
+    },
+    "claude.issue.timedOut": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code did not respond in time."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 响应超时。"
+          }
+        }
+      }
+    },
+    "claude.issue.invalidData": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Claude quota report could not be read."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取 Claude 额度报告。"
+          }
+        }
+      }
+    },
+    "claude.issue.staleData": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The last Claude quota report is out of date."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次 Claude 额度报告已过期。"
+          }
+        }
+      }
+    },
+    "claude.issue.configurationConflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude settings changed. The existing configuration was preserved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 设置已发生变化，原有配置已保留。"
+          }
+        }
+      }
+    },
+    "claude.issue.unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude quota is temporarily unavailable."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 额度暂不可用。"
+          }
+        }
+      }
+    },
+    "claude.setup.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code connection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 连接"
+          }
+        }
+      }
+    },
+    "claude.setup.help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect Claude Code’s status line to share the quota it reports. Preview the change before installing; existing status-line commands are preserved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接 Claude Code 状态栏以读取其报告的额度。安装前可预览修改，并保留已有状态栏命令。"
+          }
+        }
+      }
+    },
+    "claude.setup.preview": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview setup…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预览连接设置…"
+          }
+        }
+      }
+    },
+    "claude.setup.remove": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove connection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除连接"
+          }
+        }
+      }
+    },
+    "claude.setup.removeConfirm": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the Codex94 status-line connection?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除 Codex94 状态栏连接？"
+          }
+        }
+      }
+    },
+    "claude.setup.removeHelp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore the previous status-line command when it is still safe to do so. Other Claude settings are preserved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在配置仍允许安全恢复时还原先前状态栏命令，保留其他 Claude 设置。"
+          }
+        }
+      }
+    },
+    "claude.setup.saved": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code settings updated."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 设置已更新。"
+          }
+        }
+      }
+    },
+    "claude.setup.previewTitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect Claude Code"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接 Claude Code"
+          }
+        }
+      }
+    },
+    "claude.setup.previewHelp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review the status-line change below. Nothing is saved until you choose Install connection."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请检查下方状态栏修改。点击“安装连接”之前不会保存任何更改。"
+          }
+        }
+      }
+    },
+    "claude.setup.settingsFile": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings file"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置文件"
+          }
+        }
+      }
+    },
+    "claude.setup.existingCommand": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing status-line command"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已有状态栏命令"
+          }
+        }
+      }
+    },
+    "claude.setup.bridgeCommand": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex94 connection command"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex94 连接命令"
+          }
+        }
+      }
+    },
+    "claude.setup.preservesExisting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your existing status-line command will continue to run."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已有状态栏命令会继续运行。"
+          }
+        }
+      }
+    },
+    "claude.setup.noExisting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new status-line connection will report quota to Codex94."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新的状态栏连接会向 Codex94 报告额度。"
+          }
+        }
+      }
+    },
+    "claude.setup.cancel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        }
+      }
+    },
+    "claude.setup.install": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install connection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装连接"
+          }
+        }
+      }
+    },
     "connection.nextAutomaticAttempt %@" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Next automatic attempt: %@" } },

@@ -3,6 +3,104 @@ import XCTest
 @testable import Codex94
 
 final class AppServerClientTests: XCTestCase {
+    func testQueuedQuotaCancelledBeforeSpawnDoesNotCancelNewGeneration() async throws {
+        try await assertQueuedCancellation(usage: false)
+    }
+
+    func testQueuedUsageCancelledBeforeSpawnDoesNotCancelNewGeneration() async throws {
+        try await assertQueuedCancellation(usage: true)
+    }
+
+    func testShutdownRejectsQueuedAndFutureRequestsBeforeSpawning() async throws {
+        let queue = DispatchQueue(label: "Codex94Tests.shutdown-blocked-worker")
+        let gate = AppServerQueueGate()
+        queue.async { gate.blockWorker() }
+        defer { gate.releaseWorker() }
+        try await waitForQueueGate("Worker must be blocked before fetching") { gate.isBlocked }
+        let fixture = try makeFixture(
+            script: #"printf '%s\n' "$$" > "__CODEX94_PID_FILE__""#,
+            workerQueue: queue, requestEnqueued: { gate.recordEnqueue() }
+        )
+        let pending = Task<Void, Error> {
+            _ = try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaOnly)
+        }
+        try await waitForQueueGate("The request must actually enter the blocked queue") { gate.enqueuedCount == 1 }
+        fixture.client.shutdown()
+        gate.releaseWorker()
+        await assertIssue(.serverExited) { try await pending.value }
+        await assertIssue(.serverExited) {
+            _ = try await fixture.client.fetchUsage(executable: fixture.executable)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.pidFile.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.invocationFile.path))
+        XCTAssertFalse(gate.didTimeOut)
+    }
+
+    /// Use the real dispatch queue and synthetic subprocess, not a fake ticket
+    /// predicate. Enqueue acknowledgement makes cancellation deterministic.
+    private func assertQueuedCancellation(usage: Bool) async throws {
+        let queue = DispatchQueue(label: "Codex94Tests.cancel-blocked-worker")
+        let gate = AppServerQueueGate()
+        queue.async { gate.blockWorker() }
+        defer { gate.releaseWorker() }
+        try await waitForQueueGate("Worker must be blocked before enqueueing") { gate.isBlocked }
+        let fixture = try makeFixture(script: #"""
+        printf '%s\n' "$$" > "__CODEX94_PID_FILE__"
+        IFS= read -r initialize
+        printf '%s\n' "$initialize" >> "__CODEX94_INVOCATION_FILE__"
+        printf '%s\n' '{"id":1,"result":{}}'
+        IFS= read -r initialized
+        printf '%s\n' "$initialized" >> "__CODEX94_INVOCATION_FILE__"
+        IFS= read -r request
+        printf '%s\n' "$request" >> "__CODEX94_INVOCATION_FILE__"
+        case "$request" in
+          *'"method":"account/usage/read"'*|*'"method":"account\/usage\/read"'*)
+            printf '%s\n' '{"id":2,"result":{"summary":{"lifetimeTokens":42},"dailyUsageBuckets":[]}}' ;;
+          *'"method":"account/rateLimits/read"'*|*'"method":"account\/rateLimits\/read"'*)
+            printf '%s\n' '{"id":2,"result":{"rateLimits":{"secondary":{"usedPercent":27,"windowDurationMins":10080}}}}' ;;
+          *) exit 74 ;;
+        esac
+        """#, workerQueue: queue, requestEnqueued: { gate.recordEnqueue() })
+        let operation: @Sendable () async throws -> Int = {
+            if usage {
+                return try await fixture.client.fetchUsage(executable: fixture.executable).summary.lifetimeTokens ?? -1
+            }
+            return try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaOnly)
+                .defaultBucket?.window(.weekly)?.remainingPercent ?? -1
+        }
+        let cancelled = Task { try await operation() }
+        try await waitForQueueGate("The old request must already be queued before cancellation") { gate.enqueuedCount == 1 }
+        fixture.client.cancelCurrentRequest()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.pidFile.path))
+
+        // Queue a new ticket while the old cancelled work is still blocked.
+        let current = Task { try await operation() }
+        try await waitForQueueGate("The new generation must also be queued") { gate.enqueuedCount == 2 }
+        gate.releaseWorker()
+        do {
+            _ = try await cancelled.value
+            XCTFail("Cancelled queued work must not launch a subprocess")
+        } catch is CancellationError {
+            // Expected: nonterminal cancellation does not poison the next ticket.
+        } catch {
+            XCTFail("Queued cancellation must have its own cancellation outcome")
+        }
+        let value = try await current.value
+        XCTAssertEqual(value, usage ? 42 : 73)
+        XCTAssertEqual(try recordedRequests(fixture).compactMap { $0["method"] as? String }, [
+            "initialize", "initialized", usage ? "account/usage/read" : "account/rateLimits/read"
+        ], "Only the new generation may execute the synthetic server")
+        try assertProcessIsGone(at: fixture.pidFile)
+        XCTAssertFalse(gate.didTimeOut)
+    }
+
+    private func waitForQueueGate(_ message: String, _ condition: () -> Bool) async throws {
+        let deadline = Date().addingTimeInterval(5)
+        while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertTrue(condition(), message)
+        if !condition() { throw CancellationError() }
+    }
+
     func testUsageFetchSendsOnlyReadOnlyUsageMethodWithoutParameters() async throws {
         let fixture = try makeFixture(script: #"""
         [ "$#" -eq 6 ] || exit 70
@@ -747,9 +845,9 @@ final class AppServerClientTests: XCTestCase {
         }
     }
 
-    private func assertIssue(
+    private func assertIssue<Value: Sendable>(
         _ expected: ConnectionIssue,
-        operation: () async throws -> QuotaSnapshot
+        operation: () async throws -> Value
     ) async {
         do {
             _ = try await operation()
@@ -905,7 +1003,9 @@ final class AppServerClientTests: XCTestCase {
         quotaRequestTimeout: TimeInterval = 1,
         quotaTotalTimeout: TimeInterval = 3,
         optionalAccountTimeout: TimeInterval = 1,
-        clientVersion: String = "test"
+        clientVersion: String = "test",
+        workerQueue: DispatchQueue? = nil,
+        requestEnqueued: (@Sendable () -> Void)? = nil
     ) throws -> Fixture {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("Codex94ServerTests-\(UUID().uuidString)", isDirectory: true)
@@ -956,7 +1056,9 @@ final class AppServerClientTests: XCTestCase {
                 "PATH": "/usr/bin:/bin",
                 "TMPDIR": directory.path
             ],
-            clientVersion: clientVersion
+            clientVersion: clientVersion,
+            workerQueue: workerQueue,
+            requestEnqueued: requestEnqueued
         )
         addTeardownBlock { client.shutdown() }
         let executable = LocatedCodex(
@@ -973,4 +1075,29 @@ final class AppServerClientTests: XCTestCase {
             heartbeatFile: heartbeatFile
         )
     }
+}
+
+private final class AppServerQueueGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private let release = DispatchSemaphore(value: 0)
+    private var blocked = false
+    private var enqueued = 0
+    private var timedOut = false
+
+    var isBlocked: Bool { lock.withLock { blocked } }
+    var enqueuedCount: Int { lock.withLock { enqueued } }
+    var didTimeOut: Bool { lock.withLock { timedOut } }
+
+    func recordEnqueue() { lock.withLock { enqueued += 1 } }
+
+    func blockWorker() {
+        lock.withLock { blocked = true }
+        let result = release.wait(timeout: .now() + 10)
+        lock.withLock {
+            timedOut = result == .timedOut
+            blocked = false
+        }
+    }
+
+    func releaseWorker() { release.signal() }
 }

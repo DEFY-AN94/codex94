@@ -20,6 +20,20 @@ enum QuotaFormatting {
         return value > 100 ? "100%+" : "\(max(0, value))%"
     }
 
+    static func percent(precise value: Double?, language: LanguagePreference = .english) -> String {
+        guard let value, value.isFinite else { return "--" }
+        guard value <= 100 else { return "100%+" }
+        let formatter = NumberFormatter()
+        formatter.locale = language.locale
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = false
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 1
+        formatter.roundingMode = .halfUp
+        guard let number = formatter.string(from: NSNumber(value: max(0, value))) else { return "--" }
+        return number + "%"
+    }
+
     static func popoverTitle(
         bucketName: String,
         planType: String?,
