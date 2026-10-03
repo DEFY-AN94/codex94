@@ -428,12 +428,12 @@ final class Codex94UITests: XCTestCase {
         XCTAssertEqual(try providerRequestCounts(), beforeSelection, "Menu-bar presentation choices must not refresh providers")
 
         popover = try openProviderPopover(service: "combined", marker: "provider-quota-sections")
-        // Establish one successful freshness baseline for both mouse buttons
-        // and both ring regions, without sleeping or refreshing between opens.
-        try refreshProviders(in: popover)
-        let compactFreshCounts = try providerRequestCounts()
-        let compactFreshCache = try fixture.cacheFingerprint()
         for (rightClick, horizontalPosition) in [(false, CGFloat(0.25)), (true, CGFloat(0.75))] {
+            // Each native close/reopen gets its own successful freshness
+            // baseline so prior AX work cannot age it past the 60-second gate.
+            try refreshProviders(in: popover)
+            let compactFreshCounts = try providerRequestCounts()
+            let compactFreshCache = try fixture.cacheFingerprint()
             try closeProviderPopover(service: "combined", marker: "provider-quota-sections")
             let item = try providerStatusItem("combined")
             let point = item.coordinate(withNormalizedOffset: CGVector(dx: horizontalPosition, dy: 0.5))
@@ -788,7 +788,21 @@ final class Codex94UITests: XCTestCase {
     private func assertProviderQuotaVisibility(in popover: XCUIElement, codexFiveHour: Bool, reportName: String) throws {
         let viewport = try uniqueIdentified("provider-quota-sections", in: popover).frame.intersection(popover.frame)
         let viewportMatches = abs(viewport.width - 500) <= 2 && abs(viewport.height - 480) <= 2
+        let inset: CGFloat = 14
+        let geometryTolerance: CGFloat = 1
+        let maximumPaintWidth = viewport.width - 2 * inset + geometryTolerance
         func diagnosticNumber(_ value: CGFloat) -> Any { value.isFinite ? Double(value) : NSNull() }
+        // As with the original quota rows, merged AX encloses visible paint,
+        // not the unused space in SwiftUI's maxWidth layout frame. The actual
+        // production-row layout tests retain the logical full-width contract.
+        func rowMeetsGeometry(_ frame: CGRect) -> Bool {
+            [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
+                && frame.width > 0 && frame.width <= maximumPaintWidth
+                && frame.height > 25 && frame.height <= 80
+                && abs(frame.minX - viewport.minX - inset) <= geometryTolerance
+                && viewport.maxX - frame.maxX >= inset - geometryTolerance
+                && viewport.insetBy(dx: -geometryTolerance, dy: -geometryTolerance).contains(frame)
+        }
         var values = [("provider-codex-quota-weekly", codexFiveHour ? "80%" : "32%"),
                       ("claude-quota-fiveHour", "75.5%"), ("claude-quota-weekly", "38.8%")]
         if codexFiveHour { values.append(("provider-codex-quota-fiveHour", "88%")) }
@@ -804,7 +818,10 @@ final class Codex94UITests: XCTestCase {
                 "relativeX": diagnosticNumber(frame.minX - viewport.minX),
                 "relativeY": diagnosticNumber(frame.minY - viewport.minY),
                 "width": diagnosticNumber(frame.width), "height": diagnosticNumber(frame.height),
-                "widthMeetsContract": frame.width >= 400, "heightMeetsContract": (32...80).contains(frame.height)
+                "widthMeetsContract": frame.width.isFinite && frame.width > 0 && frame.width <= maximumPaintWidth,
+                "heightMeetsContract": frame.height.isFinite && frame.height > 25 && frame.height <= 80,
+                "leadingInsetMeetsContract": abs(frame.minX - viewport.minX - inset) <= geometryTolerance,
+                "trailingInsetMeetsContract": viewport.maxX - frame.maxX >= inset - geometryTolerance
             ])
         }
         let codexRegion = quotaFrames.filter { $0.key.hasPrefix("provider-codex-quota-") }
@@ -816,9 +833,7 @@ final class Codex94UITests: XCTestCase {
             guard let first = quotaFrames[prefix + "fiveHour"], let second = quotaFrames[prefix + "weekly"] else { return true }
             return !first.intersects(second)
         }
-        let rowsMeetGeometry = quotaFrames.values.allSatisfy {
-            $0.width >= 400 && (32...80).contains($0.height) && viewport.insetBy(dx: -1, dy: -1).contains($0)
-        }
+        let rowsMeetGeometry = quotaFrames.values.allSatisfy(rowMeetsGeometry)
         // Persist exact app-owned relative geometry before any geometry assertion
         // can stop the scenario; no global coordinates or unbounded AX text.
         try fixture.writeReport(reportName, fields: [
@@ -841,13 +856,11 @@ final class Codex94UITests: XCTestCase {
         for (identifier, percent) in values {
             let frame = try XCTUnwrap(quotaFrames[identifier])
             let relativeFrame = frame.offsetBy(dx: -viewport.minX, dy: -viewport.minY)
-            // Keep the terminal-row contract unchanged while exposing the exact
-            // failing row and geometry in CI's first failure message.
-            try require(frame.width >= 400 && (32...80).contains(frame.height)
-                        && viewport.insetBy(dx: -1, dy: -1).contains(frame),
+            try require(rowMeetsGeometry(frame),
                         "Terminal quota row \(identifier) has viewport-relative frame \(NSStringFromRect(relativeFrame)); "
                         + "viewport width=\(viewport.width), height=\(viewport.height); "
-                        + "required width>=400, height=32...80 and complete visibility")
+                        + "required finite nonempty paint width<=\(maximumPaintWidth), height>25 and <=80, "
+                        + "14pt leading/trailing insets (1pt native tolerance) and complete visibility")
             try assertProviderMetric(identifier, percent: percent, in: popover)
         }
         try require(regionsAreDistinct, "The shared viewport must contain separate visible quota regions for both services")
@@ -4128,11 +4141,14 @@ private struct SyntheticFixture {
             "usage-token-selection-diagnostic.json", "usage-pending-retry-diagnostic.json"
         ] : []
         let providers: Set<String> = scenario == "providers" ? [
-            "providers-both-en.png", "providers-claude-error-en.png",
+            "providers-both-en.png", "providers-compact-en.png", "providers-claude-error-en.png",
             "providers-claude-only-en.png", "providers-disabled-en.png",
             "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
             "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
             "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",
+            "providers-viewport-three-geometry-failure.png", "providers-viewport-four-geometry-failure.png",
+            "providers-reopen-codex-left-geometry-failure.png", "providers-reopen-codex-right-geometry-failure.png",
+            "providers-reopen-claude-left-geometry-failure.png", "providers-reopen-claude-right-geometry-failure.png",
             "providers-settings-entry.json"
         ] : []
         let floating: Set<String> = scenario == "floating" ? [
