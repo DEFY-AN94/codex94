@@ -250,6 +250,16 @@ final class AppStore: ObservableObject {
         claudeStore.setCLIUsageEnabled(enabled)
     }
 
+    func setClaudeSourceMode(_ mode: ClaudeQuotaSourceMode) {
+        guard !isShuttingDown else { return }
+        claudeStore.setSourceMode(mode)
+    }
+
+    func setClaudeStatuslineFallbackEnabled(_ enabled: Bool) {
+        guard !isShuttingDown else { return }
+        claudeStore.setStatuslineFallbackEnabled(enabled)
+    }
+
     func setClaudeNotificationPreferences(_ value: NotificationPreferences) {
         setNotificationPreferences(value, for: .claude)
     }

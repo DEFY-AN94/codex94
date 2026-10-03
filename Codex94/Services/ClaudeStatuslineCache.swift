@@ -77,6 +77,7 @@ struct ClaudeStatuslineCache: Sendable {
         let data = try ClaudeLocalFile.read(fileURL, maximumBytes: Self.maximumCacheBytes)
         guard let record = try? JSONDecoder().decode(Record.self, from: data), record.version == 1,
               record.report.source == .statusline,
+              record.report.accountContext == nil,
               Self.isSupportedTimestamp(record.report.reportedAt),
               Self.isSupportedTimestamp(record.report.receivedAt),
               record.report.reportedAt <= record.report.receivedAt,
@@ -176,7 +177,7 @@ enum ClaudeLocalFile {
                                                attributes: [.posixPermissions: 0o700])
     }
 
-    static func read(_ url: URL, maximumBytes: Int) throws -> Data {
+    static func read(_ url: URL, maximumBytes: Int, requirePrivateOwner: Bool = false) throws -> Data {
         try requireNoSymlinks(url)
         let descriptor = Darwin.open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
         guard descriptor >= 0 else { throw ClaudeQuotaIssue.unavailable }
@@ -184,6 +185,9 @@ enum ClaudeLocalFile {
         var info = stat()
         guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
               info.st_nlink == 1, info.st_size <= maximumBytes else { throw ClaudeQuotaIssue.invalidData }
+        if requirePrivateOwner {
+            guard info.st_uid == getuid(), info.st_mode & 0o077 == 0 else { throw ClaudeQuotaIssue.configurationConflict }
+        }
         let data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
         guard data.count <= maximumBytes else { throw ClaudeQuotaIssue.invalidData }
         return data

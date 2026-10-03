@@ -1,11 +1,76 @@
 # Component ownership and reuse
 
-This describes ownership and reuse constraints, including the unreleased
-`4.0.2 (23)` candidate below. The published stable version remains the
+This describes ownership and reuse constraints for development `4.1.0 (24)`,
+with the separate unreleased `4.0.2 (23)` maintenance candidate described below.
+The published stable version remains the
 [`4.0.1 (22)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
 published on 2026-10-03 (Australia/Melbourne).
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
+
+## 4.1.0 development: OAuth coordination with an unavailable production provider
+
+`ClaudeQuotaStore` remains the only Claude state exposed to the UI. It delegates
+`oauthPreferred` to `ClaudeOAuthMonitor`; `statuslineOnly` and explicitly selected
+`legacyCLI` retain separate local paths. Claude stays disabled by default, while
+the new source choice defaults to OAuth preferred. An existing explicit legacy
+CLI opt-in is preserved. The OAuth path and passive fallback cannot construct a
+CLI fetcher; source changes retire the previous generation and clear its data.
+
+`ClaudeOAuthCredentialProvider` separates credential ownership from HTTP. Its
+production implementation is `UnavailableClaudeOAuthCredentialProvider`, which
+performs no credential, browser, Keychain, file or CLI access. Real authorized
+client/callback/scope information and a controlled integration check remain
+pending. Browser sign-in, credential storage and OAuth connect/disconnect UI are
+not implemented; accepting explicit in-memory credentials in injected clients
+is not evidence of a completed production integration.
+
+`ClaudeOAuthUsageClient` owns fixed usage/profile GET endpoints, separate 10/2
+second deadlines, bounded 64 KiB response streaming, destination validation and
+typed errors. Ephemeral sessions disable cookie/credential/cache storage and
+reject redirects and ambient authentication. `ClaudeOAuthResponseParser` accepts
+only supported windows, finite percentages, strict optional reset dates and
+unambiguous account/organization UUIDs; missing data stays unknown.
+
+`ClaudeOAuthMonitor` owns one request task and one coordinator timer. Usage and
+profile run concurrently: quota is published as soon as it is usable, labelled
+identity-pending until the current profile is verified. Profile failure neither
+borrows old identity nor turns a successful quota read into a quota error.
+Pending/failed identity suppresses OAuth cache writes and notifications. A normal
+refresh that confirms the same account preserves its private notification
+baseline; changed identity, credential context or source resets it.
+
+Current credential-context and generation checks discard late results. A failed
+quota transaction may recover once: application-owned credentials call the
+provider's renewal contract; external credentials call its read-only reload
+contract. No production renewal implementation exists yet. Auth/scope rejection
+suspends that credential context without a manual bypass. A 429 applies shared
+cooldown to both endpoints and retains any later deadline; invalid/missing
+Retry-After uses five minutes. Network/server failures have at most two automatic
+recovery attempts at 60-second intervals, then return to the configured cadence.
+
+Scheduling uses process-relative `ContinuousClock` seconds, including sleep.
+Popover/wake reuse requires both wall-clock query age and continuous elapsed age
+to be nonnegative and below 60 seconds. Wake, manual, normal and reset reads share
+the same request slot. Reset coverage prevents repeated attempts after clock
+rollback. Next-attempt text is a projection, not a guarantee of execution while
+the OS is asleep or a request is active.
+
+`ClaudeOAuthQuotaCache` only accepts normalized OAuth reports with verified
+account/organization context. Separate digest-named private files isolate each
+context; tokens and raw responses are never cached. Source, query completion time
+and identity confidence travel with the report. Query completion is local timing,
+not a server-provided measurement timestamp.
+
+`ClaudeQuotaSourcePolicy` admits only fresh identifiable passive reports with
+valid resets as fallback candidates. The candidate is frozen for explicit user
+confirmation; an existing passive producer preference proves no OAuth account.
+Adoption marks the report unverified and preserves its original time. Only the
+adopted producer may update it automatically; another producer requires new
+confirmation. Expiry removes unusable data; credential/source changes clear the
+association. OAuth recovery restores the primary source and resets notification
+comparison. Statusline reports never emit alerts; the separately opted-in legacy
+CLI behavior remains independent.
 
 ## 4.0.2 candidate: callback safety and compact presentation
 
@@ -40,8 +105,9 @@ reader remains a separate default-off option.
 
 Version `4.0.1 (22)` is the stable release. The `v4.0.0` tag is retained as an
 unpublished candidate. Passive statusline reports are the
-default Claude data source. The earlier optional CLI input-footer compatibility
-fix is retained; it does not make that reader an automatic fallback.
+default Claude data source in that published version. The earlier optional CLI
+input-footer compatibility fix is retained; it does not make that reader an
+automatic fallback.
 
 `QuotaProviderID` identifies Codex and Claude. Existing Codex preference keys
 and cache v2 stay compatible; new monitoring/display choices and Claude
@@ -49,15 +115,16 @@ preferences have their own keys. Monitoring defaults to Codex only. A display
 selection never implicitly enables a provider or starts a request.
 `claude.cliUsageEnabled.v1` is a separate default-off opt-in for the optional
 CLI reader. Existing Claude monitoring preferences do not enable it during
-migration. Without it, no CLI client is created and refreshes only load the
-local statusline cache. Turning it off retires in-flight work and clears CLI
-reports while leaving statusline monitoring available.
+migration. In the 4.0.1 path, without it no CLI client is created and refreshes
+only load the local statusline cache. Turning it off retires in-flight work and
+clears CLI reports while leaving statusline monitoring available.
 
-Passive statusline is the default data path. The conditional OAuth proposal was
-reviewed against [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
-on 2026-10-03; its authorization prerequisite is not met, so no OAuth transport,
-credential reader or refresh-token flow is added. Consequently, OAuth-specific
-401/429 handling and automatic sign-in recovery are not claimed as implemented.
+For 4.0.1, passive statusline was the default data path. The conditional OAuth
+proposal was reviewed against [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
+on 2026-10-03; its authorization prerequisite was not met, so that release added
+no OAuth transport, credential reader or refresh-token flow. The 4.1.0 development
+components above supersede this transport description only; they do not establish
+production authorization or automatic sign-in.
 
 The [official statusline schema](https://code.claude.com/docs/en/statusline#available-data)
 provides quota windows and a session identifier, but no verified account identity.
@@ -97,7 +164,7 @@ configuration, key backup and conflict-aware removal. The Claude store owns
 report freshness: cache reads and duplicate statusline reports cannot renew
 quota age, reset-expired windows disappear, and unknown data is never 100%.
 
-Claude reset reads reuse the store's existing 15-second poll; they add no timer.
+Legacy CLI reset reads reuse the store's existing 15-second poll; they add no timer.
 Raw reported reset dates produce sorted, distinct `resetsAt + 5` targets, even
 after their windows disappear from the display. A refresh accepted by the
 single-flight path records its start time for due-target coverage. A request begun before a target that
@@ -131,7 +198,9 @@ unattended live monitoring are separate release evidence.
 | `AppUpdateController` | Own the explicit GitHub metadata check and its UI state. It does not poll, download, install, or share quota authentication. |
 | Token image export views/helpers | Render the current prepared chart without interaction controls or identity; own explicit PNG save/copy actions. Pass the pasteboard explicitly so tests can isolate it. |
 | `CodexExecutableLocator` | Own explicit-path precedence, known bundled/standard CLI candidates, and bounded `--version` compatibility checks. Tests inject App roots and synthetic executables. |
-| Platform and transport services | Own Codex subprocesses, notification delivery, hotkey registration, and the fixed update HTTP request. Keep bounded process-group termination in its existing service. |
+| `ClaudeQuotaStore` / `ClaudeOAuthMonitor` | Keep one Claude UI state owner; delegate OAuth requests, credential generations, identity verification, cooldown, scheduling and explicit passive fallback to the independent monitor. |
+| `ClaudeOAuthCredentialProvider` / `ClaudeOAuthQuotaCache` | Separate credential ownership from transport; production acquisition remains unavailable. Cache normalized reports only under verified account/organization context. |
+| Platform and transport services | Own Codex subprocesses, notification delivery, hotkey registration, the fixed update HTTP request and separately allowlisted Claude OAuth GETs. Keep bounded process-group termination in its existing service. |
 | Pure models and support types | Own parsing, date/count rules, selection projections, chart preparation, formatting inputs, and scheduling decisions without starting I/O. |
 
 ## Rules for focused reuse

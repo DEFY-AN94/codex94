@@ -58,27 +58,48 @@ struct ProviderSettingsView: View {
                 )
             }
             SettingsDivider()
+            SettingsRow("claude.sourceMode.title") {
+                Picker("claude.sourceMode.title", selection: sourceModeBinding) {
+                    Text("claude.sourceMode.oauthPreferred").tag(ClaudeQuotaSourceMode.oauthPreferred)
+                    Text("claude.sourceMode.statuslineOnly").tag(ClaudeQuotaSourceMode.statuslineOnly)
+                    Text("claude.sourceMode.legacyCLI").tag(ClaudeQuotaSourceMode.legacyCLI)
+                }
+                .labelsHidden().frame(maxWidth: 360)
+                .accessibilityIdentifier("claude-source-mode")
+            }
+            if store.claudeStore.sourceMode == .oauthPreferred {
+                SettingsDivider()
+                SettingsRow("claude.oauth.connection") { ClaudeOAuthConnectionNotice() }
+                SettingsDivider()
+                SettingsRow("claude.oauth.fallback.title") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Toggle("claude.oauth.fallback.enabled", isOn: fallbackBinding)
+                            .accessibilityIdentifier("claude-statusline-fallback-enabled")
+                        Text("claude.oauth.fallback.help")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            if store.claudeStore.sourceMode == .legacyCLI {
+                SettingsDivider()
+                SettingsRow("claude.cliUsage.title") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("claude.cliUsage.help")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Label("claude.cliUsage.warning", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("claude-cli-usage-warning")
+                    }
+                }
+            }
+            SettingsDivider()
             SettingsRow("claude.passive.title") {
                 ClaudeStatuslineSetupView(store: store.claudeStore)
             }
-            SettingsDivider()
-            SettingsRow("claude.cliUsage.title") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Toggle("claude.cliUsage.enable", isOn: Binding(
-                        get: { store.preferences.claudeCLIUsageEnabled },
-                        set: { store.setClaudeCLIUsageEnabled($0) }
-                    ))
-                    .accessibilityIdentifier("claude-cli-usage-enabled")
-                    Text("claude.cliUsage.help")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Label("claude.cliUsage.warning", systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption).foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("claude-cli-usage-warning")
-                }
-            }
-            if store.preferences.claudeMonitoringEnabled && store.preferences.claudeCLIUsageEnabled {
+            if store.preferences.claudeMonitoringEnabled && store.claudeStore.sourceMode != .statuslineOnly {
                 SettingsDivider()
                 SettingsRow("claude.refreshInterval") {
                     Picker("claude.refreshInterval", selection: Binding(
@@ -105,9 +126,23 @@ struct ProviderSettingsView: View {
                 }
                 SettingsDivider()
                 NotificationSettingsView(store: store, provider: .claude)
+                if store.claudeStore.sourceMode == .oauthPreferred {
+                    Text("claude.oauth.unverifiedNotifications")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("claude-oauth-notification-limits")
+                }
             }
         }
         .accessibilityIdentifier("provider-settings-page")
+    }
+
+    var sourceModeBinding: Binding<ClaudeQuotaSourceMode> {
+        Binding(get: { store.claudeStore.sourceMode }, set: { store.setClaudeSourceMode($0) })
+    }
+
+    var fallbackBinding: Binding<Bool> {
+        Binding(get: { store.claudeStore.allowsStatuslineFallback }, set: { store.setClaudeStatuslineFallbackEnabled($0) })
     }
 
     private func monitoring(_ provider: QuotaProviderID) -> Binding<Bool> {
@@ -129,6 +164,21 @@ struct ProviderSettingsView: View {
             }
             .labelsHidden().frame(maxWidth: 260)
             .accessibilityIdentifier(identifier)
+        }
+    }
+}
+
+/// A future permitted connection UI belongs here. Until then this is only
+/// information, with no fake login action, credential read or invalidation.
+struct ClaudeOAuthConnectionNotice: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("claude.oauth.notReady", systemImage: "info.circle")
+                .font(.callout)
+                .accessibilityIdentifier("claude-oauth-not-ready")
+            Text("claude.oauth.integrationHelp")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

@@ -9,22 +9,25 @@ also requests service-reported aggregate Token usage through the official
 `account/usage/read` method on first entry to the statistics page or an explicit
 statistics refresh. This request is independent of quota polling. The sandbox
 remains read-only and the noninteractive child cannot request an approval.
-Codex itself owns authentication. Codex94 does not implement OAuth or a direct
-HTTP client for quota or Token usage and does not directly inspect authentication
-stores, browser state, session logs, or local usage databases.
+Codex itself owns authentication. This Codex provider does not implement OAuth
+or direct quota/Token HTTP requests, and does not inspect authentication stores,
+browser state, session logs or local usage databases. The 4.1.0 development
+Claude HTTP boundary is separate and described below.
 
 Version 4.0.1 adds optional Claude subscription monitoring through an explicitly
 installed local statusline bridge by default, with a separate optional official
-Claude Code `/usage` reader. Authentication remains inside Claude Code. There is no
-direct Claude quota HTTP/OAuth implementation or credential-store access.
+Claude Code `/usage` reader. For these 4.0.1 local paths, authentication remains
+inside Claude Code; that release includes no direct Claude quota HTTP/OAuth
+implementation or credential-store access.
 The CLI reader has a separate, default-off opt-in with a quota-consumption
 warning. Enabling Claude monitoring does not opt into CLI sessions. While the
-CLI reader is off, automatic and manual refreshes only inspect the local
+CLI reader is off in 4.0.1, automatic and manual refreshes only inspect the local
 statusline cache. Disabling it cancels and retires an active reader.
 Source modes are isolated: a CLI failure does not adopt an account-unverified
 statusline report. Passive monitoring pins its selected report stream and asks
 for explicit adoption when a different session reports; a session fingerprint
-never proves account identity. No OAuth token access or refresh is implemented.
+never proves account identity. Published 4.0.1 implements no OAuth token access
+or refresh.
 The CLI probe has an owned working directory, disabled tools/hooks/MCP and
 remote-control startup, bounded output and a deadline. Only a recognized
 built-in usage action is submitted; unexpected login/onboarding screens are
@@ -74,6 +77,54 @@ plain text. The system browser owns subsequent navigation and downloads after
 the user opens that page. The check does not verify an installation package,
 download or install an App, relaunch it, or run in the background. See
 [docs/updating.md](docs/updating.md) for the user flow and maintenance boundary.
+
+## Development Claude OAuth boundary (4.1.0)
+
+The `4.1.0 (24)` branch implements a transport/coordinator with injectable
+in-memory credentials. The production credential provider is explicitly
+unavailable: real project-approved client/callback/scope details, production
+credential acquisition and controlled integration validation remain pending.
+There is no browser OAuth flow, Keychain credential store or OAuth connection UI.
+Do not infer authorization from upstream third-party code, a working endpoint,
+or the user's login to another application. Do not reuse a client ID assigned to
+another application or access its credentials without the project's approved
+integration contract. Project-specific approved access can be implemented
+when its actual contract is supplied.
+
+The HTTP client allows only GET to the exact Anthropic `/api/oauth/usage` and
+`/api/oauth/profile` HTTPS destinations. Bearer authorization is validated against
+that allowlist before attaching it. The transport rejects redirects, response URL
+changes, ambient HTTP authentication, excessive bodies and unbounded deadlines;
+normal TLS server-trust validation stays enabled. It identifies this app honestly,
+uses ephemeral sessions without cookie/credential/cache storage, and maps errors
+to fixed classifications without retaining raw error bodies. This adds a real
+network-capable code boundary, even though the unavailable production provider
+prevents default OAuth requests.
+
+The coordinator publishes usage independently of profile completion. Pending or
+failed identity does not inherit an old account, write cache or emit notifications.
+Only verified account/organization UUIDs isolate OAuth cache records; a credential
+context ID identifies a generation, and a local session hash proves no account.
+Generation and current-context checks reject late work. Auth rejection cannot be
+bypassed by a manual read; a refresh has one provider-owned recovery attempt,
+using application-owned renewal or external read-only reload. Profile-only auth
+failures do not block a successful quota endpoint. Rate limits gate all entry
+points with a sleep-aware monotonic cooldown and never shorten a later deadline.
+
+OAuth and statusline data are never combined. A fresh, eligible passive fallback
+requires explicit adoption of the frozen report; it remains unverified, keeps its
+original time, emits no notification and must be confirmed again if its producer
+changes. Source/credential changes clear the association. The OAuth/default
+fallback chain cannot construct the legacy CLI reader. Legacy `/usage` remains a
+separate explicit choice, with live probing still suspended.
+
+The separate private OAuth cache is the narrow account-identity persistence
+exception: verified UUIDs and normalized quota/source/times only, isolated by an
+account-plus-organization digest, with `0600` files and private directories.
+Tokens, raw responses, email and unverified reports are excluded. Existing Codex
+cache v2 and the local statusline cache remain distinct. See [PRIVACY.md](PRIVACY.md)
+for exact paths and preference keys. Synthetic tests establish these boundaries,
+not a completed authorization flow or live App/web quota support.
 
 ## Distribution trust boundary
 
@@ -178,6 +229,11 @@ The existing subprocess, fixed GitHub endpoint, and distribution-signing
 boundaries remain unchanged.
 
 ## Supported versions
+
+`4.1.0 (24)` is unreleased development work. Its OAuth infrastructure is not a
+claim of production account connectivity, real usage acceptance or publication.
+The credential provider remains unavailable pending the project-specific
+integration details and validation above.
 
 The unreleased `4.0.2 (23)` candidate repairs a notification callback actor
 boundary and changes presentation. It adds no quota API, credential access or

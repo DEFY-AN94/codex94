@@ -33,7 +33,16 @@ struct ClaudeQuotaCard: View {
                 isCLIUsageEnabled: store.isCLIUsageEnabled,
                 statuslineSetupState: store.statuslineSetupState,
                 passiveReportNeedsConfirmation: store.passiveReportNeedsConfirmation,
-                style: style
+                style: style,
+                sourceMode: store.sourceMode,
+                oauthIssue: store.oauthIssue,
+                oauthIdentityIssue: store.oauthIdentityIssue,
+                identityConfidence: store.identityConfidence,
+                oauthIdentityPending: store.oauthIdentityPending,
+                isUsingOAuthFallback: store.isUsingOAuthFallback,
+                oauthIsCached: store.oauthIsCached,
+                nextAutomaticRefreshAt: store.nextAutomaticRefreshAt,
+                oauthRetryAllowedAt: store.oauthRetryAllowedAt
             )
         }
     }
@@ -60,27 +69,46 @@ struct ClaudeQuotaCardContent: View {
     var statuslineSetupState: ClaudeStatuslineSetupState = .notInstalled
     var passiveReportNeedsConfirmation = false
     var style: ProviderQuotaDisplayStyle = .card
+    var sourceMode: ClaudeQuotaSourceMode = .statuslineOnly
+    var oauthIssue: ClaudeOAuthIssue? = nil
+    var oauthIdentityIssue: ClaudeOAuthIssue? = nil
+    var identityConfidence: ClaudeQuotaIdentityConfidence = .unknown
+    var oauthIdentityPending = false
+    var isUsingOAuthFallback = false
+    var oauthIsCached = false
+    var nextAutomaticRefreshAt: Date? = nil
+    var oauthRetryAllowedAt: Date? = nil
+
+    // Preserve older pure-content CLI fixtures; the production wrapper always
+    // passes the store's explicit source mode and consistent compatibility flag.
+    private var usesCLI: Bool { sourceMode == .legacyCLI || (sourceMode == .statuslineOnly && isCLIUsageEnabled) }
+    private var usesOAuth: Bool { sourceMode == .oauthPreferred }
 
     var badge: ConnectionBadge {
         guard isEnabled else { return .none }
-        if isCLIUsageEnabled && isRefreshing { return .refreshing }
+        if (usesCLI || usesOAuth) && isRefreshing { return .refreshing }
+        if usesOAuth {
+            if oauthIsCached || isUsingOAuthFallback || needsSourceConfirmation { return .stale }
+            if oauthIssue != nil || visibleIssue != nil { return snapshot == nil ? .unavailable : .stale }
+            return .none
+        }
         if needsSourceConfirmation || issue == .staleData || passiveWindowsExpired { return .stale }
         if visibleIssue != nil { return snapshot == nil ? .unavailable : .stale }
         return .none
     }
 
     private var needsSourceConfirmation: Bool {
-        !isCLIUsageEnabled && (passiveReportNeedsConfirmation || issue == .sourceChanged)
+        !usesCLI && (passiveReportNeedsConfirmation || issue == .sourceChanged)
     }
 
     private var passiveWindowsExpired: Bool {
-        !isCLIUsageEnabled && source == .statusline && reportedAt != nil
+        !usesCLI && source == .statusline && reportedAt != nil
             && snapshot == nil && issue == .noData
     }
 
     private var visibleIssue: ClaudeQuotaIssue? {
         guard isEnabled, let issue else { return nil }
-        if !isCLIUsageEnabled {
+        if !usesCLI && !usesOAuth {
             switch issue {
             case .setupRequired, .noData, .cliUnavailable, .loginRequired, .timedOut:
                 // Waiting for a local report is not a login or network failure.
@@ -93,7 +121,8 @@ struct ClaudeQuotaCardContent: View {
 
     var statusKey: String? {
         guard isEnabled else { return nil }
-        if isCLIUsageEnabled && isRefreshing { return "claude.refreshing" }
+        if (usesCLI || usesOAuth) && isRefreshing { return "claude.refreshing" }
+        if usesOAuth, let oauthIssue { return oauthIssue.quotaIssue.localizationKey }
         if needsSourceConfirmation { return "claude.issue.sourceChanged" }
         if let issue = visibleIssue {
             // The empty-state line already describes a missing report.
@@ -103,18 +132,27 @@ struct ClaudeQuotaCardContent: View {
     }
 
     var sourceTitleKey: String {
+        if usesOAuth && isUsingOAuthFallback { return "claude.oauth.fallback.source" }
         if let source { return source.localizationKey }
-        return isCLIUsageEnabled ? "claude.source.waiting" : "claude.source.statusline"
+        if usesOAuth { return "claude.source.oauth" }
+        return usesCLI ? "claude.source.waiting" : "claude.source.statusline"
     }
 
     var refreshTitleKey: String {
-        isCLIUsageEnabled ? "claude.refresh" : "claude.passive.reread"
+        if usesOAuth { return "claude.oauth.refresh" }
+        return usesCLI ? "claude.refresh" : "claude.passive.reread"
     }
 
     var emptyStateKey: String {
         guard isEnabled else { return "claude.monitoring.off" }
         if needsSourceConfirmation { return "claude.passive.confirmationRequired" }
-        if !isCLIUsageEnabled {
+        if usesOAuth {
+            if let oauthIssue { return oauthIssue.quotaIssue.localizationKey }
+            if let issue { return issue.localizationKey }
+            if let cooldownDeadline, cooldownDeadline > now { return "claude.oauth.rateLimited" }
+            return isRefreshing ? "claude.refreshing" : "claude.oauth.notConnected"
+        }
+        if !usesCLI {
             if issue == .staleData || passiveWindowsExpired { return "claude.passive.expiredEmpty" }
             if style == .terminal { return "claude.passive.waitingShort" }
             return statuslineSetupState == .notInstalled
@@ -127,18 +165,61 @@ struct ClaudeQuotaCardContent: View {
         statusKey.map { Text(LocalizedStringKey($0)) }
     }
 
+    var usesCachedData: Bool {
+        guard snapshot != nil else { return false }
+        return usesOAuth ? oauthIsCached : badge == .stale
+    }
+
+    var canRefresh: Bool {
+        guard isEnabled, !isRefreshing else { return false }
+        if usesOAuth, let cooldownDeadline, cooldownDeadline > now { return false }
+        return true
+    }
+
+    private var cooldownDeadline: Date? {
+        let issueDates = [oauthIssue, oauthIdentityIssue].compactMap { issue -> Date? in
+            if case let .rateLimited(date) = issue { return date }
+            return nil
+        }
+        return (issueDates + [oauthRetryAllowedAt].compactMap { $0 }).max()
+    }
+
+    var sourceDetails: [String] {
+        guard isEnabled, usesOAuth else { return [] }
+        func localized(_ key: String) -> String {
+            StatusAccessibilityString.localized(key, language: language, bundle: .main)
+        }
+        var details: [String] = []
+        if source == .oauth, snapshot != nil,
+           oauthIdentityPending || identityConfidence != .verifiedOAuth || oauthIdentityIssue != nil {
+            let reason = oauthIdentityIssue.map { localized($0.quotaIssue.localizationKey) }
+            details.append(localized("claude.oauth.identity.pending") + (reason.map { " · " + $0 } ?? ""))
+        }
+        if passiveReportNeedsConfirmation { details.append(localized("claude.oauth.fallback.pending")) }
+        if isUsingOAuthFallback { details.append(localized("claude.oauth.unverifiedNotifications")) }
+        if oauthIssue != nil || cooldownDeadline != nil {
+            let next: Date?
+            if let retryNotBefore = cooldownDeadline {
+                next = max(retryNotBefore, nextAutomaticRefreshAt ?? retryNotBefore)
+            } else { next = nextAutomaticRefreshAt }
+            if let text = ConnectionRecoveryText.nextAttempt(at: next, language: language) { details.append(text) }
+        }
+        return details
+    }
+
     var body: some View {
         ProviderQuotaCardContent(
             provider: .claude, title: "Claude", sourceTitle: LocalizedStringKey(sourceTitleKey),
             windows: snapshot?.defaultBucket?.windows ?? [], badge: badge,
-            usesCachedData: snapshot != nil && badge == .stale,
+            usesCachedData: usesCachedData,
             statusText: statusText, sourceTimeText: sourceTimeText,
             emptyText: LocalizedStringKey(emptyStateKey),
             refreshLabel: LocalizedStringKey(refreshTitleKey), detailsLabel: "claude.openSetup",
-            canRefresh: isEnabled && !isRefreshing, showsDetails: snapshot == nil || issue != nil,
+            canRefresh: canRefresh, showsDetails: snapshot == nil || issue != nil || !sourceDetails.isEmpty,
             language: language, now: now, palette: palette,
             refresh: refresh, openDetails: openSetup, timeZone: timeZone, compact: compact,
-            style: style, explainsPassiveSource: !isCLIUsageEnabled
+            style: style, explainsPassiveSource: !usesCLI && !usesOAuth,
+            sourceDetails: sourceDetails
         )
     }
 
@@ -147,10 +228,13 @@ struct ClaudeQuotaCardContent: View {
             to: reportedAt, locale: language.locale,
             calendar: Calendar(identifier: .gregorian), timeZone: timeZone
         ) else {
-            return StatusAccessibilityString.localized("claude.sourceTime.unavailable", language: language, bundle: .main)
+            return StatusAccessibilityString.localized(usesOAuth && source != .statusline
+                ? "claude.oauth.queryTime.unavailable" : "claude.sourceTime.unavailable", language: language, bundle: .main)
         }
+        let key = source == .oauth ? "claude.oauth.queryTime %@"
+            : source == .statusline ? "claude.localReportTime %@" : "claude.sourceTime %@"
         return StatusAccessibilityString.localized(
-            source == .statusline ? "claude.localReportTime %@" : "claude.sourceTime %@",
+            key,
             arguments: [timestamp], language: language, bundle: .main
         )
     }
@@ -186,6 +270,7 @@ struct ProviderQuotaCardContent: View {
     var windowIdentifierPrefix: String? = nil
     var resetLocale: Locale? = nil
     var resetCalendar = Calendar(identifier: .gregorian)
+    var sourceDetails: [String] = []
 
     private var isTerminal: Bool { style == .terminal }
 
@@ -273,6 +358,11 @@ struct ProviderQuotaCardContent: View {
                     .lineLimit(isTerminal || compact ? 1 : nil)
                     .help(Text(verbatim: sourceTimeText))
                     .accessibilityIdentifier(provider.rawValue + "-source-time")
+                ForEach(Array(sourceDetails.enumerated()), id: \.offset) { index, detail in
+                    Text(verbatim: detail).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier(provider.rawValue + "-source-detail-" + String(index))
+                }
             }
             .font(.caption)
             .fixedSize(horizontal: false, vertical: true)

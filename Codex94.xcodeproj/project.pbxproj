@@ -118,6 +118,18 @@
 		AD4234ABF933A2928B8B28C5 /* ClaudeStatuslineInstallerRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C8F75CAFD8BA789D71BCFF /* ClaudeStatuslineInstallerRecoveryTests.swift */; };
 		69A26A1070C61480A90D6BDF /* ClaudeExecutableLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20E31B7F51F0B0DD3AD7EC0 /* ClaudeExecutableLocator.swift */; };
 		C06A4E53459CE294CE5D1E8F /* ClaudeExecutableLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E526F049EEAE54AF9C8EAC15 /* ClaudeExecutableLocatorTests.swift */; };
+		8E2EC7EB996CE58A712BD634 /* ClaudeOAuthTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41BAE11064043E018D01A85E /* ClaudeOAuthTypes.swift */; };
+		8C6DE014861B2F26B5B1066A /* ClaudeOAuthCredentialProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE4CB846ABE32AB999556B01 /* ClaudeOAuthCredentialProvider.swift */; };
+		9DBCF84E33D8733D7594E063 /* ClaudeOAuthQuotaCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91EBFC5AC570C0C3B8A641A6 /* ClaudeOAuthQuotaCache.swift */; };
+		9895D61E32CA28D2BCC178D5 /* ClaudeOAuthResponseParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC42E7195145B921FBB9CC4B /* ClaudeOAuthResponseParser.swift */; };
+		50B75EEE2FF420C52A9B493B /* ClaudeOAuthUsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE231E4CF1DA729160FA73CA /* ClaudeOAuthUsageClient.swift */; };
+		9174A5C3C0DA98951DE4926A /* ClaudeOAuthMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF93D82E08146B593020DDFF /* ClaudeOAuthMonitor.swift */; };
+		D9BE3CB0B741CC5B6B261851 /* ClaudeQuotaSourcePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E833DC348F434F4D6FCD6962 /* ClaudeQuotaSourcePolicy.swift */; };
+		5AC0C568CDFE9900AD476FB8 /* ClaudeOAuthClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A934590A3792F5440D3C026 /* ClaudeOAuthClientTests.swift */; };
+		EE7CE363CC38BDB8B67E3410 /* ClaudeOAuthCachePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73E45A0581743827713C0BDA /* ClaudeOAuthCachePolicyTests.swift */; };
+		569E039194D36C1BDFE62ABA /* ClaudeOAuthMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2032F5AFD304CEB6CE0FC755 /* ClaudeOAuthMonitorTests.swift */; };
+		7614A914B10E9277AAFB7550 /* ClaudeOAuthStoreIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5783AA52124B075E81ADAF /* ClaudeOAuthStoreIntegrationTests.swift */; };
+		A300BF2A83B07389C26ABE8F /* ClaudeOAuthViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57252E7BCE946979EA1C48CD /* ClaudeOAuthViewTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -253,6 +265,18 @@
 		51C8F75CAFD8BA789D71BCFF /* ClaudeStatuslineInstallerRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeStatuslineInstallerRecoveryTests.swift"; sourceTree = "<group>"; };
 		C20E31B7F51F0B0DD3AD7EC0 /* ClaudeExecutableLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ClaudeExecutableLocator.swift"; sourceTree = "<group>"; };
 		E526F049EEAE54AF9C8EAC15 /* ClaudeExecutableLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeExecutableLocatorTests.swift"; sourceTree = "<group>"; };
+		41BAE11064043E018D01A85E /* ClaudeOAuthTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ClaudeOAuthTypes.swift"; sourceTree = "<group>"; };
+		EE4CB846ABE32AB999556B01 /* ClaudeOAuthCredentialProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ClaudeOAuthCredentialProvider.swift"; sourceTree = "<group>"; };
+		91EBFC5AC570C0C3B8A641A6 /* ClaudeOAuthQuotaCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ClaudeOAuthQuotaCache.swift"; sourceTree = "<group>"; };
+		CC42E7195145B921FBB9CC4B /* ClaudeOAuthResponseParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ClaudeOAuthResponseParser.swift"; sourceTree = "<group>"; };
+		BE231E4CF1DA729160FA73CA /* ClaudeOAuthUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ClaudeOAuthUsageClient.swift"; sourceTree = "<group>"; };
+		DF93D82E08146B593020DDFF /* ClaudeOAuthMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stores/ClaudeOAuthMonitor.swift"; sourceTree = "<group>"; };
+		E833DC348F434F4D6FCD6962 /* ClaudeQuotaSourcePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Support/ClaudeQuotaSourcePolicy.swift"; sourceTree = "<group>"; };
+		9A934590A3792F5440D3C026 /* ClaudeOAuthClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeOAuthClientTests.swift"; sourceTree = "<group>"; };
+		73E45A0581743827713C0BDA /* ClaudeOAuthCachePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeOAuthCachePolicyTests.swift"; sourceTree = "<group>"; };
+		2032F5AFD304CEB6CE0FC755 /* ClaudeOAuthMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeOAuthMonitorTests.swift"; sourceTree = "<group>"; };
+		1B5783AA52124B075E81ADAF /* ClaudeOAuthStoreIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeOAuthStoreIntegrationTests.swift"; sourceTree = "<group>"; };
+		57252E7BCE946979EA1C48CD /* ClaudeOAuthViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeOAuthViewTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -285,6 +309,13 @@
 		A00000000000000000000004 /* Codex94 */ = {
 			isa = PBXGroup;
 			children = (
+				E833DC348F434F4D6FCD6962 /* ClaudeQuotaSourcePolicy.swift */,
+				DF93D82E08146B593020DDFF /* ClaudeOAuthMonitor.swift */,
+				BE231E4CF1DA729160FA73CA /* ClaudeOAuthUsageClient.swift */,
+				CC42E7195145B921FBB9CC4B /* ClaudeOAuthResponseParser.swift */,
+				91EBFC5AC570C0C3B8A641A6 /* ClaudeOAuthQuotaCache.swift */,
+				EE4CB846ABE32AB999556B01 /* ClaudeOAuthCredentialProvider.swift */,
+				41BAE11064043E018D01A85E /* ClaudeOAuthTypes.swift */,
 				C20E31B7F51F0B0DD3AD7EC0 /* ClaudeExecutableLocator.swift */,
 				B352DE0E8067E4719367D21E /* ClaudeResetTextParser.swift */,
 				CBCF1DC3E6D6FC241C40911B /* ClaudeCLIUsageClient.swift */,
@@ -371,6 +402,11 @@
 		A00000000000000000000005 /* Codex94Tests */ = {
 			isa = PBXGroup;
 			children = (
+				57252E7BCE946979EA1C48CD /* ClaudeOAuthViewTests.swift */,
+				1B5783AA52124B075E81ADAF /* ClaudeOAuthStoreIntegrationTests.swift */,
+				2032F5AFD304CEB6CE0FC755 /* ClaudeOAuthMonitorTests.swift */,
+				73E45A0581743827713C0BDA /* ClaudeOAuthCachePolicyTests.swift */,
+				9A934590A3792F5440D3C026 /* ClaudeOAuthClientTests.swift */,
 				E526F049EEAE54AF9C8EAC15 /* ClaudeExecutableLocatorTests.swift */,
 				51C8F75CAFD8BA789D71BCFF /* ClaudeStatuslineInstallerRecoveryTests.swift */,
 				BC00E5CFD7F3F0AE7D20BC18 /* ClaudeQuotaStoreTests.swift */,
@@ -507,6 +543,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D9BE3CB0B741CC5B6B261851 /* ClaudeQuotaSourcePolicy.swift in Sources */,
+				9174A5C3C0DA98951DE4926A /* ClaudeOAuthMonitor.swift in Sources */,
+				50B75EEE2FF420C52A9B493B /* ClaudeOAuthUsageClient.swift in Sources */,
+				9895D61E32CA28D2BCC178D5 /* ClaudeOAuthResponseParser.swift in Sources */,
+				9DBCF84E33D8733D7594E063 /* ClaudeOAuthQuotaCache.swift in Sources */,
+				8C6DE014861B2F26B5B1066A /* ClaudeOAuthCredentialProvider.swift in Sources */,
+				8E2EC7EB996CE58A712BD634 /* ClaudeOAuthTypes.swift in Sources */,
 				69A26A1070C61480A90D6BDF /* ClaudeExecutableLocator.swift in Sources */,
 				362FD55891922E44183F9FB9 /* ClaudeResetTextParser.swift in Sources */,
 				E29F73FDD3D9B9403144E743 /* ClaudeCLIUsageClient.swift in Sources */,
@@ -590,6 +633,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A300BF2A83B07389C26ABE8F /* ClaudeOAuthViewTests.swift in Sources */,
+				7614A914B10E9277AAFB7550 /* ClaudeOAuthStoreIntegrationTests.swift in Sources */,
+				569E039194D36C1BDFE62ABA /* ClaudeOAuthMonitorTests.swift in Sources */,
+				EE7CE363CC38BDB8B67E3410 /* ClaudeOAuthCachePolicyTests.swift in Sources */,
+				5AC0C568CDFE9900AD476FB8 /* ClaudeOAuthClientTests.swift in Sources */,
 				C06A4E53459CE294CE5D1E8F /* ClaudeExecutableLocatorTests.swift in Sources */,
 				AD4234ABF933A2928B8B28C5 /* ClaudeStatuslineInstallerRecoveryTests.swift in Sources */,
 				382195296A06DB352844BE2A /* ClaudeQuotaStoreTests.swift in Sources */,
@@ -693,7 +741,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 24;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -701,7 +749,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 4.0.2;
+				MARKETING_VERSION = 4.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -719,7 +767,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 24;
 				DEAD_CODE_STRIPPING = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				ENABLE_APP_SANDBOX = NO;
@@ -727,7 +775,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 4.0.2;
+				MARKETING_VERSION = 4.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

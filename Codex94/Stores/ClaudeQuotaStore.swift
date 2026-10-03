@@ -14,7 +14,21 @@ final class ClaudeQuotaStore: ObservableObject {
     @Published private(set) var nextAutomaticRefreshAt: Date?
     @Published private(set) var passiveReportNeedsConfirmation = false
     @Published private(set) var pendingPassiveReportedAt: Date?
+    @Published private(set) var pendingPassiveConfirmationID: UUID?
+    var pendingPassivePreview: ClaudeQuotaReport? {
+        sourceMode == .oauthPreferred ? oauthPendingPreview : pendingPassiveReport
+    }
     @Published private(set) var statuslineSetupState: ClaudeStatuslineSetupState = .notInstalled
+    @Published private(set) var oauthIssue: ClaudeOAuthIssue?
+    @Published private(set) var oauthIdentityIssue: ClaudeOAuthIssue?
+    @Published private(set) var identityConfidence: ClaudeQuotaIdentityConfidence = .unknown
+    @Published private(set) var oauthIdentityPending = false
+    @Published private(set) var isUsingOAuthFallback = false
+    @Published private(set) var oauthIsCached = false
+    @Published private(set) var oauthRetryAllowedAt: Date?
+    @Published private(set) var lastAttemptAt: Date?
+    var sourceMode: ClaudeQuotaSourceMode { preferences.claudeSourceMode }
+    var allowsStatuslineFallback: Bool { preferences.claudeStatuslineFallbackEnabled }
     var isStatuslineInstalled: Bool { statuslineSetupState == .installed }
     var isCLIUsageEnabled: Bool { preferences.claudeCLIUsageEnabled }
     let notificationController: NotificationController
@@ -22,13 +36,15 @@ final class ClaudeQuotaStore: ObservableObject {
     private let preferences: PreferencesStore
     private let cache: ClaudeStatuslineCache
     private let installer: ClaudeStatuslineInstaller
-    private let fetcherFactory: @Sendable () -> any ClaudeQuotaFetching
+    private let fetcherFactory: (@Sendable () -> any ClaudeQuotaFetching)?
+    private var oauthMonitor: ClaudeOAuthMonitor?
     private var fetcher: (any ClaudeQuotaFetching)?
     private let sleep: @Sendable (TimeInterval) async throws -> Void
     private let now: @Sendable () -> Date
     private let maximumReportAge: TimeInterval
     private var report: ClaudeQuotaReport?
     private var pendingPassiveReport: ClaudeQuotaReport?
+    private var oauthPendingPreview: ClaudeQuotaReport?
     private var policy = QuotaNotificationPolicy()
     private var requestTask: Task<Void, Never>?
     private var pollingTask: Task<Void, Never>?
@@ -46,7 +62,10 @@ final class ClaudeQuotaStore: ObservableObject {
         preferences: PreferencesStore,
         cache: ClaudeStatuslineCache = ClaudeStatuslineCache(),
         installer: ClaudeStatuslineInstaller? = nil,
-        fetcherFactory: @escaping @Sendable () -> any ClaudeQuotaFetching = { ClaudeCLIUsageClient() },
+        fetcherFactory: (@Sendable () -> any ClaudeQuotaFetching)? = nil,
+        oauthCredentials: any ClaudeOAuthCredentialProvider = UnavailableClaudeOAuthCredentialProvider(),
+        oauthClient: any ClaudeOAuthUsageFetching = ClaudeOAuthUsageClient(),
+        oauthCache: ClaudeOAuthQuotaCache = ClaudeOAuthQuotaCache(),
         notificationController: NotificationController = NotificationController(),
         maximumReportAge: TimeInterval = 600,
         now: @escaping @Sendable () -> Date = { Date() },
@@ -60,6 +79,11 @@ final class ClaudeQuotaStore: ObservableObject {
         self.maximumReportAge = maximumReportAge
         self.now = now
         self.sleep = sleep ?? Self.sleepForPolling
+        self.oauthMonitor = ClaudeOAuthMonitor(
+            credentials: oauthCredentials, client: oauthClient, cache: oauthCache,
+            readPassive: { try cache.load() }, now: now, sleep: sleep,
+            onChange: { [weak self] state, events in self?.applyOAuth(state, events: events) }
+        )
     }
 
     deinit {
@@ -71,13 +95,18 @@ final class ClaudeQuotaStore: ObservableObject {
 
     func start() {
         guard !stopped, !isEnabled, preferences.claudeMonitoringEnabled else { return }
-        fetcher = preferences.claudeCLIUsageEnabled ? fetcherFactory() : nil
-        let expectedSource: ClaudeQuotaSource = isCLIUsageEnabled ? .cliUsage : .statusline
-        if report?.source != expectedSource { discardReport() }
         isEnabled = true
         logger.info("monitor=started")
         notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
         refreshSetupState()
+        if sourceMode == .oauthPreferred {
+            oauthMonitor?.start(interval: preferences.claudeRefreshInterval.seconds,
+                                allowsFallback: preferences.claudeStatuslineFallbackEnabled)
+            return
+        }
+        fetcher = isCLIUsageEnabled ? (fetcherFactory?() ?? ClaudeCLIUsageClient()) : nil
+        let expectedSource: ClaudeQuotaSource = isCLIUsageEnabled ? .cliUsage : .statusline
+        if report?.source != expectedSource { discardReport() }
         if let report { updateResetSchedule(from: report) }
         projectReport(at: now())
         loadBridgeReport()
@@ -88,6 +117,7 @@ final class ClaudeQuotaStore: ObservableObject {
     /// Disable is reversible. Retired clients cannot complete into the next generation.
     func stop() {
         guard !stopped else { return }
+        oauthMonitor?.stop()
         retireCLIRequest()
         pollingTask?.cancel()
         pollingTask = nil
@@ -111,6 +141,7 @@ final class ClaudeQuotaStore: ObservableObject {
 
     func refresh(trigger: RefreshTrigger = .manual) {
         guard isEnabled, !stopped else { return }
+        if sourceMode == .oauthPreferred { oauthMonitor?.refresh(trigger: trigger); return }
         guard preferences.claudeCLIUsageEnabled else {
             loadBridgeReport()
             projectReport(at: now())
@@ -162,12 +193,14 @@ final class ClaudeQuotaStore: ObservableObject {
     }
 
     func popoverWillOpen(now: Date = Date()) {
+        if sourceMode == .oauthPreferred { oauthMonitor?.refresh(trigger: .popover); return }
         guard report.map({ now.timeIntervalSince($0.reportedAt) >= 60 }) ?? true else { return }
         refresh(trigger: .popover)
     }
 
     func handleSystemWake(now: Date = Date()) {
         guard isEnabled else { return }
+        if sourceMode == .oauthPreferred { oauthMonitor?.handleWake(); return }
         projectReport(at: now)
         armPolling()
         refresh(trigger: .systemWake)
@@ -175,6 +208,7 @@ final class ClaudeQuotaStore: ObservableObject {
 
     func handleSystemClockChange(now: Date = Date()) {
         guard isEnabled else { return }
+        if sourceMode == .oauthPreferred { oauthMonitor?.handleClockChange(); return }
         projectReport(at: now)
         nextBackgroundRefreshAt = preferences.claudeCLIUsageEnabled
             ? now.addingTimeInterval(preferences.claudeRefreshInterval.seconds) : nil
@@ -184,27 +218,44 @@ final class ClaudeQuotaStore: ObservableObject {
 
     func setRefreshInterval(_ interval: RefreshInterval) {
         preferences.claudeRefreshInterval = interval
+        if sourceMode == .oauthPreferred { oauthMonitor?.setInterval(interval.seconds); return }
         if isEnabled { armPolling() }
     }
 
     func setCLIUsageEnabled(_ enabled: Bool) {
-        guard preferences.claudeCLIUsageEnabled != enabled else { return }
-        preferences.claudeCLIUsageEnabled = enabled
-        guard !stopped else { return }
-        retireCLIRequest()
-        activeReadIssue = nil
-        nextBackgroundRefreshAt = nil
-        clearResetSchedule()
+        guard isCLIUsageEnabled != enabled else { return }
+        setSourceMode(enabled ? .legacyCLI : .oauthPreferred)
+    }
+
+    func setSourceMode(_ mode: ClaudeQuotaSourceMode) {
+        guard sourceMode != mode, !stopped else { return }
+        let wasEnabled = isEnabled
+        stop()
+        preferences.claudeSourceMode = mode
         discardReport()
-        policy.reset()
-        notificationController.configure(enabled: isEnabled && preferences.claudeNotifications.isEnabled)
-        guard isEnabled else { updateNextAutomaticRefresh(); return }
-        loadBridgeReport()
-        projectReport(at: now())
-        if let report { updateResetSchedule(from: report) }
-        if enabled { fetcher = fetcherFactory() }
-        armPolling()
-        if enabled { refresh(trigger: .preferenceChange) }
+        oauthIssue = nil
+        oauthIdentityIssue = nil
+        oauthIdentityPending = false
+        oauthIsCached = false
+        oauthRetryAllowedAt = nil
+        isUsingOAuthFallback = false
+        identityConfidence = .unknown
+        lastAttemptAt = nil
+        if wasEnabled { start() }
+    }
+
+    func setStatuslineFallbackEnabled(_ enabled: Bool) {
+        preferences.claudeStatuslineFallbackEnabled = enabled
+        oauthMonitor?.setAllowsFallback(enabled)
+    }
+
+    /// Called by the approved authentication integration after a connection
+    /// changes. It never initiates a browser or reads another app's credentials.
+    func oauthCredentialsDidChange() {
+        guard !stopped else { return }
+        oauthPendingPreview = nil
+        pendingPassiveConfirmationID = nil
+        oauthMonitor?.credentialsDidChange()
     }
 
     private func retireCLIRequest() {
@@ -228,7 +279,9 @@ final class ClaudeQuotaStore: ObservableObject {
         clearPendingPassiveReport()
     }
 
-    func adoptPendingPassiveReport() {
+    func adoptPendingPassiveReport(expectedConfirmationID: UUID? = nil) {
+        if let expectedConfirmationID, pendingPassiveConfirmationID != expectedConfirmationID { return }
+        if sourceMode == .oauthPreferred { oauthMonitor?.adoptPendingFallback(); return }
         guard isEnabled, !stopped, !isCLIUsageEnabled, let pending = pendingPassiveReport else { return }
         // Adopt the frozen report shown by the confirmation UI, never a newer
         // cache value that may have arrived while the dialog was open.
@@ -254,13 +307,16 @@ final class ClaudeQuotaStore: ObservableObject {
 
     private func clearPendingPassiveReport() {
         pendingPassiveReport = nil
+        oauthPendingPreview = nil
         pendingPassiveReportedAt = nil
+        pendingPassiveConfirmationID = nil
         passiveReportNeedsConfirmation = false
     }
 
     private func requireConfirmation(for value: ClaudeQuotaReport) {
         if pendingPassiveReport == nil {
             pendingPassiveReport = value
+            pendingPassiveConfirmationID = UUID()
             pendingPassiveReportedAt = value.reportedAt
             passiveReportNeedsConfirmation = true
             policy.reset()
@@ -387,11 +443,12 @@ final class ClaudeQuotaStore: ObservableObject {
         }
         activeReadIssue = nil
         report = value
+        identityConfidence = value.identityConfidence
         reportedAt = value.reportedAt
         source = value.source
         projectReport(at: now())
         if isNew, value.source == .statusline { logger.info("source=statusline result=reported") }
-        if isNew, !passiveReportNeedsConfirmation, isCurrent(value), let snapshot {
+        if isNew, value.source == .cliUsage, !passiveReportNeedsConfirmation, isCurrent(value), let snapshot {
             let events = policy.events(for: snapshot, preferences: preferences.claudeNotifications)
             notificationController.deliver(events, language: preferences.language, provider: .claude)
         }
@@ -477,6 +534,52 @@ final class ClaudeQuotaStore: ObservableObject {
             logger.error("refresh=finished trigger=\(trigger.rawValue, privacy: .public) source=\(sourceName, privacy: .public) result=failure issue=\(issue.rawValue, privacy: .public) duration_ms=\(milliseconds, privacy: .public)")
         } else {
             logger.info("refresh=finished trigger=\(trigger.rawValue, privacy: .public) source=\(sourceName, privacy: .public) result=success duration_ms=\(milliseconds, privacy: .public)")
+        }
+    }
+
+    private func applyOAuth(_ state: ClaudeOAuthMonitor.State, events: [ClaudeOAuthMonitor.Event]) {
+        guard !stopped, isEnabled, sourceMode == .oauthPreferred else { return }
+        report = state.report
+        snapshot = state.report?.snapshot(at: now())
+        source = state.report?.source
+        reportedAt = state.report?.reportedAt
+        isRefreshing = state.isRefreshing
+        lastAttemptAt = state.lastAttemptAt
+        nextAutomaticRefreshAt = state.nextAutomaticRefreshAt
+        if oauthPendingPreview != state.pendingFallback || (state.pendingFallback != nil && pendingPassiveConfirmationID == nil) {
+            pendingPassiveConfirmationID = state.pendingFallback == nil ? nil : UUID()
+        }
+        oauthPendingPreview = state.pendingFallback
+        pendingPassiveReportedAt = state.pendingFallback?.reportedAt
+        passiveReportNeedsConfirmation = state.pendingFallback != nil
+        oauthIssue = state.quotaIssue
+        oauthIdentityIssue = state.identityIssue
+        oauthIdentityPending = state.identityPending
+        oauthIsCached = state.isCached
+        oauthRetryAllowedAt = state.retryAllowedAt
+        isUsingOAuthFallback = state.isUsingFallback
+        identityConfidence = state.report?.identityConfidence ?? .unknown
+        lastIssue = state.quotaIssue.map { $0.quotaIssue }
+        if let snapshot {
+            connectionState = state.isCached || state.quotaIssue != nil
+                ? .stale(lastSuccess: snapshot.fetchedAt, issue: .quotaUnavailable) : .connected
+        } else if state.quotaIssue != nil {
+            connectionState = .unavailable(.quotaUnavailable)
+        } else {
+            connectionState = state.isRefreshing ? .refreshing : .idle
+        }
+        for event in events {
+            switch event {
+            case .resetNotificationBaseline:
+                policy.reset()
+                notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
+            case let .evaluateNotifications(value):
+                guard value.source == .oauth, value.accountContext != nil,
+                      !state.identityPending, !state.isCached, !state.isUsingFallback,
+                      let freshSnapshot = value.snapshot(at: now()) else { continue }
+                let alerts = policy.events(for: freshSnapshot, preferences: preferences.claudeNotifications)
+                notificationController.deliver(alerts, language: preferences.language, provider: .claude)
+            }
         }
     }
 

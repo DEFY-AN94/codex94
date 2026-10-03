@@ -2,9 +2,46 @@
 
 All notable changes to Codex94 are documented here.
 
-## Unreleased
+## Unreleased — 4.1.0
 
-Version `4.0.2 (23)` is a release candidate; no publication date is assigned.
+Version `4.1.0 (24)` is a paused engineering preparation. Further OAuth integration is paused at the maintainer’s request. No publication date or live OAuth
+acceptance is claimed; the published stable version remains `4.0.1 (22)`.
+
+### Added
+
+- A bounded Claude OAuth usage/profile HTTP client with explicit in-memory
+  credential injection, typed errors and normalized quota/profile parsing.
+- An independent coordinator with concurrent usage and identity reads,
+  credential-generation checks, one ownership-aware recovery per failed quota
+  request, monotonic rate-limit cooldowns and bounded transient recovery.
+- A private quota cache isolated by verified account and organization UUIDs;
+  tokens, raw responses and unverified reports are excluded.
+- Source/identity/query-time presentation and explicit adoption of an eligible,
+  frozen passive fallback report. Passive reports do not send notifications.
+
+### Changed
+
+- Default the development source selection to OAuth preferred while Claude
+  monitoring remains off. Keep Statusline only and explicitly selected legacy
+  CLI modes separate; the OAuth/fallback path never constructs a CLI reader.
+- Keep successful quota independent of profile failures. Identity-pending or
+  failed-profile results do not borrow prior identity, write OAuth cache or
+  evaluate notifications. Profile rate limits still gate both endpoints.
+- Use one request slot and one coordinator timer with `ContinuousClock`,
+  freshness checks on wake/open, reset coverage and cancellation protection.
+
+### Not yet available
+
+- The production credential provider remains unavailable. Project-specific
+  authorized client/callback/scope details and controlled real integration
+  validation are pending. Browser authorization, Keychain credential storage
+  and OAuth connect/disconnect UI are not implemented. Existing synthetic
+  coverage does not establish live App/web quota access or permission to reuse
+  another application's OAuth client or credentials.
+
+## 4.0.2 — Unreleased (separate candidate)
+
+Version `4.0.2 (23)` is a separate maintenance candidate; no publication date is assigned.
 
 ### Fixed
 
