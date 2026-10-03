@@ -164,6 +164,7 @@ EXPECTED_VERSION="$(jq -er '.version' <<<"$METADATA_JSON")"
 EXPECTED_BUILD="$(jq -er '.build' <<<"$METADATA_JSON")"
 /usr/bin/python3 -I "$ROOT_DIR/script/tests/test_release_metadata.py"
 /bin/bash "$ROOT_DIR/script/tests/test_install.sh"
+/usr/bin/python3 -I "$ROOT_DIR/script/tests/test_security_check.py"
 git diff HEAD --check --
 PREVIOUS_TAG="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
 if [[ -n "$PREVIOUS_TAG" ]]; then
