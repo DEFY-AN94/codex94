@@ -200,6 +200,61 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         XCTAssertEqual(try fixture.cache.load()?.reportedAt, first)
     }
 
+    func testBridgeEntryReadsItsOwnStandardPreferenceDomainAndPreservesReportAge() throws {
+        let original = try helperExecutable()
+        let originalBundle = original.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        XCTAssertEqual(originalBundle.pathExtension, "app")
+        let root = try fixtureDirectory()
+        let copiedBundle = root.appendingPathComponent("IsolatedBridge.app", isDirectory: true)
+        try FileManager.default.copyItem(at: originalBundle, to: copiedBundle)
+        let suite = "com.defyan94.codex94.bridgefixture.\(UUID().uuidString.lowercased())"
+        let infoURL = copiedBundle.appendingPathComponent("Contents/Info.plist")
+        var info = try XCTUnwrap(PropertyListSerialization.propertyList(from: Data(contentsOf: infoURL), format: nil) as? [String: Any])
+        info["CFBundleIdentifier"] = suite
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0).write(to: infoURL, options: .atomic)
+        // Only this disposable test bundle is changed and re-signed. The real
+        // test host and installed application keep their identifiers and bytes.
+        let signing = Process()
+        signing.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        signing.arguments = ["--force", "--deep", "--sign", "-", "--identifier", suite, copiedBundle.path]
+        signing.standardOutput = FileHandle.nullDevice
+        signing.standardError = FileHandle.nullDevice
+        try signing.run()
+        try waitForExit(signing, timeout: 15)
+        XCTAssertEqual(signing.terminationStatus, 0)
+        let executable = copiedBundle.appendingPathComponent("Contents/MacOS/Codex94")
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        addTeardownBlock {
+            let isolated = UserDefaults(suiteName: suite)
+            isolated?.removePersistentDomain(forName: suite)
+            isolated?.synchronize()
+        }
+        let reset = Int(Date().addingTimeInterval(3_600).timeIntervalSince1970)
+        let data = Data("{\"session_id\":\"00000000-0000-0000-0000-000000000001\",\"rate_limits\":{\"five_hour\":{\"used_percentage\":23.5,\"resets_at\":\(reset)}}}".utf8)
+        for (name, value) in [("enabled", true), ("disabled", false), ("integer", 1), ("string", "true")] as [(String, Any)] {
+            defaults.set(value, forKey: "claudeMonitoringEnabled.v1")
+            XCTAssertTrue(defaults.synchronize())
+            let fixture = try installerFixture(executable: executable)
+            let preview = try fixture.installer.previewInstall()
+            XCTAssertNil(preview.originalCommand)
+            try fixture.installer.install(preview)
+            try runIsolatedBridge(executable, manifest: fixture.installer.manifestURL, input: data)
+            if name == "enabled" {
+                let first = try XCTUnwrap(fixture.cache.load())
+                XCTAssertEqual(first.source, .statusline)
+                XCTAssertEqual(first.windows.first?.usedPercentage, 23.5)
+                XCTAssertEqual(first.windows.first?.resetsAt, Date(timeIntervalSince1970: Double(reset)))
+                XCTAssertEqual(first.producerID, try ClaudeStatuslineParser.producerID(from: data))
+                try runIsolatedBridge(executable, manifest: fixture.installer.manifestURL, input: data)
+                let replay = try XCTUnwrap(fixture.cache.load())
+                XCTAssertEqual(replay.reportedAt, first.reportedAt)
+                XCTAssertGreaterThan(replay.receivedAt, first.receivedAt)
+            } else {
+                XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.cache.fileURL.path), name)
+            }
+        }
+    }
+
     func testBridgePreservesStaticCommandOutputAndExitWhenItClosesStdinEarly() throws {
         let executable = try helperExecutable()
         let fixture = try installerFixture(executable: executable)
@@ -805,7 +860,8 @@ final class ClaudeQuotaBackendTests: XCTestCase {
     private func fixtureDirectory() throws -> URL {
         let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
             .appendingPathComponent("Codex94ClaudeTests-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         return root
     }
@@ -830,8 +886,26 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         return executable
     }
 
-    private func waitForExit(_ process: Process) throws {
-        let deadline = Date().addingTimeInterval(4)
+    private func runIsolatedBridge(_ executable: URL, manifest: URL, input data: Data) throws {
+        let process = Process()
+        let input = Pipe(), output = Pipe()
+        process.executableURL = executable
+        process.arguments = [ClaudeStatuslineBridge.argument, manifest.path]
+        process.environment = CodexExecutableLocator.sanitizedEnvironment(from: ProcessInfo.processInfo.environment)
+        process.standardInput = input
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        defer { if process.isRunning { process.terminate(); try? waitForExit(process) } }
+        try input.fileHandleForWriting.write(contentsOf: data)
+        try input.fileHandleForWriting.close()
+        try waitForExit(process)
+        XCTAssertEqual(process.terminationStatus, 0)
+        XCTAssertTrue(output.fileHandleForReading.readDataToEndOfFile().isEmpty)
+    }
+
+    private func waitForExit(_ process: Process, timeout: TimeInterval = 4) throws {
+        let deadline = Date().addingTimeInterval(timeout)
         while process.isRunning, Date() < deadline { usleep(10_000) }
         if process.isRunning {
             process.terminate()

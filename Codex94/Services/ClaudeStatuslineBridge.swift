@@ -1,3 +1,4 @@
+import CoreFoundation
 import Darwin
 import Foundation
 
@@ -12,8 +13,8 @@ enum ClaudeStatuslineBridge {
         do {
             let url = URL(fileURLWithPath: arguments[2])
             let manifest = try manifest(at: url)
-            let enabled = UserDefaults(suiteName: "com.defyan94.codex94")?
-                .bool(forKey: "claudeMonitoringEnabled.v1") ?? false
+            let value = UserDefaults.standard.object(forKey: "claudeMonitoringEnabled.v1") as? NSNumber
+            let enabled = value.map { CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue } ?? false
             let status = try forward(manifest: manifest, captureEnabled: enabled, cancellation: cancellation)
             return cancellation.exitStatus ?? status
         } catch { return cancellation.exitStatus ?? 2 }

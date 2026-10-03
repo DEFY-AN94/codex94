@@ -24,6 +24,9 @@ integration; live `/usage` probing remains suspended.
 
 ### Fixed
 
+- Read the installed statusline helper's monitoring preference from the App's
+  standard defaults, so an enabled passive connection actually captures reports.
+  A packaged-entry-point regression covers enabled, disabled and malformed values.
 - Recognize the complete Claude input screen when right-aligned effort or quota
   hints appear beside the mode footer. This allows `/usage` to be sent promptly
   instead of waiting until the read times out.
