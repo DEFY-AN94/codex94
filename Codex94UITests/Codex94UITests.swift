@@ -495,6 +495,11 @@ final class Codex94UITests: XCTestCase {
         let beforeAllOff = try providerRequestCounts()
         try setProviderEnabled("claude", enabled: false, in: dashboard)
         _ = try providerStatusItems(expected: ["codex"], neutral: true)
+        // Start from another page so the button must actually navigate to
+        // Services, rather than passing because that page was already open.
+        try selectPage(.display, in: dashboard)
+        try require(!identified("provider-settings-page", in: dashboard).exists,
+                    "The settings-entry precondition must be a different Dashboard page")
         popover = try openProviderPopover(service: "codex", marker: "providers-disabled", neutral: true)
         try require(!identified("claude-quota-fiveHour", in: popover).exists
                     && !identified("claude-quota-weekly", in: popover).exists
@@ -505,10 +510,15 @@ final class Codex94UITests: XCTestCase {
                     "Both-off state must expose settings rather than old provider data")
         try captureProviderPopover(popover, marker: "providers-disabled", named: "providers-disabled-en.png")
         XCTAssertEqual(try providerRequestCounts(), beforeAllOff)
-        try uniqueIdentified("providers-open-settings", in: popover).click()
+        try disabledProviderSettingsButton(in: popover).click()
+        try waitUntil("Choosing Services must close the neutral popover") {
+            !self.identified("providers-disabled", in: self.application).exists
+        }
         dashboard = try dashboardWindow()
         try require(identified("provider-settings-page", in: dashboard).waitForExistence(timeout: 5),
                     "The neutral state must keep Services settings reachable")
+        XCTAssertEqual(try providerRequestCounts(), beforeAllOff,
+                       "Opening Services while both monitors are off must not request either provider")
         let beforeReenable = try fixture.requestCount()
         let claudeBeforeReenable = try fixture.claudeUsageRequestCount()
         try setProviderEnabled("codex", enabled: true, in: dashboard)
@@ -538,6 +548,54 @@ final class Codex94UITests: XCTestCase {
             "keyboardAcceptance": "not-tested", "spacesAndFullscreenAcceptance": "not-tested",
             "rawTestResultsUploaded": false
         ])
+    }
+
+    /// SwiftUI can propagate the disabled-state container identifier onto its
+    /// button on macOS 15. Select the actual visible, localized native action
+    /// within this known popover, never a decorative container or a fallback click.
+    private func disabledProviderSettingsButton(in popover: XCUIElement) throws -> XCUIElement {
+        try require(fixture.scenario == "providers"
+                    && (try fixture.preference("codexMonitoringEnabled.v1") as? Bool) == false
+                    && (try fixture.preference("claudeMonitoringEnabled.v1") as? Bool) == false,
+                    "The settings-entry query is limited to the synthetic both-disabled state")
+        let owned = try currentProviderPopover(marker: "providers-disabled")
+        try require(owned.frame == popover.frame, "The settings action must belong to the known neutral popover")
+        let title = language.openProviderSettings
+        let query = popover.buttons.matching(NSPredicate(format: "label == %@ OR title == %@", title, title))
+        let appeared = query.firstMatch.waitForExistence(timeout: 5)
+        let count = query.count
+        let observations: [[String: Any]] = (0..<min(count, 4)).map { index in
+            let element = query.element(boundBy: index)
+            guard element.exists else { return ["stillExists": false] }
+            let frame = element.frame
+            let finite = [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
+            let identifierClass: String = switch element.identifier {
+            case "providers-open-settings": "action"
+            case "providers-disabled": "disabled-state"
+            case "": "empty"
+            default: "other"
+            }
+            return ["stillExists": true, "role": element.elementType.rawValue,
+                    "enabled": element.isEnabled, "hittable": element.isHittable,
+                    "insideOwnedPopover": finite && !frame.isEmpty && popover.frame.contains(frame),
+                    "labelMatchesCaption": element.label == title, "titleMatchesCaption": element.title == title,
+                    "identifierClass": identifierClass]
+        }
+        try fixture.writeReport("providers-settings-entry.json", fields: [
+            "scenario": "providers", "selectionMethod": "exact-localized-native-button-in-neutral-popover",
+            "requestedIdentifierCount": popover.descendants(matching: .any).matching(identifier: "providers-open-settings").count,
+            "disabledStateIdentifierCount": popover.descendants(matching: .any).matching(identifier: "providers-disabled").count,
+            "exactCaptionButtonCount": count, "sampledCandidates": observations, "samplesTruncated": count > 4,
+            "rawAXTextIncluded": false, "globalCoordinatesIncluded": false
+        ])
+        try require(appeared && count == 1, "The neutral popover must expose exactly one native Choose Services action")
+        let button = query.element(boundBy: 0)
+        let frame = button.frame
+        try require(button.elementType == .button && button.isEnabled && button.isHittable
+                    && [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
+                    && !frame.isEmpty && popover.frame.contains(frame),
+                    "The exact localized settings action must be enabled, clickable and inside its own popover")
+        return button
     }
 
     private func providerRequestCounts() throws -> [Int] {
@@ -3307,6 +3365,7 @@ private enum UILanguage: String, CaseIterable {
     var connectionFailed: String { chinese ? "无法读取额度" : "Could not read quota" }
     var cachedStatus: String { chinese ? "缓存数据" : "Cached data" }
     var nextAttemptPrefix: String { chinese ? "下次自动尝试：" : "Next automatic attempt: " }
+    var openProviderSettings: String { chinese ? "选择监控服务…" : "Choose services…" }
     var choose: String { chinese ? "选择…" : "Choose…" }
     var quotaModel: String { chinese ? "额度模型" : "Quota model" }
     var menuBarQuota: String { chinese ? "菜单栏额度" : "Menu bar quota" }
@@ -3992,7 +4051,8 @@ private struct SyntheticFixture {
             "providers-claude-only-en.png", "providers-disabled-en.png",
             "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
             "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
-            "providers-reopen-claude-left.json", "providers-reopen-claude-right.json"
+            "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",
+            "providers-settings-entry.json"
         ] : []
         let floating: Set<String> = scenario == "floating" ? [
             "floating-cold-en.png", "floating-compact-en.png", "floating-expanded-en.png",
