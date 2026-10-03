@@ -323,13 +323,37 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         }
     }
 
+    func testNewCLIReadyFooterAcceptsPersistentSeparatedHints() async throws {
+        let rule = String(repeating: "─", count: 180)
+        for suffix in ["     ◐ medium · /effort", "     Synthetic limit warning"] {
+            let screen = """
+            Claude Code v2.1.286
+            \(rule)
+            ❯ Try "show a synthetic example"
+            \(rule)
+            ⏸ plan mode on (shift+tab to cycle)\(suffix)
+            """
+            // This fixture never clears its suffix before receiving /usage.
+            // Its five-second budget proves readiness does not wait for a tip
+            // to expire before submitting the usage request.
+            try await assertGatedCLIUsage(readyScreen: screen)
+        }
+    }
+
     func testPromptLikeDialogsNeverReceiveUsageInput() async throws {
         let rule = String(repeating: "─", count: 80)
-        for body in ["\(rule)\n❯ Yes, continue\n\(rule)", "❯\n\(rule)"] {
+        let framedPrompt = "\(rule)\n❯\n\(rule)"
+        let mode = "⏸ plan mode on (shift+tab to cycle)"
+        for (body, footer) in [
+            ("\(rule)\n❯ Yes, continue\n\(rule)", mode),
+            ("❯\n\(rule)", mode),
+            (framedPrompt, "⏸ plan mode on (shift+tab to cycle     Synthetic hint"),
+            (framedPrompt, mode + "Synthetic hint")
+        ] {
             let root = try fixtureDirectory()
             let executable = root.appendingPathComponent("claude")
             let unexpectedInput = root.appendingPathComponent("unexpected-input")
-            let frame = "Claude Code v2.1.286\n\(body)\n⏸ plan mode on (shift+tab to cycle)"
+            let frame = "Claude Code v2.1.286\n\(body)\n\(footer)"
                 .replacingOccurrences(of: "\n", with: "\\r\\n")
             let script = """
             #!/bin/sh

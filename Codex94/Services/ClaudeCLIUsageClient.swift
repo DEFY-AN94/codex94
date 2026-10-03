@@ -306,10 +306,13 @@ enum ClaudeUsageScreen {
         guard upper.count >= 20, upper.allSatisfy({ $0 == "─" }), upper == lower else { return false }
         let input = lines[prompt].dropFirst().trimmingCharacters(in: .whitespaces)
         guard input.isEmpty || (input.hasPrefix("Try \"") && input.hasSuffix("\"")) else { return false }
+        let mode = "⏸ plan mode on (shift+tab to cycle)"
         return lines.dropFirst(prompt + 2).contains { line in
-            line.replacingOccurrences(of: "\u{fe0f}", with: "")
+            let footer = line.replacingOccurrences(of: "\u{fe0f}", with: "")
                 .components(separatedBy: .whitespaces).filter { !$0.isEmpty }.joined(separator: " ")
-                == "⏸ plan mode on (shift+tab to cycle)"
+            // The right side can show effort or quota hints. Require the full
+            // mode prefix and a whitespace boundary before any such suffix.
+            return footer == mode || footer.hasPrefix(mode + " ")
         }
     }
 
