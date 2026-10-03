@@ -787,46 +787,71 @@ final class Codex94UITests: XCTestCase {
 
     private func assertProviderQuotaVisibility(in popover: XCUIElement, codexFiveHour: Bool, reportName: String) throws {
         let viewport = try uniqueIdentified("provider-quota-sections", in: popover).frame.intersection(popover.frame)
-        try require(abs(viewport.width - 500) <= 2 && abs(viewport.height - 480) <= 2,
-                    "Both-provider evidence requires the actual 500 × 480 viewport")
+        let viewportMatches = abs(viewport.width - 500) <= 2 && abs(viewport.height - 480) <= 2
+        func diagnosticNumber(_ value: CGFloat) -> Any { value.isFinite ? Double(value) : NSNull() }
         var values = [("provider-codex-quota-weekly", codexFiveHour ? "80%" : "32%"),
                       ("claude-quota-fiveHour", "75.5%"), ("claude-quota-weekly", "38.8%")]
         if codexFiveHour { values.append(("provider-codex-quota-fiveHour", "88%")) }
         var geometry: [[String: Any]] = []
         var quotaFrames: [String: CGRect] = [:]
-        for (identifier, percent) in values {
+        for (identifier, _) in values {
             let element = try uniqueIdentified(identifier, in: popover)
             let frame = element.frame
-            try assertProviderMetric(identifier, percent: percent, in: popover)
-            // Terminal rows contain a main quota line and a compact reset line;
-            // allow native font metrics without accepting the old half-width cards.
-            try require(frame.width >= 400 && (32...80).contains(frame.height)
-                        && viewport.insetBy(dx: -1, dy: -1).contains(frame),
-                        "Every full-width terminal quota row must fit completely in the shared viewport")
             quotaFrames[identifier] = frame
-            geometry.append(["identifier": identifier, "insideViewport": true,
-                             "relativeX": Double(frame.minX - viewport.minX), "relativeY": Double(frame.minY - viewport.minY),
-                             "width": Double(frame.width), "height": Double(frame.height)])
+            geometry.append([
+                "identifier": identifier, "insideViewport": viewport.insetBy(dx: -1, dy: -1).contains(frame),
+                "finiteFrame": [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite),
+                "relativeX": diagnosticNumber(frame.minX - viewport.minX),
+                "relativeY": diagnosticNumber(frame.minY - viewport.minY),
+                "width": diagnosticNumber(frame.width), "height": diagnosticNumber(frame.height),
+                "widthMeetsContract": frame.width >= 400, "heightMeetsContract": (32...80).contains(frame.height)
+            ])
         }
         let codexRegion = quotaFrames.filter { $0.key.hasPrefix("provider-codex-quota-") }
             .values.reduce(CGRect.null) { $0.union($1) }
         let claudeRegion = quotaFrames.filter { $0.key.hasPrefix("claude-quota-") }
             .values.reduce(CGRect.null) { $0.union($1) }
-        try require(!codexRegion.isNull && !claudeRegion.isNull && !codexRegion.intersects(claudeRegion),
-                    "The shared viewport must contain separate visible quota regions for both services")
-        for prefix in ["provider-codex-quota-", "claude-quota-"] {
-            if let first = quotaFrames[prefix + "fiveHour"], let second = quotaFrames[prefix + "weekly"] {
-                try require(!first.intersects(second), "A provider's two quota rows must not overlap")
-            }
+        let regionsAreDistinct = !codexRegion.isNull && !claudeRegion.isNull && !codexRegion.intersects(claudeRegion)
+        let rowPairsDoNotOverlap = ["provider-codex-quota-", "claude-quota-"].allSatisfy { prefix in
+            guard let first = quotaFrames[prefix + "fiveHour"], let second = quotaFrames[prefix + "weekly"] else { return true }
+            return !first.intersects(second)
         }
+        let rowsMeetGeometry = quotaFrames.values.allSatisfy {
+            $0.width >= 400 && (32...80).contains($0.height) && viewport.insetBy(dx: -1, dy: -1).contains($0)
+        }
+        // Persist exact app-owned relative geometry before any geometry assertion
+        // can stop the scenario; no global coordinates or unbounded AX text.
         try fixture.writeReport(reportName, fields: [
             "scenario": "providers", "method": "external-aut-accessibility-geometry",
             "quotaRows": geometry, "quotaRowCount": values.count,
-            "viewportWidth": Double(viewport.width), "viewportHeight": Double(viewport.height),
-            "sharedViewportContainsBothProviders": true, "providerQuotaRegionsAreDistinct": true,
+            "viewportWidth": diagnosticNumber(viewport.width), "viewportHeight": diagnosticNumber(viewport.height),
+            "viewportMeetsContract": viewportMatches, "rowsMeetGeometryContract": rowsMeetGeometry,
+            "sharedViewportContainsBothProviders": quotaFrames.values.allSatisfy { viewport.insetBy(dx: -1, dy: -1).contains($0) },
+            "providerQuotaRegionsAreDistinct": regionsAreDistinct, "providerRowsDoNotOverlap": rowPairsDoNotOverlap,
+            "recordedBeforeAssertions": true,
             "containerObservations": providerContainerObservations(in: popover),
             "globalCoordinatesIncluded": false, "rawAXTextIncluded": false, "allDataSynthetic": true
         ])
+        if !viewportMatches || !rowsMeetGeometry || !regionsAreDistinct || !rowPairsDoNotOverlap {
+            let imageName = (reportName as NSString).deletingPathExtension + "-geometry-failure.png"
+            try captureProviderPopover(popover, marker: "provider-quota-sections", named: imageName)
+        }
+        try require(viewportMatches,
+                    "Both-provider viewport must be 500 × 480; actual width=\(viewport.width), height=\(viewport.height)")
+        for (identifier, percent) in values {
+            let frame = try XCTUnwrap(quotaFrames[identifier])
+            let relativeFrame = frame.offsetBy(dx: -viewport.minX, dy: -viewport.minY)
+            // Keep the terminal-row contract unchanged while exposing the exact
+            // failing row and geometry in CI's first failure message.
+            try require(frame.width >= 400 && (32...80).contains(frame.height)
+                        && viewport.insetBy(dx: -1, dy: -1).contains(frame),
+                        "Terminal quota row \(identifier) has viewport-relative frame \(NSStringFromRect(relativeFrame)); "
+                        + "viewport width=\(viewport.width), height=\(viewport.height); "
+                        + "required width>=400, height=32...80 and complete visibility")
+            try assertProviderMetric(identifier, percent: percent, in: popover)
+        }
+        try require(regionsAreDistinct, "The shared viewport must contain separate visible quota regions for both services")
+        try require(rowPairsDoNotOverlap, "A provider's two quota rows must not overlap")
     }
 
     /// Failure triage only. Container aliases are not the acceptance condition;
