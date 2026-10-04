@@ -1,6 +1,6 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v4.1.0 (24)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0),
+The published stable version is [`v4.1.1 (25)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1),
 released on 2026-10-05 (Australia/Melbourne). Later docs-only commits do not
 move its tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
@@ -33,9 +33,9 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
-The current candidate is **`4.1.1 (25)`**, with a changelog date of
-**2026-10-05** (Australia/Melbourne), on branch `codex/4.1.1-cache-maintenance`. Stable downloads remain on published
-`v4.1.0` until the maintenance release is verified. The `4.0.2 (23)` candidate
+The latest maintenance release is **`4.1.1 (25)`**, published on
+**2026-10-05** (Australia/Melbourne) from PR #49. Stable downloads point to
+`v4.1.1`; the verified package and installation record appears below. The `4.0.2 (23)` candidate
 was merged through PR #43 and carried into 4.1.0 without a separate release.
 Never move or reuse existing tags, including the retained `v4.0.0` candidate.
 
@@ -182,7 +182,7 @@ reports by default and a separate, explicitly enabled CLI option.
 The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
 do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
 records do not establish validation of these source boundaries. Final checks,
-artifacts and installation need separate records. Its release records remain historical; current stable links point to 4.1.0.
+artifacts and installation need separate records. Its release records remain historical; current stable links point to 4.1.1.
 
 During the earlier 4.0 release work, the maintainer approved a ten-minute
 live-observation scope.
@@ -265,7 +265,8 @@ separate and tied to the revision actually tested.
 Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
 Its historical tag and DMG remain bound to
 `ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`. Current download and clone
-instructions point to `v4.1.0`. That maintenance release isolates quota request contexts, shares strict
+instructions point to `v4.1.1`. The 3.0.1 maintenance release isolates quota
+request contexts, shares strict
 service-value parsing, reuses chart preparation/formatting, retires old Token
 clients outside the main actor, and validates development-script arguments
 before side effects. It does not introduce a broad timer rewrite, new data
@@ -412,7 +413,7 @@ states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
 Wait for CI, every synthetic UI smoke required by the candidate, and
-Actions/Python/Swift CodeQL on the actual tested revision. The `4.1.1` candidate gate
+Actions/Python/Swift CodeQL on the actual tested revision. The `4.1.1` release gate
 includes five UI scenarios: Display, Recovery, Token usage, Floating, and
 Providers. Providers uses synthetic data, including a synthetic local usage
 cache under `CLAUDE_CONFIG_DIR`; passing it does not verify real Claude account
@@ -931,3 +932,62 @@ Later documentation commits do not move either tag or replace release assets.
 
 Direct OAuth remains unimplemented; the paused work stays in draft PR #44.
 Later documentation commits do not move the tag or replace release assets.
+
+
+### 4.1.1 cache maintenance release — 2026-10-05
+
+- Version/build: `4.1.1 (25)`. [PR #49](https://github.com/DEFY-AN94/codex94/pull/49)
+  was marked Ready and squash-merged after independent review, local acceptance
+  and all required PR checks. The maintainer authorized development, installation,
+  Ready, merge and publication in the task goal.
+- Release source: `e86cad021bf984f738df379e57cf9174dc45430c`; tree `fdf02e5b8907b4b9d671cc2ae0523385b1ca75ab`.
+  PR head `4240ec5b441be113bd7edbd450743dec47774a01` and tested merge
+  `e51cd6ffed0cd1700ab3873019f331c2bab792db` have the same tree.
+- Local Xcode 27.0 full gate: **565 tests executed, 1 existing hosted-focus skip,
+  0 failures**; metadata/installer/security checks, Universal build and package
+  verification passed. The skip is not a pass. Initial focused testing passed
+  116 tests; the added confirmation-context follow-up passed 62 focused tests.
+- PR [CI 37232196265](https://github.com/DEFY-AN94/codex94/actions/runs/37232196265)
+  passed its 565-test gate and all five UI scenarios on Xcode 16.4. PR
+  [CodeQL 37232194575](https://github.com/DEFY-AN94/codex94/actions/runs/37232194575)
+  passed Actions/Python/Swift and aggregate analysis. Main-only attestation was
+  intentionally skipped for the PR.
+- Final-main [CI 37233582007](https://github.com/DEFY-AN94/codex94/actions/runs/37233582007)
+  and [CodeQL 37233582061](https://github.com/DEFY-AN94/codex94/actions/runs/37233582061)
+  passed for the frozen release source, including all five UI scenarios and
+  DMG attestation.
+- Local candidate executable SHA-256: `140a414ac84a6594f4a4b44a9453e67eac1071671e07bad449bb97a15082371b`.
+  Local DMG SHA-256: `6ef934133ae6ab370eb050b67bb3d1773c7d0e154455be2444522e9d1c7648fd`; these were local
+  validation artifacts, not the public release bytes.
+- Local candidate observation ran for 610 seconds in the same App process:
+  two successful Codex background refreshes, zero failures, zero Claude CLI
+  read starts, and the CLI preference off before and after. Startup confirmed
+  a valid Claude local-cache read. No live `/usage` or cloud quota comparison
+  was performed; no synthetic data was put into the user's real cache.
+- Reviewed synthetic bilingual/theme renders and native CI screenshots. The
+  first floating capture was blank; later compact, expanded and dual-window
+  captures plus functional assertions provide the accepted visual evidence.
+  Local native UI control was unavailable. Existing keyboard, Spaces, hosted
+  tooltip and custom-date-editing limits remain explicit in artifact JSON.
+- CI artifact `11314614865` supplied exactly the DMG and checksum.
+  DMG SHA-256: `898c9bf487ffdfabd3e8c7a2e70e410baf2829f9d8e25b4e6b9d9bd867ac95ce`.
+  Checksum-file SHA-256: `614b1b767cd93880382cbd0e237c634a87631c76389bddd9190d5d454b59d743`.
+  [Attestation 52645893](https://github.com/DEFY-AN94/codex94/attestations/52645893)
+  was verified against this repository, `refs/heads/main`, the CI workflow,
+  GitHub-hosted runners and the frozen source. The annotated tag object is `d042833df34800baa9a6983a73bdb006d4b77cec` and peels
+  to that source.
+- [Public v4.1.1 Release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1)
+  (ID `403215362`, published `2026-10-04T21:27:34Z`) was verified through the
+  Release API as public, stable and latest. Asset IDs are `610706738` (DMG)
+  and `610706741` (checksum). Draft and
+  public downloads matched the verified CI bytes. The exact final CI App was
+  installed and launched, with executable SHA-256 `1910fd7e666b62f94371e533c4ec67981031d1afe9f01d65229a4d59ea659c52`.
+  All 14 descendant bundle entries matched the CI App, including file bytes,
+  modes and link destinations. Public ZIP and TAR archives matched all 173
+  committed Git blobs and executable modes; a fresh shallow tag clone reproduced
+  the frozen source/tree and version/build. The prior App was preserved for
+  rollback. No tag or published asset was moved
+  or overwritten. The App remains ad-hoc signed and the DMG unnotarized;
+  attestation is provenance evidence, not Apple notarization. No quarantine was
+  removed; none was present on the installed App. Fresh-account first-launch
+  Gatekeeper acceptance remains unverified.

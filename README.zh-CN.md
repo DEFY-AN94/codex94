@@ -26,19 +26,21 @@ Claude 默认读取 Claude Code 本地用量缓存，以符合条件的状态栏
 > Codex94 与 OpenAI 或 Anthropic 没有隶属关系，也未获得两者的认可、背书或赞助。
 > Codex `app-server` 是实验性接口；上游更新也可能改变 CLI 和状态栏的数据格式。
 
-## 4.1.1 维护候选版（尚未发布）
+## 4.1.1 版本
 
-`4.1.1 (25)` 优化 Claude 缓存恢复、账号上下文隔离和本地读取安全：选源前排除
+`4.1.1 (25)` 已于 **2026-10-05**（Australia/Melbourne）正式发布。
+本版优化 Claude 缓存恢复、账号上下文隔离和本地读取安全：选源前排除
 无可用窗口的报告，时间恢复后复核未来时间戳，减少重复解析与相同界面状态的发布。
 界面区分本地重读与 Claude Code 获取新数据，并显示 Auto 实际选择的额度。
 定期 CLI 读取仍为独立、默认关闭的选项；单次按钮保留额度消耗提示。OAuth 继续暂停。
 
-验证仍在进行，稳定下载入口继续指向 4.1.0；最终提交对应的证据见
-[发布流程](docs/RELEASING.md)。
+本机及最终主分支检查均通过：565 项测试、1 项既有托管焦点测试跳过、0 失败，
+五组界面场景与 CodeQL 全部通过。本机 610 秒观察完成两次后台自动刷新，CLI 保持关闭。
+安装包来源与验证范围见[发布记录](docs/RELEASING.md)。
 
-## 4.1.0 版本
+## 早先的 4.1.0 版本
 
-`4.1.0 (24)` 已于 **2026-10-05**（Australia/Melbourne）正式发布，现为稳定版。`4.0.2 (23)` 候选版
+`4.1.0 (24)` 已于 **2026-10-05**（Australia/Melbourne）正式发布。`4.0.2 (23)` 候选版
 （通知回调修复、独立大额度卡片、紧凑双圈以及状态栏适用范围说明）已通过 PR #43 合并，但从未单独打标签或发布；
 4.1.0 原样带入这些改动。
 
@@ -55,7 +57,7 @@ Claude 默认读取 Claude Code 本地用量缓存，以符合条件的状态栏
   改为最后选项；它不再与被动来源互斥，结果只是加入选择，关闭时仅丢弃 CLI 数据。
   最新的有效报告胜出，时间相同时缓存优先。不同来源的百分比绝不取平均或合并。
   符合条件的报告在已观察的上下文内共用通知基线，来源之间的账号身份并未得到验证。
-  4.1.1 候选版还会在上下文丢失时重置基线，并抑制旧报告回退产生的新通知。
+  4.1.1 还会在上下文丢失时重置基线，并抑制旧报告回退产生的新通知。
 - **用 CLI 刷新一次。** Dashboard → **服务**新增一个按钮，无论 CLI 开关如何都只运行一次
   官方 CLI，并显示同样的提示。若 Claude Code 写入更新的缓存，主来源会在后续轮询读取；
   Codex94 不写入或强制刷新该文件。
@@ -77,7 +79,7 @@ Claude 默认读取 Claude Code 本地用量缓存，以符合条件的状态栏
 读取并解码整个 JSON 文档，但只解释 `cachedUsageUtilization`，其余字段立即丢弃；除上述额度字段外，文件中的任何内容都不会
 被保留、记录或导出。账号 UUID 仅在内存中比较，用于识别换了登录账号（这会重置通知基线），
 从不持久化。读取器从不写入该文件，通常仅在其大小、修改时间或 inode 变化时重新解析；
-4.1.1 候选版另会复核未来时间戳和临时读取失败，无需等待文件变化。偏好 key
+4.1.1 另会复核未来时间戳和临时读取失败，无需等待文件变化。偏好 key
 保持不变（`claude.cliUsageEnabled.v1` 含义不变）；不新增偏好、缓存文件、entitlement、
 网络端点或安装步骤。
 
@@ -236,7 +238,7 @@ Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 ## 当前分发状态
 
 - 已发布的稳定版为
-  [`v4.1.0 (24)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0)，
+  [`v4.1.1 (25)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1)，
   于 **2026-10-05**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
   annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
@@ -251,7 +253,7 @@ Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 - 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
-已发布的 `4.1.0` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+已发布的 `4.1.1` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
 attestation 都不会改变这一 Apple 信任状态。
 
@@ -276,23 +278,23 @@ Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
 
 ## 安装 Universal DMG
 
-请从 [`v4.1.0` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0)
+请从 [`v4.1.1` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1)
 下载以下两个正式资产：
 
-- `Codex94-4.1.0-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.0-SHA256SUMS.txt`
+- `Codex94-4.1.1-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.1-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-4.1.0-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.1-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-4.1.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -312,7 +314,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v4.1.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
