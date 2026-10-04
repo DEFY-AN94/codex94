@@ -1,13 +1,13 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints for the published
-[`4.1.0 (24)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0),
+[`4.1.1 (25)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1),
 published on 2026-10-05 (Australia/Melbourne), including the unpublished
 `4.0.2 (23)` candidate it carries forward.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.1.1 maintenance candidate
+## 4.1.1 maintenance release
 
 `4.1.1 (25)` keeps the existing sources and polling frequency. The store
 isolates an observed cache account context from previously accepted backup
@@ -35,7 +35,7 @@ poll. The local reader normally skips unchanged bytes; a rejected future
 Statusline capture decodes windows and producer information from one JSON parse.
 Projection still recomputes freshness/expiry every poll but publishes only
 changed values. UI Auto captions use the existing quota resolver and do not
-start a request. Validation of this candidate is recorded separately in
+start a request. Validation of this release is recorded separately in
 [RELEASING.md](RELEASING.md).
 
 ## Local usage cache as the primary Claude source (introduced in 4.1.0)

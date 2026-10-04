@@ -31,22 +31,24 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
-## 4.1.1 maintenance candidate (unreleased)
+## Version 4.1.1
 
-`4.1.1 (25)` improves Claude cache recovery, account-context isolation and local
-read safety. It filters unusable reports before source selection, rechecks
+`4.1.1 (25)` was published on **2026-10-05** (Australia/Melbourne). It improves
+Claude cache recovery, account-context isolation and local read safety. It filters unusable reports before source selection, rechecks
 future timestamps when time catches up, and reduces repeated parsing and
 unchanged UI publications. The UI distinguishes local re-reading from Claude
 Code fetching new data and shows which quota Auto selected. Scheduled CLI
 reading stays optional and default-off; the independent one-time action keeps
 its quota-consumption warning. OAuth remains paused.
 
-Validation is in progress. Stable downloads still point to 4.1.0; see the
-[release workflow](docs/RELEASING.md) for evidence tied to the final revision.
+The full local and final-main gates passed: 565 tests, 1 existing hosted-focus
+skip, 0 failures, all five UI scenarios and CodeQL. A 610-second local observation
+recorded two successful background refreshes with CLI off. See the
+[release record](docs/RELEASING.md) for package provenance and acceptance limits.
 
-## Version 4.1.0
+## Earlier 4.1.0 release
 
-`4.1.0 (24)` is the published stable release, dated **2026-10-05**
+`4.1.0 (24)` was released on **2026-10-05**
 (Australia/Melbourne). The `4.0.2 (23)` candidate (the notification-callback
 fix, large separate service cards, compact dual rings and the statusline-scope
 explanation) was merged through PR #43 but never tagged or published; 4.1.0 carries
@@ -71,7 +73,7 @@ those changes forward unchanged.
   The newest valid report wins and the cache wins ties. Percentages from
   different sources are never averaged or merged. Eligible reports share a
   notification baseline within the observed context; cross-source account
-  identity is not proven. The 4.1.1 candidate also resets that baseline on
+  identity is not proven. Version 4.1.1 also resets that baseline on
   context loss and suppresses notifications from older fallback observations.
 - **Read once with the CLI.** Dashboard → **Services** gains a button that runs
   the official CLI exactly once regardless of the CLI switch, with the same
@@ -105,7 +107,7 @@ files and files over 16 MiB. It decodes the JSON document, interprets only
 above is retained, logged or exported. The account UUID is compared in memory
 only to detect a different login, which resets the notification baseline, and
 is never persisted. The reader never writes the file and re-parses it only
-when its size, modification time or inode changes. The 4.1.1 candidate additionally
+when its size, modification time or inode changes. Version 4.1.1 additionally
 revalidates future timestamps and transient reads without requiring a file change. Preference keys are unchanged
 (`claude.cliUsageEnabled.v1` keeps its meaning); no new preference, cache file,
 entitlement, network endpoint or installer step is added.
@@ -302,7 +304,7 @@ statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v4.1.0 (24)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0),
+  [`v4.1.1 (25)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1),
   released on **2026-10-05** (Australia/Melbourne) as a Universal 2 DMG and
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
@@ -321,7 +323,7 @@ statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `4.1.0` DMG itself is completely unsigned, has no Apple Developer ID
+The published `4.1.1` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -352,23 +354,23 @@ precedence; an invalid manual choice is not silently bypassed.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v4.1.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0):
+[`v4.1.1` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1):
 
-- `Codex94-4.1.0-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.0-SHA256SUMS.txt`
+- `Codex94-4.1.1-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.1-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-4.1.0-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.1-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-4.1.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -390,7 +392,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v4.1.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
