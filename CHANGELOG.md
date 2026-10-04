@@ -2,7 +2,7 @@
 
 All notable changes to Codex94 are documented here.
 
-## 4.1.0 - 2026-10-04 (candidate, not yet published)
+## 4.1.0 - 2026-10-05 (candidate, not yet published)
 
 Version `4.1.0 (24)`. Release dates use Australia/Melbourne. It carries forward
 the unpublished `4.0.2 (23)` candidate below. The published stable release
