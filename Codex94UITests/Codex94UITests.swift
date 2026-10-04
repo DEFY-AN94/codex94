@@ -590,6 +590,9 @@ final class Codex94UITests: XCTestCase {
         try require(identified("claude-quota-history", in: dashboard).waitForExistence(timeout: 5),
                     "Dashboard must share the same historical presentation")
         try capture(dashboard, named: "dashboard-providers-history-en.png")
+        // Overview intentionally shares the provider section identifier. Leave
+        // that page before the strict app-wide popover-closed precondition.
+        try selectPage(.providers, in: dashboard)
         popover = try openProviderPopover(service: "claude", marker: "claude-quota-section")
         try fixture.setClaudeLocalCacheExpired(false)
         try uniqueIdentified("claude-refresh", in: popover).click()
