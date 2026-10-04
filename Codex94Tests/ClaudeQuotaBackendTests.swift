@@ -50,6 +50,33 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         XCTAssertNil(report.snapshot(at: first.addingTimeInterval(10)))
     }
 
+    func testStatuslineCacheRejectsRecordsThatCarryModelLimits() throws {
+        let support = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Codex94BackendModelLimits-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: support) }
+        let cache = ClaudeStatuslineCache(fileURL: support.appendingPathComponent("statusline-quota.json"))
+        let date = Date(timeIntervalSince1970: 1_900_000_000)
+        let windows = [ClaudeQuotaWindow(kind: .fiveHour, usedPercentage: 30, resetsAt: date.addingTimeInterval(1_000))]
+        func record(_ report: ClaudeQuotaReport) throws -> Data {
+            try JSONSerialization.data(withJSONObject: [
+                "version": 1, "report": try JSONSerialization.jsonObject(with: JSONEncoder().encode(report)),
+                "producers": [:]
+            ])
+        }
+        let plain = ClaudeQuotaReport(source: .statusline, reportedAt: date, receivedAt: date, windows: windows)
+        try ClaudeLocalFile.write(try record(plain), to: cache.fileURL)
+        XCTAssertEqual(try cache.load(), plain)
+        let scoped = ClaudeQuotaReport(source: .statusline, reportedAt: date, receivedAt: date, windows: windows,
+                                       modelLimits: [.init(modelName: "Fable", usedPercentage: 1, resetsAt: nil)])
+        try ClaudeLocalFile.write(try record(scoped), to: cache.fileURL)
+        XCTAssertThrowsError(try cache.load(), "Statusline reports never carry model-scoped limits")
+        let foreign = ClaudeQuotaReport(source: .localCache, reportedAt: date, receivedAt: date, windows: windows)
+        try ClaudeLocalFile.write(try record(foreign), to: cache.fileURL)
+        XCTAssertThrowsError(try cache.load(), "The statusline cache only stores statusline reports")
+    }
+
     func testStatuslineRejectsInvalidNumbersAndOversizedInput() {
         for number in ["true", "false", "-0.1", "100.01", "\"23\"", "1e999"] {
             XCTAssertThrowsError(try ClaudeStatuslineParser.windows(from: payload(used: number)), number)

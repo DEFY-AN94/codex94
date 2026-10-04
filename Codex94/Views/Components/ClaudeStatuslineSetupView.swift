@@ -18,7 +18,7 @@ struct ClaudeStatuslineSetupView: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("claude-passive-account-help")
-            if store.passiveReportNeedsConfirmation && !store.isCLIUsageEnabled {
+            if store.passiveReportNeedsConfirmation {
                 ClaudePassiveReportAdoptionView(
                     reportedAt: store.pendingPassiveReportedAt,
                     canAdopt: store.isEnabled,
@@ -75,7 +75,6 @@ struct ClaudeStatuslineSetupView: View {
             }
         }
         .onAppear { store.refreshSetupState() }
-        .onChange(of: store.isCLIUsageEnabled) { _, _ in dismissAdoptionConfirmation() }
         .onChange(of: store.isEnabled) { _, _ in dismissAdoptionConfirmation() }
         .onChange(of: store.passiveReportNeedsConfirmation) { _, needsConfirmation in
             if !needsConfirmation { dismissAdoptionConfirmation() }
@@ -135,8 +134,7 @@ struct ClaudeStatuslineSetupView: View {
             case .adoptReport:
                 // The store owns the frozen pending report and may reject it
                 // if expired. Its published state is the result, not a toast.
-                guard store.isEnabled, !store.isCLIUsageEnabled,
-                      store.passiveReportNeedsConfirmation else { return }
+                guard store.isEnabled, store.passiveReportNeedsConfirmation else { return }
                 store.adoptPendingPassiveReport()
             }
         } catch {

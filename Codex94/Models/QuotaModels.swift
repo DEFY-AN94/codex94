@@ -438,6 +438,7 @@ struct RedactedDiagnostics: Equatable, Sendable {
     var claudeSource: ClaudeQuotaSource? = nil
     var claudeIssue: ClaudeQuotaIssue? = nil
     var claudeLastReport: Date? = nil
+    var claudeLocalCache: ClaudeLocalUsageCacheState? = nil
 
     var text: String {
         let iso = ISO8601DateFormatter()
@@ -458,7 +459,8 @@ struct RedactedDiagnostics: Equatable, Sendable {
             "claudeConnection: \(claudeConnection)",
             "claudeSource: \(claudeSource?.rawValue ?? "none")",
             "claudeIssue: \(claudeIssue?.rawValue ?? "none")",
-            "claudeLastReport: \(claudeLastReport.map(iso.string(from:)) ?? "none")"
+            "claudeLastReport: \(claudeLastReport.map(iso.string(from:)) ?? "none")",
+            "claudeLocalCache: \(claudeLocalCache?.rawValue ?? "none")"
         ].joined(separator: "\n")
     }
 }

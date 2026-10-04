@@ -1,6 +1,329 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "claude.cliUsage.readOnce.noData": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The CLI read returned only windows that had already reset."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI 读取只返回了已到期的窗口。"
+          }
+        }
+      }
+    },
+    "claude.source.localCache": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code local cache"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 本地缓存"
+          }
+        }
+      }
+    },
+    "claude.source.passive": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local sources"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地来源"
+          }
+        }
+      }
+    },
+    "claude.localCacheTime %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code fetched: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 取数时间：%@"
+          }
+        }
+      }
+    },
+    "claude.localCache.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Claude Code usage cache on this Mac yet. Run claude in a terminal and enter /usage, or use the one-time CLI read in Services."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本机还没有 Claude Code 的用量缓存。请在终端运行 claude 并输入 /usage，或在服务设置里使用一次 CLI 读取。"
+          }
+        }
+      }
+    },
+    "claude.localCache.unreadable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Claude Code cache file could not be read safely."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法安全读取 Claude Code 的缓存文件。"
+          }
+        }
+      }
+    },
+    "claude.issue.localCacheUnreadable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Claude Code cache file could not be read safely."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法安全读取 Claude Code 的缓存文件。"
+          }
+        }
+      }
+    },
+    "claude.localCache.status.absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local cache: not found"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地缓存：不存在"
+          }
+        }
+      }
+    },
+    "claude.localCache.status.valid": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local cache: available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地缓存：可用"
+          }
+        }
+      }
+    },
+    "claude.localCache.status.unreadable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local cache: not readable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地缓存：无法读取"
+          }
+        }
+      }
+    },
+    "claude.localCache.status.invalid": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local cache: no usage data"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地缓存：没有用量数据"
+          }
+        }
+      }
+    },
+    "claude.modelLimits.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per-model weekly limits"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按模型周限额"
+          }
+        }
+      }
+    },
+    "claude.sources.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude data sources"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 数据来源"
+          }
+        }
+      }
+    },
+    "claude.sources.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex94 shows one report at a time. Claude Code's own usage cache is the primary source, the status-line connection fills in when it is newer, and the optional CLI read is the last option. Sources are never merged."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex94 每次只显示一份报告。Claude Code 自己的用量缓存是主来源，状态栏连接在更新时补位，可选的 CLI 读取是最后选项。来源之间不会合并计算。"
+          }
+        }
+      }
+    },
+    "claude.sources.current %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current source: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前来源：%@"
+          }
+        }
+      }
+    },
+    "claude.sources.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no report yet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无报告"
+          }
+        }
+      }
+    },
+    "claude.cliUsage.readOnce": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read once with the CLI"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 CLI 刷新一次"
+          }
+        }
+      }
+    },
+    "claude.cliUsage.readOnce.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runs the official Claude Code once regardless of the switch above. Claude Code also refreshes its own usage cache afterwards."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无论上方开关如何，只运行一次官方 Claude Code；读取后 Claude Code 也会刷新自己的用量缓存。"
+          }
+        }
+      }
+    },
+    "claude.cliUsage.lastRead %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last CLI read: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次 CLI 读取：%@"
+          }
+        }
+      }
+    },
     "display.layout.compactProviderHelp": {
       "extractionState": "manual",
       "localizations": {
@@ -41,13 +364,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting for Claude Code reports"
+            "value": "Waiting for Claude Code data"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "等待 Claude Code 报告"
+            "value": "等待 Claude Code 数据"
           }
         }
       }
@@ -58,13 +381,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Passive reports require the Claude Code status line. Claude chat apps and the website do not report quota here."
+            "value": "Passive data comes from Claude Code on this Mac: its usage cache or the status-line connection. Claude chat apps and the website do not report quota here."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "被动读取需要 Claude Code 状态栏；Claude 聊天 App 和网页不会在此上报额度。"
+            "value": "被动数据来自本机的 Claude Code：它的用量缓存或状态栏连接。Claude 聊天 App 和网页不会在此上报额度。"
           }
         }
       }
@@ -126,13 +449,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Passive reading (default)"
+            "value": "Status-line connection (backup)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "被动读取（默认）"
+            "value": "状态栏连接（备援）"
           }
         }
       }
@@ -143,13 +466,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reread local report"
+            "value": "Reread local data"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "重新读取本地报告"
+            "value": "重新读取本地数据"
           }
         }
       }
@@ -177,13 +500,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting for a report from your normal Claude Code use."
+            "value": "Waiting for Claude Code's usage cache or a status-line report."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "等待你正常使用 Claude Code 时产生报告。"
+            "value": "等待 Claude Code 的用量缓存或状态栏报告。"
           }
         }
       }
@@ -194,13 +517,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This report has no valid quota windows left. Waiting for a new report."
+            "value": "The last report has no quota windows left; waiting for Claude Code to fetch usage again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此报告已无有效额度窗口；等待新报告。"
+            "value": "上次报告的额度窗口均已到期，等待 Claude Code 再次获取用量。"
           }
         }
       }
@@ -381,13 +704,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "CLI /usage reading (optional)"
+            "value": "CLI /usage read (last option)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "CLI /usage 读取（可选）"
+            "value": "CLI /usage 读取（最后选项）"
           }
         }
       }
@@ -415,13 +738,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Off by default. When off, automatic refresh, opening the popover, manual refresh and recovery only reread local reports and never launch Claude Code. Other source failures do not enable this option."
+            "value": "Off by default. When on, Claude Code is launched on the refresh interval as the last source after the local cache and status-line reports. When off, refreshes only reread local data and never launch Claude Code."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "默认关闭。关闭时，自动刷新、打开面板、手动刷新和错误恢复都只重读本地报告，不启动 Claude Code；其他来源失败也不会自动开启此选项。"
+            "value": "默认关闭。开启后按刷新间隔启动 Claude Code，作为本地缓存和状态栏报告之后的最后一层来源；关闭时刷新只重读本地数据，不会启动 Claude Code。"
           }
         }
       }

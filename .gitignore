@@ -23,3 +23,6 @@ xcuserdata/
 *.app
 *.dmg
 *.pkg
+
+# Python bytecode from script self-tests
+__pycache__/

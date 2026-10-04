@@ -19,12 +19,16 @@ Claude Code `/usage` reader. Authentication remains inside Claude Code. There is
 direct Claude quota HTTP/OAuth implementation or credential-store access.
 The CLI reader has a separate, default-off opt-in with a quota-consumption
 warning. Enabling Claude monitoring does not opt into CLI sessions. While the
-CLI reader is off, automatic and manual refreshes only inspect the local
-statusline cache. Disabling it cancels and retires an active reader.
-Source modes are isolated: a CLI failure does not adopt an account-unverified
-statusline report. Passive monitoring pins its selected report stream and asks
-for explicit adoption when a different session reports; a session fingerprint
-never proves account identity. No OAuth token access or refresh is implemented.
+CLI reader is off, automatic and manual refreshes read only local files: in
+4.0.1 the statusline cache alone, and from the 4.1.0 candidate below also Claude
+Code's own usage cache in `.claude.json` (read-only, `cachedUsageUtilization`
+key only). Disabling the CLI reader cancels and retires an active reader.
+In 4.0.1, source modes are isolated: a CLI failure does not adopt an
+account-unverified statusline report (the 4.1.0 candidate below replaces this
+isolation with tiered selection). Passive monitoring pins its selected report
+stream and asks for explicit adoption when a different session reports; a
+session fingerprint never proves account identity. No OAuth token access or
+refresh is implemented.
 The CLI probe has an owned working directory, disabled tools/hooks/MCP and
 remote-control startup, bounded output and a deadline. Only a recognized
 built-in usage action is submitted; unexpected login/onboarding screens are
@@ -43,6 +47,41 @@ previews the change, preserves unrelated settings, backs up only the previous
 statusline key and checks for conflicting changes before restoration. The
 manifest and cache use private local files; neither is included in releases.
 See [PRIVACY.md](PRIVACY.md) for the new configuration and cache inventory.
+
+The unreleased `4.1.0 (24)` candidate adds one read-only file source and no
+new network path. `ClaudeLocalUsageCacheReader` opens Claude Code's global
+state file `.claude.json`, in the home directory or in `CLAUDE_CONFIG_DIR` when
+Codex94's own environment sets it, read-only with `O_NOFOLLOW`. It refuses
+symlinks, hard-linked files, foreign owners, non-regular files and files over
+16 MiB, parses the bounded JSON, interprets only the `cachedUsageUtilization`
+key and discards every other key, including account email, organization,
+project paths and MCP settings. It never writes, and re-parses only when the
+file's size/mtime/inode stamp changes. The cache is untrusted input:
+percentages must be finite values from 0 to 100, timestamps must be strict
+ISO-8601 with a zone, model-limit rows are capped at sixteen and malformed rows
+are skipped, and a malformed or partially written cache keeps the previous
+report. The `accountUuid` value is compared in memory only to detect a
+different login; it is never persisted or logged.
+
+Sources are tiered, not merged: the local usage cache is primary, the
+status-line connection (statusline bridge) is the backup when its report is
+strictly newer or the cache is absent or unreadable, and the optional CLI
+`/usage` read is the last option. The CLI reader stays default-off with its
+quota-consumption warning; it is no longer mutually exclusive with the passive
+sources, and a **Read once with the CLI** button runs the official CLI exactly
+once under the same warning. Exactly one report is shown at a time; tiers of
+the same account share one notification baseline, which only a different login,
+a different status-line producer or a rejected CLI login resets.
+`script/security_check.sh` additionally forbids `.credentials.json`, the
+Keychain item name `Claude Code-credentials`, `SecItemAdd`, `SecItemUpdate`,
+`SecItemDelete`, `SecKeychain` and the `api/oauth/usage` endpoint string in
+production sources, and requires that the literal `claude.json` appears only in
+`Services/ClaudeLocalUsageCacheReader.swift`. `AppUpdateClient.swift` remains
+the only network client. No HTTP/OAuth client, Keychain, cookie or token
+reading was added: Anthropic's credential-use rules reserve OAuth tokens for
+Claude Code and native Anthropic apps, so Codex94 reads only files that the
+official client leaves on the Mac. The paused OAuth work is draft PR #44 and is
+not part of 4.1.0.
 
 The app is intentionally not App Sandboxed because the child Codex process must
 access its own existing login state. Hardened Runtime is enabled for installed
@@ -179,9 +218,30 @@ boundaries remain unchanged.
 
 ## Supported versions
 
-The unreleased `4.0.2 (23)` candidate repairs a notification callback actor
-boundary and changes presentation. It adds no quota API, credential access or
-automatic installer. The fixed official Claude Usage link is opened only by an
+The unreleased `4.1.0 (24)` candidate adds the read-only Claude Code usage-cache
+source, source tiering, the one-time CLI read and per-model weekly buckets
+described above. It adds no quota API, credential access, preference key,
+cache file, entitlement or installer step. The App target and the UI test bundle build locally on Xcode 27.0, and the
+hosted unit suite passed there: 544 tests executed, 1 existing hosted-focus
+skip, 0 failures. The metadata, installer and security-scanner script
+self-tests also passed locally, and `script/release_check.sh` passed
+locally on Xcode 27.0 for `4.1.0 (24)`: it verified the Universal App and an
+unsigned DMG candidate (SHA-256
+`9be68277c0f6db6d820da06e3da0b9f8bb29dba7bb99a999d0eeefe9facb9fd0`; a local
+artifact, not the release asset). On CI (Xcode 16.4) the `test` job and the
+display, floating, recovery and usage UI smokes passed for the first PR head;
+the providers smoke failed four times on test-side causes that were
+corrected afterwards (an exact-text assertion predating the cached-data
+prefix, a fixture whose scoped Fable limit was the tightest window and
+relabelled the native item, a new screenshot name missing from the artifact
+allowlist, then a fixture-policy check that still required the CLI opt-in
+to stay on while the smoke itself toggles it), so its rerun, candidate
+acceptance, tag, the CI DMG and publication are pending.
+
+The unpublished `4.0.2 (23)` candidate, carried into 4.1.0, repairs a
+notification callback actor boundary and changes presentation. It adds no
+quota API, credential access or automatic installer. The fixed official Claude
+Usage link is opened only by an
 explicit user action in the system browser; Codex94 does not read the resulting
 page or browser session. Claude Code `/usage` remains independently default-off.
 

@@ -4,6 +4,23 @@ enum ProviderQuotaDisplayStyle: Equatable {
     case card, terminal
 }
 
+/// A model-scoped weekly limit shown beneath the shared windows.
+struct ProviderScopedLimit: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let window: QuotaWindowSnapshot
+
+    /// Every displayable bucket beside the default one carries exactly the
+    /// weekly window of one model.
+    static func limits(in snapshot: QuotaSnapshot?) -> [ProviderScopedLimit] {
+        guard let snapshot else { return [] }
+        return snapshot.displayableBuckets.compactMap { bucket in
+            guard bucket.limitID != snapshot.defaultLimitID, let window = bucket.window(.weekly) else { return nil }
+            return ProviderScopedLimit(id: bucket.limitID, name: snapshot.displayName(for: bucket), window: window)
+        }
+    }
+}
+
 /// Observes Claude's own state. Reading/rendering this view never refreshes it.
 struct ClaudeQuotaCard: View {
     @ObservedObject var store: ClaudeQuotaStore
@@ -33,7 +50,8 @@ struct ClaudeQuotaCard: View {
                 isCLIUsageEnabled: store.isCLIUsageEnabled,
                 statuslineSetupState: store.statuslineSetupState,
                 passiveReportNeedsConfirmation: store.passiveReportNeedsConfirmation,
-                style: style
+                style: style,
+                localCacheState: store.localCacheState
             )
         }
     }
@@ -60,22 +78,28 @@ struct ClaudeQuotaCardContent: View {
     var statuslineSetupState: ClaudeStatuslineSetupState = .notInstalled
     var passiveReportNeedsConfirmation = false
     var style: ProviderQuotaDisplayStyle = .card
+    var localCacheState: ClaudeLocalUsageCacheState = .absent
 
     var badge: ConnectionBadge {
         guard isEnabled else { return .none }
-        if isCLIUsageEnabled && isRefreshing { return .refreshing }
+        if isRefreshing { return .refreshing }
         if needsSourceConfirmation || issue == .staleData || passiveWindowsExpired { return .stale }
         if visibleIssue != nil { return snapshot == nil ? .unavailable : .stale }
         return .none
     }
 
+    /// Confirmation concerns the card only while the pending statusline report
+    /// is what would be shown; another selected source keeps presenting its data.
     private var needsSourceConfirmation: Bool {
-        !isCLIUsageEnabled && (passiveReportNeedsConfirmation || issue == .sourceChanged)
+        issue == .sourceChanged || (passiveReportNeedsConfirmation && (source == nil || source == .statusline))
+    }
+
+    private var isPassiveSource: Bool {
+        source == .localCache || source == .statusline
     }
 
     private var passiveWindowsExpired: Bool {
-        !isCLIUsageEnabled && source == .statusline && reportedAt != nil
-            && snapshot == nil && issue == .noData
+        isPassiveSource && reportedAt != nil && snapshot == nil && issue == .noData
     }
 
     private var visibleIssue: ClaudeQuotaIssue? {
@@ -84,27 +108,30 @@ struct ClaudeQuotaCardContent: View {
             switch issue {
             case .setupRequired, .noData, .cliUnavailable, .loginRequired, .timedOut:
                 // Waiting for a local report is not a login or network failure.
+                // A failed one-time CLI read is reported beside its button instead.
                 return nil
             default: break
             }
         }
+        // With the option on, the store projects a CLI failure onto passive data
+        // only while that data is out of date; it is shown as the reason.
         return issue
     }
 
     var statusKey: String? {
         guard isEnabled else { return nil }
-        if isCLIUsageEnabled && isRefreshing { return "claude.refreshing" }
+        if isRefreshing { return "claude.refreshing" }
         if needsSourceConfirmation { return "claude.issue.sourceChanged" }
         if let issue = visibleIssue {
-            // The empty-state line already describes a missing report.
-            return issue == .noData ? nil : issue.localizationKey
+            // The empty-state line already describes a missing or unreadable report.
+            return issue == .noData || issue == .localCacheUnreadable ? nil : issue.localizationKey
         }
         return nil
     }
 
     var sourceTitleKey: String {
         if let source { return source.localizationKey }
-        return isCLIUsageEnabled ? "claude.source.waiting" : "claude.source.statusline"
+        return isCLIUsageEnabled ? "claude.source.waiting" : "claude.source.passive"
     }
 
     var refreshTitleKey: String {
@@ -114,13 +141,15 @@ struct ClaudeQuotaCardContent: View {
     var emptyStateKey: String {
         guard isEnabled else { return "claude.monitoring.off" }
         if needsSourceConfirmation { return "claude.passive.confirmationRequired" }
-        if !isCLIUsageEnabled {
-            if issue == .staleData || passiveWindowsExpired { return "claude.passive.expiredEmpty" }
-            if style == .terminal { return "claude.passive.waitingShort" }
-            return statuslineSetupState == .notInstalled
-                ? "claude.passive.notConfigured" : "claude.passive.waiting"
+        if issue == .staleData || passiveWindowsExpired { return "claude.passive.expiredEmpty" }
+        if localCacheState == .unreadable { return "claude.localCache.unreadable" }
+        if isCLIUsageEnabled, source == nil { return "claude.quota.empty" }
+        if style == .terminal { return "claude.passive.waitingShort" }
+        // A state file without usage data needs the same /usage instruction as a missing file.
+        if localCacheState == .absent || localCacheState == .invalid, statuslineSetupState == .notInstalled {
+            return "claude.localCache.absent"
         }
-        return "claude.quota.empty"
+        return "claude.passive.waiting"
     }
 
     private var statusText: Text? {
@@ -138,7 +167,8 @@ struct ClaudeQuotaCardContent: View {
             canRefresh: isEnabled && !isRefreshing, showsDetails: snapshot == nil || issue != nil,
             language: language, now: now, palette: palette,
             refresh: refresh, openDetails: openSetup, timeZone: timeZone, compact: compact,
-            style: style, explainsPassiveSource: !isCLIUsageEnabled
+            style: style, explainsPassiveSource: source != .cliUsage,
+            scopedLimits: ProviderScopedLimit.limits(in: snapshot)
         )
     }
 
@@ -149,10 +179,12 @@ struct ClaudeQuotaCardContent: View {
         ) else {
             return StatusAccessibilityString.localized("claude.sourceTime.unavailable", language: language, bundle: .main)
         }
-        return StatusAccessibilityString.localized(
-            source == .statusline ? "claude.localReportTime %@" : "claude.sourceTime %@",
-            arguments: [timestamp], language: language, bundle: .main
-        )
+        let key: String = switch source {
+        case .localCache: "claude.localCacheTime %@"
+        case .statusline: "claude.localReportTime %@"
+        case .cliUsage, nil: "claude.sourceTime %@"
+        }
+        return StatusAccessibilityString.localized(key, arguments: [timestamp], language: language, bundle: .main)
     }
 
 }
@@ -186,6 +218,7 @@ struct ProviderQuotaCardContent: View {
     var windowIdentifierPrefix: String? = nil
     var resetLocale: Locale? = nil
     var resetCalendar = Calendar(identifier: .gregorian)
+    var scopedLimits: [ProviderScopedLimit] = []
 
     private var isTerminal: Bool { style == .terminal }
 
@@ -245,6 +278,19 @@ struct ProviderQuotaCardContent: View {
                         windowContent(window)
                     }
                 }
+            }
+
+            if !windows.isEmpty, !scopedLimits.isEmpty {
+                VStack(alignment: .leading, spacing: isTerminal ? 4 : 6) {
+                    Text("claude.modelLimits.title")
+                        .font(isTerminal ? .system(size: 11, design: .monospaced) : .caption)
+                        .foregroundStyle(.secondary)
+                    ForEach(scopedLimits) { limit in
+                        scopedLimitRow(limit)
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier(provider.rawValue + "-model-limits")
             }
 
             if provider == .claude && windows.isEmpty {
@@ -335,5 +381,32 @@ struct ProviderQuotaCardContent: View {
                 + Text(verbatim: ", " + reset.accessibilityLabel)
         )
         .accessibilityIdentifier(windowIdentifier(window))
+    }
+
+    /// One compact line per model: name, remaining share and reset countdown.
+    private func scopedLimitRow(_ limit: ProviderScopedLimit) -> some View {
+        let percent = QuotaFormatting.percent(precise: limit.window.preciseRemainingPercent, language: language)
+        let color = palette.quotaColor(for: QuotaLevel(preciseRemainingPercent: limit.window.preciseRemainingPercent))
+        let reset = resetPresentation(limit.window)
+        return HStack(spacing: 8) {
+            Text(verbatim: limit.name).fontWeight(.medium).lineLimit(1).truncationMode(.tail)
+                .frame(maxWidth: 180, alignment: .leading)
+            Text(verbatim: percent).monospacedDigit().foregroundStyle(color)
+                .fixedSize(horizontal: true, vertical: false).layoutPriority(2)
+            Text("floating.remaining").foregroundStyle(.secondary)
+                .fixedSize(horizontal: true, vertical: false).layoutPriority(2)
+            (Text("quota.resets") + Text(verbatim: " " + reset.countdown))
+                .foregroundStyle(.secondary).lineLimit(1).layoutPriority(1)
+            Spacer(minLength: 0)
+        }
+        .font(isTerminal ? .system(size: 12, design: .monospaced) : .caption)
+        .help(Text(verbatim: reset.absolute))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            Text(verbatim: limit.name + ", ")
+                + StatusAccessibilityText.remainingPercent(percent)
+                + Text(verbatim: ", " + reset.accessibilityLabel)
+        )
+        .accessibilityIdentifier(provider.rawValue + "-model-limit-" + limit.id)
     }
 }

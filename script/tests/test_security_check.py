@@ -95,6 +95,24 @@ class SecurityCheckFixtureTests(unittest.TestCase):
         self.historical_only("Codex94/Production.swift", TRUST_PATH + "\n")
         self.scan("machine path or email exists in Git history")
 
+    def test_claude_state_file_may_be_named_only_by_the_usage_cache_reader(self):
+        self.write("Codex94/Services/ClaudeLocalUsageCacheReader.swift",
+                   'static let fileName = ".claude.json"\n')
+        self.scan()
+        self.write("Codex94/Stores/Elsewhere.swift", 'let path = ".claude.json"\n')
+        self.scan("Claude state file referenced outside the usage-cache reader")
+
+    def test_credential_store_and_oauth_patterns_remain_rejected_in_production(self):
+        for text in ['let item = "Claude Code-credentials"\n',
+                     'let path = ".credentials.json"\n',
+                     'let status = SecItemAdd(query, nil)\n',
+                     'let url = "https://api.anthropic.com/api/oauth/usage"\n']:
+            with self.subTest(text=text):
+                self.write("Codex94/Services/Reader.swift", text)
+                self.scan("prohibited credential or direct-HTTP pattern found")
+        self.write("Codex94/Services/Reader.swift", "// nothing\n")
+        self.scan()
+
     def test_credentials_remain_rejected_in_current_tests(self):
         self.write("Codex94Tests/Fixture.swift", TOKEN + "\n")
         self.scan("possible committed credential or private key found")

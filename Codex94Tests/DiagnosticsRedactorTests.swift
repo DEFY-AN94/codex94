@@ -113,7 +113,8 @@ final class DiagnosticsRedactorTests: XCTestCase {
             claudeConnection: "stale",
             claudeSource: .cliUsage,
             claudeIssue: .timedOut,
-            claudeLastReport: Date(timeIntervalSince1970: 800)
+            claudeLastReport: Date(timeIntervalSince1970: 800),
+            claudeLocalCache: .valid
         ).text
 
         XCTAssertTrue(diagnostics.contains("connection: connected"))
@@ -126,6 +127,7 @@ final class DiagnosticsRedactorTests: XCTestCase {
         XCTAssertTrue(diagnostics.contains("claudeSource: cliUsage"))
         XCTAssertTrue(diagnostics.contains("claudeIssue: timedOut"))
         XCTAssertTrue(diagnostics.contains("claudeLastReport: 1970-01-01T00:13:20Z"))
+        XCTAssertTrue(diagnostics.contains("claudeLocalCache: valid"))
         XCTAssertFalse(diagnostics.contains("private-model-identifier"))
         XCTAssertFalse(diagnostics.contains("/Users/private"))
         XCTAssertFalse(diagnostics.contains("@"))

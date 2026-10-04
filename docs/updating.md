@@ -10,10 +10,18 @@ manual-only update design. It adds no update polling, download, installation,
 relaunch, endpoint, or signing-policy change. Stable discovery continues to
 follow the latest published GitHub Release.
 
-The unreleased `4.0.2 (23)` candidate preserves this update mechanism. Its
-notification callback fix and compact quota layouts do not add automatic
-update checks or installation. The separate official Claude Usage-page link
-is browser navigation, not an additional update or quota API.
+The unpublished `4.0.2 (23)` candidate, carried into 4.1.0, preserves this
+update mechanism. Its notification callback fix and compact quota layouts do
+not add automatic update checks or installation. The separate official Claude
+Usage-page link is browser navigation, not an additional update or quota API.
+
+The unreleased `4.1.0 (24)` candidate also keeps the manual update mechanism.
+Reading Claude Code's local usage cache, the tiered Claude sources, the one-time
+CLI read and per-model weekly limits add no network client:
+`AppUpdateClient.swift` remains the only one, and no HTTP/OAuth client,
+Keychain, cookie or token reading, endpoint, polling, download, installation or
+relaunch is added. Neither candidate is published; stable links still point to
+`v4.0.1`.
 
 `v4.0.0` remains an unchanged candidate tag; its Draft Release was removed. A tag alone is not a public stable
 Release and does not change what the latest-release API returns.
@@ -115,8 +123,15 @@ be proposed. This document does not claim that path already exists.
 浏览器打开经过验证的发布页面。下载、校验和安装仍由用户完成，不会自动替换或重启
 App。`0.2.2` 用户需先手动安装 `0.3.0` 或之后的正式稳定版本，才能使用检查入口。
 
-尚未发布的 `4.0.2 (23)` 候选版继续沿用此更新机制。通知回调修复和紧凑额度布局
-不会新增自动检查或安装；“查看官方 Claude 用量”仅打开浏览器页面，不是新的额度 API。
+未发布的 `4.0.2 (23)` 候选版（已并入 4.1.0）继续沿用此更新机制。通知回调修复和
+紧凑额度布局不会新增自动检查或安装；“查看官方 Claude 用量”仅打开浏览器页面，不是
+新的额度 API。
+
+尚未发布的 `4.1.0 (24)` 候选版同样保留手动更新机制。读取 Claude Code 本地用量缓存、
+分层的 Claude 数据来源、“用 CLI 刷新一次”和按模型的周限额都不新增网络客户端：
+`AppUpdateClient.swift` 仍是唯一的网络客户端，没有新增 HTTP/OAuth 客户端、Keychain、
+cookie 或令牌读取、端点、轮询、下载、安装或重启。两个候选版均未发布，稳定下载链接
+仍指向 `v4.0.1`。
 
 检查不发送账号或用量数据，结果不落盘；GitHub 仍能看到普通网络连接信息。检查失败
 不等于“已是最新”。它也不代表安装包已完成签名、公证或安全审查。未来自动安装需在

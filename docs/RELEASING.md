@@ -33,12 +33,88 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
-The current candidate is **`4.0.2 (23)`**, with its changelog under **Unreleased**.
-Keep the stable `v4.0.1` download, clone, checksum and attestation references
-until public 4.0.2 publication is verified. Do not move or reuse any existing
-release tag, including the retained `v4.0.0` candidate tag.
+The current candidate is **`4.1.0 (24)`**, with its changelog under **Unreleased**
+on branch `claude/4.1.0-local-usage-cache`. It carries forward the unpublished
+`4.0.2 (23)` candidate ([PR #43](https://github.com/DEFY-AN94/codex94/pull/43)),
+which was merged-ready but never tagged or published. Keep the stable `v4.0.1`
+download, clone, checksum and attestation references until public 4.1.0
+publication is verified. Do not move or reuse any existing release tag,
+including the retained `v4.0.0` candidate tag.
 
-For 4.0.2, verify the following changes against its own source and artifacts:
+For 4.1.0, verify the following against its own source and artifacts. Use
+synthetic state files under `CLAUDE_CONFIG_DIR` and the synthetic Claude
+executable; do not read the maintainer's real `~/.claude.json`, launch the real
+CLI or send a prompt to populate test data.
+
+- Local cache states: absent (no file), valid, unreadable (symlink, foreign
+  owner, non-regular or hard-linked file, over 16 MiB) and invalid (no usable
+  `cachedUsageUtilization`). Check the Claude card's empty states and the
+  Services local-cache state for each, that a torn rewrite keeps the last good
+  report while the state reads invalid, that a decoded file without usage data
+  drops it, and that the diagnostics export carries `claudeLocalCache` with
+  exactly one of absent/valid/unreadable/invalid while Claude monitoring is on
+  (none once it is off) and no path or account identifier. Confirm the reader
+  never writes the file.
+- Expired windows: a cache whose `resets_at` has passed disappears from the
+  card, picker and menu bar and is never shown as 100% remaining; a report with
+  only expired windows shows the windows-expired state.
+- 60-minute freshness: a cache report is current for 60 minutes after
+  `fetchedAtMs`, then shows the amber cached marker and the **Claude Code
+  fetched** time while keeping its numbers. Statusline keeps 10 minutes; CLI
+  keeps max(10 min, refresh interval + 60 s). Re-reading an unchanged file
+  must not renew report age.
+- Source switching: with cache and statusline reports present, the cache is
+  shown unless the statusline report's observation time is strictly newer;
+  equal times keep the cache. The same rule applies to a CLI report. Values
+  are never averaged or merged. A source change resets the notification
+  baseline; a different `accountUuid` also resets it and is not stored.
+- CLI option off keeps passive data: turning `claude.cliUsageEnabled.v1` off
+  discards only CLI data and leaves the cache or statusline report shown with
+  no CLI launch. Turning it on runs the reader on the existing interval and its
+  result participates in selection. The key keeps its meaning and default.
+- Read once with the CLI: the Dashboard → Services action runs the official
+  `/usage` exactly once with the option off, shows the quota-consumption
+  warning, retires the one-shot client afterwards and does not enable the
+  option. The cache then picks up Claude Code's refreshed file on the next poll.
+- Per-model weekly limits: `weekly_scoped` entries (for example "Fable") appear
+  under **Per-model weekly limits**, in the menu-bar quota picker and in
+  automatic most-constrained selection. Malformed rows are skipped without
+  invalidating the shared windows; older cached reports without the field decode.
+- Security scanner: `script/security_check.sh` rejects `.credentials.json`,
+  `Claude Code-credentials`, `SecItemAdd`/`SecItemUpdate`/`SecItemDelete`,
+  `SecKeychain` and `api/oauth/usage` in production sources, and rejects
+  `claude.json` outside `Services/ClaudeLocalUsageCacheReader.swift`;
+  `script/tests/test_security_check.py` covers both rules.
+- No new network client: `AppUpdateClient.swift` remains the only network
+  client. The diff adds no HTTP/OAuth client, Keychain, cookie or token reading,
+  preference key, cache file, entitlement, endpoint or installer step. Codex
+  behavior, existing Codex preferences and cache v2 are unchanged.
+
+The Providers UI smoke fixture seeds a synthetic `.claude.json` through
+`CLAUDE_CONFIG_DIR` and is intended to show that turning the CLI option off
+displays the cache source without launching the CLI. That is CI evidence only
+after the job runs on the tested revision; until then it is planned.
+
+Local evidence so far: The App target and the UI test bundle build locally on Xcode 27.0, and the
+hosted unit suite passed there: 544 tests executed, 1 existing hosted-focus
+skip, 0 failures. The metadata, installer and security-scanner script
+self-tests also passed locally, and `script/release_check.sh` passed
+locally on Xcode 27.0 for `4.1.0 (24)`: it verified the Universal App and an
+unsigned DMG candidate (SHA-256
+`9be68277c0f6db6d820da06e3da0b9f8bb29dba7bb99a999d0eeefe9facb9fd0`; a local
+artifact, not the release asset). On CI (Xcode 16.4) the `test` job and the
+display, floating, recovery and usage UI smokes passed for the first PR head;
+the providers smoke failed four times on test-side causes that were
+corrected afterwards (an exact-text assertion predating the cached-data
+prefix, a fixture whose scoped Fable limit was the tightest window and
+relabelled the native item, a new screenshot name missing from the artifact
+allowlist, then a fixture-policy check that still required the CLI opt-in
+to stay on while the smoke itself toggles it), so its rerun, candidate
+acceptance, tag, the CI DMG and publication are pending. Record each from the
+actual revision; no record below implies a 4.1.0 result.
+
+The `4.0.2 (23)` checks below are retained because that candidate was carried
+forward into 4.1.0 without publication; verify them on the 4.1.0 revision:
 
 - Invoke authorization, permission and delivery completions from a background
   fake notification adapter. They must not trigger MainActor isolation checks;
@@ -60,8 +136,8 @@ For 4.0.2, verify the following changes against its own source and artifacts:
   separately default-off; do not resume real CLI probing for these checks.
 
 Record actual local tests, synthetic UI results, changed-behavior acceptance,
-final-main checks and package identities separately. No 4.0.2 validation result
-is implied by the historical records below.
+final-main checks and package identities separately. No 4.0.2 or 4.1.0
+validation result is implied by the historical records below.
 
 Version 4.0.1 follows the revised conditional data-source plan. The OAuth
 authorization prerequisite is not met, so it uses passive statusline reports
@@ -71,6 +147,8 @@ a quota-consumption warning, never an automatic fallback. Validate source
 isolation and report age with synthetic data; do not launch Claude or send a
 prompt merely to populate test data. Earlier green CI does not validate these
 new source boundaries or resolve the historical CLI consumption/timeout concern.
+Version 4.1.0 replaces that mode isolation with tiered selection, as described
+above; the 4.0.1 records do not validate the tiered rules.
 
 Version `4.0.1 (22)`, released on 2026-10-03 (Australia/Melbourne), carries
 forward dual-provider monitoring with passive Claude
@@ -308,10 +386,11 @@ states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
 Wait for CI, every synthetic UI smoke required by the candidate, and
-Actions/Python/Swift CodeQL on the actual tested revision. The `4.0.2` candidate gate
+Actions/Python/Swift CodeQL on the actual tested revision. The `4.1.0` candidate gate
 includes five UI scenarios: Display, Recovery, Token usage, Floating, and
-Providers. Providers uses synthetic data; passing it does not verify real Claude
-account quota, ordinary App/web collection or a restored live CLI reader.
+Providers. Providers uses synthetic data, including a synthetic local usage
+cache under `CLAUDE_CONFIG_DIR`; passing it does not verify real Claude account
+quota, ordinary App/web collection or a restored live CLI reader.
 Skipped, cancelled, unavailable, pending, or failed is not passed. Review the
 synthetic images themselves for UI and privacy. Retain the existing screenshots
 as historical captures unless separately replacing them with reviewed evidence.

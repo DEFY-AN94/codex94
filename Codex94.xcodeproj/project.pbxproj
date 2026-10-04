@@ -33,6 +33,7 @@
 		B00000000000000000000018 /* StatusPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000019 /* StatusPresentation.swift */; };
 		B00000000000000000000019 /* ConnectionBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001A /* ConnectionBadgeView.swift */; };
 		B0000000000000000000001A /* RefreshPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001B /* RefreshPolicy.swift */; };
+		C1A4E0004100000000000004 /* ClaudeQuotaFreshnessPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A4E0004100000000000003 /* ClaudeQuotaFreshnessPolicy.swift */; };
 		B0000000000000000000001B /* MenuBarAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001C /* MenuBarAppearance.swift */; };
 		B0000000000000000000001C /* DisplaySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001D /* DisplaySettingsView.swift */; };
 		B0000000000000000000001D /* CopyTextButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000001E /* CopyTextButton.swift */; };
@@ -100,6 +101,7 @@
 		29F53B10DB9B26878C3C6858 /* ClaudeQuotaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4DA8D98E7875692488FE119 /* ClaudeQuotaModels.swift */; };
 		618394C4A97E38A4C77EE6A0 /* QuotaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 460D6A7ACC56B7BDAE922C8E /* QuotaProvider.swift */; };
 		6312EF04E868E3E49C0C4C7E /* ClaudeStatuslineCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DFAF12BCC04F9D3D725CBC /* ClaudeStatuslineCache.swift */; };
+		C1A4E0004100000000000002 /* ClaudeLocalUsageCacheReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A4E0004100000000000001 /* ClaudeLocalUsageCacheReader.swift */; };
 		D235FCF3568BCFCB61D7B09F /* ClaudeQuotaStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD144790F7B6FC86204B8A5E /* ClaudeQuotaStore.swift */; };
 		BFF5464E4777184D250463FD /* ProviderPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D0164D46559815CCD8226B /* ProviderPresentation.swift */; };
 		C07D724B8C8A933A21EDF581 /* ClaudeQuotaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD3568FBE91D9E804C3A12F8 /* ClaudeQuotaCard.swift */; };
@@ -114,6 +116,8 @@
 		362FD55891922E44183F9FB9 /* ClaudeResetTextParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B352DE0E8067E4719367D21E /* ClaudeResetTextParser.swift */; };
 		2331267FFEA3501B794A840A /* ClaudeQuotaBackendTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F521D7C17FC91A4E4BCD3F39 /* ClaudeQuotaBackendTests.swift */; };
 		346D18B2F8C696E7B0450EFD /* ClaudeResetTextParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89AAC667ACCD0B21B695FD2D /* ClaudeResetTextParserTests.swift */; };
+		C1A4E0004100000000000008 /* ClaudeQuotaFreshnessPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A4E0004100000000000007 /* ClaudeQuotaFreshnessPolicyTests.swift */; };
+		C1A4E0004100000000000006 /* ClaudeLocalUsageCacheReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A4E0004100000000000005 /* ClaudeLocalUsageCacheReaderTests.swift */; };
 		382195296A06DB352844BE2A /* ClaudeQuotaStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC00E5CFD7F3F0AE7D20BC18 /* ClaudeQuotaStoreTests.swift */; };
 		AD4234ABF933A2928B8B28C5 /* ClaudeStatuslineInstallerRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C8F75CAFD8BA789D71BCFF /* ClaudeStatuslineInstallerRecoveryTests.swift */; };
 		69A26A1070C61480A90D6BDF /* ClaudeExecutableLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20E31B7F51F0B0DD3AD7EC0 /* ClaudeExecutableLocator.swift */; };
@@ -165,6 +169,7 @@
 		F00000000000000000000019 /* StatusPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/StatusPresentation.swift; sourceTree = "<group>"; };
 		F0000000000000000000001A /* ConnectionBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/ConnectionBadgeView.swift; sourceTree = "<group>"; };
 		F0000000000000000000001B /* RefreshPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/RefreshPolicy.swift; sourceTree = "<group>"; };
+		C1A4E0004100000000000003 /* ClaudeQuotaFreshnessPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Support/ClaudeQuotaFreshnessPolicy.swift"; sourceTree = "<group>"; };
 		F0000000000000000000001C /* MenuBarAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/MenuBarAppearance.swift; sourceTree = "<group>"; };
 		F0000000000000000000001D /* DisplaySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Dashboard/DisplaySettingsView.swift; sourceTree = "<group>"; };
 		F0000000000000000000001E /* CopyTextButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/CopyTextButton.swift; sourceTree = "<group>"; };
@@ -235,6 +240,7 @@
 		F4DA8D98E7875692488FE119 /* ClaudeQuotaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ClaudeQuotaModels.swift"; sourceTree = "<group>"; };
 		460D6A7ACC56B7BDAE922C8E /* QuotaProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/QuotaProvider.swift"; sourceTree = "<group>"; };
 		A2DFAF12BCC04F9D3D725CBC /* ClaudeStatuslineCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ClaudeStatuslineCache.swift"; sourceTree = "<group>"; };
+		C1A4E0004100000000000001 /* ClaudeLocalUsageCacheReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ClaudeLocalUsageCacheReader.swift"; sourceTree = "<group>"; };
 		FD144790F7B6FC86204B8A5E /* ClaudeQuotaStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stores/ClaudeQuotaStore.swift"; sourceTree = "<group>"; };
 		D9D0164D46559815CCD8226B /* ProviderPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stores/ProviderPresentation.swift"; sourceTree = "<group>"; };
 		FD3568FBE91D9E804C3A12F8 /* ClaudeQuotaCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Components/ClaudeQuotaCard.swift"; sourceTree = "<group>"; };
@@ -249,6 +255,8 @@
 		B352DE0E8067E4719367D21E /* ClaudeResetTextParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Support/ClaudeResetTextParser.swift"; sourceTree = "<group>"; };
 		F521D7C17FC91A4E4BCD3F39 /* ClaudeQuotaBackendTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeQuotaBackendTests.swift"; sourceTree = "<group>"; };
 		89AAC667ACCD0B21B695FD2D /* ClaudeResetTextParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeResetTextParserTests.swift"; sourceTree = "<group>"; };
+		C1A4E0004100000000000007 /* ClaudeQuotaFreshnessPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeQuotaFreshnessPolicyTests.swift"; sourceTree = "<group>"; };
+		C1A4E0004100000000000005 /* ClaudeLocalUsageCacheReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeLocalUsageCacheReaderTests.swift"; sourceTree = "<group>"; };
 		BC00E5CFD7F3F0AE7D20BC18 /* ClaudeQuotaStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeQuotaStoreTests.swift"; sourceTree = "<group>"; };
 		51C8F75CAFD8BA789D71BCFF /* ClaudeStatuslineInstallerRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeStatuslineInstallerRecoveryTests.swift"; sourceTree = "<group>"; };
 		C20E31B7F51F0B0DD3AD7EC0 /* ClaudeExecutableLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ClaudeExecutableLocator.swift"; sourceTree = "<group>"; };
@@ -296,6 +304,7 @@
 				D9D0164D46559815CCD8226B /* ProviderPresentation.swift */,
 				FD144790F7B6FC86204B8A5E /* ClaudeQuotaStore.swift */,
 				A2DFAF12BCC04F9D3D725CBC /* ClaudeStatuslineCache.swift */,
+				C1A4E0004100000000000001 /* ClaudeLocalUsageCacheReader.swift */,
 				460D6A7ACC56B7BDAE922C8E /* QuotaProvider.swift */,
 				F4DA8D98E7875692488FE119 /* ClaudeQuotaModels.swift */,
 				CB4B696605F3B88443EF4540 /* TokenUsageImageExportControls.swift */,
@@ -352,6 +361,7 @@
 				F0000000000000000000000E /* Theme.swift */,
 				F00000000000000000000019 /* StatusPresentation.swift */,
 				F0000000000000000000001B /* RefreshPolicy.swift */,
+				C1A4E0004100000000000003 /* ClaudeQuotaFreshnessPolicy.swift */,
 				F0000000000000000000000F /* QuotaBarView.swift */,
 				F0000000000000000000001A /* ConnectionBadgeView.swift */,
 				F0000000000000000000001E /* CopyTextButton.swift */,
@@ -375,6 +385,8 @@
 				51C8F75CAFD8BA789D71BCFF /* ClaudeStatuslineInstallerRecoveryTests.swift */,
 				BC00E5CFD7F3F0AE7D20BC18 /* ClaudeQuotaStoreTests.swift */,
 				89AAC667ACCD0B21B695FD2D /* ClaudeResetTextParserTests.swift */,
+				C1A4E0004100000000000007 /* ClaudeQuotaFreshnessPolicyTests.swift */,
+				C1A4E0004100000000000005 /* ClaudeLocalUsageCacheReaderTests.swift */,
 				F521D7C17FC91A4E4BCD3F39 /* ClaudeQuotaBackendTests.swift */,
 				922FECFC6D035AC0F4C968A6 /* ProviderViewTests.swift */,
 				ADF698B0C0EF9E991411DFF4 /* MultiProviderStoreTests.swift */,
@@ -518,6 +530,7 @@
 				BFF5464E4777184D250463FD /* ProviderPresentation.swift in Sources */,
 				D235FCF3568BCFCB61D7B09F /* ClaudeQuotaStore.swift in Sources */,
 				6312EF04E868E3E49C0C4C7E /* ClaudeStatuslineCache.swift in Sources */,
+				C1A4E0004100000000000002 /* ClaudeLocalUsageCacheReader.swift in Sources */,
 				618394C4A97E38A4C77EE6A0 /* QuotaProvider.swift in Sources */,
 				29F53B10DB9B26878C3C6858 /* ClaudeQuotaModels.swift in Sources */,
 				9C8A34BE2A915C303E50F1EB /* TokenUsageImageExportControls.swift in Sources */,
@@ -574,6 +587,7 @@
 				B0000000000000000000000E /* Theme.swift in Sources */,
 				B00000000000000000000018 /* StatusPresentation.swift in Sources */,
 				B0000000000000000000001A /* RefreshPolicy.swift in Sources */,
+				C1A4E0004100000000000004 /* ClaudeQuotaFreshnessPolicy.swift in Sources */,
 				B0000000000000000000000F /* QuotaBarView.swift in Sources */,
 				B00000000000000000000019 /* ConnectionBadgeView.swift in Sources */,
 				B0000000000000000000001D /* CopyTextButton.swift in Sources */,
@@ -594,6 +608,8 @@
 				AD4234ABF933A2928B8B28C5 /* ClaudeStatuslineInstallerRecoveryTests.swift in Sources */,
 				382195296A06DB352844BE2A /* ClaudeQuotaStoreTests.swift in Sources */,
 				346D18B2F8C696E7B0450EFD /* ClaudeResetTextParserTests.swift in Sources */,
+				C1A4E0004100000000000008 /* ClaudeQuotaFreshnessPolicyTests.swift in Sources */,
+				C1A4E0004100000000000006 /* ClaudeLocalUsageCacheReaderTests.swift in Sources */,
 				2331267FFEA3501B794A840A /* ClaudeQuotaBackendTests.swift in Sources */,
 				7C4C5BCE69EA94415670463E /* ProviderViewTests.swift in Sources */,
 				A1C466E068EE8714ACADFF72 /* MultiProviderStoreTests.swift in Sources */,
@@ -693,7 +709,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 24;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -701,7 +717,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 4.0.2;
+				MARKETING_VERSION = 4.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -719,7 +735,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 24;
 				DEAD_CODE_STRIPPING = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				ENABLE_APP_SANDBOX = NO;
@@ -727,7 +743,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 4.0.2;
+				MARKETING_VERSION = 4.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

@@ -1,6 +1,10 @@
 import Foundation
 
+/// Sources are listed in presentation order: the local cache is the primary
+/// passive source, the statusline bridge backs it up, and the CLI reader is an
+/// explicit last option. The store selects one report; sources never merge.
 enum ClaudeQuotaSource: String, Codable, Sendable {
+    case localCache
     case statusline
     case cliUsage
 }
@@ -8,6 +12,7 @@ enum ClaudeQuotaSource: String, Codable, Sendable {
 enum ClaudeQuotaIssue: String, Error, Equatable, Sendable {
     case cliUnavailable, loginRequired, setupRequired, timedOut, invalidData
     case noData, staleData, sourceChanged, configurationConflict, unavailable
+    case localCacheUnreadable
 }
 
 /// An opaque report-stream selection, never proof of account identity.
@@ -27,23 +32,73 @@ struct ClaudeQuotaWindow: Codable, Equatable, Sendable {
     let resetsAt: Date?
 }
 
+/// A model-scoped weekly limit reported beside the shared windows. Only the
+/// display name, percentage and reset time are retained.
+struct ClaudeQuotaModelLimit: Codable, Equatable, Sendable {
+    static let maximumNameLength = 64
+
+    let modelName: String
+    let usedPercentage: Double
+    let resetsAt: Date?
+
+    /// A stable bucket identifier derived from the display name alone.
+    var limitID: String { "claude.model." + Self.slug(modelName) }
+
+    static func slug(_ name: String) -> String {
+        var result = ""
+        var pendingSeparator = false
+        for scalar in name.lowercased().unicodeScalars {
+            if scalar.properties.isAlphabetic || scalar.properties.numericType != nil {
+                if pendingSeparator, !result.isEmpty { result.append("-") }
+                pendingSeparator = false
+                result.unicodeScalars.append(scalar)
+            } else {
+                pendingSeparator = true
+            }
+        }
+        return result.isEmpty ? "unknown" : result
+    }
+}
+
 /// `reportedAt` is the last changed report, never the time a cache was reread.
 struct ClaudeQuotaReport: Codable, Equatable, Sendable {
+    static let defaultLimitID = "claude"
+
     let source: ClaudeQuotaSource
     let reportedAt: Date
     let receivedAt: Date
     let windows: [ClaudeQuotaWindow]
     let producerID: String?
+    let modelLimits: [ClaudeQuotaModelLimit]
 
     init(source: ClaudeQuotaSource, reportedAt: Date, receivedAt: Date,
-         windows: [ClaudeQuotaWindow], producerID: String? = nil) {
+         windows: [ClaudeQuotaWindow], producerID: String? = nil,
+         modelLimits: [ClaudeQuotaModelLimit] = []) {
         self.source = source
         self.reportedAt = reportedAt
         self.receivedAt = receivedAt
         self.windows = windows
         self.producerID = producerID
+        self.modelLimits = modelLimits
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case source, reportedAt, receivedAt, windows, producerID, modelLimits
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        source = try values.decode(ClaudeQuotaSource.self, forKey: .source)
+        reportedAt = try values.decode(Date.self, forKey: .reportedAt)
+        receivedAt = try values.decode(Date.self, forKey: .receivedAt)
+        windows = try values.decode([ClaudeQuotaWindow].self, forKey: .windows)
+        producerID = try values.decodeIfPresent(String.self, forKey: .producerID)
+        // Records written before model limits existed stay readable.
+        modelLimits = try values.decodeIfPresent([ClaudeQuotaModelLimit].self, forKey: .modelLimits) ?? []
+    }
+
+    /// The shared windows and any model-scoped limits that are still inside
+    /// their reset time. Expired windows disappear; they never become 100%.
     func snapshot(at now: Date) -> QuotaSnapshot? {
         let visible = windows.compactMap { window -> QuotaWindowSnapshot? in
             guard window.resetsAt.map({ $0 > now }) ?? true else { return nil }
@@ -53,9 +108,24 @@ struct ClaudeQuotaReport: Codable, Equatable, Sendable {
             )
         }
         guard !visible.isEmpty else { return nil }
+        var buckets = [QuotaBucketSnapshot(
+            limitID: Self.defaultLimitID, limitName: nil, planType: nil, windows: visible
+        )]
+        var seen: Set<String> = []
+        for limit in modelLimits {
+            guard limit.resetsAt.map({ $0 > now }) ?? true,
+                  seen.insert(limit.limitID).inserted,
+                  let window = QuotaWindowSnapshot(
+                      kind: .weekly, fractionalUsedPercent: limit.usedPercentage,
+                      windowMinutes: 10_080, resetsAt: limit.resetsAt
+                  ) else { continue }
+            buckets.append(QuotaBucketSnapshot(
+                limitID: limit.limitID, limitName: limit.modelName, planType: nil, windows: [window]
+            ))
+        }
         return QuotaSnapshot(
-            buckets: [QuotaBucketSnapshot(limitID: "claude", limitName: nil, planType: nil, windows: visible)],
-            defaultLimitID: "claude", fetchedAt: reportedAt, account: nil, codex: nil, provider: .claude
+            buckets: buckets, defaultLimitID: Self.defaultLimitID, fetchedAt: reportedAt,
+            account: nil, codex: nil, provider: .claude
         )
     }
 }

@@ -4,14 +4,107 @@ All notable changes to Codex94 are documented here.
 
 ## Unreleased
 
-Version `4.0.2 (23)` is a release candidate; no publication date is assigned.
+Version `4.1.0 (24)` is the current candidate; no publication date is assigned.
+It carries forward the unpublished `4.0.2 (23)` candidate below. The published
+stable release remains `4.0.1 (22)`.
 
-### Fixed
+Claude monitoring now reads Claude Code's own local usage cache first. Codex
+behavior is unchanged.
+
+### Added
+
+- Read Claude Code's own plan-usage cache, the `cachedUsageUtilization` key in
+  its global state file, as the primary Claude source through a read-only
+  `ClaudeLocalUsageCacheReader`. Keep the fetch time, 5-hour/weekly utilization,
+  reset times and model-scoped weekly limits; discard everything else in the
+  file immediately. Honor `CLAUDE_CONFIG_DIR` the way Claude Code does.
+- Show per-model weekly limits as extra Claude quota buckets: listed under
+  **Per-model weekly limits** on the Claude card, selectable in the menu-bar
+  quota picker, and eligible for automatic most-constrained selection.
+- Add **Read once with the CLI** in Dashboard → Services. It runs the official
+  `/usage` exactly once regardless of the CLI option, with the same
+  quota-consumption warning; Claude Code then refreshes its own cache.
+- Show the Claude source name and the **Claude Code fetched** time, and add
+  empty states for no cache yet, an unreadable cache, and expired windows. Add
+  a read-only **Claude data sources** section to Dashboard → Services that
+  describes the three tiers and shows the current source and local-cache state.
+- Add a `claudeLocalCache` line (`absent`, `valid`, `unreadable` or `invalid`;
+  `none` while Claude monitoring is off) to the redacted diagnostics export,
+  without a path or account identifier.
+
+### Changed
+
+- Tier the Claude sources: the local usage cache first, the status-line
+  connection (statusline bridge) as backup, the optional CLI `/usage` read as
+  the last option. Show exactly one report at a time; a backup replaces the
+  cache only when its observation time is strictly newer. Never average or
+  merge percentages from different sources. Tiers of the same account share
+  one notification baseline; only a different login, a different status-line
+  producer or a rejected CLI login resets it.
+- Treat a cache report as current for 60 minutes after Claude Code fetched it,
+  matching Claude Code's own last-known rule, then show the amber cached marker
+  and the data time while keeping the numbers. Statusline reports keep the
+  10-minute rule; CLI reports keep max(10 min, refresh interval + 60 s).
+  Windows whose reset time passed disappear and are never shown as 100%.
+- Let the optional CLI reader run alongside the passive sources instead of
+  replacing them. Disabling it discards only CLI data.
+  `claude.cliUsageEnabled.v1` keeps its meaning and its default-off state.
+  While the option is on and the shown passive report is out of date, the
+  card names the CLI failure (for example a required sign-in) as the reason;
+  a one-time read reports its failure beside its button only. A cache file
+  that stops decoding mid-rewrite keeps the last good report as a candidate
+  while the local-cache state reads `invalid`; a decoded file without usage
+  data (for example after `/logout`) drops it.
+
+### Security
+
+- Open the Claude Code state file read-only with `O_NOFOLLOW`; refuse symlinks,
+  hard-linked files, foreign owners, non-regular files and files over 16 MiB;
+  never write it.
+  Compare the account identifier in memory only, to detect a different login;
+  never persist, log or export it. Re-parse only when the file's
+  size/mtime/inode stamp changes.
+- Extend `security_check.sh` to forbid `.credentials.json`, the
+  `Claude Code-credentials` Keychain item, `SecItemAdd`/`SecItemUpdate`/
+  `SecItemDelete`, `SecKeychain` and the `api/oauth/usage` endpoint string in
+  production sources, and to require that `claude.json` appears only in
+  `Services/ClaudeLocalUsageCacheReader.swift`.
+- Keep `AppUpdateClient.swift` as the only network client. Add no HTTP/OAuth
+  client, Keychain, cookie or token reading, preference key, cache file,
+  entitlement, network endpoint or installer step. Codex94 reads only files the
+  official Claude Code client leaves on this Mac; the paused OAuth work in
+  draft PR #44 is not part of this release.
+
+The App target and the UI test bundle build locally on Xcode 27.0, and the
+hosted unit suite passed there: 544 tests executed, 1 existing hosted-focus
+skip, 0 failures. The metadata, installer and security-scanner script
+self-tests also passed locally, and `script/release_check.sh` passed
+locally on Xcode 27.0 for `4.1.0 (24)`: it verified the Universal App and an
+unsigned DMG candidate (SHA-256
+`9be68277c0f6db6d820da06e3da0b9f8bb29dba7bb99a999d0eeefe9facb9fd0`; a local
+artifact, not the release asset). On CI (Xcode 16.4) the `test` job and the
+display, floating, recovery and usage UI smokes passed for the first PR head;
+the providers smoke failed four times on test-side causes that were
+corrected afterwards (an exact-text assertion predating the cached-data
+prefix, a fixture whose scoped Fable limit was the tightest window and
+relabelled the native item, a new screenshot name missing from the artifact
+allowlist, then a fixture-policy check that still required the CLI opt-in
+to stay on while the smoke itself toggles it), so its rerun, candidate
+acceptance, tag, the CI DMG and publication are pending; see
+[docs/RELEASING.md](docs/RELEASING.md).
+
+### 4.0.2 (23) - unpublished candidate carried into 4.1.0
+
+Version `4.0.2 (23)` was prepared as a release candidate but was never tagged
+or published; no date is assigned. Its changes below are carried into
+`4.1.0 (24)` above and remain unreleased.
+
+#### Fixed
 
 - Keep UserNotifications completion handlers safe when the system calls them
   from a background queue, preventing the inherited MainActor isolation crash.
 
-### Changed
+#### Changed
 
 - Use separate large service cards in Dashboard, compact terminal-style service
   rows in the popover, and a smaller read-only manual-reset count.

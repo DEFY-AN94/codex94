@@ -31,29 +31,101 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
-## 4.0.2 candidate (unreleased)
+## 4.1.0 candidate (unreleased)
 
-The development version is **4.0.2 (23)**. Stable downloads below remain on
-4.0.1 until publication of the new release is confirmed.
+The development version is **4.1.0 (24)** on branch
+`claude/4.1.0-local-usage-cache`. Stable downloads below remain on 4.0.1 until
+publication of the new release is confirmed. The `4.0.2 (23)` candidate (the
+notification-callback fix, large separate service cards, compact dual rings and
+the statusline-scope explanation) was merge-ready but never tagged or
+published; 4.1.0 carries those changes forward unchanged.
 
-- Fix notification completion callbacks that may run on a background queue
-  and previously could trigger a MainActor isolation crash.
-- Give the two enabled services large, separate quota cards in Dashboard.
-  The popover uses compact terminal-style rows and a smaller read-only reset
-  count. Single-service menu-bar items omit redundant service names.
-- Add **compact dual rings** (`compactBoth`): one native status item containing
-  the two services' separate rings. **Single service** (`single`) and the existing
-  **two independent items** (`both`) remain separate choices; saved `both`
-  preferences are not converted to the new mode.
-- Clarify that passive reports come from **Claude Code's statusline**. Ordinary
-  Claude App or web chats do not produce that local report. The passive view
-  explains this scope and offers **View official usage** to open
-  [Claude's Usage settings](https://claude.ai/settings/usage) in the system browser.
+4.1.0 changes the Claude side only. Codex behavior is unchanged.
 
-This candidate adds no quota API or automatic App/web quota reader. The optional
-`/usage` reader remains independently disabled by default. Candidate checks and
-acceptance must be recorded for this version; the historical screenshots and
-release results below are not 4.0.2 validation.
+- **Claude Code's local usage cache becomes the primary source.** Claude Code
+  writes the result of its own plan-usage fetch (the data behind its `/usage`
+  screen) into its global state file `~/.claude.json` under the key
+  `cachedUsageUtilization`; Claude Code 2.1.208 and later keep this last-known
+  usage. Codex94 reads only that key and shows the 5-hour and 7-day
+  utilization, their reset times, and the time Claude Code fetched them. If
+  `CLAUDE_CONFIG_DIR` is set in Codex94's own environment, the file is read
+  from that directory instead, mirroring Claude Code.
+- **Three tiers, one report at a time.** The existing status-line connection
+  becomes the backup: it is used when its report is strictly newer than the
+  cache, or when the cache is absent or unreadable. The optional CLI `/usage`
+  read stays default-off with its quota-consumption warning and becomes the
+  last option; it is no longer mutually exclusive with the passive sources, its
+  result simply joins the selection, and disabling it discards only CLI data.
+  The newest valid report wins and the cache wins ties. Percentages from
+  different sources are never averaged or merged. Tiers of the same account
+  share one notification baseline; only a different login, a different
+  status-line producer or a rejected CLI login resets it.
+- **Read once with the CLI.** Dashboard → **Services** gains a button that runs
+  the official CLI exactly once regardless of the CLI switch, with the same
+  warning. Claude Code then refreshes its own cache, which the primary source
+  picks up.
+- **Per-model weekly limits.** Model-scoped weekly limits from the cache (for
+  example a Fable weekly limit) appear as extra Claude quota buckets: listed
+  under **Per-model weekly limits** on the card, selectable in the menu-bar
+  quota picker, and eligible for the automatic most-constrained selection.
+- **Freshness and presentation.** A cache report counts as current for 60
+  minutes after Claude Code fetched it, matching Claude Code's own last-known
+  rule; after that the amber cached marker and the data time appear while the
+  numbers stay visible. Status-line reports keep the existing 10-minute rule;
+  CLI reads keep the larger of 10 minutes and the refresh interval plus 60
+  seconds. Windows whose reset time has passed disappear and are never shown
+  as 100% remaining. The card names the source (**Claude Code local cache**),
+  shows **Claude Code fetched** with the fetch time, and has explicit empty
+  states for no cache yet (run `claude` in a terminal and enter `/usage`, or
+  use the one-time CLI read), an unreadable cache, and expired windows.
+  Services gains a read-only **Claude data sources** section describing the
+  three tiers and showing the current source and local-cache state.
+  Diagnostics export gains a `claudeLocalCache` line
+  (absent/valid/unreadable/invalid, or none while Claude monitoring is off)
+  with no path or account identifier.
+
+**Privacy boundary.** `~/.claude.json` also contains the account email,
+organization, project paths and MCP settings. Codex94 opens it read-only with
+`O_NOFOLLOW`, refuses symlinks, hard-linked files, foreign owners, non-regular
+files and files over 16 MiB, parses only `cachedUsageUtilization`, and discards
+everything else immediately; nothing from the file beyond the quota fields
+above is retained, logged or exported. The account UUID is compared in memory
+only to detect a different login, which resets the notification baseline, and
+is never persisted. The reader never writes the file and re-parses it only
+when its size, modification time or inode changes. Preference keys are unchanged
+(`claude.cliUsageEnabled.v1` keeps its meaning); no new preference, cache file,
+entitlement, network endpoint or installer step is added.
+
+**No OAuth or credential access.** [Anthropic's legal page](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
+(2026-02-20) restricts OAuth tokens to Claude Code and native Anthropic apps
+and forbids third parties from collecting, storing or intermediating Claude.ai
+credentials or session tokens. Codex94 therefore reads only files that the
+official client leaves on the Mac. `AppUpdateClient.swift` remains the only
+network client; no HTTP/OAuth client, Keychain, cookie or token reading was
+added. `script/security_check.sh` additionally rejects credential-file names,
+the Claude Code Keychain item name, `SecItem`/`SecKeychain` calls and the OAuth
+usage endpoint string in production sources, and allows the literal
+`claude.json` only in the cache reader. The paused OAuth work lives in draft
+[PR #44](https://github.com/DEFY-AN94/codex94/pull/44) and is not part of 4.1.0.
+
+The App target and the UI test bundle build locally on Xcode 27.0, and the
+hosted unit suite passed there: 544 tests executed, 1 existing hosted-focus
+skip, 0 failures. The metadata, installer and security-scanner script
+self-tests also passed locally, and `script/release_check.sh` passed locally on
+Xcode 27.0 for `4.1.0 (24)`, verifying the Universal App and an unsigned DMG
+candidate (a local artifact, not the release asset). On CI (Xcode 16.4) the
+`test` job and four of the five UI smokes passed for the first PR heads; the
+providers smoke failed four times on test-side causes that were corrected
+afterwards (an exact-text assertion predating the cached-data prefix, a fixture
+whose scoped Fable limit was the tightest window and relabelled the native item,
+a new screenshot name missing from the artifact allowlist, then a fixture-policy
+check that still required the CLI opt-in to stay on while the smoke itself
+toggles it), so its rerun, candidate acceptance, tag, the CI DMG and publication
+are pending. The Providers UI smoke fixture seeds a synthetic
+`.claude.json` through `CLAUDE_CONFIG_DIR` and checks that turning the CLI
+option off shows the cache source without launching the CLI; it counts as
+evidence only after it runs on CI. The historical screenshots and release
+results below are not 4.1.0 validation.
 
 ## Version 4.0.1
 
@@ -172,7 +244,7 @@ is limited to its tested Mac and candidate.
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.
-These retained captures do not show the 4.0.2 candidate's revised presentation.
+These retained captures do not show the 4.1.0 candidate's revised presentation.
 The chart previews were captured during `0.3.0 (14)` candidate testing and
 show **Bar chart** and **Line chart** over the same seven reported days. These
 original synthetic captures remain unchanged, from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
@@ -246,10 +318,12 @@ trust status.
 - macOS 14 or later.
 - Codex monitoring requires a compatible Codex executable and a current Codex
   login.
-- Optional Claude monitoring requires the official Claude Code
-  CLI with its initial setup and login already completed in a terminal. Codex94
-  does not complete Claude login or onboarding for you. Status-line quota appears
-  only when Claude Code reports it; installing the connection cannot create data.
+- Optional Claude monitoring requires only a Claude Code login on this Mac that
+  has fetched usage at least once (for example by opening `/usage` in a
+  terminal), or an installed status-line connection. Codex94 does not complete
+  Claude login or onboarding for you, and neither the cache nor the connection
+  can create data that Claude Code has not fetched or reported. The CLI
+  `/usage` option remains optional and off by default.
 
 DMG installation does not require Xcode. Source installation additionally
 requires full Xcode 16.4 or later (Command Line Tools alone are insufficient)
@@ -521,7 +595,9 @@ their own provenance above.
 Version 4.0.1 adds a separate, default-off local Claude CLI reader and a
 status-line quota cache. Previewing setup is read-only; installing or removing
 the connection explicitly edits Claude Code's status-line setting and retains
-recovery material. The diagram below describes the existing Codex path.
+recovery material. The 4.1.0 candidate additionally reads the usage cache that
+Claude Code itself writes, as described above, without any new network path.
+The diagram below describes the existing Codex path.
 
 
 ```mermaid

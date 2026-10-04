@@ -77,6 +77,7 @@ struct ClaudeStatuslineCache: Sendable {
         let data = try ClaudeLocalFile.read(fileURL, maximumBytes: Self.maximumCacheBytes)
         guard let record = try? JSONDecoder().decode(Record.self, from: data), record.version == 1,
               record.report.source == .statusline,
+              record.report.modelLimits.isEmpty,
               Self.isSupportedTimestamp(record.report.reportedAt),
               Self.isSupportedTimestamp(record.report.receivedAt),
               record.report.reportedAt <= record.report.receivedAt,

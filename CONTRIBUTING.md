@@ -6,7 +6,8 @@ and a zero third-party runtime dependency model.
 ## Before opening a pull request
 
 1. Keep credential access inside the existing Codex subprocess boundary. Do not
-   add browser-cookie, Keychain, token-file, or direct usage-endpoint readers.
+   add browser-cookie, Keychain, token-file (including Claude Code's
+   `.credentials.json`), or direct usage-endpoint readers.
 2. Do not log or persist account identity, credentials, raw RPC payloads, or
    private filesystem paths.
 3. Add focused tests for behavior changes and both English and Simplified Chinese
@@ -105,6 +106,87 @@ Version `3.1.0` adds **Floating** as a fourth external UI scenario alongside
 Display, Recovery, and Token usage; usage also covers the new date/export
 controls without additional RPCs. New runs and visual acceptance are required
 before reporting these features as verified. See [architecture rules](docs/ARCHITECTURE.md).
+
+### Version 4.1.0 behavior
+
+Version `4.1.0 (24)` is an unreleased candidate on
+`claude/4.1.0-local-usage-cache`; the published stable release remains
+`4.0.1 (22)`. The App target and the UI test bundle build locally on Xcode 27.0, and the
+hosted unit suite passed there: 544 tests executed, 1 existing hosted-focus
+skip, 0 failures. The metadata, installer and security-scanner script
+self-tests also passed locally, and `script/release_check.sh` passed
+locally on Xcode 27.0 for `4.1.0 (24)`: it verified the Universal App and an
+unsigned DMG candidate (SHA-256
+`9be68277c0f6db6d820da06e3da0b9f8bb29dba7bb99a999d0eeefe9facb9fd0`; a local
+artifact, not the release asset). On CI (Xcode 16.4) the `test` job and the
+display, floating, recovery and usage UI smokes passed for the first PR head;
+the providers smoke failed four times on test-side causes that were
+corrected afterwards (an exact-text assertion predating the cached-data
+prefix, a fixture whose scoped Fable limit was the tightest window and
+relabelled the native item, a new screenshot name missing from the artifact
+allowlist, then a fixture-policy check that still required the CLI opt-in
+to stay on while the smoke itself toggles it), so its rerun, candidate
+acceptance, tag, the CI DMG and publication are pending and must be reported as such. The unpublished
+`4.0.2 (23)` candidate is carried into 4.1.0; keep its changelog entry under
+Unreleased, annotated as unpublished, rather than deleting it.
+
+Claude has three sources in a fixed order, and Codex behavior is unchanged.
+Claude Code's own local usage cache is primary, the status-line connection
+(statusline bridge) is the backup, and the optional CLI `/usage` read is the
+last option. Exactly one report is shown at a time: "newest valid wins,
+primary wins ties". A statusline or CLI report replaces the cache report only
+when its observation time is strictly newer; equal times keep the primary.
+Never average, merge or interpolate percentages across sources, and never show
+an expired window as 100% remaining. Tiers of the same account share one
+notification baseline; only an identity change (a different cache account, a
+different status-line producer or a rejected CLI login) resets it. Keep
+selection and freshness in the pure `ClaudeQuotaFreshnessPolicy` (cache 60
+minutes after Claude Code's own fetch, statusline 10 minutes, CLI
+`max(10 min, refresh interval + 60 s)`); `ClaudeQuotaStore` owns the slots and
+the schedule. The CLI reader stays default-off with its warning, is no longer
+mutually exclusive with the passive sources, and disabling it discards only CLI
+data. **Read once with the CLI** runs the CLI exactly once regardless of the
+switch, under the same warning, and relies on Claude Code refreshing its own
+cache afterwards.
+
+`ClaudeLocalUsageCacheReader` reads one key only, `cachedUsageUtilization`,
+from Claude Code's global state file, and discards everything else. Do not
+parse, log, test for or persist the account email, organization, project
+paths, MCP settings or any other key. `fetchedAtMs` is the report time, not the
+read time. `accountUuid` is compared in memory only to detect a different
+login; never persist, log or display it. The reader opens the file read-only
+with `O_NOFOLLOW`, refuses symlinks, hard links, foreign owners, non-regular
+files and files over 16 MiB, never writes, and skips parsing when the
+size/mtime/inode stamp is unchanged. Treat the content as untrusted: finite
+0–100 percentages, strict ISO-8601 timestamps with a zone, at most sixteen
+model rows, malformed rows skipped and a malformed cache keeping the previous
+report. Do not add a second reader of that file, a `.credentials.json`,
+Keychain, cookie, token or OAuth reader, or a Claude network client; the
+paused OAuth work is draft PR #44 and is not part of 4.1.0.
+
+Write no literal home paths. Resolve the file through the current user's home
+directory or `CLAUDE_CONFIG_DIR`, as the reader does; tests and the Providers
+fixture point `CLAUDE_CONFIG_DIR` at a temporary directory holding a synthetic
+`.claude.json` and must never read or modify the developer's real file.
+`script/security_check.sh` requires that the literal `claude.json` appears
+only in `Services/ClaudeLocalUsageCacheReader.swift` and forbids
+`.credentials.json`, the Keychain item name `Claude Code-credentials`,
+`SecItemAdd`, `SecItemUpdate`, `SecItemDelete`, `SecKeychain` and the
+`api/oauth/usage` endpoint string in production sources; `AppUpdateClient.swift`
+remains the only network client. Extend `script/tests/test_security_check.py`
+with any scanner change.
+
+Per-model weekly limits become extra Claude buckets with the stable identifier
+`claude.model.<slug>`, listed under "Per-model weekly limits", selectable in
+the menu-bar quota picker and eligible for automatic most-constrained
+selection. Preference keys are unchanged, `claude.cliUsageEnabled.v1` keeps its
+meaning, and no new cache file, entitlement, endpoint or installer step may be
+added. The redacted-diagnostics line `claudeLocalCache` carries only `absent`,
+`valid`, `unreadable` or `invalid` while Claude monitoring is on, and `none`
+while it is off. The Providers UI smoke seeds the synthetic cache through
+`CLAUDE_CONFIG_DIR` and checks that turning the CLI option off shows the cache
+source without launching the CLI; treat it as evidence only after it has run
+on CI.
 
 ## Development and validation
 

@@ -486,11 +486,19 @@ final class Codex94UITests: XCTestCase {
         let claudeBeforeFailure = try fixture.claudeUsageRequestCount()
         try fixture.setClaudeMode("error")
         try uniqueIdentified("claude-refresh", in: popover).click()
+        // 4.1.0: a rejected CLI login drops the CLI report. The months-old local
+        // cache from the fixture stays visible as cached data, and the card names
+        // the sign-in failure as the reason ("Cached data · Sign in to ...").
         try waitUntil("The synthetic Claude login failure did not reach its own card", timeout: 30) {
             let issue = self.identified("claude-issue", in: popover)
             return issue.exists && [issue.label, issue.title, issue.value as? String ?? ""]
-                .contains("Sign in to Claude Code, then refresh here.")
+                .contains { $0.contains("Sign in to Claude Code, then refresh here.") }
         }
+        try require(identified("claude-quota-fiveHour", in: popover).exists
+                    && identified("claude-quota-weekly", in: popover).exists,
+                    "A failed CLI read must not hide the cached local usage windows")
+        try assertProviderMetric("claude-quota-fiveHour", percent: "60%", in: popover)
+        try assertProviderMetric("claude-quota-weekly", percent: "75%", in: popover)
         XCTAssertEqual(try fixture.claudeUsageRequestCount(), claudeBeforeFailure + 1)
         XCTAssertEqual(try fixture.requestCount(), codexBeforeFailure)
         XCTAssertEqual(try fixture.cacheFingerprint(), cacheBeforeFailure)
@@ -527,6 +535,34 @@ final class Codex94UITests: XCTestCase {
         XCTAssertEqual(try fixture.requestCount(), disabledCodexCount)
 
         try selectPage(.providers, in: dashboard)
+
+        // 4.1.0: with the CLI option off, Claude Code's own usage cache is the
+        // shown source. Nothing is launched and the cached per-model limit appears.
+        let cliReadsBeforeOff = try fixture.claudeUsageRequestCount()
+        try setClaudeCLIUsageEnabled(false, in: dashboard)
+        try waitUntil("Turning the CLI option off must select the local usage cache") {
+            let current = self.identified("claude-sources-current", in: dashboard)
+            return current.exists && [current.label, current.title, current.value as? String ?? ""]
+                .contains { $0.contains("Claude Code local cache") }
+        }
+        popover = try openProviderPopover(service: "claude", marker: "claude-quota-section")
+        try waitUntil("The cached Claude windows did not appear", timeout: 10) {
+            self.identified("claude-quota-fiveHour", in: popover).exists
+                && self.identified("claude-quota-weekly", in: popover).exists
+        }
+        try assertProviderMetric("claude-quota-fiveHour", percent: "60%", in: popover)
+        try assertProviderMetric("claude-quota-weekly", percent: "75%", in: popover)
+        try require(identified("claude-model-limit-claude.model.fable", in: popover).exists,
+                    "The cached per-model weekly limit must be listed")
+        XCTAssertEqual(try fixture.claudeUsageRequestCount(), cliReadsBeforeOff,
+                       "Reading the local usage cache must never launch the CLI")
+        try captureProviderPopover(popover, marker: "claude-quota-section", named: "providers-local-cache-en.png")
+        dashboard = try openDashboard(from: popover)
+        try selectPage(.providers, in: dashboard)
+        try setClaudeCLIUsageEnabled(true, in: dashboard)
+        try waitUntil("Re-enabling the CLI option must perform one read", timeout: 30) {
+            try self.fixture.claudeUsageRequestCount() == cliReadsBeforeOff + 1
+        }
         let beforeAllOff = try providerRequestCounts()
         try setProviderEnabled("claude", enabled: false, in: dashboard)
         _ = try providerStatusItems(expected: ["codex"], neutral: true)
@@ -565,6 +601,8 @@ final class Codex94UITests: XCTestCase {
         ]), savedChoices, "Disabling and reenabling must preserve both raw presentation choices and Codex quota selection")
         XCTAssertEqual(try selectedQuotaPreference(), savedCodexSelection)
         XCTAssertEqual(try ownedApplicationPID(), applicationPID)
+        XCTAssertEqual(try fixture.preference("claude.cliUsageEnabled.v1") as? Bool, true,
+                       "The smoke must leave the synthetic CLI opt-in on, as seeded")
         try fixture.assertSafePreferences()
         try quitNormally()
         try fixture.writeReport("providers-result.json", fields: [
@@ -650,6 +688,19 @@ final class Codex94UITests: XCTestCase {
         try require(toggle.isEnabled && toggle.isHittable, "The real monitoring control must be interactive")
         toggle.click()
         try waitUntil("The monitoring toggle did not persist") {
+            try self.fixture.preference(key) as? Bool == enabled
+        }
+    }
+
+    private func setClaudeCLIUsageEnabled(_ enabled: Bool, in dashboard: XCUIElement) throws {
+        try require(fixture.scenario == "providers", "The CLI option toggle belongs to the Providers scenario")
+        let key = "claude.cliUsageEnabled.v1"
+        try require((try fixture.preference(key) as? Bool) != enabled, "The toggle precondition must differ from its target")
+        let toggle = try uniqueIdentified("claude-cli-usage-enabled", in: dashboard)
+        try reveal(toggle, in: dashboard)
+        try require(toggle.isEnabled && toggle.isHittable, "The CLI option control must be interactive")
+        toggle.click()
+        try waitUntil("The CLI option did not persist") {
             try self.fixture.preference(key) as? Bool == enabled
         }
     }
@@ -2087,7 +2138,10 @@ final class Codex94UITests: XCTestCase {
         if scenario == "providers" {
             try require(fixture.claudeExecutable != nil && !fixture.readOnlyFocusProbeEnabled,
                         "Providers must use the manifest-validated fake Claude and unmodified AUT")
-            application.launchEnvironment = ["PATH": fixture.root.path + ":/usr/bin:/bin"]
+            let claudeConfig = try XCTUnwrap(fixture.claudeConfigDirectory,
+                                             "Providers must carry the synthetic Claude state directory")
+            application.launchEnvironment = ["PATH": fixture.root.path + ":/usr/bin:/bin",
+                                             "CLAUDE_CONFIG_DIR": claudeConfig.path]
         }
         if fixture.readOnlyFocusProbeEnabled {
             // These five nonsecret values enable only the observer compiled
@@ -3548,6 +3602,7 @@ private struct SyntheticFixture {
     let claudeExecutable: URL?
     let claudeModeURL: URL?
     let claudeRequestLogURL: URL?
+    let claudeConfigDirectory: URL?
     let artifacts: URL
     let applicationURL: URL
     let applicationBinaryURL: URL
@@ -3630,6 +3685,7 @@ private struct SyntheticFixture {
         var claudeExecutable: URL?
         var claudeModeURL: URL?
         var claudeRequestLogURL: URL?
+        var claudeConfigDirectory: URL?
         if expectedScenario == "providers" {
             let fake = try child("claudeExecutable", "claude")
             try validate(fake, type: .typeRegular, mode: 0o700)
@@ -3651,10 +3707,20 @@ private struct SyntheticFixture {
             claudeRequestLogURL = try child("claudeRequestLogPath", "claude-request-log.jsonl")
             try validate(claudeModeURL!, type: .typeRegular, mode: 0o600)
             try validate(claudeRequestLogURL!, type: .typeRegular, mode: 0o600)
+            // The synthetic Claude Code state file lives outside HOME and is
+            // handed to the AUT only through CLAUDE_CONFIG_DIR.
+            claudeConfigDirectory = try child("claudeConfigDirectory", "claude-config", directory: true)
+            try validate(claudeConfigDirectory!, type: .typeDirectory, mode: 0o700)
+            let stateFile = claudeConfigDirectory!.appendingPathComponent(".claude.json")
+            try validate(stateFile, type: .typeRegular, mode: 0o600)
+            guard !(try read(stateFile, maximumBytes: 65_536)).isEmpty else {
+                throw UITestFailure("The synthetic Claude usage cache must not be empty")
+            }
             guard try read(claudeRequestLogURL!, maximumBytes: 1_048_576).isEmpty else {
                 throw UITestFailure("Claude usage must not run during fixture preparation")
             }
-        } else if ["claudeExecutable", "claudeExecutableSHA256", "claudeModePath", "claudeRequestLogPath", "claudeIsolation"]
+        } else if ["claudeExecutable", "claudeExecutableSHA256", "claudeModePath", "claudeRequestLogPath", "claudeIsolation",
+                   "claudeConfigDirectory"]
             .contains(where: { manifest[$0] != nil }) {
             throw UITestFailure("Claude fixture paths are restricted to the Providers scenario")
         }
@@ -3732,7 +3798,8 @@ private struct SyntheticFixture {
             sourceRevision: sourceRevision,
             executable: executable, invalidExecutable: invalidExecutable, modeURL: modeURL,
             requestLogURL: requestLogURL, claudeExecutable: claudeExecutable,
-            claudeModeURL: claudeModeURL, claudeRequestLogURL: claudeRequestLogURL, artifacts: artifacts,
+            claudeModeURL: claudeModeURL, claudeRequestLogURL: claudeRequestLogURL,
+            claudeConfigDirectory: claudeConfigDirectory, artifacts: artifacts,
             applicationURL: applicationURL, applicationBinaryURL: applicationBinaryURL,
             candidateBinarySHA256: candidateBinarySHA256, readOnlyFocusProbeEnabled: readOnlyFocusProbeEnabled,
             quotaCacheURL: quotaCacheURL,
@@ -3815,14 +3882,18 @@ private struct SyntheticFixture {
             throw UITestFailure("Synthetic quota-only/manual-path/30-minute fixture boundaries changed")
         }
         if scenario == "providers" {
+            // The smoke itself turns the synthetic CLI opt-in off and back on
+            // through the Services toggle, so only its boolean type is fixed here;
+            // assertInitialPreferences requires it to start on and the smoke
+            // asserts that it ends on.
             guard let syntheticCLIEnabled = try preference("claude.cliUsageEnabled.v1") as? NSNumber,
-                  CFGetTypeID(syntheticCLIEnabled) == CFBooleanGetTypeID(), syntheticCLIEnabled.boolValue,
+                  CFGetTypeID(syntheticCLIEnabled) == CFBooleanGetTypeID(),
                   try preference("claude.refreshInterval.v1") as? Int == 30,
                   try preference("codexMonitoringEnabled.v1") is Bool,
                   try preference("claudeMonitoringEnabled.v1") is Bool,
                   let mode = try preference("menuBarServiceMode.v1") as? String,
                   ["single", "compactBoth", "both"].contains(mode) else {
-                throw UITestFailure("Providers must retain the 30-minute fixture policy and explicit synthetic CLI opt-in")
+                throw UITestFailure("Providers must retain the 30-minute fixture policy and a boolean synthetic CLI opt-in")
             }
         }
         guard let style = try preference("tokenUsageChartStyle.v1") as? String,
@@ -4144,7 +4215,7 @@ private struct SyntheticFixture {
         ] : []
         let providers: Set<String> = scenario == "providers" ? [
             "providers-both-en.png", "providers-compact-en.png", "providers-claude-error-en.png",
-            "providers-claude-only-en.png", "providers-disabled-en.png",
+            "providers-claude-only-en.png", "providers-local-cache-en.png", "providers-disabled-en.png",
             "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
             "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
             "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",

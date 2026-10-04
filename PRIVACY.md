@@ -6,13 +6,90 @@ stable version is [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/
 released on 2026-10-03 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
-The unreleased `4.0.2 (23)` candidate changes notification callback handling and
-quota presentation. Its compact dual-ring mode uses the existing service-mode
-preference and does not combine provider percentages or add quota collection.
+The unpublished `4.0.2 (23)` candidate, carried forward into 4.1.0, changes
+notification callback handling and quota presentation. Its compact dual-ring
+mode uses the existing service-mode preference and does not combine provider
+percentages or add quota collection.
 The official Claude Usage-page button hands a fixed HTTPS URL to the system
 browser only when clicked. Codex94 does not inspect that page, its cookies or
 login state. Browser navigation is separate from Codex94's quota reader and
 is not telemetry uploaded by this project.
+
+## 4.1.0 candidate
+
+The unreleased `4.1.0 (24)` candidate has no publication date; the published
+stable version remains `4.0.1 (22)`. Its changes are Claude-side only, and
+Codex quota behavior is unchanged. Codex94 gains a read-only primary Claude
+source: the plan-usage cache that Claude Code itself writes into its global
+state file after fetching `/usage`, described in the next section. The existing
+status-line connection (the statusline bridge) becomes the backup source and
+the optional CLI `/usage` read becomes the last option. The CLI reader stays
+off by default and keeps its quota-consumption warning; it is no longer
+mutually exclusive with the passive sources, and disabling it discards only
+CLI data. A new **Read once with the CLI** button in Dashboard → Services
+starts the official CLI exactly once, regardless of that switch, under the
+same warning. Afterwards Claude Code refreshes its own cache, which the primary
+source then picks up. Exactly one report is shown at a time; percentages from
+different sources are never averaged or merged.
+
+Model-scoped weekly limits found in the same cache appear as additional Claude
+quota buckets in the card, the menu-bar quota picker and the automatic
+most-constrained selection. They are derived from the same read; no further
+request, file or preference is added. Redacted diagnostics gain one
+`claudeLocalCache` line whose value is `absent`, `valid`, `unreadable` or
+`invalid` (or `none` while Claude monitoring is off), without a path or account
+identifier. No new preference key, cache
+file, entitlement, network endpoint or installer step is introduced, and
+`claude.cliUsageEnabled.v1` keeps its meaning.
+
+Direct OAuth remains out of scope. Anthropic's
+[legal page](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
+(2026-02-20) restricts OAuth tokens to Claude Code and native Anthropic apps and
+forbids third parties from collecting, storing or intermediating Claude.ai
+credentials or session tokens. Codex94 therefore reads only files that the
+official client leaves on the Mac. The paused OAuth work lives in draft PR #44
+and is not part of 4.1.0.
+
+## Claude Code local usage cache (4.1.0)
+
+Claude Code 2.1.208 and later keep the result of their plan-usage fetch, the
+data behind the `/usage` screen, as "last-known usage" under the key
+`cachedUsageUtilization` in their global state file `~/.claude.json`. When
+`CLAUDE_CONFIG_DIR` is set in Codex94's own environment, the file is read from
+that directory instead, mirroring Claude Code. Codex94's
+`ClaudeLocalUsageCacheReader` is the only code that names this file, and it
+interprets only that one key.
+
+From the key it extracts `fetchedAtMs`, which becomes the report time shown as
+"Claude Code fetched", the `five_hour` and `seven_day` utilization percentages
+with their ISO-8601 `resets_at` values, and model-scoped weekly limits (display
+name, percentage and reset time; at most sixteen rows). Everything else in the
+file is discarded immediately. The file also contains the account email,
+organization, project paths and MCP settings; Codex94 never retains, logs,
+displays or exports them. The `accountUuid` value is compared in memory only,
+so that a cache written by a different login starts a fresh notification
+baseline. It is never persisted, logged, shown or exported.
+
+The file is only read. The reader opens it read-only with `O_NOFOLLOW`, refuses
+symlinks, hard-linked files, files owned by another user, non-regular files and
+files larger than 16 MiB, and parses the bounded JSON. It re-parses only when
+the file's size, modification time or inode changes, and it never creates,
+writes, renames or deletes the file. The parsed quota windows enter the same
+in-memory Claude state that previous versions already hold; they are not
+written to `statusline-quota.json`, `UserDefaults`, the quota cache or logs.
+Logs record fixed source/result words only. Codex94 never writes this file
+itself; only Claude Code's own `/usage` fetch refreshes it, including one
+started by the optional CLI reader or the explicit one-time CLI read above.
+
+A cache report counts as current for 60 minutes after Claude Code fetched it,
+matching Claude Code's own last-known rule. Older reports keep their numbers
+and data time with the amber cached marker. Windows whose reset time has passed
+disappear and are never shown as 100% remaining. The statusline bridge report
+replaces the cache only when its observation time is strictly newer, or when
+the cache is absent or unreadable; its existing producer-fingerprint
+confirmation is unchanged. Codex94 still does not read `.credentials.json`, the
+Keychain, browser cookies, tokens or conversation transcripts, and the
+repository security scanner forbids those identifiers in production sources.
 
 ## Optional Claude monitoring (4.0.1)
 
