@@ -4,6 +4,51 @@ import XCTest
 final class StatusPresentationTests: XCTestCase {
     private let lastSuccess = Date(timeIntervalSince1970: 1_900_000_000)
 
+    func testHistoricalFormattingPreservesRawQuotaSourceAndOriginalTime() throws {
+        let now = lastSuccess.addingTimeInterval(30_000)
+        let report = ClaudeQuotaReport(source: .localCache, reportedAt: lastSuccess, receivedAt: lastSuccess,
+            windows: [.init(kind: .weekly, usedPercentage: 100, resetsAt: lastSuccess.addingTimeInterval(60)),
+                      .init(kind: .fiveHour, usedPercentage: 24.5, resetsAt: lastSuccess.addingTimeInterval(60))],
+            modelLimits: [.init(modelName: "Synthetic model", usedPercentage: 0, resetsAt: now.addingTimeInterval(300))])
+        let history = try XCTUnwrap(ClaudeQuotaHistoryPresentation(report: report, at: now))
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let original = ClaudeQuotaHistoryFormatting.sourceTime(source: .localCache, reportedAt: lastSuccess,
+                                                                   language: language, timeZone: TimeZone(secondsFromGMT: 0)!)
+            let detail = ClaudeQuotaHistoryFormatting.summary(history, now: now, language: language,
+                                                               timeZone: TimeZone(secondsFromGMT: 0)!)
+            XCTAssertTrue(detail.contains(original))
+            XCTAssertTrue(detail.contains("75.5%"))
+            XCTAssertTrue(detail.contains("24.5%"))
+            XCTAssertTrue(detail.contains("0%"))
+            XCTAssertTrue(detail.contains("100%"), "Recorded values stay real, including a model whose reset is still future")
+            XCTAssertTrue(detail.contains(StatusAccessibilityString.localized("claude.history.currentUnknown",
+                                                                            language: language, bundle: .main)))
+            XCTAssertTrue(detail.contains("Synthetic model"))
+            let later = ClaudeQuotaHistoryFormatting.reportTime(history, now: now.addingTimeInterval(3_600),
+                                                                language: language, timeZone: TimeZone(secondsFromGMT: 0)!)
+            XCTAssertTrue(later.hasPrefix(original), "Rendering later changes relative age, not the original source timestamp")
+        }
+    }
+
+    func testHistoricalAgeRejectsClockRollbackAndInvalidOrUnrepresentableIntervals() throws {
+        let now = lastSuccess.addingTimeInterval(300)
+        let report = ClaudeQuotaReport(source: .statusline, reportedAt: lastSuccess, receivedAt: lastSuccess,
+            windows: [.init(kind: .weekly, usedPercentage: 10, resetsAt: lastSuccess.addingTimeInterval(60))])
+        let history = try XCTUnwrap(ClaudeQuotaHistoryPresentation(report: report, at: now))
+        let unknown = "Age unavailable"
+        for invalidNow in [lastSuccess.addingTimeInterval(-1), Date(timeIntervalSince1970: .infinity),
+                           Date(timeIntervalSince1970: -.infinity), Date(timeIntervalSince1970: 1e20)] {
+            XCTAssertEqual(ClaudeQuotaHistoryFormatting.relativeAge(since: lastSuccess, now: invalidNow, language: .english), unknown)
+        }
+        XCTAssertEqual(ClaudeQuotaHistoryFormatting.relativeAge(since: Date(timeIntervalSince1970: .nan),
+                                                                now: now, language: .english), unknown)
+        let original = ClaudeQuotaHistoryFormatting.sourceTime(source: .statusline, reportedAt: lastSuccess, language: .english)
+        let rollback = ClaudeQuotaHistoryFormatting.reportTime(history, now: lastSuccess.addingTimeInterval(-1), language: .english)
+        XCTAssertTrue(rollback.hasPrefix(original))
+        XCTAssertTrue(rollback.contains(unknown))
+        XCTAssertFalse(rollback.contains("just now"))
+    }
+
     func testAllConnectionIssuesMapToExpectedRecoveryDestination() {
         let expectations: [(ConnectionIssue, ConnectionRecoveryDestination)] = [
             (.codexNotFound, .connection),

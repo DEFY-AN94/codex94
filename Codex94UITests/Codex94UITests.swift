@@ -557,6 +557,51 @@ final class Codex94UITests: XCTestCase {
         XCTAssertEqual(try fixture.claudeUsageRequestCount(), cliReadsBeforeOff,
                        "Reading the local usage cache must never launch the CLI")
         try captureProviderPopover(popover, marker: "claude-quota-section", named: "providers-local-cache-en.png")
+
+        // 4.1.2: expiry changes presentation only. The original source time and
+        // percentages remain visible as history, never as selectable current quota.
+        let priorTimeElement = identified("claude-source-time", in: popover)
+        let priorSourceTime = [priorTimeElement.label, priorTimeElement.title, priorTimeElement.value as? String ?? ""]
+            .first { $0.contains("Claude Code fetched:") } ?? ""
+        try require(!priorSourceTime.isEmpty, "The source timestamp must be visible before expiry")
+        try fixture.setClaudeLocalCacheExpired(true)
+        try uniqueIdentified("claude-refresh", in: popover).click()
+        try waitUntil("The expired Claude report must remain visible as history", timeout: 25) {
+            self.identified("claude-quota-history", in: popover).exists
+                && self.identified("claude-history-fiveHour", in: popover).exists
+                && !self.identified("claude-quota-fiveHour", in: popover).exists
+                && !self.identified("claude-quota-weekly", in: popover).exists
+        }
+        try assertProviderMetric("claude-history-fiveHour", percent: "60%", in: popover)
+        try assertProviderMetric("claude-history-weekly", percent: "75%", in: popover)
+        try require(identified("claude-history-current-unknown", in: popover).exists,
+                    "Historical values must explicitly say current quota is unknown")
+        let historyTimeElement = identified("claude-source-time", in: popover)
+        try require([historyTimeElement.label, historyTimeElement.title, historyTimeElement.value as? String ?? ""]
+            .contains { $0.contains(priorSourceTime) }, "Expiry must retain the original source time")
+        let autoSelection = identified("claude-auto-quota-selection", in: popover)
+        try require([autoSelection.label, autoSelection.title, autoSelection.value as? String ?? ""]
+            .contains { $0.contains("Waiting for quota") }, "History must not become Auto's current quota")
+        try captureProviderPopover(popover, marker: "claude-quota-section", named: "providers-history-en.png")
+        XCTAssertEqual(try fixture.claudeUsageRequestCount(), cliReadsBeforeOff)
+        XCTAssertEqual(try fixture.requestCount(), disabledCodexCount)
+        dashboard = try openDashboard(from: popover)
+        try selectPage(.overview, in: dashboard)
+        try require(identified("claude-quota-history", in: dashboard).waitForExistence(timeout: 5),
+                    "Dashboard must share the same historical presentation")
+        try capture(dashboard, named: "dashboard-providers-history-en.png")
+        // Overview intentionally shares the provider section identifier. Leave
+        // that page before the strict app-wide popover-closed precondition.
+        try selectPage(.providers, in: dashboard)
+        popover = try openProviderPopover(service: "claude", marker: "claude-quota-section")
+        try fixture.setClaudeLocalCacheExpired(false)
+        try uniqueIdentified("claude-refresh", in: popover).click()
+        try waitUntil("A usable report must replace history", timeout: 25) {
+            self.identified("claude-quota-fiveHour", in: popover).exists
+                && !self.identified("claude-quota-history", in: popover).exists
+        }
+        XCTAssertEqual(try fixture.claudeUsageRequestCount(), cliReadsBeforeOff)
+        XCTAssertEqual(try fixture.requestCount(), disabledCodexCount)
         dashboard = try openDashboard(from: popover)
         try selectPage(.providers, in: dashboard)
         try setClaudeCLIUsageEnabled(true, in: dashboard)
@@ -621,6 +666,8 @@ final class Codex94UITests: XCTestCase {
             "allOffNeutralSettingsEntryVerified": true, "reenablePreservesSelections": true,
             "sameApplicationProcess": true, "productionAUTUnmodified": true,
             "onlyFixedSyntheticClaudeUsed": true, "statuslineInstallAttempted": false,
+            "expiredClaudeHistoryVerified": true, "historyDoesNotBecomeCurrentQuota": true,
+            "historyPreservesSourceTimeAndRequestCounts": true, "usableReportReplacesHistory": true,
             "authenticationUIOperated": false, "realAccountDataUsed": false,
             "keyboardAcceptance": "not-tested", "spacesAndFullscreenAcceptance": "not-tested",
             "rawTestResultsUploaded": false
@@ -3709,7 +3756,7 @@ private struct SyntheticFixture {
             try validate(claudeRequestLogURL!, type: .typeRegular, mode: 0o600)
             // The synthetic Claude Code state file lives outside HOME and is
             // handed to the AUT only through CLAUDE_CONFIG_DIR.
-            claudeConfigDirectory = try child("claudeConfigDirectory", "claude-config", directory: true)
+            claudeConfigDirectory = try child("claudeConfigDirectory", "control/claude-config", directory: true)
             try validate(claudeConfigDirectory!, type: .typeDirectory, mode: 0o700)
             let stateFile = claudeConfigDirectory!.appendingPathComponent(".claude.json")
             try validate(stateFile, type: .typeRegular, mode: 0o600)
@@ -4022,6 +4069,41 @@ private struct SyntheticFixture {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: claudeModeURL.path)
     }
 
+    /// Mutates only the already-created synthetic cache inside the existing
+    /// control exception. No extra sandbox directory or production path is writable.
+    func setClaudeLocalCacheExpired(_ expired: Bool) throws {
+        guard scenario == "providers", let directory = claudeConfigDirectory,
+              directory == root.appendingPathComponent("control/claude-config", isDirectory: true) else {
+            throw UITestFailure("Historical report transitions require the fixed Providers control cache")
+        }
+        try Self.validate(directory, type: .typeDirectory, mode: 0o700)
+        let file = directory.appendingPathComponent(".claude.json")
+        try Self.validate(file, type: .typeRegular, mode: 0o600)
+        guard var document = try JSONSerialization.jsonObject(with: Self.read(file, maximumBytes: 65_536)) as? [String: Any],
+              var report = document["cachedUsageUtilization"] as? [String: Any],
+              report["accountUuid"] as? String == "00000000-0000-4000-8000-000000000001",
+              (report["fetchedAtMs"] as? NSNumber)?.int64Value == 1_767_225_600_000,
+              var utilization = report["utilization"] as? [String: Any] else {
+            throw UITestFailure("The history transition cannot replace an unrecognized cache")
+        }
+        for (key, originalReset) in [("five_hour", "2033-05-19T06:30:00+00:00"),
+                                     ("seven_day", "2033-05-19T19:00:00+00:00")] {
+            guard var window = utilization[key] as? [String: Any] else { throw UITestFailure("Missing synthetic shared window") }
+            window["resets_at"] = expired ? "2026-01-01T01:00:00+00:00" : originalReset
+            utilization[key] = window
+        }
+        if var limits = utilization["limits"] as? [[String: Any]] {
+            for index in limits.indices {
+                limits[index]["resets_at"] = expired ? "2026-01-01T01:00:00+00:00" : "2033-05-19T19:00:00+00:00"
+            }
+            utilization["limits"] = limits
+        }
+        report["utilization"] = utilization
+        document["cachedUsageUtilization"] = report
+        try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]).write(to: file, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+    }
+
     func setTokenUsageMode(_ mode: String) throws {
         guard scenario == "usage", ["complete", "partial", "missing", "unsupported", "slow"].contains(mode) else {
             throw UITestFailure("Invalid synthetic token-usage mode")
@@ -4216,6 +4298,7 @@ private struct SyntheticFixture {
         let providers: Set<String> = scenario == "providers" ? [
             "providers-both-en.png", "providers-compact-en.png", "providers-claude-error-en.png",
             "providers-claude-only-en.png", "providers-local-cache-en.png", "providers-disabled-en.png",
+            "providers-history-en.png", "dashboard-providers-history-en.png",
             "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
             "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
             "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",

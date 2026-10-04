@@ -27,6 +27,7 @@ METADATA_HELPER = "script/release_metadata.py"
 BUILD_INPUTS = (
     "Codex94/Services/ClaudeLocalUsageCacheReader.swift",
     "Codex94/Support/ClaudeQuotaFreshnessPolicy.swift",
+    "Codex94/Support/ClaudeQuotaHistoryFormatting.swift",
     "Codex94Tests/ClaudeLocalUsageCacheReaderTests.swift",
     "Codex94Tests/ClaudeQuotaFreshnessPolicyTests.swift",
     "Codex94Tests/ClaudeExecutableLocatorTests.swift",
@@ -45,6 +46,7 @@ BUILD_INPUTS = (
     "Codex94/Views/Dashboard/ProviderSettingsView.swift",
     "Codex94/Views/Components/ClaudeStatuslineSetupView.swift",
     "Codex94/Views/Components/ClaudeQuotaCard.swift",
+    "Codex94/Views/Components/ClaudeQuotaHistoryView.swift",
     "Codex94/Stores/ProviderPresentation.swift",
     "Codex94/Stores/ClaudeQuotaStore.swift",
     "Codex94/Services/ClaudeStatuslineCache.swift",
@@ -493,7 +495,9 @@ def main():
         # bucket and label the native item "Fable, ..." instead of "Claude, ...",
         # which the exact native-item inspection rejects. Model-bucket selection
         # itself is covered by the unit tests.
-        claude_config = root / "claude-config"
+        # Keep the synthetic cache under the existing control write exception so
+        # the UI runner can advance only its fixed report between scenarios.
+        claude_config = control / "claude-config"
         claude_config.mkdir(mode=0o700)
         write_new(claude_config / ".claude.json", json_bytes({
             "numStartups": 1,

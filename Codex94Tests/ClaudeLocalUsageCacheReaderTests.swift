@@ -321,6 +321,69 @@ final class ClaudeLocalUsageCacheReaderTests: XCTestCase {
         XCTAssertNil(report.snapshot(at: now.addingTimeInterval(2_000)), "Model limits alone never resurrect quota")
     }
 
+    func testHistoricalProjectionPreservesWholeExpiredReportWithoutResurrectingQuota() throws {
+        let windows = [ClaudeQuotaWindow(kind: .fiveHour, usedPercentage: 100, resetsAt: now),
+                       ClaudeQuotaWindow(kind: .weekly, usedPercentage: 17.25, resetsAt: now.addingTimeInterval(-1))]
+        let limits = [ClaudeQuotaModelLimit(modelName: "Fable", usedPercentage: 33.5,
+                                          resetsAt: now.addingTimeInterval(1_000))]
+        for source in [ClaudeQuotaSource.localCache, .statusline, .cliUsage] {
+            let report = ClaudeQuotaReport(source: source, reportedAt: now.addingTimeInterval(-100), receivedAt: now,
+                                           windows: windows, producerID: String(repeating: "a", count: 64), modelLimits: limits)
+            let history = try XCTUnwrap(ClaudeQuotaHistoryPresentation(report: report, at: now))
+            XCTAssertEqual(history.source, source)
+            XCTAssertEqual(history.reportedAt, report.reportedAt)
+            XCTAssertEqual(history.windows, windows)
+            XCTAssertEqual(history.modelLimits, limits)
+            XCTAssertNil(report.snapshot(at: now), "A historical model row is not current shared quota")
+            XCTAssertEqual(ClaudeQuotaHistoryPresentation(report: report, at: now.addingTimeInterval(10)), history,
+                           "Rereading or aging history cannot change recorded values or observation time")
+        }
+    }
+
+    func testHistoricalProjectionUsesSourceTimeDespiteFutureLocalReceiptAfterClockRollback() throws {
+        let sourceTime = now.addingTimeInterval(-100)
+        let windows = [ClaudeQuotaWindow(kind: .fiveHour, usedPercentage: 61.5, resetsAt: now.addingTimeInterval(-1))]
+        for receiptOffset in [0.005, 3_600.0] {
+            let report = ClaudeQuotaReport(source: .localCache, reportedAt: sourceTime,
+                                           receivedAt: now.addingTimeInterval(receiptOffset), windows: windows)
+            let history = try XCTUnwrap(ClaudeQuotaHistoryPresentation(report: report, at: now))
+            XCTAssertEqual(history.reportedAt, sourceTime)
+            XCTAssertEqual(history.windows, windows)
+        }
+        let futureSource = ClaudeQuotaReport(source: .localCache, reportedAt: now.addingTimeInterval(1),
+                                             receivedAt: now.addingTimeInterval(2), windows: windows)
+        XCTAssertNil(ClaudeQuotaHistoryPresentation(report: futureSource, at: now),
+                     "Only the local receipt may be ahead of now; a future source observation is rejected")
+    }
+
+    func testHistoricalProjectionRejectsPartialCurrentEmptyAndInvalidReports() {
+        func history(windows: [ClaudeQuotaWindow], reportedAt: Date? = nil, receivedAt: Date? = nil,
+                     limits: [ClaudeQuotaModelLimit] = []) -> ClaudeQuotaHistoryPresentation? {
+            ClaudeQuotaHistoryPresentation(report: .init(source: .localCache,
+                reportedAt: reportedAt ?? now.addingTimeInterval(-100), receivedAt: receivedAt ?? now,
+                windows: windows, modelLimits: limits), at: now)
+        }
+        let expired = ClaudeQuotaWindow(kind: .fiveHour, usedPercentage: 25.5, resetsAt: now)
+        XCTAssertNil(history(windows: []))
+        XCTAssertNil(history(windows: [expired, .init(kind: .weekly, usedPercentage: 70, resetsAt: now.addingTimeInterval(1))]))
+        XCTAssertNil(history(windows: [.init(kind: .fiveHour, usedPercentage: 25, resetsAt: nil)]))
+        XCTAssertNil(history(windows: [expired, expired]))
+        for invalid in [-0.1, 100.1, Double.infinity, Double.nan] {
+            XCTAssertNil(history(windows: [.init(kind: .fiveHour, usedPercentage: invalid, resetsAt: now)]))
+            XCTAssertNil(history(windows: [expired], limits: [.init(modelName: "Fable", usedPercentage: invalid, resetsAt: now)]))
+        }
+        for invalidDate in [Date(timeIntervalSince1970: -1), Date(timeIntervalSince1970: 1e300)] {
+            XCTAssertNil(history(windows: [expired], reportedAt: invalidDate))
+            XCTAssertNil(history(windows: [expired], receivedAt: invalidDate))
+            XCTAssertNil(history(windows: [.init(kind: .fiveHour, usedPercentage: 25, resetsAt: invalidDate)]))
+        }
+        XCTAssertNil(history(windows: [expired], reportedAt: now.addingTimeInterval(1), receivedAt: now.addingTimeInterval(1)))
+        XCTAssertNil(history(windows: [expired], receivedAt: now.addingTimeInterval(-101)))
+        for name in [" ", "bad\nname", String(repeating: "a", count: 65)] {
+            XCTAssertNil(history(windows: [expired], limits: [.init(modelName: name, usedPercentage: 50, resetsAt: now)]))
+        }
+    }
+
     func testReportCodableKeepsModelLimitsAndOldRecordsStillDecode() throws {
         let report = ClaudeQuotaReport(
             source: .localCache, reportedAt: now, receivedAt: now,

@@ -39,6 +39,18 @@ The latest maintenance release is **`4.1.1 (25)`**, published on
 was merged through PR #43 and carried into 4.1.0 without a separate release.
 Never move or reuse existing tags, including the retained `v4.0.0` candidate.
 
+The next candidate is **4.1.2 (26)**, dated for **2026-10-05**
+(Australia/Melbourne). Keep stable download links on 4.1.1 until publication.
+Use synthetic data to verify that fully expired accepted reports retain values
+and source time in historical UI, while current snapshots/rings/Auto/notifications
+remain empty or unchanged. Check source switching, account invalidation, disable,
+late CLI results, pending confirmations, unchanged rereads, clock changes and cold
+local-cache recovery. No-record and malformed/future-data states remain unknown.
+Review history cards/terminal rows in both languages and themes, native tooltip
+and floating expanded detail, and enforce zero extra requests from presentation.
+Record 4.1.2 local, PR, final-main, package and installed-App evidence separately.
+Do not launch real `/usage` or seed the user's actual cache for these checks.
+
 For 4.1.1, use synthetic reports and disposable files to verify:
 
 - Observed account change, cache absence/unreadability/decoded-invalid state,
@@ -80,9 +92,10 @@ CLI or send a prompt to populate test data.
   exactly one of absent/valid/unreadable/invalid while Claude monitoring is on
   (none once it is off) and no path or account identifier. Confirm the reader
   never writes the file.
-- Expired windows: a cache whose `resets_at` has passed disappears from the
-  card, picker and menu bar and is never shown as 100% remaining; a report with
-  only expired windows shows the windows-expired state.
+- Expired windows leave the current snapshot, picker and menu-bar percentage;
+  expiry never implies 100% remaining. From 4.1.2, an accepted fully expired
+  report may be shown separately as historical values with its original time
+  and an explicit current-quota-unknown label.
 - 60-minute freshness: a cache report is current for 60 minutes after
   `fetchedAtMs`, then shows the amber cached marker and the **Claude Code
   fetched** time while keeping its numbers. Statusline keeps 10 minutes; CLI

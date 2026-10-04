@@ -8,6 +8,61 @@ import XCTest
 final class FloatingWindowTests: XCTestCase {
     private let referenceDate = Date(timeIntervalSince1970: 2_000_000_000)
 
+    func testClaudeHistoryExpandedTextKeepsUnknownValuesAndExistingFloatingGeometry() throws {
+        let report = ClaudeQuotaReport(source: .localCache, reportedAt: referenceDate.addingTimeInterval(-30_000),
+            receivedAt: referenceDate.addingTimeInterval(-30_000), windows: [
+                .init(kind: .fiveHour, usedPercentage: 24.5, resetsAt: referenceDate.addingTimeInterval(-1)),
+                .init(kind: .weekly, usedPercentage: 61.2, resetsAt: referenceDate.addingTimeInterval(-1))
+            ], modelLimits: [.init(modelName: "Synthetic model", usedPercentage: 100, resetsAt: nil)])
+        let history = try XCTUnwrap(ClaudeQuotaHistoryPresentation(report: report, at: referenceDate))
+        let output = try outputDirectory()
+        print("CODEX94_FLOATING_HISTORY_RENDER_DIR=\(output.path)")
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            for theme in [ThemePreference.terminalLight, .terminalDark] {
+                for expanded in [false, true] {
+                    let empty = FloatingQuotaContent(
+                        bucketName: "Claude", fiveHour: nil, weekly: nil,
+                        presentation: StatusPresentation(remainingPercent: nil, connectionState: .unavailable(.quotaUnavailable),
+                                                         isRefreshing: false, lastSuccessfulFetch: nil),
+                        resetCredits: nil, hasFetchedLiveSnapshot: false, language: language, theme: theme,
+                        now: referenceDate, isPinned: true, isExpanded: expanded, isActive: false,
+                        reduceMotion: true, reduceTransparency: true, provider: .claude, availableProviders: [.claude],
+                        refresh: { XCTFail("History rendering must not refresh") },
+                        openDashboard: { XCTFail("Rendering must not open Dashboard") }
+                    )
+                    var recorded = empty
+                    recorded.historicalReport = history
+                    XCTAssertNil(recorded.fiveHour)
+                    XCTAssertNil(recorded.weekly)
+                    XCTAssertEqual(QuotaFormatting.percent(precise: recorded.weekly?.preciseRemainingPercent), "--")
+                    XCTAssertTrue(try XCTUnwrap(recorded.historicalSummary).contains("75.5%"))
+                    let detail = try XCTUnwrap(recorded.historicalDetail)
+                    XCTAssertTrue(detail.contains("24.5%"))
+                    XCTAssertTrue(detail.contains("Synthetic model"))
+                    XCTAssertTrue(detail.contains(StatusAccessibilityString.localized("claude.history.currentUnknown",
+                                                                                    language: language, bundle: .main)))
+                    let suffix = "\(language.rawValue)-\(theme.rawValue)-\(expanded ? "expanded" : "collapsed")"
+                    let baselineSize = try render(empty, named: "floating-no-history-" + suffix,
+                                                  theme: theme, output: output, width: 480)
+                    let historySize = try render(recorded, named: "floating-history-" + suffix,
+                                                 theme: theme, output: output, width: 480)
+                    XCTAssertEqual(historySize, baselineSize)
+                    XCTAssertEqual(historySize.width, 480, accuracy: 0.5, "Historical 5h data must not widen an empty current panel")
+                    XCTAssertEqual(historySize.height, expanded ? 132 : 90, accuracy: 0.5)
+                    let label = FloatingRefreshText(presentation: recorded.presentation, language: language,
+                                                    now: referenceDate, historicalReport: recorded.historyForDisplay)
+                    XCTAssertEqual(label.title, language == .english ? "Last record" : "上次记录")
+                    XCTAssertFalse(label.title.contains("失败"))
+                    XCTAssertFalse(label.title.localizedCaseInsensitiveContains("failed"))
+                    XCTAssertEqual(label.detail, detail, "Both folded and expanded history labels keep the full original record in help")
+                    var codex = recorded
+                    codex.provider = .codex
+                    XCTAssertNil(codex.historyForDisplay)
+                }
+            }
+        }
+    }
+
     func testFoldedAndExpandedFramesKeepTheSameTopLeft() {
         let screen = CGRect(x: 0, y: 30, width: 1_440, height: 870)
         for saved in [nil, FloatingWindowPosition(x: 90, y: 500), FloatingWindowPosition(x: 90, y: 50)] {
@@ -326,6 +381,34 @@ final class FloatingWindowTests: XCTestCase {
         XCTAssertTrue(loading.detail.contains("Cached data"))
         XCTAssertEqual(FloatingRefreshText(presentation: failed, language: .simplifiedChinese, now: now).title,
                        "失败 · 上次27 分钟前")
+    }
+
+    func testHistoryRefreshLabelDoesNotCallExpiryAFailureAndStillPrioritizesAnActiveRead() throws {
+        let report = ClaudeQuotaReport(source: .statusline, reportedAt: referenceDate.addingTimeInterval(-300),
+            receivedAt: referenceDate.addingTimeInterval(-300), windows: [
+                .init(kind: .weekly, usedPercentage: 61.2, resetsAt: referenceDate.addingTimeInterval(-1))
+            ])
+        let history = try XCTUnwrap(ClaudeQuotaHistoryPresentation(report: report, at: referenceDate))
+        let expired = StatusPresentation(remainingPercent: nil, connectionState: .unavailable(.quotaUnavailable),
+                                        isRefreshing: false, lastSuccessfulFetch: nil)
+        let active = StatusPresentation(remainingPercent: nil, connectionState: .unavailable(.quotaUnavailable),
+                                       isRefreshing: true, lastSuccessfulFetch: nil)
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let record = FloatingRefreshText(presentation: expired, language: language, now: referenceDate,
+                                            historicalReport: history)
+            XCTAssertEqual(record.title, language == .english ? "Last record" : "上次记录")
+            XCTAssertTrue(record.detail.contains("38.8%"))
+            XCTAssertTrue(record.detail.contains("61.2%"))
+            XCTAssertTrue(record.detail.contains(ClaudeQuotaHistoryFormatting.sourceTime(
+                source: history.source, reportedAt: history.reportedAt, language: language)))
+            let loading = FloatingRefreshText(presentation: active, language: language, now: referenceDate,
+                                             historicalReport: history)
+            XCTAssertEqual(loading, FloatingRefreshText(presentation: active, language: language, now: referenceDate),
+                           "Active refresh retains its existing title/detail and disabled-button behavior")
+            XCTAssertNotEqual(loading.title, record.title)
+        }
+        XCTAssertEqual(FloatingRefreshText(presentation: expired, language: .english, now: referenceDate).title,
+                       "Refresh failed", "The existing no-history failure label is unchanged")
     }
 
     func testFloatingStripSyntheticEnglishChineseRenderingMatrix() throws {

@@ -46,7 +46,8 @@ struct FloatingQuotaView: View {
             selectProvider: { store.preferences.floatingProvider = $0 },
             refresh: { store.refreshProvider(provider) }, togglePin: togglePin,
             toggleExpanded: toggleExpanded, hide: hide,
-            openDashboard: openDashboard, finishDrag: finishDrag
+            openDashboard: openDashboard, finishDrag: finishDrag,
+            historicalReport: store.providerHistoricalReport(for: provider)
         )
     }
 }
@@ -78,6 +79,7 @@ struct FloatingQuotaContent: View {
     var hide: () -> Void = {}
     var openDashboard: () -> Void = {}
     var finishDrag: () -> Void = {}
+    var historicalReport: ClaudeQuotaHistoryPresentation? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -153,6 +155,19 @@ struct FloatingQuotaContent: View {
     private var resolvedWidth: CGFloat { width ?? layout.preferredWidth }
     private var isCompact: Bool { layout.usesCompactMetrics(at: resolvedWidth) }
 
+    var historyForDisplay: ClaudeQuotaHistoryPresentation? {
+        guard provider == .claude, fiveHour == nil, weekly == nil else { return nil }
+        return historicalReport
+    }
+
+    var historicalSummary: String? {
+        historyForDisplay.map { ClaudeQuotaHistoryFormatting.compactSummary($0, language: language) }
+    }
+
+    var historicalDetail: String? {
+        historyForDisplay.map { ClaudeQuotaHistoryFormatting.summary($0, now: now, language: language) }
+    }
+
     private var palette: Codex94Palette {
         .resolve(theme, scheme: colorScheme, overrides: accentOverrides)
     }
@@ -201,7 +216,8 @@ struct FloatingQuotaContent: View {
                 }
                 FloatingRefreshButton(
                     presentation: presentation, language: language, now: now,
-                    isActive: isActive, reduceMotion: reduceMotion, refresh: refresh
+                    isActive: isActive, reduceMotion: reduceMotion, refresh: refresh,
+                    historicalReport: historyForDisplay
                 )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -270,6 +286,19 @@ struct FloatingQuotaContent: View {
                     Text(hasFetchedLiveSnapshot ? LocalizedStringKey("resetCredits.unavailable") : "resetCredits.notFetched")
                         .foregroundStyle(.secondary)
                 }
+                } else if let history = historyForDisplay {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(verbatim: ClaudeQuotaHistoryFormatting.compactSummary(history, language: language))
+                            .font(.system(size: 10))
+                        Text(verbatim: ClaudeQuotaHistoryFormatting.reportTime(history, now: now, language: language))
+                            .font(.system(size: 8)).foregroundStyle(.secondary)
+                    }
+                    .lineLimit(1).truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .help(Text(verbatim: historicalDetail ?? ""))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text(verbatim: historicalDetail ?? ""))
+                    .accessibilityIdentifier("floating-claude-history")
                 } else {
                     Label("Claude Code", systemImage: provider.systemImageName)
                     if presentation.usesCachedData { Text("status.cached").foregroundStyle(.secondary) }
@@ -376,12 +405,14 @@ private struct FloatingRefreshButton: View {
     let isActive: Bool
     let reduceMotion: Bool
     let refresh: () -> Void
+    var historicalReport: ClaudeQuotaHistoryPresentation? = nil
     @State private var hovering = false
     @FocusState private var focused: Bool
     @AccessibilityFocusState private var accessibilityFocused: Bool
 
     var body: some View {
-        let label = FloatingRefreshText(presentation: presentation, language: language, now: now)
+        let label = FloatingRefreshText(presentation: presentation, language: language, now: now,
+                                        historicalReport: historicalReport)
         Button(action: refresh) {
             HStack(spacing: 4) {
                 Group {
@@ -426,10 +457,16 @@ struct FloatingRefreshText: Equatable {
     let title: String
     let detail: String
 
-    init(presentation: StatusPresentation, language: LanguagePreference, now: Date) {
+    init(presentation: StatusPresentation, language: LanguagePreference, now: Date,
+         historicalReport: ClaudeQuotaHistoryPresentation? = nil) {
         func localized(_ key: String, arguments: [String] = []) -> String {
             StatusAccessibilityString.localized(key, arguments: arguments.map { $0 as CVarArg },
                                                 language: language, bundle: .main)
+        }
+        if presentation.connectionBadge != .refreshing, let historicalReport {
+            title = localized("floating.history")
+            detail = ClaudeQuotaHistoryFormatting.summary(historicalReport, now: now, language: language)
+            return
         }
         detail = StatusAccessibilityString.statusContext(presentation, now: now, language: language, bundle: .main)
         if presentation.connectionBadge == .refreshing {

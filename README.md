@@ -31,6 +31,18 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
+## 4.1.2 display-fix candidate (unreleased)
+
+`4.1.2 (26)` shows an accepted Claude report as **Last usage record** when its
+shared windows have ended. The popover and Dashboard retain its original
+remaining/used percentages and source time, with a clear **Current quota unknown**
+label. Historical numbers do not fill current menu-bar rings, drive Auto or
+send notifications. They appear only as qualified tooltip/accessibility and
+expanded floating-window detail. This rereads existing reports; it does not
+fetch fresh cloud usage or start the optional CLI reader.
+
+Verification is in progress. Stable download and clone links remain on 4.1.1.
+
 ## Version 4.1.1
 
 `4.1.1 (25)` was published on **2026-10-05** (Australia/Melbourne). It improves

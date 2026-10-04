@@ -8,6 +8,7 @@ import OSLog
 @MainActor
 final class ClaudeQuotaStore: ObservableObject {
     @Published private(set) var snapshot: QuotaSnapshot?
+    @Published private(set) var historicalReport: ClaudeQuotaHistoryPresentation?
     @Published private(set) var connectionState: ConnectionState = .idle
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastIssue: ClaudeQuotaIssue?
@@ -118,6 +119,7 @@ final class ClaudeQuotaStore: ObservableObject {
         pollingTask?.cancel()
         pollingTask = nil
         isEnabled = false
+        publishHistory(nil)
         logger.info("monitor=stopped")
         nextBackgroundRefreshAt = nil
         clearResetSchedule()
@@ -474,6 +476,7 @@ final class ClaudeQuotaStore: ObservableObject {
     }
 
     private func invalidateLocalIdentity() {
+        publishHistory(nil)
         localIdentityInterrupted = true
         localAccountID = nil
         localReport = nil
@@ -599,10 +602,15 @@ final class ClaudeQuotaStore: ObservableObject {
         // again, but are not new notification observations.
         let selected = usable ?? ClaudeQuotaFreshnessPolicy.select(localCache: localReport, statusline: passiveReport, cli: cliReport)
         report = selected
+        let currentSnapshot = selected?.snapshot(at: date)
+        // Publish mutually exclusive quota/history values in a safe order even
+        // for synchronous observers of the individual @Published properties.
+        if currentSnapshot != nil { publishHistory(nil, hasCurrentQuota: true) }
+        assign(\.snapshot, currentSnapshot)
+        publishHistory(isEnabled ? selected.flatMap { ClaudeQuotaHistoryPresentation(report: $0, at: date) } : nil)
         assign(\.source, selected?.source)
         assign(\.reportedAt, selected?.reportedAt)
         guard let selected else {
-            assign(\.snapshot, nil)
             if passiveReportNeedsConfirmation { setIssue(.sourceChanged) }
             else if let activeReadIssue { setIssue(activeReadIssue) }
             else if localCacheState == .unreadable { setIssue(.localCacheUnreadable) }
@@ -610,7 +618,6 @@ final class ClaudeQuotaStore: ObservableObject {
             else { assign(\.lastIssue, nil); assign(\.connectionState, .idle) }
             return
         }
-        assign(\.snapshot, selected.snapshot(at: date))
         let current = isCurrent(selected, at: date)
         // An automatic CLI failure is reported while CLI data is what is shown,
         // or while the shown passive data is itself out of date: the failure
@@ -629,6 +636,16 @@ final class ClaudeQuotaStore: ObservableObject {
         lastNotifiedReport = selected
         let events = policy.events(for: snapshot, preferences: preferences.claudeNotifications)
         notificationController.deliver(events, language: preferences.language, provider: .claude)
+    }
+
+    private func publishHistory(_ value: ClaudeQuotaHistoryPresentation?, hasCurrentQuota: Bool = false) {
+        guard historicalReport != value else { return }
+        if historicalReport == nil, value != nil { logger.info("presentation=history") }
+        else if value == nil {
+            if hasCurrentQuota { logger.info("presentation=current") }
+            else { logger.info("presentation=empty") }
+        }
+        assign(\.historicalReport, value)
     }
 
     private func setIssue(_ issue: ClaudeQuotaIssue) {
