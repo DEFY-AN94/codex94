@@ -17,6 +17,7 @@ final class ClaudeQuotaStore: ObservableObject {
     @Published private(set) var nextAutomaticRefreshAt: Date?
     @Published private(set) var passiveReportNeedsConfirmation = false
     @Published private(set) var pendingPassiveReportedAt: Date?
+    @Published private(set) var pendingPassiveConfirmationID: UUID?
     @Published private(set) var statuslineSetupState: ClaudeStatuslineSetupState = .notInstalled
     @Published private(set) var localCacheState: ClaudeLocalUsageCacheState = .absent
     @Published private(set) var lastCLIReadIssue: ClaudeQuotaIssue?
@@ -41,6 +42,9 @@ final class ClaudeQuotaStore: ObservableObject {
     private var localReport: ClaudeQuotaReport?
     private var localAccountID: UUID?
     private var localStamp: ClaudeLocalUsageCacheStamp?
+    private var localTimeRecheckAt: Date?
+    private var passiveRequiresReconfirmation = false
+    private var localIdentityInterrupted = false
     private var passiveReport: ClaudeQuotaReport?
     private var passiveIssue: ClaudeQuotaIssue?
     private var cliReport: ClaudeQuotaReport?
@@ -119,15 +123,24 @@ final class ClaudeQuotaStore: ObservableObject {
         clearResetSchedule()
         clearPendingPassiveReport()
         nextAutomaticRefreshAt = nil
-        policy.reset()
-        lastNotifiedReport = nil
-        notificationController.configure(enabled: false)
+        resetNotificationBaseline(enabled: false)
         // The cache is read only while monitoring is on; a disabled monitor must
         // not publish a state that was never re-examined.
         localStamp = nil
+        localTimeRecheckAt = nil
         localReport = nil
+        if localAccountID != nil || localIdentityInterrupted {
+            localIdentityInterrupted = true
+            passiveRequiresReconfirmation = true
+            passiveReport = nil
+            cliReport = nil
+            passiveIssue = nil
+            activeReadIssue = nil
+            assign(\.lastCLIReadIssue, nil)
+            assign(\.lastCLIReadAt, nil)
+        }
         localAccountID = nil
-        localCacheState = .absent
+        assign(\.localCacheState, .absent)
     }
 
     func shutdown() {
@@ -200,9 +213,7 @@ final class ClaudeQuotaStore: ObservableObject {
                     // passive reports keep their own, separately labelled, state.
                     cliReport = nil
                     clearResetSchedule()
-                    policy.reset()
-                    lastNotifiedReport = nil
-                    notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
+                    resetNotificationBaseline()
                 }
                 projectReport(at: now())
                 logRefresh(trigger: trigger, startedAt: startedAt, issue: issue)
@@ -228,6 +239,7 @@ final class ClaudeQuotaStore: ObservableObject {
 
     func handleSystemWake(now: Date = Date()) {
         guard isEnabled else { return }
+        readLocalCache(forceTimeRecheck: true)
         projectReport(at: now)
         armPolling()
         refresh(trigger: .systemWake)
@@ -235,6 +247,7 @@ final class ClaudeQuotaStore: ObservableObject {
 
     func handleSystemClockChange(now: Date = Date()) {
         guard isEnabled else { return }
+        readLocalCache(forceTimeRecheck: true)
         projectReport(at: now)
         nextBackgroundRefreshAt = preferences.claudeCLIUsageEnabled
             ? now.addingTimeInterval(preferences.claudeRefreshInterval.seconds) : nil
@@ -259,9 +272,7 @@ final class ClaudeQuotaStore: ObservableObject {
         nextBackgroundRefreshAt = nil
         clearResetSchedule()
         cliReport = nil
-        policy.reset()
-        lastNotifiedReport = nil
-        notificationController.configure(enabled: isEnabled && preferences.claudeNotifications.isEnabled)
+        resetNotificationBaseline()
         guard isEnabled else { updateNextAutomaticRefresh(); return }
         if enabled { fetcher = fetcherFactory() }
         armPolling()
@@ -280,8 +291,11 @@ final class ClaudeQuotaStore: ObservableObject {
         cleanup.async { retired?.shutdown() }
     }
 
-    func adoptPendingPassiveReport() {
-        guard isEnabled, !stopped, let pending = pendingPassiveReport else { return }
+    func adoptPendingPassiveReport(expectedConfirmationID: UUID) {
+        guard isEnabled, !stopped,
+              let confirmationID = pendingPassiveConfirmationID,
+              confirmationID == expectedConfirmationID,
+              let pending = pendingPassiveReport else { return }
         // Adopt the frozen report shown by the confirmation UI, never a newer
         // cache value that may have arrived while the dialog was open.
         clearPendingPassiveReport()
@@ -297,37 +311,34 @@ final class ClaudeQuotaStore: ObservableObject {
             return
         }
         preferences.setClaudePassiveProducerID(ClaudeStatuslineParser.identifiableProducerID(pending.producerID))
+        passiveRequiresReconfirmation = false
         passiveReport = nil
-        policy.reset()
-        lastNotifiedReport = nil
-        notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
+        resetNotificationBaseline()
         acceptPassive(pending)
         projectReport(at: date)
     }
 
     private func clearPendingPassiveReport() {
         pendingPassiveReport = nil
-        pendingPassiveReportedAt = nil
-        passiveReportNeedsConfirmation = false
+        assign(\.pendingPassiveConfirmationID, nil)
+        assign(\.pendingPassiveReportedAt, nil)
+        assign(\.passiveReportNeedsConfirmation, false)
     }
 
     private func requireConfirmation(for value: ClaudeQuotaReport) {
         guard pendingPassiveReport == nil else { return }
         pendingPassiveReport = value
         pendingPassiveReportedAt = value.reportedAt
+        pendingPassiveConfirmationID = UUID()
         passiveReportNeedsConfirmation = true
-        policy.reset()
-        lastNotifiedReport = nil
-        notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
+        resetNotificationBaseline()
     }
 
     func setNotificationPreferences(_ value: NotificationPreferences) {
         let old = preferences.claudeNotifications
         preferences.claudeNotifications = value.validated
-        policy.reset()
-        lastNotifiedReport = nil
-        notificationController.configure(enabled: isEnabled && value.isEnabled,
-                                         requestPermission: isEnabled && value.isEnabled && !old.isEnabled)
+        resetNotificationBaseline(enabled: isEnabled && value.isEnabled,
+                                  requestPermission: isEnabled && value.isEnabled && !old.isEnabled)
     }
 
     func requestNotificationPermission() {
@@ -381,6 +392,9 @@ final class ClaudeQuotaStore: ObservableObject {
         let date = now()
         projectReport(at: date)
         updateNextAutomaticRefresh()
+        // An identity transition rearms a new poll generation, but this turn
+        // must still publish the cleared/new data before the old poll exits.
+        guard expectedGeneration == generation else { return false }
         if let nextAutomaticRefreshAt, nextAutomaticRefreshAt <= date {
             let trigger: RefreshTrigger = nextResetRefreshAt == nextAutomaticRefreshAt ? .quotaReset : .background
             refresh(trigger: trigger)
@@ -390,51 +404,57 @@ final class ClaudeQuotaStore: ObservableObject {
 
     // MARK: Primary source: Claude Code's local usage cache
 
-    private func readLocalCache() {
+    private func readLocalCache(forceTimeRecheck: Bool = false) {
         let date = now()
-        let reading = localCacheReader.read(now: date, unchangedSince: localStamp)
+        let recheck = forceTimeRecheck || (localTimeRecheckAt.map { date >= $0 } ?? false)
+        let reading = localCacheReader.read(now: date, unchangedSince: recheck ? nil : localStamp)
+        if reading.outcome != .unchanged { localTimeRecheckAt = nil }
         switch reading.outcome {
         case .unchanged:
             return
         case .absent:
+            invalidateLocalIdentityIfKnown()
             localStamp = nil
             localReport = nil
             localAccountID = nil
-            localCacheState = .absent
+            assign(\.localCacheState, .absent)
         case .unreadable:
+            invalidateLocalIdentityIfKnown()
             localStamp = reading.stamp
             localReport = nil
             localAccountID = nil
-            localCacheState = .unreadable
+            assign(\.localCacheState, .unreadable)
         case .unparsable:
             // A rewrite in progress or a corrupt file: keep the last good report
             // as a candidate but describe what is on disk now. A completed write
             // changes the stamp and is parsed on the next poll.
             localStamp = reading.stamp
-            localCacheState = .invalid
+            assign(\.localCacheState, .invalid)
         case .invalid:
             // The file decoded but holds no usable cache, for example after
             // `/logout` or a layout change: the previous report no longer
             // describes this file and is dropped.
+            invalidateLocalIdentityIfKnown()
             localStamp = reading.stamp
             localReport = nil
-            localCacheState = .invalid
+            localAccountID = nil
+            assign(\.localCacheState, .invalid)
         case let .report(value, accountID):
             localStamp = reading.stamp
-            guard value.reportedAt <= date.addingTimeInterval(5), value.receivedAt >= value.reportedAt else {
-                // A fetch time in the future is a clock problem, not usage data.
-                localCacheState = .invalid
-                return
-            }
-            if let previous = localAccountID, previous != accountID {
-                // Another login's cache is a different stream: start a fresh
-                // notification baseline. The identifier itself is never stored.
-                policy.reset()
-                lastNotifiedReport = nil
-                notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
+            // Identity is useful even when the usage timestamp needs rechecking:
+            // a future-dated B record must never leave A's reports eligible.
+            if localIdentityInterrupted || localAccountID.map({ $0 != accountID }) == true {
+                invalidateLocalIdentity()
                 logger.info("source=localCache account=changed")
             }
             localAccountID = accountID
+            localIdentityInterrupted = false
+            guard value.reportedAt <= date.addingTimeInterval(5), value.receivedAt >= value.reportedAt else {
+                // A fetch time in the future is a clock problem, not usage data.
+                localTimeRecheckAt = date.addingTimeInterval(min(3_600, max(15, value.reportedAt.timeIntervalSince(date))))
+                assign(\.localCacheState, .invalid)
+                return
+            }
             let unchanged = localReport.map {
                 $0.reportedAt == value.reportedAt && $0.windows == value.windows && $0.modelLimits == value.modelLimits
             } ?? false
@@ -442,8 +462,49 @@ final class ClaudeQuotaStore: ObservableObject {
                 localReport = value
                 logger.info("source=localCache result=updated")
             }
-            localCacheState = .valid
+            assign(\.localCacheState, .valid)
         }
+    }
+
+    /// A session fingerprint cannot carry identity across an observed account
+    /// boundary. Keep its saved preference, but require a new explicit adoption.
+    private func invalidateLocalIdentityIfKnown() {
+        guard localAccountID != nil else { return }
+        invalidateLocalIdentity()
+    }
+
+    private func invalidateLocalIdentity() {
+        localIdentityInterrupted = true
+        localAccountID = nil
+        localReport = nil
+        passiveReport = nil
+        passiveIssue = nil
+        cliReport = nil
+        clearPendingPassiveReport()
+        passiveRequiresReconfirmation = true
+        activeReadIssue = nil
+        assign(\.lastCLIReadIssue, nil)
+        assign(\.lastCLIReadAt, nil)
+        retireCLIRequest()
+        clearResetSchedule()
+        resetNotificationBaseline()
+        if isEnabled {
+            if preferences.claudeCLIUsageEnabled { fetcher = fetcherFactory() }
+            // Retiring the CLI changes generation; the previous poll must not
+            // silently stop all subsequent local-file observations.
+            armPolling()
+        }
+    }
+
+    private func resetNotificationBaseline(enabled: Bool? = nil, requestPermission: Bool = false) {
+        policy.reset()
+        lastNotifiedReport = nil
+        notificationController.configure(enabled: enabled ?? (isEnabled && preferences.claudeNotifications.isEnabled),
+                                         requestPermission: requestPermission)
+    }
+
+    private func assign<Value: Equatable>(_ keyPath: ReferenceWritableKeyPath<ClaudeQuotaStore, Value>, _ value: Value) {
+        if self[keyPath: keyPath] != value { self[keyPath: keyPath] = value }
     }
 
     // MARK: Backup source: statusline bridge reports
@@ -454,6 +515,7 @@ final class ClaudeQuotaStore: ObservableObject {
         guard let value = try? cache.load() else { return }
         guard value.snapshot(at: now()) != nil else { return }
         guard value.reportedAt <= now().addingTimeInterval(5) else { passiveIssue = .invalidData; return }
+        if passiveRequiresReconfirmation { requireConfirmation(for: value); return }
         let producer = ClaudeStatuslineParser.identifiableProducerID(value.producerID)
         let selected = ClaudeStatuslineParser.identifiableProducerID(preferences.claudePassiveProducerID)
         if producer == nil {
@@ -478,9 +540,7 @@ final class ClaudeQuotaStore: ObservableObject {
               value.reportedAt <= now().addingTimeInterval(5),
               value.receivedAt >= value.reportedAt else { passiveIssue = .invalidData; return }
         if let passiveReport, passiveReport.producerID != value.producerID {
-            policy.reset()
-            lastNotifiedReport = nil
-            notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
+            resetNotificationBaseline()
         }
         passiveIssue = nil
         if passiveReport != value { logger.info("source=statusline result=reported") }
@@ -528,25 +588,29 @@ final class ClaudeQuotaStore: ObservableObject {
     }
 
     /// Selects one report, projects it and evaluates notifications once per new
-    /// current report. All tiers describe the same account's windows, so a tier
-    /// switch keeps the notification baseline; only an identity change resets it
-    /// (a different cache account in `readLocalCache`, a different statusline
-    /// producer in `acceptPassive`/`requireConfirmation`, a rejected CLI login).
+    /// current report. Eligible tiers preserve the baseline within the observed
+    /// context. An account boundary clears their eligibility; a producer alone
+    /// cannot prove account identity. Falling back to older data never rewinds
+    /// the notification observation watermark.
     private func projectReport(at date: Date) {
-        let selected = ClaudeQuotaFreshnessPolicy.select(localCache: localReport, statusline: passiveReport, cli: cliReport)
+        let usable = ClaudeQuotaFreshnessPolicy.select(localCache: localReport, statusline: passiveReport, cli: cliReport, at: date)
+        // If every window expired, keep only its source/time diagnostic; never
+        // create quota from that report. Eligible old reports may be displayed
+        // again, but are not new notification observations.
+        let selected = usable ?? ClaudeQuotaFreshnessPolicy.select(localCache: localReport, statusline: passiveReport, cli: cliReport)
         report = selected
-        source = selected?.source
-        reportedAt = selected?.reportedAt
+        assign(\.source, selected?.source)
+        assign(\.reportedAt, selected?.reportedAt)
         guard let selected else {
-            snapshot = nil
+            assign(\.snapshot, nil)
             if passiveReportNeedsConfirmation { setIssue(.sourceChanged) }
             else if let activeReadIssue { setIssue(activeReadIssue) }
             else if localCacheState == .unreadable { setIssue(.localCacheUnreadable) }
             else if let passiveIssue { setIssue(passiveIssue) }
-            else { lastIssue = nil; connectionState = .idle }
+            else { assign(\.lastIssue, nil); assign(\.connectionState, .idle) }
             return
         }
-        snapshot = selected.snapshot(at: date)
+        assign(\.snapshot, selected.snapshot(at: date))
         let current = isCurrent(selected, at: date)
         // An automatic CLI failure is reported while CLI data is what is shown,
         // or while the shown passive data is itself out of date: the failure
@@ -557,10 +621,10 @@ final class ClaudeQuotaStore: ObservableObject {
         else if let activeReadIssue, selected.source == .cliUsage || (!current && activeReadIssue != .noData) {
             setIssue(activeReadIssue)
         }
-        else if current { lastIssue = nil; connectionState = .connected }
+        else if current { assign(\.lastIssue, nil); assign(\.connectionState, .connected) }
         else { setIssue(.staleData) }
 
-        guard let snapshot, current, lastNotifiedReport != selected,
+        guard let snapshot, current, lastNotifiedReport.map({ selected.reportedAt > $0.reportedAt }) ?? true,
               !passiveReportNeedsConfirmation || selected.source != .statusline else { return }
         lastNotifiedReport = selected
         let events = policy.events(for: snapshot, preferences: preferences.claudeNotifications)
@@ -568,9 +632,9 @@ final class ClaudeQuotaStore: ObservableObject {
     }
 
     private func setIssue(_ issue: ClaudeQuotaIssue) {
-        lastIssue = issue
-        if let snapshot { connectionState = .stale(lastSuccess: snapshot.fetchedAt, issue: .quotaUnavailable) }
-        else { connectionState = .unavailable(issue == .loginRequired ? .notLoggedIn : .quotaUnavailable) }
+        assign(\.lastIssue, issue)
+        if let snapshot { assign(\.connectionState, .stale(lastSuccess: snapshot.fetchedAt, issue: .quotaUnavailable)) }
+        else { assign(\.connectionState, .unavailable(issue == .loginRequired ? .notLoggedIn : .quotaUnavailable)) }
     }
 
     // MARK: CLI reset scheduling
@@ -613,10 +677,10 @@ final class ClaudeQuotaStore: ObservableObject {
     }
 
     private func updateNextAutomaticRefresh() {
-        guard isEnabled, !stopped, preferences.claudeCLIUsageEnabled else { nextAutomaticRefreshAt = nil; return }
+        guard isEnabled, !stopped, preferences.claudeCLIUsageEnabled else { assign(\.nextAutomaticRefreshAt, nil); return }
         // These are due times. The existing 15-second poll performs the read
         // after the earliest deadline; no additional reset timer is created.
-        nextAutomaticRefreshAt = [nextBackgroundRefreshAt, nextResetRefreshAt].compactMap { $0 }.min()
+        assign(\.nextAutomaticRefreshAt, [nextBackgroundRefreshAt, nextResetRefreshAt].compactMap { $0 }.min())
     }
 
     private func logRefresh(trigger: RefreshTrigger, startedAt: TimeInterval, issue: ClaudeQuotaIssue?) {

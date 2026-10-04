@@ -23,6 +23,23 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         }
     }
 
+    func testUnifiedStatuslineInputKeepsWrapperContractsAndExactSourceFingerprint() throws {
+        let data = payload(used: "23.5")
+        let parsed = try ClaudeStatuslineParser.parse(data)
+        XCTAssertEqual(parsed.windows.map(\.usedPercentage), [23.5])
+        XCTAssertEqual(parsed.windows, try ClaudeStatuslineParser.windows(from: data))
+        XCTAssertEqual(parsed.producerID, try ClaudeStatuslineParser.producerID(from: data))
+        XCTAssertEqual(ClaudeStatuslineParser.identifiableProducerID(parsed.producerID), parsed.producerID)
+        let malformedWindow = payload(used: "true")
+        XCTAssertThrowsError(try ClaudeStatuslineParser.parse(malformedWindow))
+        XCTAssertEqual(try ClaudeStatuslineParser.producerID(from: malformedWindow), parsed.producerID,
+                       "The source-only compatibility API must not acquire quota-schema validation")
+        let empty = try ClaudeStatuslineParser.parse(Data(#"{"rate_limits":null}"#.utf8))
+        XCTAssertTrue(empty.windows.isEmpty)
+        XCTAssertEqual(empty.producerID, ClaudeStatuslineParser.legacyUnknownProducerID)
+        XCTAssertThrowsError(try ClaudeStatuslineParser.parse(Data(repeating: 32, count: 1_048_577)))
+    }
+
     func testMissingSessionDiscriminatorCannotBeUsedAsASelectedStream() throws {
         for input in [#"{}"#, #"{"session_id":"not-a-session"}"#] {
             let producer = try ClaudeStatuslineParser.producerID(from: Data(input.utf8))

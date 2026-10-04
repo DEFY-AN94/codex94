@@ -1,7 +1,7 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
-released on 2026-10-03 (Australia/Melbourne). Later docs-only commits do not
+The published stable version is [`v4.1.0 (24)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0),
+released on 2026-10-05 (Australia/Melbourne). Later docs-only commits do not
 move its tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -33,14 +33,39 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
-The current candidate is **`4.1.0 (24)`**, with its changelog under **Unreleased**
-on branch `claude/4.1.0-local-usage-cache`. It carries forward the unpublished
-`4.0.2 (23)` candidate ([PR #43](https://github.com/DEFY-AN94/codex94/pull/43)),
-which was merged-ready but never tagged or published. Keep the stable `v4.0.1`
-download, clone, checksum and attestation references until public 4.1.0
-publication is verified. Do not move or reuse any existing release tag,
-including the retained `v4.0.0` candidate tag.
+The current candidate is **`4.1.1 (25)`**, with a changelog date of
+**2026-10-05** (Australia/Melbourne), on branch `codex/4.1.1-cache-maintenance`. Stable downloads remain on published
+`v4.1.0` until the maintenance release is verified. The `4.0.2 (23)` candidate
+was merged through PR #43 and carried into 4.1.0 without a separate release.
+Never move or reuse existing tags, including the retained `v4.0.0` candidate.
 
+For 4.1.1, use synthetic reports and disposable files to verify:
+
+- Observed account change, cache absence/unreadability/decoded-invalid state,
+  stop/restart and late CLI completion cannot restore a previous context.
+  A transient torn write preserves the last good report. An already-open report
+  confirmation cannot approve a replacement; validate its captured confirmation ID. Reconfirmed statusline
+  data is a report stream, not authenticated account proof.
+- The first accepted report establishes a notification baseline. A fallback to
+  an older observation never causes a fresh recovery alert. Later new reports
+  still trigger the configured thresholds.
+- Source eligibility is checked before usable-window filtering and newest-report
+  selection. Keep exactly one report and its timestamp, including on fallback.
+- FIFO, directory, symlink, hardlink, ownership and size rejection remain bounded.
+  A file changed during reading is retried by the existing poll.
+- Future-timestamp recovery works without a file change; unchanged normal polls
+  avoid parsing. Expiry and freshness still advance without duplicate published state.
+- Local-only refresh does not invoke CLI; explicit one-time and scheduled CLI
+  paths remain distinct. Use fakes for both, not live `/usage`.
+- Auto's caption matches the existing resolver, including model/weekly-only,
+  unavailable and manual-selection states in both languages and themes.
+
+Run focused regressions, the full local release gate, all five UI smokes,
+Actions/Python/Swift CodeQL and final-main artifact attestation. Record local
+candidate installation and approximately ten minutes of observation separately.
+The previous release's 544-test result does not validate 4.1.1. OAuth remains paused.
+
+The following 4.1.0 checks remain applicable to the local-cache source.
 For 4.1.0, verify the following against its own source and artifacts. Use
 synthetic state files under `CLAUDE_CONFIG_DIR` and the synthetic Claude
 executable; do not read the maintainer's real `~/.claude.json`, launch the real
@@ -66,8 +91,9 @@ CLI or send a prompt to populate test data.
 - Source switching: with cache and statusline reports present, the cache is
   shown unless the statusline report's observation time is strictly newer;
   equal times keep the cache. The same rule applies to a CLI report. Values
-  are never averaged or merged. A source change resets the notification
-  baseline; a different `accountUuid` also resets it and is not stored.
+  are never averaged or merged. An observed identity change resets the notification
+  baseline; `accountUuid` stays in memory. In 4.1.1, context loss also clears old
+  backups, and older fallback reports cannot generate new alerts.
 - CLI option off keeps passive data: turning `claude.cliUsageEnabled.v1` off
   discards only CLI data and leaves the cache or statusline report shown with
   no CLI launch. Turning it on runs the reader on the existing interval and its
@@ -156,7 +182,7 @@ reports by default and a separate, explicitly enabled CLI option.
 The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
 do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
 records do not establish validation of these source boundaries. Final checks,
-artifacts and installation need separate records. Public stable links point to 4.0.1.
+artifacts and installation need separate records. Its release records remain historical; current stable links point to 4.1.0.
 
 During the earlier 4.0 release work, the maintainer approved a ten-minute
 live-observation scope.
@@ -239,7 +265,7 @@ separate and tied to the revision actually tested.
 Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
 Its historical tag and DMG remain bound to
 `ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`. Current download and clone
-instructions point to `v4.0.1`. This maintenance release isolates quota request contexts, shares strict
+instructions point to `v4.1.0`. That maintenance release isolates quota request contexts, shares strict
 service-value parsing, reuses chart preparation/formatting, retires old Token
 clients outside the main actor, and validates development-script arguments
 before side effects. It does not introduce a broad timer rewrite, new data
@@ -386,7 +412,7 @@ states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
 Wait for CI, every synthetic UI smoke required by the candidate, and
-Actions/Python/Swift CodeQL on the actual tested revision. The `4.1.0` candidate gate
+Actions/Python/Swift CodeQL on the actual tested revision. The `4.1.1` candidate gate
 includes five UI scenarios: Display, Recovery, Token usage, Floating, and
 Providers. Providers uses synthetic data, including a synthetic local usage
 cache under `CLAUDE_CONFIG_DIR`; passing it does not verify real Claude account

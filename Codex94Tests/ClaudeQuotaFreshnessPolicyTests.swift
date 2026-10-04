@@ -32,6 +32,19 @@ final class ClaudeQuotaFreshnessPolicyTests: XCTestCase {
                        "A CLI read that only matches the cache does not displace it")
     }
 
+    func testFullyExpiredNewerReportCannotHideAUsableOlderReport() {
+        let local = report(.localCache, at: now, resetAt: 3_600)
+        let backup = report(.statusline, at: now.addingTimeInterval(1), resetAt: 30)
+        let later = now.addingTimeInterval(31)
+        XCTAssertEqual(ClaudeQuotaFreshnessPolicy.select(localCache: local, statusline: backup, cli: nil, at: later), local)
+        XCTAssertEqual(ClaudeQuotaFreshnessPolicy.select(localCache: local, statusline: backup, cli: nil,
+                                                         at: now.addingTimeInterval(2)), backup)
+        XCTAssertNil(ClaudeQuotaFreshnessPolicy.select(localCache: local, statusline: backup, cli: nil,
+                                                       at: now.addingTimeInterval(3_600)))
+        XCTAssertEqual(ClaudeQuotaFreshnessPolicy.select(localCache: local, statusline: backup, cli: nil), backup,
+                       "Unfiltered selection retains only the latest source/time diagnostic")
+    }
+
     func testMaximumAgeDependsOnSourceAndRefreshInterval() {
         XCTAssertEqual(ClaudeQuotaFreshnessPolicy.maximumAge(for: .localCache, baseline: 600, refreshInterval: 60), 3_600)
         XCTAssertEqual(ClaudeQuotaFreshnessPolicy.maximumAge(for: .statusline, baseline: 600, refreshInterval: 60), 600)

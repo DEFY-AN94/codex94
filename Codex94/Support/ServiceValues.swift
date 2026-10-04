@@ -49,3 +49,13 @@ enum StrictJSONInteger {
         return integer
     }
 }
+
+/// Percentages retain fractional values, but JSON Boolean values never mean
+/// 0%/1%. Timestamp units and window schemas remain each parser's responsibility.
+enum StrictJSONPercentage {
+    static func value(_ value: Any?) -> Double? {
+        guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+              number.doubleValue.isFinite, (0...100).contains(number.doubleValue) else { return nil }
+        return number.doubleValue
+    }
+}

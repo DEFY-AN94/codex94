@@ -104,6 +104,114 @@ final class ProviderViewTests: XCTestCase {
         }
     }
 
+    func testLocalRereadHelpKeepsSourceTimeSeparateFromTheCLIOption() throws {
+        let snapshot = try claudeSnapshot()
+        let earlier = card(snapshot: snapshot, source: .localCache, now: reportedAt.addingTimeInterval(60))
+        var later = card(snapshot: snapshot, source: .localCache, now: reportedAt.addingTimeInterval(500))
+        XCTAssertEqual(earlier.sourceTimeText, later.sourceTimeText)
+        XCTAssertEqual(later.refreshHelpKey, "claude.passive.reread.help")
+        XCTAssertEqual(later.sourceTimeHelpKey, "claude.localCacheTime.help")
+        later.isCLIUsageEnabled = true
+        XCTAssertEqual(later.refreshHelpKey, "claude.cliUsage.regularRefresh.help")
+        XCTAssertEqual(later.sourceTimeText, earlier.sourceTimeText,
+                       "Permission to run a future CLI read cannot relabel the source of existing data")
+        XCTAssertEqual(later.sourceTimeHelpKey, "claude.localCacheTime.help")
+        XCTAssertNil(card(snapshot: snapshot, source: .cliUsage, now: reportedAt).sourceTimeHelpKey)
+    }
+
+    func testClaudeAutoCaptionTracksTheResolvedWindowWithoutStartingRequests() async throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let state = directory.appendingPathComponent("auto-caption-state")
+        try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        let fixture = try makeFixture(directory: state)
+        defer { fixture.cleanUp() }
+        fixture.preferences.claudeCLIUsageEnabled = false
+        fixture.preferences.claudeMonitoringEnabled = true
+        let cacheURL = try writeAutoCaptionCache(in: state, includeModel: true, includeFiveHour: true)
+        fixture.claude.start()
+        XCTAssertEqual(fixture.claude.source, .localCache)
+        XCTAssertEqual(fixture.store.providerMenuBarQuota(for: .claude)?.bucket.limitID, "claude.model.fable")
+        let picker = MenuBarQuotaPicker(store: fixture.store, provider: .claude)
+        XCTAssertNil(MenuBarQuotaPicker(store: fixture.store).automaticSelectionText(),
+                     "Codex's existing picker presentation remains unchanged")
+
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            fixture.preferences.language = language
+            let text = try XCTUnwrap(picker.automaticSelectionText())
+            XCTAssertTrue(text.contains("Claude · Fable"))
+            XCTAssertTrue(text.hasSuffix(StatusAccessibilityString.localized(
+                "quota.weeklyShort", language: language, bundle: .main
+            )))
+            for dark in [false, true] {
+                let content = VStack(alignment: .leading, spacing: 18) {
+                    ClaudeSourcesSummaryView(store: fixture.claude, language: language)
+                    Divider()
+                    ClaudeCLIUsageSettingsView(store: fixture.store)
+                    Divider()
+                    picker
+                }
+                .padding(18)
+                .codex94Environment(fixture.preferences)
+                _ = try render(content, width: 460, dark: dark, language: language,
+                               name: "claude-read-help-auto-\(language.rawValue)-\(dark ? "dark" : "light")",
+                               output: directory)
+            }
+        }
+
+        fixture.store.setMenuBarQuotaSelection(.defaultBucket(.weekly), for: .claude)
+        XCTAssertNil(picker.automaticSelectionText(), "A manual choice already names its selected window")
+        fixture.store.setMenuBarQuotaSelection(.automatic, for: .claude)
+        fixture.preferences.codexMonitoringEnabled = false
+        XCTAssertTrue(try XCTUnwrap(picker.automaticSelectionText()).contains("Fable"),
+                      "The same hint works when Claude is the only enabled service")
+
+        // A valid changed payload can retain its original fetch time. The atomic
+        // rewrite changes its file stamp without inventing a future report.
+        _ = try writeAutoCaptionCache(in: state, includeModel: false, includeFiveHour: false)
+        fixture.claude.refresh(trigger: .manual)
+        XCTAssertEqual(fixture.store.providerMenuBarQuota(for: .claude)?.window.kind, .weekly)
+        XCTAssertEqual(fixture.store.providerMenuBarQuota(for: .claude)?.bucket.limitID, "claude")
+        let weeklyOnly = try XCTUnwrap(picker.automaticSelectionText())
+        XCTAssertTrue(weeklyOnly.contains("Claude"))
+        XCTAssertFalse(weeklyOnly.contains("Fable"), "Removing a model cannot leave its name in the Auto hint")
+
+        try FileManager.default.removeItem(at: cacheURL)
+        fixture.claude.refresh(trigger: .manual)
+        XCTAssertEqual(picker.automaticSelectionText(), StatusAccessibilityString.localized(
+            "claude.autoSelection.unavailable", language: fixture.preferences.language, bundle: .main
+        ))
+        let claudeCalls = await fixture.claudeFetcher.calls
+        let codexCalls = await fixture.codexFetcher.calls
+        XCTAssertEqual(claudeCalls, 0)
+        XCTAssertEqual(codexCalls, 0)
+        XCTAssertFalse(fixture.preferences.claudeCLIUsageEnabled)
+    }
+
+    private func writeAutoCaptionCache(in directory: URL, includeModel: Bool,
+                                       includeFiveHour: Bool) throws -> URL {
+        let cacheDirectory = directory.appendingPathComponent("claude-state")
+        try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        let formatter = ISO8601DateFormatter()
+        let reset = formatter.string(from: reportedAt.addingTimeInterval(20_000))
+        var utilization: [String: Any] = ["seven_day": ["utilization": 40, "resets_at": reset]]
+        if includeFiveHour { utilization["five_hour"] = ["utilization": 20, "resets_at": reset] }
+        if includeModel {
+            utilization["limits"] = [["kind": "weekly_scoped", "percent": 90, "resets_at": reset,
+                                      "scope": ["model": ["display_name": "Fable"]]]]
+        }
+        let bytes = try JSONSerialization.data(withJSONObject: ["cachedUsageUtilization": [
+            "fetchedAtMs": Int(reportedAt.timeIntervalSince1970 * 1_000),
+            "accountUuid": "00000000-0000-0000-0000-000000000111", "utilization": utilization
+        ]])
+        let url = cacheDirectory.appendingPathComponent(".claude.json")
+        try bytes.write(to: url, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        return url
+    }
+
     func testUnverifiedAndExpiredPassiveReportsKeepTheirOwnTimeAndUnknownWindows() throws {
         let snapshot = try claudeSnapshot()
         let original = card(snapshot: snapshot, source: .statusline, now: reportedAt)

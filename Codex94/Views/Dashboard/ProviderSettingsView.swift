@@ -135,6 +135,12 @@ struct ClaudeSourcesSummaryView: View {
             Text("claude.sources.help")
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if !store.isCLIUsageEnabled {
+                Text("claude.passive.reread.help")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("claude-local-reread-help")
+            }
             Text(verbatim: currentSourceText)
                 .font(.caption)
                 .accessibilityIdentifier("claude-sources-current")

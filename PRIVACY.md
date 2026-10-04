@@ -27,8 +27,8 @@ off by default and keeps its quota-consumption warning; it is no longer
 mutually exclusive with the passive sources, and disabling it discards only
 CLI data. A new **Read once with the CLI** button in Dashboard → Services
 starts the official CLI exactly once, regardless of that switch, under the
-same warning. Afterwards Claude Code refreshes its own cache, which the primary
-source then picks up. Exactly one report is shown at a time; percentages from
+same warning. If Claude Code writes an updated cache, the primary source reads
+it on a later poll; Codex94 does not write or force-refresh that file. Exactly one report is shown at a time; percentages from
 different sources are never averaged or merged.
 
 Model-scoped weekly limits found in the same cache appear as additional Claude
@@ -71,14 +71,15 @@ baseline. It is never persisted, logged, shown or exported.
 
 The file is only read. The reader opens it read-only with `O_NOFOLLOW`, refuses
 symlinks, hard-linked files, files owned by another user, non-regular files and
-files larger than 16 MiB, and parses the bounded JSON. It re-parses only when
-the file's size, modification time or inode changes, and it never creates,
+files larger than 16 MiB, and parses the bounded JSON. It normally re-parses when
+the file's size, modification time or inode changes (4.1.1 also retries transient
+reads and revalidates future timestamps), and it never creates,
 writes, renames or deletes the file. The parsed quota windows enter the same
 in-memory Claude state that previous versions already hold; they are not
 written to `statusline-quota.json`, `UserDefaults`, the quota cache or logs.
 Logs record fixed source/result words only. Codex94 never writes this file
-itself; only Claude Code's own `/usage` fetch refreshes it, including one
-started by the optional CLI reader or the explicit one-time CLI read above.
+itself; updates belong to Claude Code, including any it writes after an optional
+CLI read or the explicit one-time CLI action above.
 
 A cache report counts as current for 60 minutes after Claude Code fetched it,
 matching Claude Code's own last-known rule. Older reports keep their numbers

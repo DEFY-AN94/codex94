@@ -19,7 +19,8 @@ Claude Code `/usage` reader. Authentication remains inside Claude Code. There is
 direct Claude quota HTTP/OAuth implementation or credential-store access.
 The CLI reader has a separate, default-off opt-in with a quota-consumption
 warning. Enabling Claude monitoring does not opt into CLI sessions. While the
-CLI reader is off, automatic and manual refreshes read only local files: in
+CLI reader is off, automatic and ordinary manual refreshes read only local files
+(the explicit one-time CLI action is separate): in
 4.0.1 the statusline cache alone, and from 4.1.0 also Claude
 Code's own usage cache in `.claude.json` (read-only, `cachedUsageUtilization`
 key only). Disabling the CLI reader cancels and retires an active reader.
@@ -55,8 +56,9 @@ Codex94's own environment sets it, read-only with `O_NOFOLLOW`. It refuses
 symlinks, hard-linked files, foreign owners, non-regular files and files over
 16 MiB, parses the bounded JSON, interprets only the `cachedUsageUtilization`
 key and discards every other key, including account email, organization,
-project paths and MCP settings. It never writes, and re-parses only when the
-file's size/mtime/inode stamp changes. The cache is untrusted input:
+project paths and MCP settings. It never writes, and normally re-parses when the
+file's size/mtime/inode stamp changes. The 4.1.1 candidate additionally retries
+transient reads and revalidates future timestamps. The cache is untrusted input:
 percentages must be finite values from 0 to 100, timestamps must be strict
 ISO-8601 with a zone, model-limit rows are capped at sixteen and malformed rows
 are skipped, and a malformed or partially written cache keeps the previous

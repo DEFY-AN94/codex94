@@ -138,6 +138,14 @@ struct ClaudeQuotaCardContent: View {
         isCLIUsageEnabled ? "claude.refresh" : "claude.passive.reread"
     }
 
+    var refreshHelpKey: String {
+        isCLIUsageEnabled ? "claude.cliUsage.regularRefresh.help" : "claude.passive.reread.help"
+    }
+
+    var sourceTimeHelpKey: String? {
+        source == .localCache ? "claude.localCacheTime.help" : nil
+    }
+
     var emptyStateKey: String {
         guard isEnabled else { return "claude.monitoring.off" }
         if needsSourceConfirmation { return "claude.passive.confirmationRequired" }
@@ -168,7 +176,9 @@ struct ClaudeQuotaCardContent: View {
             language: language, now: now, palette: palette,
             refresh: refresh, openDetails: openSetup, timeZone: timeZone, compact: compact,
             style: style, explainsPassiveSource: source != .cliUsage,
-            scopedLimits: ProviderScopedLimit.limits(in: snapshot)
+            scopedLimits: ProviderScopedLimit.limits(in: snapshot),
+            refreshHelp: LocalizedStringKey(refreshHelpKey),
+            sourceTimeHelp: sourceTimeHelpKey.map { LocalizedStringKey($0) }
         )
     }
 
@@ -219,6 +229,8 @@ struct ProviderQuotaCardContent: View {
     var resetLocale: Locale? = nil
     var resetCalendar = Calendar(identifier: .gregorian)
     var scopedLimits: [ProviderScopedLimit] = []
+    var refreshHelp: LocalizedStringKey? = nil
+    var sourceTimeHelp: LocalizedStringKey? = nil
 
     private var isTerminal: Bool { style == .terminal }
 
@@ -254,7 +266,7 @@ struct ProviderQuotaCardContent: View {
                 }
                 Button(action: refresh) { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(.borderless).disabled(!canRefresh)
-                    .help(Text(refreshLabel)).accessibilityLabel(Text(refreshLabel))
+                    .help(Text(refreshHelp ?? refreshLabel)).accessibilityLabel(Text(refreshLabel))
                     .accessibilityIdentifier(provider == .claude ? "claude-refresh" : "provider-codex-refresh")
             }
 
@@ -317,7 +329,7 @@ struct ProviderQuotaCardContent: View {
                 }
                 Text(verbatim: sourceTimeText).foregroundStyle(.secondary)
                     .lineLimit(isTerminal || compact ? 1 : nil)
-                    .help(Text(verbatim: sourceTimeText))
+                    .help(sourceTimeTooltip)
                     .accessibilityIdentifier(provider.rawValue + "-source-time")
             }
             .font(.caption)
@@ -341,6 +353,12 @@ struct ProviderQuotaCardContent: View {
     }
 
     static let officialClaudeUsageURL = URL(string: "https://claude.ai/settings/usage")!
+
+    private var sourceTimeTooltip: Text {
+        let time = Text(verbatim: sourceTimeText)
+        guard let sourceTimeHelp else { return time }
+        return time + Text(verbatim: "\n") + Text(sourceTimeHelp)
+    }
 
     private func windowIdentifier(_ window: QuotaWindowSnapshot) -> String {
         (windowIdentifierPrefix ?? (provider == .claude ? "claude-quota" : "provider-codex-quota"))

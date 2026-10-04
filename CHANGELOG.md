@@ -2,6 +2,38 @@
 
 All notable changes to Codex94 are documented here.
 
+## 4.1.1 - 2026-10-05
+
+Version `4.1.1 (25)` is a maintenance candidate dated for release in
+Australia/Melbourne. Public downloads stay on 4.1.0 until the new release and
+its artifacts are verified.
+
+### Fixed
+
+- Retire old Claude CLI work and clear backup reports when an observed local
+  account changes or its cache context is lost. A newly accepted report starts
+  a notification baseline; an older fallback cannot produce recovery alerts.
+  Bind passive-report confirmation to the exact pending report, so an open
+  confirmation cannot adopt a replacement after the account context changes.
+- Exclude reports with no usable shared quota window before selecting a source.
+  Keep one complete report and its original observation time; never combine sources.
+- Open local quota files nonblocking before checking their type, so an unexpected
+  FIFO cannot stall the main thread. Detect writes during reading and retry on
+  the existing poll while retaining the last good report.
+- Revalidate a rejected future cache timestamp when it becomes eligible, even
+  when the file has not changed.
+
+### Changed
+
+- Share safe file reading and strict percentage validation, decode statusline
+  input once, and avoid publishing identical display state on every poll while
+  still checking freshness and expiry.
+- Clarify local re-reading versus Claude Code's fetch time, separate the optional
+  scheduled CLI setting from its one-time action, and show the quota resolved
+  by Auto. CLI quota-consumption warnings and the default-off setting remain.
+- Correct stale current-version and cache-reading descriptions in documentation.
+  No OAuth, new data source, preference or cache schema is introduced.
+
 ## 4.1.0 - 2026-10-05
 
 Version `4.1.0 (24)` is the published stable release. Release dates use

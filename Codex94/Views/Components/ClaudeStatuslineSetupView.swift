@@ -18,11 +18,15 @@ struct ClaudeStatuslineSetupView: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("claude-passive-account-help")
-            if store.passiveReportNeedsConfirmation {
+            if store.passiveReportNeedsConfirmation, let pendingID = store.pendingPassiveConfirmationID {
                 ClaudePassiveReportAdoptionView(
                     reportedAt: store.pendingPassiveReportedAt,
                     canAdopt: store.isEnabled,
-                    adopt: { clearFeedback(); confirmation = .adoptReport }
+                    adopt: {
+                        guard store.pendingPassiveConfirmationID == pendingID else { return }
+                        clearFeedback()
+                        confirmation = .adoptReport(pendingID)
+                    }
                 )
             }
             if store.statuslineSetupState == .conflict {
@@ -79,6 +83,11 @@ struct ClaudeStatuslineSetupView: View {
         .onChange(of: store.passiveReportNeedsConfirmation) { _, needsConfirmation in
             if !needsConfirmation { dismissAdoptionConfirmation() }
         }
+        .onChange(of: store.pendingPassiveConfirmationID) { _, currentID in
+            if case let .adoptReport(capturedID)? = confirmation, capturedID != currentID {
+                confirmation = nil
+            }
+        }
         .sheet(isPresented: $showingPreview) {
             if let preview {
                 ClaudeStatuslinePreviewView(preview: preview) {
@@ -101,7 +110,7 @@ struct ClaudeStatuslineSetupView: View {
             titleVisibility: .visible
         ) {
             if let action = confirmation {
-                Button(action.actionKey, role: action == .adoptReport ? nil : .destructive) { perform(action) }
+                Button(action.actionKey, role: action.isAdoptReport ? nil : .destructive) { perform(action) }
                     .accessibilityIdentifier(action.accessibilityIdentifier)
             }
             Button("claude.setup.cancel", role: .cancel) { confirmation = nil }
@@ -117,7 +126,7 @@ struct ClaudeStatuslineSetupView: View {
     }
 
     private func dismissAdoptionConfirmation() {
-        if confirmation == .adoptReport { confirmation = nil }
+        if confirmation?.isAdoptReport == true { confirmation = nil }
     }
 
     private func perform(_ action: SetupConfirmation) {
@@ -131,11 +140,11 @@ struct ClaudeStatuslineSetupView: View {
             case .forgetRecord:
                 try store.forgetConflictingStatuslineInstallation()
                 successMessage = "claude.setup.recordForgotten"
-            case .adoptReport:
+            case let .adoptReport(capturedID):
                 // The store owns the frozen pending report and may reject it
                 // if expired. Its published state is the result, not a toast.
                 guard store.isEnabled, store.passiveReportNeedsConfirmation else { return }
-                store.adoptPendingPassiveReport()
+                store.adoptPendingPassiveReport(expectedConfirmationID: capturedID)
             }
         } catch {
             operationIssue = error as? ClaudeQuotaIssue ?? .unavailable
@@ -144,7 +153,13 @@ struct ClaudeStatuslineSetupView: View {
     }
 
     private enum SetupConfirmation: Equatable {
-        case remove, forgetRecord, adoptReport
+        case remove, forgetRecord
+        case adoptReport(UUID)
+
+        var isAdoptReport: Bool {
+            if case .adoptReport = self { return true }
+            return false
+        }
         var titleKey: LocalizedStringKey {
             switch self {
             case .remove: "claude.setup.removeConfirm"
