@@ -4209,7 +4209,7 @@ private struct SyntheticFixture {
         ] : []
         let providers: Set<String> = scenario == "providers" ? [
             "providers-both-en.png", "providers-compact-en.png", "providers-claude-error-en.png",
-            "providers-claude-only-en.png", "providers-disabled-en.png",
+            "providers-claude-only-en.png", "providers-local-cache-en.png", "providers-disabled-en.png",
             "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
             "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
             "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",
