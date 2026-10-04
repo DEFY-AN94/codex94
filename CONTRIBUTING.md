@@ -120,9 +120,11 @@ unsigned DMG candidate (SHA-256
 `9be68277c0f6db6d820da06e3da0b9f8bb29dba7bb99a999d0eeefe9facb9fd0`; a local
 artifact, not the release asset). On CI (Xcode 16.4) the `test` job and the
 display, floating, recovery and usage UI smokes passed for the first PR head;
-the providers smoke failed on an exact-text assertion that predates the
-cached-data prefix and was corrected afterwards, so its rerun, candidate
-acceptance, tag, the CI DMG and publication are pending and must be reported as such. The unpublished
+the providers smoke failed twice on test-side causes that were corrected
+afterwards (an exact-text assertion predating the cached-data prefix, then a
+fixture whose scoped Fable limit was the tightest window and relabelled the
+native item), so its rerun, candidate acceptance, tag, the CI DMG and
+publication are pending and must be reported as such. The unpublished
 `4.0.2 (23)` candidate is carried into 4.1.0; keep its changelog entry under
 Unreleased, annotated as unpublished, rather than deleting it.
 

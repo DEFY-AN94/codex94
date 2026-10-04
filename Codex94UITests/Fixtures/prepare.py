@@ -488,6 +488,11 @@ def main():
         # A synthetic Claude Code state file holding only the usage cache. Its
         # fetch time predates any CLI read so the live CLI wins while enabled,
         # and the cache becomes the shown source once the CLI option is off.
+        # The scoped Fable limit stays looser than the shared windows: the
+        # automatic menu-bar selection would otherwise show the tightest
+        # bucket and label the native item "Fable, ..." instead of "Claude, ...",
+        # which the exact native-item inspection rejects. Model-bucket selection
+        # itself is covered by the unit tests.
         claude_config = root / "claude-config"
         claude_config.mkdir(mode=0o700)
         write_new(claude_config / ".claude.json", json_bytes({
@@ -500,7 +505,7 @@ def main():
                     "seven_day": {"utilization": 25, "resets_at": "2033-05-19T19:00:00+00:00"},
                     "limits": [
                         {"kind": "weekly_all", "percent": 25, "resets_at": "2033-05-19T19:00:00+00:00", "scope": None},
-                        {"kind": "weekly_scoped", "percent": 60, "resets_at": "2033-05-19T19:00:00+00:00",
+                        {"kind": "weekly_scoped", "percent": 30, "resets_at": "2033-05-19T19:00:00+00:00",
                          "scope": {"model": {"display_name": "Fable", "id": None}, "surface": None}},
                     ],
                 },
