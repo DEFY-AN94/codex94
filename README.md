@@ -31,14 +31,13 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
-## 4.1.0 candidate (unreleased)
+## Version 4.1.0
 
-The development version is **4.1.0 (24)** on branch
-`claude/4.1.0-local-usage-cache`. Stable downloads below remain on 4.0.1 until
-publication of the new release is confirmed. The `4.0.2 (23)` candidate (the
-notification-callback fix, large separate service cards, compact dual rings and
-the statusline-scope explanation) was merge-ready but never tagged or
-published; 4.1.0 carries those changes forward unchanged.
+`4.1.0 (24)` is the published stable release, dated **2026-10-05**
+(Australia/Melbourne). The `4.0.2 (23)` candidate (the notification-callback
+fix, large separate service cards, compact dual rings and the statusline-scope
+explanation) was merge-ready but never tagged or published; 4.1.0 carries
+those changes forward unchanged.
 
 4.1.0 changes the Claude side only. Codex behavior is unchanged.
 
@@ -120,18 +119,17 @@ afterwards (an exact-text assertion predating the cached-data prefix, a fixture
 whose scoped Fable limit was the tightest window and relabelled the native item,
 a new screenshot name missing from the artifact allowlist, then a fixture-policy
 check that still required the CLI opt-in to stay on while the smoke itself
-toggles it), so its rerun, candidate acceptance, tag, the CI DMG and publication
-are pending. The Providers UI smoke fixture seeds a synthetic
-`.claude.json` through `CLAUDE_CONFIG_DIR` and checks that turning the CLI
-option off shows the cache source without launching the CLI; it counts as
-evidence only after it runs on CI. The historical screenshots and release
-results below are not 4.1.0 validation.
+toggles it), and the release commit passed every check on final main. The
+Providers UI smoke fixture seeds a synthetic `.claude.json` through
+`CLAUDE_CONFIG_DIR` and checks that turning the CLI option off shows the cache
+source without launching the CLI; it passed on the release commit. Final
+release acceptance is recorded in [RELEASING.md](docs/RELEASING.md). The
+historical screenshots and release results below predate 4.1.0.
 
-## Version 4.0.1
+## Earlier 4.0.1 release
 
-`4.0.1 (22)` is the published stable release, dated **2026-10-03**
-(Australia/Melbourne). It carries forward the dual-provider features from the
-unpublished 4.0.0 candidate. The `v4.0.0` tag remains unchanged and its Draft
+`4.0.1 (22)` was released on **2026-10-03** (Australia/Melbourne). It carried
+forward the dual-provider features from the unpublished 4.0.0 candidate. The `v4.0.0` tag remains unchanged and its Draft
 Release was removed; its validation records below remain historical.
 
 Claude uses **passive local status-line reports by default**. Direct
@@ -244,7 +242,7 @@ is limited to its tested Mac and candidate.
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.
-These retained captures do not show the 4.1.0 candidate's revised presentation.
+These retained captures do not show 4.1.0's revised presentation.
 The chart previews were captured during `0.3.0 (14)` candidate testing and
 show **Bar chart** and **Line chart** over the same seven reported days. These
 original synthetic captures remain unchanged, from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
@@ -289,8 +287,8 @@ statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
-  released on **2026-10-03** (Australia/Melbourne) as a Universal 2 DMG and
+  [`v4.1.0 (24)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0),
+  released on **2026-10-05** (Australia/Melbourne) as a Universal 2 DMG and
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
   Later documentation commits do not move its tag or regenerate its assets.
@@ -308,7 +306,7 @@ statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `4.0.1` DMG itself is completely unsigned, has no Apple Developer ID
+The published `4.1.0` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -339,23 +337,23 @@ precedence; an invalid manual choice is not silently bypassed.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v4.0.1` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1):
+[`v4.1.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0):
 
-- `Codex94-4.0.1-macos-universal-unnotarized.dmg`
-- `Codex94-4.0.1-SHA256SUMS.txt`
+- `Codex94-4.1.0-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.0-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-4.0.1-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.0-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-4.0.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -377,7 +375,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v4.0.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
@@ -595,7 +593,7 @@ their own provenance above.
 Version 4.0.1 adds a separate, default-off local Claude CLI reader and a
 status-line quota cache. Previewing setup is read-only; installing or removing
 the connection explicitly edits Claude Code's status-line setting and retains
-recovery material. The 4.1.0 candidate additionally reads the usage cache that
+recovery material. Version 4.1.0 additionally reads the usage cache that
 Claude Code itself writes, as described above, without any new network path.
 The diagram below describes the existing Codex path.
 

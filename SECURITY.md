@@ -20,11 +20,11 @@ direct Claude quota HTTP/OAuth implementation or credential-store access.
 The CLI reader has a separate, default-off opt-in with a quota-consumption
 warning. Enabling Claude monitoring does not opt into CLI sessions. While the
 CLI reader is off, automatic and manual refreshes read only local files: in
-4.0.1 the statusline cache alone, and from the 4.1.0 candidate below also Claude
+4.0.1 the statusline cache alone, and from 4.1.0 also Claude
 Code's own usage cache in `.claude.json` (read-only, `cachedUsageUtilization`
 key only). Disabling the CLI reader cancels and retires an active reader.
 In 4.0.1, source modes are isolated: a CLI failure does not adopt an
-account-unverified statusline report (the 4.1.0 candidate below replaces this
+account-unverified statusline report (4.1.0 replaces this
 isolation with tiered selection). Passive monitoring pins its selected report
 stream and asks for explicit adoption when a different session reports; a
 session fingerprint never proves account identity. No OAuth token access or
@@ -48,7 +48,7 @@ statusline key and checks for conflicting changes before restoration. The
 manifest and cache use private local files; neither is included in releases.
 See [PRIVACY.md](PRIVACY.md) for the new configuration and cache inventory.
 
-The unreleased `4.1.0 (24)` candidate adds one read-only file source and no
+Version `4.1.0 (24)` adds one read-only file source and no
 new network path. `ClaudeLocalUsageCacheReader` opens Claude Code's global
 state file `.claude.json`, in the home directory or in `CLAUDE_CONFIG_DIR` when
 Codex94's own environment sets it, read-only with `O_NOFOLLOW`. It refuses
@@ -124,9 +124,9 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-4.0.1-SHA256SUMS.txt` before opening the DMG. The optional
+Verify `Codex94-4.1.0-SHA256SUMS.txt` before opening the DMG. The optional
 GitHub command
-`gh attestation verify Codex94-4.0.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
+`gh attestation verify Codex94-4.1.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
 can prove repository/workflow/commit provenance for the exact DMG. A matching
 checksum or attestation is not notarization, malware review, a security audit,
 or Gatekeeper approval. If the exact release is trusted, use only Apple's
@@ -218,7 +218,7 @@ boundaries remain unchanged.
 
 ## Supported versions
 
-The unreleased `4.1.0 (24)` candidate adds the read-only Claude Code usage-cache
+Version `4.1.0 (24)` adds the read-only Claude Code usage-cache
 source, source tiering, the one-time CLI read and per-model weekly buckets
 described above. It adds no quota API, credential access, preference key,
 cache file, entitlement or installer step. The App target and the UI test bundle build locally on Xcode 27.0, and the
@@ -235,8 +235,9 @@ corrected afterwards (an exact-text assertion predating the cached-data
 prefix, a fixture whose scoped Fable limit was the tightest window and
 relabelled the native item, a new screenshot name missing from the artifact
 allowlist, then a fixture-policy check that still required the CLI opt-in
-to stay on while the smoke itself toggles it), so its rerun, candidate
-acceptance, tag, the CI DMG and publication are pending.
+to stay on while the smoke itself toggles it); the release commit passed
+every check on final main, and the published release is recorded in
+[docs/RELEASING.md](docs/RELEASING.md).
 
 The unpublished `4.0.2 (23)` candidate, carried into 4.1.0, repairs a
 notification callback actor boundary and changes presentation. It adds no
@@ -249,8 +250,8 @@ Version `4.0.1 (22)` uses passive Claude reports by default with explicit
 report-stream adoption and a separate default-off CLI reader. The retained
 `v4.0.0` tag identifies an unpublished candidate, not a supported stable release.
 
-The supported published stable version is [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
-released on 2026-10-03 (Australia/Melbourne).
+The supported published stable version is [`v4.1.0 (24)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0),
+released on 2026-10-05 (Australia/Melbourne).
 Feature branches and `main` may contain development work that has not passed
 release acceptance. Current stable-version links identify the published release.
 Version `3.1.4` adjusts bounded quota deadlines and permits three extra

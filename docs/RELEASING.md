@@ -92,8 +92,8 @@ CLI or send a prompt to populate test data.
 
 The Providers UI smoke fixture seeds a synthetic `.claude.json` through
 `CLAUDE_CONFIG_DIR` and is intended to show that turning the CLI option off
-displays the cache source without launching the CLI. That is CI evidence only
-after the job runs on the tested revision; until then it is planned.
+displays the cache source without launching the CLI; it passed on the release
+commit (see the 4.1.0 record below).
 
 Local evidence so far: The App target and the UI test bundle build locally on Xcode 27.0, and the
 hosted unit suite passed there: 544 tests executed, 1 existing hosted-focus
@@ -110,8 +110,8 @@ prefix, a fixture whose scoped Fable limit was the tightest window and
 relabelled the native item, a new screenshot name missing from the artifact
 allowlist, then a fixture-policy check that still required the CLI opt-in
 to stay on while the smoke itself toggles it), so its rerun, candidate
-acceptance, tag, the CI DMG and publication are pending. Record each from the
-actual revision; no record below implies a 4.1.0 result.
+acceptance, tag, the CI DMG and publication followed; the 4.1.0 acceptance
+record below is the authoritative result.
 
 The `4.0.2 (23)` checks below are retained because that candidate was carried
 forward into 4.1.0 without publication; verify them on the 4.1.0 revision:
@@ -846,3 +846,62 @@ prerequisite was not established. Passive reports have no verified account ID;
 report-stream selection is not authentication. The optional CLI reader remains
 default-off, with a quota-consumption warning and suspended live probing.
 Later documentation commits do not move either tag or replace release assets.
+
+### 4.1.0 local usage cache release — 2026-10-05
+
+- Version/build: `4.1.0 (24)`. Release source: `5931618240b9fc60090f9626f292d1f7bdba20d6`;
+  tree `c4636fee119e292902f1d82d15c44d8d03d247c8`. [PR #46](https://github.com/DEFY-AN94/codex94/pull/46)
+  (the change; final head `f7b197f`) was marked Ready and squash-merged as
+  `d0ff9bd` after its final-head checks passed, and [PR #47](https://github.com/DEFY-AN94/codex94/pull/47)
+  dated the changelog and was squash-merged as the release source. The maintainer
+  authorized Ready, merge and the remaining gates in chat once CI was green.
+- Final-main [CI 37213593738](https://github.com/DEFY-AN94/codex94/actions/runs/37213593738)
+  passed test, five synthetic UI scenarios and main-only attestation on Xcode 16.4.
+  **544 tests executed, 1 existing hosted-focus skip, 0 failures**; the skip is not
+  counted as a pass. The display smoke was cancelled at the 20-minute job timeout on
+  attempt 1 after uploading its evidence and passed on attempt 2 (failed-jobs
+  rerun); the DMG artifact and attestation come from attempt 1.
+- Final-main [CodeQL 37213593623](https://github.com/DEFY-AN94/codex94/actions/runs/37213593623)
+  passed. A shallow clone of the annotated release tag reproduced the frozen
+  commit/tree and version/build.
+- Annotated `v4.1.0` tag object: `394c142673c417d9742fb21adc5490eaba670b5b`,
+  peeling to the frozen source above. The first narrow push attempt reported a
+  transient failure without creating the remote ref; the retry created it.
+- CI artifact `11307836866`, `codex94-dmg-5931618240b9fc60090f9626f292d1f7bdba20d6`,
+  had the GitHub API ZIP digest
+  `sha256:d7bab2a036b2804d161fe9425731b0336e9a51c50403e593d73adc1359efd9b9`.
+  It contained exactly the DMG and checksum file.
+- DMG SHA-256: `658e00bf5fc24239cbe4fe2a8e71a08614ff8ceac29a9e15f8eae7f0e2a669fc`.
+- Checksum-file SHA-256: `c8ddeee6bb0b24d9352e1d07886ad1a6cb24e064f8d161ca4da011777e1e2c05`.
+- [GitHub attestation 52604145](https://github.com/DEFY-AN94/codex94/attestations/52604145)
+  was verified against this repository, `refs/heads/main`,
+  `.github/workflows/ci.yml`, the source commit above and CI run 37213593738
+  attempt 1; the statement's subject matches the DMG name/hash.
+  `package_dmg.sh verify` passed on the artifact, on the Draft download and on
+  the anonymous public download.
+- [Public v4.1.0 Release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0), ID `403105633`,
+  was published as Latest at `2026-10-04T16:30:10Z` (2026-10-05 03:30
+  Australia/Melbourne). Draft and anonymous public asset downloads matched the
+  original CI bytes and the GitHub API SHA-256 digests. Anonymous Latest
+  discovery returned this stable, non-draft release. Manual asset IDs are
+  `610182702` (DMG) and `610182700` (checksum).
+- At the maintainer's instruction, installation followed publication. The
+  running `/Applications/Codex94.app` 4.0.2 (23) candidate (executable SHA-256
+  `74f58ef7db3265abedb0a141018230c220d5528f836884eabc107db6710f2b27`) was quit
+  and moved to the Trash, not deleted, and the App from the verified DMG was
+  installed at the same path. The installed executable SHA-256 is
+  `f2fc931e94d1e7604a7c1e5d16f2978c79b7b916f29306c693d0c44d12ea07fd`; its 15
+  bundle entries, every file hash and the root mode match the DMG payload, and
+  the original signing was preserved. The DMG was fetched with the GitHub CLI,
+  so no quarantine attribute existed and the copy carries only
+  `com.apple.provenance`; first-launch Gatekeeper evidence is therefore
+  uncertain. The installed copy launched and stayed running. `~/Applications`
+  holds no copy.
+- Final-package checks confirmed macOS 14+, arm64 and x86_64, an unsigned and
+  unnotarized outer DMG, and an ad-hoc Hardened Runtime App.
+- Runtime reading of the maintainer's real Claude usage cache was not inspected
+  by automation; the Providers UI smoke verified the cache source with synthetic
+  data only.
+
+Direct OAuth remains unimplemented; the paused work stays in draft PR #44.
+Later documentation commits do not move the tag or replace release assets.
