@@ -589,7 +589,7 @@ final class Codex94UITests: XCTestCase {
         try selectPage(.overview, in: dashboard)
         try require(identified("claude-quota-history", in: dashboard).waitForExistence(timeout: 5),
                     "Dashboard must share the same historical presentation")
-        try capture(dashboard, named: "providers-history-dashboard-en.png")
+        try capture(dashboard, named: "dashboard-providers-history-en.png")
         popover = try openProviderPopover(service: "claude", marker: "claude-quota-section")
         try fixture.setClaudeLocalCacheExpired(false)
         try uniqueIdentified("claude-refresh", in: popover).click()
@@ -4295,7 +4295,7 @@ private struct SyntheticFixture {
         let providers: Set<String> = scenario == "providers" ? [
             "providers-both-en.png", "providers-compact-en.png", "providers-claude-error-en.png",
             "providers-claude-only-en.png", "providers-local-cache-en.png", "providers-disabled-en.png",
-            "providers-history-en.png", "providers-history-dashboard-en.png",
+            "providers-history-en.png", "dashboard-providers-history-en.png",
             "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
             "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
             "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",
