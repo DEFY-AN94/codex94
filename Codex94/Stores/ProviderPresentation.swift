@@ -16,6 +16,13 @@ extension AppStore {
         return provider == .codex ? snapshot : claudeStore.snapshot
     }
 
+    /// Historical text is a separate channel. It must never become an Auto
+    /// candidate, a current gauge value, or an input to floating-window sizing.
+    func providerHistoricalReport(for provider: QuotaProviderID) -> ClaudeQuotaHistoryPresentation? {
+        guard provider == .claude, preferences.claudeMonitoringEnabled, claudeStore.snapshot == nil else { return nil }
+        return claudeStore.historicalReport
+    }
+
     func providerMenuBarQuota(for provider: QuotaProviderID) -> ResolvedQuotaWindow? {
         guard let snapshot = providerSnapshot(for: provider) else { return nil }
         let selection = provider == .codex

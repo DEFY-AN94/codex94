@@ -88,7 +88,11 @@ struct MenuBarStatusView: View {
                 nextAttempt: store.providerNextAutomaticRefreshAt(for: provider),
                 language: store.preferences.language
             )
-            return context.isEmpty ? summary : summary + ", " + context
+            var text = context.isEmpty ? summary : summary + ", " + context
+            if let history = store.providerHistoricalReport(for: provider) {
+                text += "\n" + ClaudeQuotaHistoryFormatting.summary(history, now: now, language: store.preferences.language)
+            }
+            return text
         }
         if let recovery = ConnectionRecoveryText.context(
             presentation: presentation,

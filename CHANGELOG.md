@@ -2,6 +2,30 @@
 
 All notable changes to Codex94 are documented here.
 
+## 4.1.2 - 2026-10-05
+
+Version `4.1.2 (26)` is a display-fix candidate dated for release in
+Australia/Melbourne. Stable downloads remain on published 4.1.1 until release
+verification completes.
+
+### Changed
+
+- When all shared Claude quota windows have ended, show the last accepted
+  report's remaining/used percentages and original source time in the menu
+  popover and Dashboard. Historical values use a muted appearance and a clear
+  current-quota-unknown label instead of only the expired-window message.
+- Keep history separate from current quota: menu-bar rings and floating main
+  values remain unknown, while their tooltip/accessibility text and floating
+  expanded row can describe the previous record. Auto selection, notifications,
+  reset scheduling and valid-window presentation do not use historical values.
+- Reuse source-time, relative-age and percentage formatting across these surfaces.
+  Rereading a file never freshens the report time. Missing records, unconfirmed
+  sources and invalidated account contexts do not produce invented history.
+
+There is no new request, history database, preference, cache schema, OAuth
+integration or automatic CLI usage query. Existing CLI opt-in and its quota
+warning remain unchanged; this release does not obtain new cloud usage by itself.
+
 ## 4.1.1 - 2026-10-05
 
 Version `4.1.1 (25)` is the published stable release. Release dates use

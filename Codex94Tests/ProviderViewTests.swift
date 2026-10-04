@@ -270,6 +270,23 @@ final class ProviderViewTests: XCTestCase {
         XCTAssertEqual(waiting.sourceTimeText, "No quota report yet")
     }
 
+    func testStaleIssueWithoutAnyAcceptedReportKeepsTheNeutralWaitingState() {
+        for cliEnabled in [false, true] {
+            var content = card(snapshot: nil, source: nil, now: reportedAt, issue: .staleData)
+            content.isCLIUsageEnabled = cliEnabled
+            XCTAssertNil(content.reportedAt)
+            XCTAssertNil(content.displayedHistory)
+            XCTAssertEqual(content.badge, .none)
+            XCTAssertNil(content.statusKey, "An expired candidate must not imply an accepted report became outdated")
+            XCTAssertEqual(content.emptyStateKey, cliEnabled ? "claude.quota.empty" : "claude.localCache.absent")
+            XCTAssertEqual(content.sourceTimeText, "No quota report yet")
+            content.passiveReportNeedsConfirmation = true
+            XCTAssertEqual(content.badge, .stale, "A pending-source warning still has priority")
+            XCTAssertEqual(content.statusKey, "claude.issue.sourceChanged")
+            XCTAssertEqual(content.emptyStateKey, "claude.passive.confirmationRequired")
+        }
+    }
+
     func testTerminalRowsRetainFractionalQuotaAndPassiveSourceMeaning() throws {
         let window = try XCTUnwrap(claudeSnapshot(used: 24.5).defaultBucket?.window(.fiveHour))
         for language in [LanguagePreference.english, .simplifiedChinese] {
@@ -449,6 +466,112 @@ final class ProviderViewTests: XCTestCase {
         let codexCalls = await fixture.codexFetcher.calls
         XCTAssertEqual(callsAfter, callsBefore)
         XCTAssertEqual(codexCalls, 0)
+    }
+
+    func testAcceptedHistoryKeepsItsOwnSourceAndTimeWhileASeparateReportNeedsConfirmation() throws {
+        let now = reportedAt.addingTimeInterval(30_000)
+        let history = try historicalReport(at: now)
+        var content = ClaudeQuotaCardContent(
+            snapshot: nil, source: .statusline, reportedAt: now.addingTimeInterval(-60), issue: .sourceChanged,
+            isRefreshing: false, isEnabled: true, language: .english, now: now,
+            palette: .resolve(.system, scheme: .light), refresh: {}, openSetup: {},
+            timeZone: TimeZone(secondsFromGMT: 0)!, passiveReportNeedsConfirmation: true,
+            historicalReport: history
+        )
+        XCTAssertEqual(content.displayedHistory, history)
+        XCTAssertNil(content.snapshot, "History must not recreate current quota")
+        XCTAssertEqual(content.sourceTitleKey, "claude.source.localCache")
+        XCTAssertEqual(content.sourceTimeHelpKey, "claude.localCacheTime.help")
+        XCTAssertTrue(content.sourceTimeText.hasPrefix("Claude Code fetched: "))
+        let originalTime = try XCTUnwrap(QuotaFormatting.absoluteReset(
+            to: reportedAt, locale: LanguagePreference.english.locale,
+            calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(secondsFromGMT: 0)!
+        ))
+        XCTAssertTrue(content.sourceTimeText.contains(originalTime),
+                      "The footer must identify the accepted history, not a pending report or local reread")
+        XCTAssertTrue(content.sourceTimeText.contains("8 hours"), content.sourceTimeText)
+        XCTAssertEqual(content.badge, .stale)
+        XCTAssertEqual(content.statusKey, "claude.issue.sourceChanged",
+                       "Showing accepted history must not hide the pending-source warning")
+        content.passiveReportNeedsConfirmation = false
+        XCTAssertEqual(content.statusKey, "claude.issue.sourceChanged")
+        var unreadable = card(snapshot: nil, source: .localCache, now: now, issue: .localCacheUnreadable)
+        unreadable.historicalReport = history
+        XCTAssertEqual(unreadable.statusKey, "claude.issue.localCacheUnreadable",
+                       "History replaces the empty state, so a current read error must remain in the status line")
+    }
+
+    func testHistoryIsHiddenForActivePartialQuotaDisabledMonitoringAndNoAcceptedReport() throws {
+        let now = reportedAt.addingTimeInterval(30_000)
+        let history = try historicalReport(at: now)
+        let weekly = try claudeSnapshot(weeklyOnly: true, used: 61.2)
+        var active = card(snapshot: weekly, source: .cliUsage, now: reportedAt)
+        active.historicalReport = history
+        XCTAssertNil(active.displayedHistory, "A partial current snapshot retains its existing presentation")
+        XCTAssertEqual(active.snapshot?.defaultBucket?.windows.count, 1)
+        XCTAssertEqual(active.snapshot?.defaultBucket?.window(.weekly)?.preciseRemainingPercent ?? -1,
+                       38.8, accuracy: 0.001)
+        XCTAssertEqual(active.sourceTitleKey, "claude.source.cliUsage")
+        XCTAssertEqual(active.sourceTimeText, card(snapshot: weekly, source: .cliUsage, now: reportedAt).sourceTimeText)
+
+        let disabled = ClaudeQuotaCardContent(
+            snapshot: nil, source: .localCache, reportedAt: reportedAt, issue: .noData,
+            isRefreshing: false, isEnabled: false, language: .english, now: now,
+            palette: .resolve(.system, scheme: .light), refresh: {}, openSetup: {}, historicalReport: history
+        )
+        XCTAssertNil(disabled.displayedHistory)
+        XCTAssertEqual(disabled.badge, .none)
+        let noReport = card(snapshot: nil, source: nil, now: now, issue: .noData)
+        XCTAssertNil(noReport.displayedHistory)
+        XCTAssertEqual(noReport.sourceTimeText, "No quota report yet")
+    }
+
+    func testHistoryRendersBothDisplayStylesInBothLanguagesAndAppearancesWithoutActions() throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let now = reportedAt.addingTimeInterval(30_000)
+        let history = try historicalReport(at: now)
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            for dark in [false, true] {
+                for style in [ProviderQuotaDisplayStyle.card, .terminal] {
+                    let content = ClaudeQuotaCardContent(
+                        snapshot: nil, source: history.source, reportedAt: history.reportedAt, issue: .noData,
+                        isRefreshing: false, isEnabled: true, language: language, now: now,
+                        palette: .resolve(.system, scheme: dark ? .dark : .light),
+                        refresh: { XCTFail("History rendering cannot start a read") },
+                        openSetup: { XCTFail("History rendering cannot navigate") },
+                        timeZone: TimeZone(secondsFromGMT: 0)!, compact: style == .terminal,
+                        style: style, localCacheState: .valid, historicalReport: history
+                    )
+                    XCTAssertEqual(content.badge, .stale)
+                    XCTAssertNil(content.statusKey, "The history heading already explains the no-current-quota state")
+                    XCTAssertNil(content.snapshot)
+                    XCTAssertEqual(content.displayedHistory?.windows.map(\.usedPercentage), [24.5, 61.2])
+                    XCTAssertEqual(content.displayedHistory?.modelLimits.map(\.usedPercentage), [0, 100])
+                    let size = try render(
+                        content.padding(style == .terminal ? 14 : 0), width: 500,
+                        dark: dark, language: language,
+                        name: "claude-history-\(style == .terminal ? "terminal" : "card")-\(language.rawValue)-\(dark ? "dark" : "light")",
+                        output: directory
+                    )
+                    XCTAssertEqual(size.width, 500, accuracy: 1)
+                    XCTAssertGreaterThan(size.height, 200)
+                    XCTAssertLessThan(size.height, 520, "Shared and model history should stay compact and allow the parent viewport to scroll")
+                }
+            }
+        }
+    }
+
+    private func historicalReport(at now: Date) throws -> ClaudeQuotaHistoryPresentation {
+        let report = ClaudeQuotaReport(
+            source: .localCache, reportedAt: reportedAt, receivedAt: reportedAt.addingTimeInterval(60),
+            windows: [ClaudeQuotaWindow(kind: .fiveHour, usedPercentage: 24.5, resetsAt: reportedAt.addingTimeInterval(300)),
+                      ClaudeQuotaWindow(kind: .weekly, usedPercentage: 61.2, resetsAt: reportedAt.addingTimeInterval(600))],
+            modelLimits: [ClaudeQuotaModelLimit(modelName: "Fable", usedPercentage: 0, resetsAt: reportedAt.addingTimeInterval(600)),
+                          ClaudeQuotaModelLimit(modelName: "Synthetic model with a longer display name", usedPercentage: 100,
+                                                resetsAt: now.addingTimeInterval(600))]
+        )
+        return try XCTUnwrap(ClaudeQuotaHistoryPresentation(report: report, at: now))
     }
 
     func testClaudeCardsRenderReportedUnknownCachedAndZeroStatesInBothLanguages() throws {

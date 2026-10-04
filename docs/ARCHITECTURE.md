@@ -7,6 +7,27 @@ published on 2026-10-05 (Australia/Melbourne), including the unpublished
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
+## 4.1.2 display candidate: historical quota is not current quota
+
+`ClaudeQuotaHistoryPresentation` is an in-memory, display-only value derived from
+one already accepted, selected report when no current snapshot can be produced.
+It contains only source, original report time, quota windows and model limits;
+account UUIDs and producer identifiers never enter the presentation value.
+`ClaudeQuotaStore` owns its publication and clears it on disable or observed
+identity invalidation. It preserves the existing source-selection, pending-report
+confirmation and late-result generation rules. A file reread does not become a
+new observation time; invalid/future report data is not invented into history.
+
+`ClaudeQuotaHistoryView` is shared by the compact popover and Dashboard card.
+`ClaudeQuotaHistoryFormatting` reuses the existing percentage, absolute-source-time
+and relative-age formatters for those surfaces, native tooltip/accessibility text
+and floating expanded detail. Native rings, floating main metrics, Auto choices
+and notifications continue using only the existing `QuotaSnapshot` path.
+Partially valid reports retain their current-window presentation; model-only
+current quota semantics are unchanged. History adds no timer, disk record,
+preference, data source or request. Expired statusline reports are not newly
+adopted on cold start; persisted local usage data can be reread when still safe.
+
 ## 4.1.1 maintenance release
 
 `4.1.1 (25)` keeps the existing sources and polling frequency. The store

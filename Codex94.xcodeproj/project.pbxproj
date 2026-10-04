@@ -122,6 +122,8 @@
 		AD4234ABF933A2928B8B28C5 /* ClaudeStatuslineInstallerRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C8F75CAFD8BA789D71BCFF /* ClaudeStatuslineInstallerRecoveryTests.swift */; };
 		69A26A1070C61480A90D6BDF /* ClaudeExecutableLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20E31B7F51F0B0DD3AD7EC0 /* ClaudeExecutableLocator.swift */; };
 		C06A4E53459CE294CE5D1E8F /* ClaudeExecutableLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E526F049EEAE54AF9C8EAC15 /* ClaudeExecutableLocatorTests.swift */; };
+		C1A4E0004120000000000002 /* ClaudeQuotaHistoryFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A4E0004120000000000001 /* ClaudeQuotaHistoryFormatting.swift */; };
+		C1A4E0004120000000000004 /* ClaudeQuotaHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A4E0004120000000000003 /* ClaudeQuotaHistoryView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -261,6 +263,8 @@
 		51C8F75CAFD8BA789D71BCFF /* ClaudeStatuslineInstallerRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeStatuslineInstallerRecoveryTests.swift"; sourceTree = "<group>"; };
 		C20E31B7F51F0B0DD3AD7EC0 /* ClaudeExecutableLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ClaudeExecutableLocator.swift"; sourceTree = "<group>"; };
 		E526F049EEAE54AF9C8EAC15 /* ClaudeExecutableLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeExecutableLocatorTests.swift"; sourceTree = "<group>"; };
+		C1A4E0004120000000000001 /* ClaudeQuotaHistoryFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Support/ClaudeQuotaHistoryFormatting.swift"; sourceTree = "<group>"; };
+		C1A4E0004120000000000003 /* ClaudeQuotaHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Components/ClaudeQuotaHistoryView.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -301,6 +305,7 @@
 				3EFB239A355CDB6103A9C5E8 /* ProviderSettingsView.swift */,
 				58C0F8FEC138DA99FE3B60BF /* ClaudeStatuslineSetupView.swift */,
 				FD3568FBE91D9E804C3A12F8 /* ClaudeQuotaCard.swift */,
+				C1A4E0004120000000000003 /* ClaudeQuotaHistoryView.swift */,
 				D9D0164D46559815CCD8226B /* ProviderPresentation.swift */,
 				FD144790F7B6FC86204B8A5E /* ClaudeQuotaStore.swift */,
 				A2DFAF12BCC04F9D3D725CBC /* ClaudeStatuslineCache.swift */,
@@ -355,6 +360,7 @@
 				F00000000000000000000009 /* PreferencesStore.swift */,
 				F0000000000000000000000A /* AppStore.swift */,
 				F0000000000000000000000B /* Formatting.swift */,
+				C1A4E0004120000000000001 /* ClaudeQuotaHistoryFormatting.swift */,
 				F00000000000000000000017 /* AppMetadata.swift */,
 				F0000000000000000000000C /* DiagnosticsRedactor.swift */,
 				F0000000000000000000000D /* Localization.swift */,
@@ -527,6 +533,7 @@
 				BB9C1B4290B4EABC2C602C13 /* ProviderSettingsView.swift in Sources */,
 				DC42B246B3DFB24B58517DA8 /* ClaudeStatuslineSetupView.swift in Sources */,
 				C07D724B8C8A933A21EDF581 /* ClaudeQuotaCard.swift in Sources */,
+				C1A4E0004120000000000004 /* ClaudeQuotaHistoryView.swift in Sources */,
 				BFF5464E4777184D250463FD /* ProviderPresentation.swift in Sources */,
 				D235FCF3568BCFCB61D7B09F /* ClaudeQuotaStore.swift in Sources */,
 				6312EF04E868E3E49C0C4C7E /* ClaudeStatuslineCache.swift in Sources */,
@@ -581,6 +588,7 @@
 				B00000000000000000000009 /* PreferencesStore.swift in Sources */,
 				B0000000000000000000000A /* AppStore.swift in Sources */,
 				B0000000000000000000000B /* Formatting.swift in Sources */,
+				C1A4E0004120000000000002 /* ClaudeQuotaHistoryFormatting.swift in Sources */,
 				B00000000000000000000016 /* AppMetadata.swift in Sources */,
 				B0000000000000000000000C /* DiagnosticsRedactor.swift in Sources */,
 				B0000000000000000000000D /* Localization.swift in Sources */,
@@ -709,7 +717,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -717,7 +725,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 4.1.1;
+				MARKETING_VERSION = 4.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -735,7 +743,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEAD_CODE_STRIPPING = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				ENABLE_APP_SANDBOX = NO;
@@ -743,7 +751,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 4.1.1;
+				MARKETING_VERSION = 4.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

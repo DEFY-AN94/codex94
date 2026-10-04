@@ -1208,6 +1208,175 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertGreaterThan(publications.read(), afterAge)
     }
 
+    func testFullyExpiredAcceptedReportPublishesHistoryWithoutQuotaOrNotificationObservation() async throws {
+        let f = try fixture(cliEnabled: false)
+        var alerts = NotificationPreferences()
+        alerts.isEnabled = true
+        alerts.recoveryEnabled = true
+        f.preferences.claudeNotifications = alerts
+        let began = f.clock.read(), reset = began.addingTimeInterval(10)
+        try writeLocalCache(f, fiveHourUsed: 100, weeklyUsed: 17.25, fetchedAt: began, resetAt: reset,
+                            modelLimits: [("Fable", 33.5)])
+        let originalBytes = try Data(contentsOf: f.localCacheURL)
+        f.store.start()
+        try await wait { f.store.notificationController.authorization == .authorized }
+        XCTAssertNotNil(f.store.snapshot?.automaticResolvedWindow)
+        XCTAssertNil(f.store.historicalReport)
+        f.clock.advance(10)
+        try await poll(f)
+        let history = try XCTUnwrap(f.store.historicalReport)
+        XCTAssertEqual(history.source, .localCache)
+        XCTAssertEqual(history.reportedAt, began)
+        XCTAssertEqual(history.windows.map(\.usedPercentage), [100, 17.25])
+        XCTAssertEqual(history.windows.map(\.resetsAt), [reset, reset])
+        XCTAssertEqual(history.modelLimits.map(\.usedPercentage), [33.5])
+        XCTAssertNil(f.store.snapshot, "Historical values must not re-enter current quota or Auto selection")
+        XCTAssertEqual(f.store.lastIssue, .noData)
+        XCTAssertNil(f.store.nextAutomaticRefreshAt)
+        let publications = ClaudeStoreTestCounter()
+        let subscription = f.store.$historicalReport.dropFirst().sink { _ in publications.increment() }
+        defer { subscription.cancel() }
+        for _ in 0..<3 { f.clock.advance(15); try await poll(f) }
+        XCTAssertEqual(f.store.historicalReport, history)
+        XCTAssertEqual(publications.read(), 0, "Unchanged history must not publish on each poll")
+        XCTAssertTrue(f.notifications.deliveries.isEmpty)
+        XCTAssertEqual(f.factoryCalls.read(), 0)
+        XCTAssertEqual(try Data(contentsOf: f.localCacheURL), originalBytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: f.cache.fileURL.path))
+    }
+
+    func testColdLocalHistoryKeepsSourceTimeAcrossClockChangesRestartAndNewReports() async throws {
+        let f = try fixture(cliEnabled: false)
+        let began = f.clock.read(), fetched = began.addingTimeInterval(-100)
+        try writeLocalCache(f, fiveHourUsed: 61.5, fetchedAt: fetched, resetAt: began.addingTimeInterval(-1))
+        f.store.start()
+        let history = try XCTUnwrap(f.store.historicalReport)
+        XCTAssertEqual(history.reportedAt, fetched)
+        XCTAssertEqual(history.windows.first?.usedPercentage, 61.5)
+        XCTAssertNil(f.store.snapshot)
+        let hiddenHistory = ClaudeStoreTestCounter()
+        let subscription = f.store.$historicalReport.dropFirst().sink { value in
+            if value == nil { hiddenHistory.increment() }
+        }
+        f.store.handleSystemWake(now: began.addingTimeInterval(-0.005))
+        XCTAssertEqual(f.store.historicalReport, history)
+        XCTAssertEqual(hiddenHistory.read(), 0, "A wake event a few milliseconds before local receipt must not transiently clear history")
+        f.clock.advance(-1)
+        f.store.handleSystemClockChange(now: f.clock.read())
+        XCTAssertEqual(f.store.historicalReport, history,
+                       "The original receivedAt may now be future, while source time and reset remain in the past")
+        f.clock.advance(1)
+        f.store.handleSystemClockChange(now: f.clock.read())
+        XCTAssertEqual(f.store.historicalReport, history)
+        XCTAssertEqual(hiddenHistory.read(), 0)
+        subscription.cancel()
+        f.store.stop()
+        XCTAssertNil(f.store.historicalReport, "Disabled monitoring immediately hides history")
+        f.clock.advance(10)
+        f.store.start()
+        XCTAssertEqual(f.store.historicalReport, history, "Rereading the same upstream cache does not change its source time")
+        try writeLocalCache(f, fiveHourUsed: 20, fetchedAt: f.clock.read(), resetAt: f.clock.read().addingTimeInterval(20))
+        try await poll(f)
+        XCTAssertNil(f.store.historicalReport)
+        XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 80)
+        let updatedAt = f.clock.read()
+        f.clock.advance(20)
+        try await poll(f)
+        XCTAssertEqual(f.store.historicalReport?.reportedAt, updatedAt)
+        XCTAssertEqual(f.store.historicalReport?.windows.first?.usedPercentage, 20)
+        XCTAssertEqual(f.factoryCalls.read(), 0)
+    }
+
+    func testPendingStatuslineCannotReplaceAcceptedHistoryAndColdExpiredReportsRemainUnaccepted() async throws {
+        let f = try fixture(cliEnabled: false)
+        let began = f.clock.read()
+        try f.cache.capture(passivePayload(session: 1, used: 45.5, reset: Int(began.timeIntervalSince1970 + 10)), at: began)
+        f.store.start()
+        XCTAssertNil(f.store.historicalReport)
+        f.clock.advance(10)
+        try await poll(f)
+        let accepted = try XCTUnwrap(f.store.historicalReport)
+        XCTAssertEqual(accepted.source, .statusline)
+        XCTAssertEqual(accepted.windows.first?.usedPercentage, 45.5)
+        try f.cache.capture(passivePayload(session: 2, used: 95), at: f.clock.read())
+        f.store.refresh()
+        let oldConfirmation = try XCTUnwrap(f.store.pendingPassiveConfirmationID)
+        XCTAssertEqual(f.store.historicalReport, accepted, "A pending candidate cannot replace an already accepted historical report")
+        XCTAssertTrue(f.store.passiveReportNeedsConfirmation)
+        f.store.stop()
+        XCTAssertNil(f.store.historicalReport)
+        f.store.adoptPendingPassiveReport(expectedConfirmationID: oldConfirmation)
+        XCTAssertNil(f.store.historicalReport)
+        f.store.start()
+        let newConfirmation = try XCTUnwrap(f.store.pendingPassiveConfirmationID)
+        XCTAssertNotEqual(newConfirmation, oldConfirmation)
+        f.store.adoptPendingPassiveReport(expectedConfirmationID: oldConfirmation)
+        XCTAssertEqual(f.store.historicalReport, accepted)
+        XCTAssertNil(f.store.snapshot)
+        XCTAssertEqual(f.store.pendingPassiveConfirmationID, newConfirmation,
+                       "An obsolete dialog cannot replace history with the pending report")
+
+        let cold = try fixture(cliEnabled: false)
+        cold.store.start()
+        XCTAssertNil(cold.store.historicalReport, "No prior accepted report means no history")
+        let expired = ClaudeQuotaReport(source: .statusline, reportedAt: began.addingTimeInterval(-100), receivedAt: began,
+            windows: [.init(kind: .fiveHour, usedPercentage: 45.5, resetsAt: began.addingTimeInterval(-1))],
+            producerID: String(repeating: "a", count: 64))
+        try writePassiveReport(expired, cache: cold.cache)
+        cold.store.refresh()
+        XCTAssertNil(cold.store.historicalReport, "Cold expired statusline data must not bypass the existing acceptance rule")
+        XCTAssertNil(cold.store.snapshot)
+        XCTAssertEqual(cold.factoryCalls.read(), 0)
+    }
+
+    func testIdentityLossImmediatelyClearsHistoryAndLateCLICannotRestoreIt() async throws {
+        let f = try fixture()
+        let began = f.clock.read()
+        try writeLocalCache(f, fiveHourUsed: 80, fetchedAt: began.addingTimeInterval(-100), resetAt: began.addingTimeInterval(-1))
+        f.store.start()
+        try await wait { await f.fetcher.count() == 1 }
+        XCTAssertEqual(f.store.historicalReport?.windows.first?.usedPercentage, 80)
+        try FileManager.default.removeItem(at: f.localCacheURL)
+        try await poll(f)
+        XCTAssertNil(f.store.historicalReport)
+        XCTAssertNil(f.store.snapshot)
+        await f.fetcher.complete(.success(report(at: began, used: 99, resetAt: began.addingTimeInterval(10))))
+        try await Task.sleep(for: .milliseconds(40))
+        XCTAssertNil(f.store.snapshot, "The retired CLI result would be current if accepted")
+        XCTAssertNil(f.store.historicalReport)
+        f.clock.advance(10)
+        try await poll(f)
+        XCTAssertNil(f.store.historicalReport, "The rejected late result must not become history when its window expires")
+        f.store.setCLIUsageEnabled(false)
+        try writeLocalCache(f, fiveHourUsed: 25, fetchedAt: began.addingTimeInterval(-50), resetAt: began.addingTimeInterval(-1),
+                            account: "00000000-0000-4000-8000-000000000002")
+        try await poll(f)
+        XCTAssertEqual(f.store.historicalReport?.windows.first?.usedPercentage, 25)
+        XCTAssertEqual(f.store.historicalReport?.reportedAt, began.addingTimeInterval(-50))
+        XCTAssertNil(f.store.snapshot)
+        XCTAssertTrue(f.notifications.deliveries.isEmpty)
+    }
+
+    func testDisablingCLIAlsoDropsItsHistoricalReportWithoutPersistingIt() async throws {
+        let f = try fixture()
+        let began = f.clock.read()
+        f.store.start()
+        try await wait { await f.fetcher.count() == 1 }
+        await f.fetcher.complete(.success(report(at: began, used: 75, resetAt: began.addingTimeInterval(10))))
+        try await wait { !f.store.isRefreshing }
+        f.clock.advance(10)
+        try await poll(f)
+        XCTAssertEqual(f.store.historicalReport?.source, .cliUsage)
+        XCTAssertEqual(f.store.historicalReport?.windows.first?.usedPercentage, 75)
+        XCTAssertNil(f.store.snapshot)
+        f.store.setCLIUsageEnabled(false)
+        XCTAssertNil(f.store.historicalReport)
+        XCTAssertNil(f.store.snapshot)
+        XCTAssertNil(f.store.nextAutomaticRefreshAt)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: f.cache.fileURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: f.localCacheURL.path))
+    }
+
     private func writeLocalCacheBytes(_ fixture: Fixture, _ contents: String) throws {
         try FileManager.default.createDirectory(at: fixture.localCacheURL.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)

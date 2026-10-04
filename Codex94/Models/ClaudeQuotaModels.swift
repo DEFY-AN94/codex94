@@ -130,6 +130,53 @@ struct ClaudeQuotaReport: Codable, Equatable, Sendable {
     }
 }
 
+/// Read-only presentation of the selected report after all shared windows have
+/// expired. This is deliberately not a QuotaSnapshot or a persisted record:
+/// history must never participate in quota selection, scheduling or alerts.
+struct ClaudeQuotaHistoryPresentation: Equatable, Sendable {
+    let source: ClaudeQuotaSource
+    let reportedAt: Date
+    let windows: [ClaudeQuotaWindow]
+    let modelLimits: [ClaudeQuotaModelLimit]
+
+    init?(report: ClaudeQuotaReport, at now: Date) {
+        // Source time defines the historical observation. Local receipt may be
+        // later than a wake event or a rolled-back clock, without changing it.
+        guard Self.validTimestamp(now), Self.validTimestamp(report.reportedAt),
+              Self.validTimestamp(report.receivedAt),
+              report.reportedAt <= report.receivedAt, report.reportedAt <= now,
+              !report.windows.isEmpty, report.windows.count <= 2,
+              Set(report.windows.map(\.kind)).count == report.windows.count,
+              report.windows.allSatisfy({ window in
+                  Self.validPercentage(window.usedPercentage)
+                      && (window.resetsAt.map(Self.validTimestamp) ?? true)
+              }),
+              report.modelLimits.count <= 16,
+              Set(report.modelLimits.map(\.limitID)).count == report.modelLimits.count,
+              report.modelLimits.allSatisfy({ limit in
+                  !limit.modelName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                      && limit.modelName.count <= ClaudeQuotaModelLimit.maximumNameLength
+                      && !limit.modelName.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+                      && Self.validPercentage(limit.usedPercentage)
+                      && (limit.resetsAt.map(Self.validTimestamp) ?? true)
+              }),
+              report.snapshot(at: now) == nil else { return nil }
+        source = report.source
+        reportedAt = report.reportedAt
+        windows = report.windows
+        modelLimits = report.modelLimits
+    }
+
+    private static func validPercentage(_ value: Double) -> Bool {
+        value.isFinite && (0...100).contains(value)
+    }
+
+    private static func validTimestamp(_ date: Date) -> Bool {
+        let seconds = date.timeIntervalSince1970
+        return seconds.isFinite && (0...253_402_300_799).contains(seconds)
+    }
+}
+
 protocol ClaudeQuotaFetching: Sendable {
     func fetch() async throws -> ClaudeQuotaReport
     func shutdown()

@@ -1,3 +1,4 @@
+import AppKit
 import Darwin
 import Foundation
 import XCTest
@@ -5,6 +6,78 @@ import XCTest
 
 @MainActor
 final class MultiProviderStoreTests: XCTestCase {
+    func testHistoricalClaudeTextDoesNotPopulateCurrentQuotaAutoOrNativeRing() async throws {
+        let fixture = try makeFixture(codexEnabled: false, claudeEnabled: true, claudeCLIEnabled: false)
+        let url = fixture.directory.appendingPathComponent("claude-state/.claude.json")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let formatter = ISO8601DateFormatter()
+        func writeCache(expired: Bool) throws {
+            let reset = formatter.string(from: referenceDate.addingTimeInterval(expired ? -1 : 3_600))
+            let bytes = try JSONSerialization.data(withJSONObject: ["cachedUsageUtilization": [
+                "accountUuid": "00000000-0000-4000-8000-000000000001",
+                "fetchedAtMs": Int(referenceDate.addingTimeInterval(expired ? -30_000 : 0).timeIntervalSince1970 * 1_000),
+                "utilization": ["five_hour": ["utilization": 24.5, "resets_at": reset],
+                                "seven_day": ["utilization": 61.2, "resets_at": reset]]
+            ]])
+            try bytes.write(to: url, options: .atomic)
+        }
+        try writeCache(expired: true)
+        let cacheBefore = try Data(contentsOf: url)
+        fixture.preferences.language = .english
+        fixture.preferences.floatingProvider = .claude
+        var notifications = NotificationPreferences()
+        notifications.isEnabled = true
+        fixture.preferences.claudeNotifications = notifications
+        fixture.store.start()
+        let history = try XCTUnwrap(fixture.store.providerHistoricalReport(for: .claude))
+        XCTAssertEqual(history.windows.map(\.usedPercentage), [24.5, 61.2])
+        XCTAssertNil(fixture.store.providerHistoricalReport(for: .codex))
+        XCTAssertNil(fixture.store.providerSnapshot(for: .claude))
+        XCTAssertNil(fixture.store.providerMenuBarQuota(for: .claude))
+        XCTAssertNil(fixture.store.providerDualWindowBucket(for: .claude))
+        XCTAssertTrue(fixture.store.providerActiveQuotas(for: .claude).isEmpty)
+        XCTAssertNil(fixture.store.floatingBucket)
+        XCTAssertEqual(fixture.store.menuBarQuotaOptions(for: .claude).map(\.selection), [.automatic])
+
+        let item = NSStatusBar.system.statusItem(withLength: 58)
+        defer { NSStatusBar.system.removeStatusItem(item) }
+        var imageInputs: [MenuBarStatusImageInput] = []
+        let renderer = MenuBarStatusRenderer(store: fixture.store, statusItem: item, provider: .claude) { input in
+            imageInputs.append(input)
+            return NSImage(size: input.contentSize)
+        }
+        defer { renderer.shutdown() }
+        renderer.update(now: referenceDate)
+        XCTAssertNil(imageInputs.last?.remainingPercent, "Historical percentages cannot enter the native image input")
+        XCTAssertNil(imageInputs.last?.dualWindowBucket)
+        let tooltip = try XCTUnwrap(item.button?.toolTip)
+        XCTAssertEqual(tooltip, item.button?.accessibilityLabel())
+        XCTAssertTrue(tooltip.contains("Current quota unknown"))
+        XCTAssertTrue(tooltip.contains("Last remaining 75.5%"))
+        XCTAssertTrue(tooltip.contains("used 24.5%"))
+        XCTAssertTrue(tooltip.contains("8 hours ago"))
+        XCTAssertEqual(try Data(contentsOf: url), cacheBefore)
+        XCTAssertEqual(fixture.preferences.claudeMenuBarQuotaSelection, .automatic)
+        await Task.yield()
+        let before = await fixture.claude.requestCount()
+        XCTAssertEqual(before, 0)
+        XCTAssertEqual(fixture.codex.requestCount, 0)
+        XCTAssertEqual(fixture.claudeNotifications.deliveries, 0)
+
+        try writeCache(expired: false)
+        fixture.store.refreshProvider(.claude)
+        renderer.update(now: referenceDate)
+        XCTAssertNotNil(fixture.store.providerSnapshot(for: .claude))
+        XCTAssertNil(fixture.store.providerHistoricalReport(for: .claude))
+        XCTAssertNotNil(imageInputs.last?.remainingPercent)
+        XCTAssertFalse(try XCTUnwrap(item.button?.toolTip).contains("Last remaining"))
+        fixture.store.setMonitoringEnabled(false, for: .claude)
+        XCTAssertNil(fixture.store.providerHistoricalReport(for: .claude))
+        let after = await fixture.claude.requestCount()
+        XCTAssertEqual(after, 0)
+        XCTAssertEqual(fixture.claudeNotifications.deliveries, 0)
+    }
+
     func testAppStoreCLIUsageSwitchRequiresOptInAndDoesNotDisableStatuslineMonitoring() async throws {
         let fixture = try makeFixture(codexEnabled: false, claudeEnabled: true, claudeCLIEnabled: false)
         fixture.store.start()
@@ -235,6 +308,7 @@ final class MultiProviderStoreTests: XCTestCase {
         let retry: MultiProviderSleep
         let background: MultiProviderSleep
         let notifications: MultiProviderNotificationService
+        let claudeNotifications: MultiProviderNotificationService
     }
 
     private func makeFixture(
@@ -269,6 +343,7 @@ final class MultiProviderStoreTests: XCTestCase {
         let background = MultiProviderSleep()
         let claudeSleep = MultiProviderSleep()
         let notifications = MultiProviderNotificationService()
+        let claudeNotifications = MultiProviderNotificationService()
         let claudeCache = ClaudeStatuslineCache(fileURL: directory.appendingPathComponent("claude-quota.json"))
         let installer = ClaudeStatuslineInstaller(
             settingsURL: directory.appendingPathComponent("synthetic-settings.json"), cache: claudeCache,
@@ -278,7 +353,7 @@ final class MultiProviderStoreTests: XCTestCase {
         let claudeStore = ClaudeQuotaStore(
             preferences: preferences, cache: claudeCache, installer: installer,
             localCache: ClaudeLocalUsageCacheReader(fileURL: directory.appendingPathComponent("claude-state/.claude.json")),
-            fetcherFactory: { claude }, notificationController: NotificationController(service: MultiProviderNotificationService()),
+            fetcherFactory: { claude }, notificationController: NotificationController(service: claudeNotifications),
             now: { now }, sleep: { try await claudeSleep.sleep($0) }
         )
         let usage = TokenUsageStore(
@@ -308,7 +383,8 @@ final class MultiProviderStoreTests: XCTestCase {
             try? FileManager.default.removeItem(at: directory)
         }
         return Fixture(directory: directory, cacheURL: cacheURL, preferences: preferences, store: store,
-                       codex: codex, claude: claude, retry: retry, background: background, notifications: notifications)
+                       codex: codex, claude: claude, retry: retry, background: background,
+                       notifications: notifications, claudeNotifications: claudeNotifications)
     }
 
     private func waitFor(_ message: String, _ condition: @MainActor () async -> Bool) async throws {
