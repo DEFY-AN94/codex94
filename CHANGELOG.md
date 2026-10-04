@@ -2,11 +2,11 @@
 
 All notable changes to Codex94 are documented here.
 
-## Unreleased
+## 4.1.0 - 2026-10-04 (candidate, not yet published)
 
-Version `4.1.0 (24)` is the current candidate; no publication date is assigned.
-It carries forward the unpublished `4.0.2 (23)` candidate below. The published
-stable release remains `4.0.1 (22)`.
+Version `4.1.0 (24)`. Release dates use Australia/Melbourne. It carries forward
+the unpublished `4.0.2 (23)` candidate below. The published stable release
+remains `4.0.1 (22)` until this version's Release is published.
 
 Claude monitoring now reads Claude Code's own local usage cache first. Codex
 behavior is unchanged.
@@ -89,9 +89,11 @@ corrected afterwards (an exact-text assertion predating the cached-data
 prefix, a fixture whose scoped Fable limit was the tightest window and
 relabelled the native item, a new screenshot name missing from the artifact
 allowlist, then a fixture-policy check that still required the CLI opt-in
-to stay on while the smoke itself toggles it), so its rerun, candidate
-acceptance, tag, the CI DMG and publication are pending; see
-[docs/RELEASING.md](docs/RELEASING.md).
+to stay on while the smoke itself toggles it); the final PR head `f7b197f`
+passed every check in [CI 37192101006](https://github.com/DEFY-AN94/codex94/actions/runs/37192101006)
+and [PR #46](https://github.com/DEFY-AN94/codex94/pull/46) was squash-merged as
+`d0ff9bd`. Candidate acceptance, tag, the CI DMG and publication are pending;
+see [docs/RELEASING.md](docs/RELEASING.md).
 
 ### 4.0.2 (23) - unpublished candidate carried into 4.1.0
 
