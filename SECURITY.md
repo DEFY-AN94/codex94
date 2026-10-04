@@ -224,9 +224,15 @@ described above. It adds no quota API, credential access, preference key,
 cache file, entitlement or installer step. The App target and the UI test bundle build locally on Xcode 27.0, and the
 hosted unit suite passed there: 544 tests executed, 1 existing hosted-focus
 skip, 0 failures. The metadata, installer and security-scanner script
-self-tests also passed locally.
-`script/release_check.sh` (which needs ripgrep installed locally), CI on
-Xcode 16.4, candidate acceptance, tag, DMG and publication are pending.
+self-tests also passed locally, and `script/release_check.sh` passed
+locally on Xcode 27.0 for `4.1.0 (24)`: it verified the Universal App and an
+unsigned DMG candidate (SHA-256
+`9be68277c0f6db6d820da06e3da0b9f8bb29dba7bb99a999d0eeefe9facb9fd0`; a local
+artifact, not the release asset). On CI (Xcode 16.4) the `test` job and the
+display, floating, recovery and usage UI smokes passed for the first PR head;
+the providers smoke failed on an exact-text assertion that predates the
+cached-data prefix and was corrected afterwards, so its rerun, candidate
+acceptance, tag, the CI DMG and publication are pending.
 
 The unpublished `4.0.2 (23)` candidate, carried into 4.1.0, repairs a
 notification callback actor boundary and changes presentation. It adds no

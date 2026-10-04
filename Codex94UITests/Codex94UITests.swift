@@ -486,11 +486,19 @@ final class Codex94UITests: XCTestCase {
         let claudeBeforeFailure = try fixture.claudeUsageRequestCount()
         try fixture.setClaudeMode("error")
         try uniqueIdentified("claude-refresh", in: popover).click()
+        // 4.1.0: a rejected CLI login drops the CLI report. The months-old local
+        // cache from the fixture stays visible as cached data, and the card names
+        // the sign-in failure as the reason ("Cached data · Sign in to ...").
         try waitUntil("The synthetic Claude login failure did not reach its own card", timeout: 30) {
             let issue = self.identified("claude-issue", in: popover)
             return issue.exists && [issue.label, issue.title, issue.value as? String ?? ""]
-                .contains("Sign in to Claude Code, then refresh here.")
+                .contains { $0.contains("Sign in to Claude Code, then refresh here.") }
         }
+        try require(identified("claude-quota-fiveHour", in: popover).exists
+                    && identified("claude-quota-weekly", in: popover).exists,
+                    "A failed CLI read must not hide the cached local usage windows")
+        try assertProviderMetric("claude-quota-fiveHour", percent: "60%", in: popover)
+        try assertProviderMetric("claude-quota-weekly", percent: "75%", in: popover)
         XCTAssertEqual(try fixture.claudeUsageRequestCount(), claudeBeforeFailure + 1)
         XCTAssertEqual(try fixture.requestCount(), codexBeforeFailure)
         XCTAssertEqual(try fixture.cacheFingerprint(), cacheBeforeFailure)
