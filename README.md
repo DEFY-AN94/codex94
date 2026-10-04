@@ -21,8 +21,8 @@ The read-only **Manual quota resets** display shows the available reset count in
 the popover and Overview without redeeming a reset.
 
 Codex94 is an MIT-licensed source project. Codex monitoring uses the locally
-installed Codex CLI; Claude defaults to reading existing local status-line
-reports. No third-party runtime frameworks are bundled.
+installed Codex CLI; Claude defaults to reading Claude Code's local usage cache,
+with eligible statusline reports as a backup. No third-party runtime frameworks are bundled.
 
 **Vibe-built with Codex.** Each release is still maintainer-reviewed, tested,
 and security-scanned before it is tagged.
@@ -31,12 +31,25 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
+## 4.1.1 maintenance candidate (unreleased)
+
+`4.1.1 (25)` improves Claude cache recovery, account-context isolation and local
+read safety. It filters unusable reports before source selection, rechecks
+future timestamps when time catches up, and reduces repeated parsing and
+unchanged UI publications. The UI distinguishes local re-reading from Claude
+Code fetching new data and shows which quota Auto selected. Scheduled CLI
+reading stays optional and default-off; the independent one-time action keeps
+its quota-consumption warning. OAuth remains paused.
+
+Validation is in progress. Stable downloads still point to 4.1.0; see the
+[release workflow](docs/RELEASING.md) for evidence tied to the final revision.
+
 ## Version 4.1.0
 
 `4.1.0 (24)` is the published stable release, dated **2026-10-05**
 (Australia/Melbourne). The `4.0.2 (23)` candidate (the notification-callback
 fix, large separate service cards, compact dual rings and the statusline-scope
-explanation) was merge-ready but never tagged or published; 4.1.0 carries
+explanation) was merged through PR #43 but never tagged or published; 4.1.0 carries
 those changes forward unchanged.
 
 4.1.0 changes the Claude side only. Codex behavior is unchanged.
@@ -56,13 +69,14 @@ those changes forward unchanged.
   last option; it is no longer mutually exclusive with the passive sources, its
   result simply joins the selection, and disabling it discards only CLI data.
   The newest valid report wins and the cache wins ties. Percentages from
-  different sources are never averaged or merged. Tiers of the same account
-  share one notification baseline; only a different login, a different
-  status-line producer or a rejected CLI login resets it.
+  different sources are never averaged or merged. Eligible reports share a
+  notification baseline within the observed context; cross-source account
+  identity is not proven. The 4.1.1 candidate also resets that baseline on
+  context loss and suppresses notifications from older fallback observations.
 - **Read once with the CLI.** Dashboard → **Services** gains a button that runs
   the official CLI exactly once regardless of the CLI switch, with the same
-  warning. Claude Code then refreshes its own cache, which the primary source
-  picks up.
+  warning. If Claude Code writes an updated cache, the primary source reads
+  it on a later poll. Codex94 does not write or force-refresh that file.
 - **Per-model weekly limits.** Model-scoped weekly limits from the cache (for
   example a Fable weekly limit) appear as extra Claude quota buckets: listed
   under **Per-model weekly limits** on the card, selectable in the menu-bar
@@ -86,12 +100,13 @@ those changes forward unchanged.
 **Privacy boundary.** `~/.claude.json` also contains the account email,
 organization, project paths and MCP settings. Codex94 opens it read-only with
 `O_NOFOLLOW`, refuses symlinks, hard-linked files, foreign owners, non-regular
-files and files over 16 MiB, parses only `cachedUsageUtilization`, and discards
-everything else immediately; nothing from the file beyond the quota fields
+files and files over 16 MiB. It decodes the JSON document, interprets only
+`cachedUsageUtilization`, and discards all other decoded fields immediately; nothing from the file beyond the quota fields
 above is retained, logged or exported. The account UUID is compared in memory
 only to detect a different login, which resets the notification baseline, and
 is never persisted. The reader never writes the file and re-parses it only
-when its size, modification time or inode changes. Preference keys are unchanged
+when its size, modification time or inode changes. The 4.1.1 candidate additionally
+revalidates future timestamps and transient reads without requiring a file change. Preference keys are unchanged
 (`claude.cliUsageEnabled.v1` keeps its meaning); no new preference, cache file,
 entitlement, network endpoint or installer step is added.
 

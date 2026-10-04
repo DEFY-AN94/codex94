@@ -121,6 +121,120 @@ final class ClaudeLocalUsageCacheReaderTests: XCTestCase {
         XCTAssertNotEqual(second.stamp, stamp)
     }
 
+    func testFIFOIsRejectedWithoutAWriterByLocalAndSharedReaders() throws {
+        let fifo = directory.appendingPathComponent(".claude.json")
+        XCTAssertEqual(Darwin.mkfifo(fifo.path, 0o600), 0)
+        let reader = ClaudeLocalUsageCacheReader(fileURL: fifo)
+        let date = now
+        let result = LocalReadResultBox()
+        let finished = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .userInitiated).async {
+            let reading = reader.read(now: date)
+            let sharedRejected = (try? ClaudeLocalFile.read(fifo, maximumBytes: 1_024)) == nil
+            result.set(reading: reading, sharedRejected: sharedRejected)
+            finished.signal()
+        }
+        let completion = finished.wait(timeout: .now() + 2)
+        if completion == .timedOut {
+            // A regression must fail rather than hang the test host forever.
+            // Only after the no-writer deadline, open this test's own FIFO at
+            // both ends to release an old blocking open, without supplying data.
+            let rescue = Darwin.open(fifo.path, O_RDWR | O_NONBLOCK | O_CLOEXEC)
+            XCTAssertGreaterThanOrEqual(rescue, 0)
+            if rescue >= 0 {
+                _ = finished.wait(timeout: .now() + 2)
+                Darwin.close(rescue)
+            }
+        }
+        XCTAssertEqual(completion, .success, "An untrusted file type must not wait for a FIFO writer")
+        let value = try XCTUnwrap(result.value)
+        XCTAssertEqual(value.reading.outcome, .unreadable)
+        XCTAssertNil(value.reading.stamp)
+        XCTAssertTrue(value.sharedRejected)
+    }
+
+    func testHardLinksAndSharedReadSizeLimitsRemainRejected() throws {
+        let reader = try writeCache(sample())
+        let alias = directory.appendingPathComponent("hard-link.json")
+        try FileManager.default.linkItem(at: reader.fileURL, to: alias)
+        XCTAssertEqual(reader.read(now: now).outcome, .unreadable)
+        XCTAssertThrowsError(try ClaudeLocalFile.read(reader.fileURL, maximumBytes: 65_536)) {
+            XCTAssertEqual($0 as? ClaudeQuotaIssue, .invalidData)
+        }
+        try FileManager.default.removeItem(at: alias)
+        let bytes = try Data(contentsOf: reader.fileURL)
+        XCTAssertEqual(try ClaudeLocalFile.read(reader.fileURL, maximumBytes: bytes.count), bytes)
+        XCTAssertThrowsError(try ClaudeLocalFile.read(reader.fileURL, maximumBytes: bytes.count - 1)) {
+            XCTAssertEqual($0 as? ClaudeQuotaIssue, .invalidData)
+        }
+        // Readable ordinary permissions remain accepted; shared reads did not
+        // acquire a new 0600-only or owner-only policy as part of this refactor.
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: reader.fileURL.path)
+        XCTAssertEqual(try ClaudeLocalFile.read(reader.fileURL, maximumBytes: bytes.count), bytes)
+        guard case .report = reader.read(now: now).outcome else { return XCTFail("Current-owner regular file remains readable") }
+    }
+
+    func testStampedReadSkipsBytesAndRejectsMutationBeforeReturningAnyStamp() throws {
+        let url = directory.appendingPathComponent("read-race.json")
+        try Data("first".utf8).write(to: url)
+        guard case let .contents(bytes, stamp) = try ClaudeLocalFile.readStamped(url, maximumBytes: 64) else {
+            return XCTFail("Expected a first stable read")
+        }
+        XCTAssertEqual(bytes, Data("first".utf8))
+        var reads = 0
+        let unchanged = try ClaudeLocalFile.readStamped(url, maximumBytes: 64, unchangedSince: stamp) { _, _ in
+            reads += 1
+            XCTFail("An unchanged stamp must skip the byte reader")
+            return Data()
+        }
+        XCTAssertEqual(unchanged, .unchanged(stamp))
+        XCTAssertEqual(reads, 0)
+        XCTAssertThrowsError(try ClaudeLocalFile.readStamped(url, maximumBytes: 64) { handle, limit in
+            reads += 1
+            let oldBytes = try handle.read(upToCount: limit) ?? Data()
+            let writer = try FileHandle(forWritingTo: url)
+            defer { try? writer.close() }
+            try writer.truncate(atOffset: 0)
+            try writer.write(contentsOf: Data("completed rewrite".utf8))
+            return oldBytes
+        }) {
+            XCTAssertEqual($0 as? ClaudeLocalFile.ReadFailure, .changedDuringRead)
+        }
+        XCTAssertEqual(reads, 1, "A changing file is not immediately retried")
+        guard case let .contents(completed, nextStamp) = try ClaudeLocalFile.readStamped(url, maximumBytes: 64) else {
+            return XCTFail("The next ordinary read must accept a completed rewrite")
+        }
+        XCTAssertEqual(completed, Data("completed rewrite".utf8))
+        XCTAssertNotEqual(stamp, nextStamp)
+    }
+
+    func testReadFailureDuringRewriteIsTransientButUnchangedFailureIsUnavailable() throws {
+        let url = directory.appendingPathComponent("failing-read.json")
+        try Data("first".utf8).write(to: url)
+        XCTAssertThrowsError(try ClaudeLocalFile.readStamped(url, maximumBytes: 64) { _, _ in
+            throw CocoaError(.fileReadUnknown)
+        }) { XCTAssertEqual($0 as? ClaudeLocalFile.ReadFailure, .unavailable) }
+        XCTAssertThrowsError(try ClaudeLocalFile.readStamped(url, maximumBytes: 64) { _, _ in
+            let writer = try FileHandle(forWritingTo: url)
+            defer { try? writer.close() }
+            _ = try writer.seekToEnd()
+            try writer.write(contentsOf: Data(" changed".utf8))
+            throw CocoaError(.fileReadUnknown)
+        }) { XCTAssertEqual($0 as? ClaudeLocalFile.ReadFailure, .changedDuringRead) }
+    }
+
+    func testSharedPercentageValidationRetainsFractionAndRejectsBooleanCoercion() {
+        for value in [0.0, 0.001, 23.5, 99.999, 100.0] {
+            XCTAssertEqual(StrictJSONPercentage.value(NSNumber(value: value)), value)
+            XCTAssertEqual(ClaudeLocalUsageCacheReader.percentage(NSNumber(value: value)), value)
+        }
+        let invalid: [Any?] = [nil, NSNull(), true, false, "23.5", -0.01, 100.01, Double.nan, Double.infinity]
+        for value in invalid {
+            XCTAssertNil(StrictJSONPercentage.value(value))
+            XCTAssertNil(ClaudeLocalUsageCacheReader.percentage(value))
+        }
+    }
+
     func testTruncatedJSONIsUnparsableAndOversizedFilesAreUnreadable() throws {
         let truncated = String(sample().prefix(sample().count / 2))
         var reader = try writeCache(truncated)
@@ -268,5 +382,16 @@ final class ClaudeLocalUsageCacheReaderTests: XCTestCase {
           }
         }
         """
+    }
+}
+
+/// The FIFO test records results on its worker without sharing mutable test state.
+private final class LocalReadResultBox: @unchecked Sendable {
+    struct Value: Sendable { let reading: ClaudeLocalUsageCacheReading; let sharedRejected: Bool }
+    private let lock = NSLock()
+    private var stored: Value?
+    var value: Value? { lock.withLock { stored } }
+    func set(reading: ClaudeLocalUsageCacheReading, sharedRejected: Bool) {
+        lock.withLock { stored = Value(reading: reading, sharedRejected: sharedRejected) }
     }
 }

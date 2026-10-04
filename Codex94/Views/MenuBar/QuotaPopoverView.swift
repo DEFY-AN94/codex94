@@ -565,27 +565,61 @@ struct MenuBarQuotaPicker: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Picker("display.label", selection: selectionBinding) {
-                ForEach(store.menuBarQuotaOptions(for: provider)) { option in
-                    Text(verbatim: optionLabel(option))
-                        .help(Text(verbatim: optionLabel(option, abbreviated: false)))
-                        .accessibilityLabel(Text(verbatim: optionLabel(option, abbreviated: false)))
-                        .tag(option.selection)
-                        .disabled(!option.isAvailable)
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 8) {
+                Picker("display.label", selection: selectionBinding) {
+                    ForEach(store.menuBarQuotaOptions(for: provider)) { option in
+                        Text(verbatim: optionLabel(option))
+                            .help(Text(verbatim: optionLabel(option, abbreviated: false)))
+                            .accessibilityLabel(Text(verbatim: optionLabel(option, abbreviated: false)))
+                            .tag(option.selection)
+                            .disabled(!option.isAvailable)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .accessibilityIdentifier(provider == .codex ? "menu-bar-quota-picker" : "claude-menu-bar-quota-picker")
+
+                if selection != .automatic && snapshot?.resolved(selection) == nil {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .help("display.selectionUnavailable")
+                        .accessibilityLabel(Text("display.selectionUnavailable"))
                 }
             }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .accessibilityIdentifier(provider == .codex ? "menu-bar-quota-picker" : "claude-menu-bar-quota-picker")
-
-            if selection != .automatic && snapshot?.resolved(selection) == nil {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .help("display.selectionUnavailable")
-                    .accessibilityLabel(Text("display.selectionUnavailable"))
+            if let text = automaticSelectionText() {
+                let fullText = automaticSelectionText(abbreviated: false) ?? text
+                Text(verbatim: text)
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .help(Text(verbatim: fullText))
+                    .accessibilityLabel(Text(verbatim: fullText))
+                    .accessibilityIdentifier("claude-auto-quota-selection")
             }
         }
+    }
+
+    /// Describes the existing resolved selection; it never resolves a different
+    /// algorithm or starts a read. Saved manual choices already name the window.
+    func automaticSelectionText(abbreviated: Bool = true) -> String? {
+        guard provider == .claude, store.preferences.claudeMonitoringEnabled,
+              selection == .automatic else { return nil }
+        let language = store.preferences.language
+        func localized(_ key: String, arguments: [CVarArg] = []) -> String {
+            StatusAccessibilityString.localized(key, arguments: arguments, language: language, bundle: .main)
+        }
+        guard let snapshot, let resolved = store.providerMenuBarQuota(for: provider) else {
+            return localized("claude.autoSelection.unavailable")
+        }
+        let fullName = snapshot.displayName(for: resolved.bucket)
+        let name = abbreviated
+            ? QuotaFormatting.bucketMenuNames(in: snapshot, limit: 24)[resolved.bucket.limitID] ?? fullName
+            : fullName
+        let serviceAndBucket = fullName == provider.displayName ? provider.displayName
+            : provider.displayName + " · " + name
+        let window = localized(resolved.window.kind == .fiveHour ? "quota.fiveHourShort" : "quota.weeklyShort")
+        return localized("claude.autoSelection %@", arguments: [serviceAndBucket + " · " + window])
     }
 
     func optionLabel(_ option: MenuBarQuotaOption, abbreviated: Bool = true) -> String {

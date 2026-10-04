@@ -1,5 +1,4 @@
 import CoreFoundation
-import Darwin
 import Foundation
 
 enum ClaudeLocalUsageCacheState: String, Equatable, Sendable {
@@ -17,20 +16,15 @@ enum ClaudeLocalUsageCacheState: String, Equatable, Sendable {
 }
 
 /// Identity of the bytes that were last parsed. A matching stamp skips parsing.
-struct ClaudeLocalUsageCacheStamp: Equatable, Sendable {
-    let device: Int64
-    let inode: UInt64
-    let size: Int64
-    let modifiedSeconds: Int64
-    let modifiedNanoseconds: Int64
-}
+typealias ClaudeLocalUsageCacheStamp = ClaudeLocalFile.ReadStamp
 
 struct ClaudeLocalUsageCacheReading: Equatable, Sendable {
     enum Outcome: Equatable, Sendable {
         case absent
         case unreadable
-        /// The bytes are not a JSON document: a rewrite in progress or a corrupt
-        /// file. The previous report may still describe the completed file.
+        /// The bytes are not a JSON document, or changed during the read. The
+        /// previous report may still describe the completed file. A nil stamp
+        /// requests a fresh read on the next ordinary poll, without a busy loop.
         case unparsable
         /// A JSON document without a usable `cachedUsageUtilization`, for example
         /// after `/logout` or a layout change. No previous report applies.
@@ -83,29 +77,21 @@ struct ClaudeLocalUsageCacheReader: Sendable {
     }
 
     func read(now: Date, unchangedSince previous: ClaudeLocalUsageCacheStamp? = nil) -> ClaudeLocalUsageCacheReading {
-        guard (try? ClaudeLocalFile.requireNoSymlinks(fileURL)) != nil else {
+        let data: Data
+        let stamp: ClaudeLocalUsageCacheStamp
+        do {
+            switch try ClaudeLocalFile.readStamped(
+                fileURL, maximumBytes: Self.maximumBytes, requireCurrentOwner: true, unchangedSince: previous
+            ) {
+            case let .unchanged(value): return ClaudeLocalUsageCacheReading(outcome: .unchanged, stamp: value)
+            case let .contents(bytes, value): data = bytes; stamp = value
+            }
+        } catch ClaudeLocalFile.ReadFailure.absent {
+            return ClaudeLocalUsageCacheReading(outcome: .absent, stamp: nil)
+        } catch ClaudeLocalFile.ReadFailure.changedDuringRead {
+            return ClaudeLocalUsageCacheReading(outcome: .unparsable, stamp: nil)
+        } catch {
             return ClaudeLocalUsageCacheReading(outcome: .unreadable, stamp: nil)
-        }
-        let descriptor = Darwin.open(fileURL.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
-        guard descriptor >= 0 else {
-            return ClaudeLocalUsageCacheReading(outcome: errno == ENOENT ? .absent : .unreadable, stamp: nil)
-        }
-        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-        var info = stat()
-        guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
-              info.st_uid == getuid(), info.st_nlink == 1,
-              info.st_size >= 0, info.st_size <= Self.maximumBytes else {
-            return ClaudeLocalUsageCacheReading(outcome: .unreadable, stamp: nil)
-        }
-        let stamp = ClaudeLocalUsageCacheStamp(
-            device: Int64(info.st_dev), inode: UInt64(info.st_ino), size: Int64(info.st_size),
-            modifiedSeconds: Int64(info.st_mtimespec.tv_sec), modifiedNanoseconds: Int64(info.st_mtimespec.tv_nsec)
-        )
-        if let previous, previous == stamp {
-            return ClaudeLocalUsageCacheReading(outcome: .unchanged, stamp: stamp)
-        }
-        guard let data = try? handle.read(upToCount: Self.maximumBytes + 1), data.count <= Self.maximumBytes else {
-            return ClaudeLocalUsageCacheReading(outcome: .unreadable, stamp: stamp)
         }
         // Bytes that do not decode are a rewrite in progress or a corrupt file;
         // the store keeps its previous report as a candidate until the completed
@@ -187,9 +173,7 @@ struct ClaudeLocalUsageCacheReader: Sendable {
     }
 
     static func percentage(_ value: Any?) -> Double? {
-        guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
-              number.doubleValue.isFinite, (0...100).contains(number.doubleValue) else { return nil }
-        return number.doubleValue
+        StrictJSONPercentage.value(value)
     }
 
     static func epochMilliseconds(_ value: Any?) -> Date? {

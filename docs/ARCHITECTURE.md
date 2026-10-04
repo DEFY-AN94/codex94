@@ -7,9 +7,40 @@ published on 2026-10-05 (Australia/Melbourne), including the unpublished
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.1.0: local usage cache as the primary Claude source
+## 4.1.1 maintenance candidate
 
-Version `4.1.0 (24)` is the stable release. It changes only the
+`4.1.1 (25)` keeps the existing sources and polling frequency. The store
+isolates an observed cache account context from previously accepted backup
+reports and in-flight CLI results. Missing, unsafe or decoded-invalid cache
+state after a known account retires that context; a torn JSON write is transient.
+A statusline fingerprint identifies a stream, not an authenticated account.
+After context loss it needs explicit reconfirmation before it can be selected.
+Each pending confirmation has an in-memory UUID captured by the dialog and
+checked by the store; an old dialog cannot adopt a replacement report.
+The first accepted report establishes a new notification baseline; falling
+back to an older observation does not emit fresh recovery notifications.
+
+Eligible reports must yield a usable snapshot at the reference time before
+newest-report selection. A selected report remains whole and keeps its original
+timestamp. The existing shared-window requirement for model limits is unchanged.
+
+The file helper opens with `O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC` before checking
+for a regular, bounded, single-link file. The local usage reader additionally
+requires the current owner; existing statusline ownership semantics are retained.
+A pre/post-read stamp mismatch is transient and is retried by the next existing
+poll. The local reader normally skips unchanged bytes; a rejected future
+`fetchedAtMs` has a bounded revalidation point and relevant clock/wake recovery.
+
+`StrictJSONPercentage` centralizes finite, non-Boolean values in 0...100.
+Statusline capture decodes windows and producer information from one JSON parse.
+Projection still recomputes freshness/expiry every poll but publishes only
+changed values. UI Auto captions use the existing quota resolver and do not
+start a request. Validation of this candidate is recorded separately in
+[RELEASING.md](RELEASING.md).
+
+## Local usage cache as the primary Claude source (introduced in 4.1.0)
+
+Version `4.1.0 (24)` introduced this source. It changed only the
 Claude side; Codex ownership, preferences and cache v2 are unchanged.
 
 ### Source tiers
@@ -30,30 +61,33 @@ the poll schedule and the notification baseline; it never merges slots.
    `claude.cliUsageEnabled.v1` and keeps its quota-consumption warning. When
    enabled it runs on the existing refresh interval and its result participates
    in selection; disabling it discards only CLI data. `readOnceWithCLI()` runs
-   the official CLI exactly once regardless of the switch, using a one-shot
-   client that retires afterwards. Claude Code then refreshes its own cache,
-   which the primary tier picks up on the next poll.
+   the official CLI exactly once regardless of the switch. With the switch off,
+   its one-shot client retires afterwards; when on, it reuses the regular client.
+   If Claude Code writes an updated cache, the primary tier reads it on a later
+   poll; Codex94 never writes or force-refreshes that file.
 
 This replaces 4.0.1's rule that CLI mode never loads passive reports. That rule
 isolated two mutually exclusive modes whose data could not be compared; 4.1.0
 treats the same sources as tiers of one selection with comparable observation
 times. Explicit mode switches no longer clear the other source's data. Instead
 `ClaudeQuotaFreshnessPolicy.select` decides what is shown. The notification
-baseline is kept across tier switches because every tier describes the same
-account's windows; only an identity change resets it (a different cache
-account, a different status-line producer, or a rejected CLI login). An
+baseline is kept across eligible tier switches with forward observation time.
+An observed cache identity change or loss, a different statusline producer, or
+a rejected CLI login resets it. Cross-source account identity is not proven. An
 automatic CLI failure is projected while CLI data is shown or while the shown
-passive report is out of date; a one-time read never drives the card.
+passive report is out of date. A one-time failure is shown beside its button
+only; a successful one-time report participates in normal quota selection.
 
 ### `ClaudeLocalUsageCacheReader` ownership
 
 The reader owns the file location, the safe-open rules and the parse. The file
 is `~/.claude.json`, or `$CLAUDE_CONFIG_DIR/.claude.json` when that variable is
 set in Codex94's own environment, mirroring Claude Code. It opens read-only
-with `O_NOFOLLOW`, refuses symlinks anywhere in the path, foreign owners,
+with `O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC`, refuses symlinks anywhere in the path, foreign owners,
 non-regular or hard-linked files and anything over 16 MiB, and never writes.
 It records a size/mtime/inode stamp and returns `.unchanged` without parsing
-when the stamp matches.
+when the stamp matches, except when a transient read or rejected future timestamp
+needs revalidation.
 
 From the usage key it keeps `fetchedAtMs` as the report time (when Claude Code
 fetched usage, not when Codex94 read the file), `five_hour`/`seven_day`
@@ -82,7 +116,8 @@ line; no path accompanies it.
 The policy is pure. The store owns slots and schedule; the policy decides which
 report is shown and whether it still counts as current.
 
-- `select(localCache:statusline:cli:)` starts with the cache and lets a backup
+- `select(localCache:statusline:cli:at:)` rejects candidates without a usable
+  snapshot, starts with the cache and lets a backup
   replace it only when its `reportedAt` is strictly newer; equal times keep the
   primary. Exactly one report is shown, so percentages from different sources
   are never averaged or merged.
@@ -123,7 +158,7 @@ Codex94 reads only files the official client leaves on the Mac because
 (2026-02-20) restricts OAuth tokens to Claude Code and native Anthropic apps
 and forbids third parties from collecting, storing or intermediating Claude.ai
 credentials or session tokens. The paused OAuth work lives in draft PR #44 and
-is not part of 4.1.0. Validation of these boundaries is pending; see
+is not part of 4.1.0. Validation records for each revision are separate; see
 [RELEASING.md](RELEASING.md).
 
 ## 4.0.2 candidate (carried into 4.1.0): callback safety and compact presentation

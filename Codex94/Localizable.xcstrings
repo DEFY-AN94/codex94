@@ -1,6 +1,91 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "claude.autoSelection.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto → Waiting for quota"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动 → 等待额度"
+          }
+        }
+      }
+    },
+    "claude.autoSelection %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto → %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动 → %@"
+          }
+        }
+      }
+    },
+    "claude.localCacheTime.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is when Claude Code fetched the data, not when Codex94 reread the local file."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这是 Claude Code 获取数据的时间，不是 Codex94 重读本地文件的时间。"
+          }
+        }
+      }
+    },
+    "claude.cliUsage.regularRefresh.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regular refresh is allowed to start Claude Code. It may consume Tokens and five-hour or weekly subscription quota."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已允许常规刷新启动 Claude Code，可能消耗 Token 和五小时、每周订阅额度。"
+          }
+        }
+      }
+    },
+    "claude.passive.reread.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rereads local quota files without fetching cloud usage. If there is no new report, the report time stays unchanged."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只重读本地额度文件，不查询云端用量；没有新报告时，报告时间保持不变。"
+          }
+        }
+      }
+    },
     "claude.cliUsage.readOnce.noData": {
       "extractionState": "manual",
       "localizations": {
@@ -279,13 +364,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Read once with the CLI"
+            "value": "Start Claude Code for one query"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用 CLI 刷新一次"
+            "value": "启动 Claude Code 读取一次"
           }
         }
       }
@@ -296,13 +381,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Runs the official Claude Code once regardless of the switch above. Claude Code also refreshes its own usage cache afterwards."
+            "value": "This explicit action starts Claude Code once even when regular CLI queries are disabled. It does not enable regular queries and may consume Tokens and five-hour or weekly subscription quota."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无论上方开关如何，只运行一次官方 Claude Code；读取后 Claude Code 也会刷新自己的用量缓存。"
+            "value": "即使常规 CLI 查询关闭，此操作仍会启动一次 Claude Code，不会开启常规查询；可能消耗 Token 和五小时、每周订阅额度。"
           }
         }
       }
@@ -721,13 +806,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enable CLI /usage reading"
+            "value": "Allow CLI queries during regular refresh"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "启用 CLI /usage 读取"
+            "value": "允许常规刷新使用 CLI"
           }
         }
       }
@@ -738,13 +823,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Off by default. When on, Claude Code is launched on the refresh interval as the last source after the local cache and status-line reports. When off, refreshes only reread local data and never launch Claude Code."
+            "value": "Off by default. When enabled, scheduled and regular refreshes can start Claude Code. When disabled, these refreshes only reread local files. The one-time button below is separate."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "默认关闭。开启后按刷新间隔启动 Claude Code，作为本地缓存和状态栏报告之后的最后一层来源；关闭时刷新只重读本地数据，不会启动 Claude Code。"
+            "value": "默认关闭。开启后，定时和常规刷新可启动 Claude Code；关闭后，这些刷新只重读本地文件。下方单次按钮独立生效。"
           }
         }
       }

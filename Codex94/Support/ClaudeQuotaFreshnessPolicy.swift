@@ -38,14 +38,17 @@ enum ClaudeQuotaFreshnessPolicy {
     /// The local cache is the primary report. A backup replaces it only when
     /// strictly newer; equal observation times keep the primary. Exactly one
     /// report is ever shown, so percentages from different sources never mix.
+    /// Passing a date excludes fully expired reports. Omitting it is only for
+    /// retaining source/time diagnostics when no usable report remains.
     static func select(
         localCache: ClaudeQuotaReport?,
         statusline: ClaudeQuotaReport?,
-        cli: ClaudeQuotaReport?
+        cli: ClaudeQuotaReport?,
+        at now: Date? = nil
     ) -> ClaudeQuotaReport? {
-        var chosen = localCache
-        for candidate in [statusline, cli] {
-            guard let candidate else { continue }
+        var chosen: ClaudeQuotaReport?
+        for candidate in [localCache, statusline, cli] {
+            guard let candidate, now.map({ candidate.snapshot(at: $0) != nil }) ?? true else { continue }
             if let current = chosen, candidate.reportedAt <= current.reportedAt { continue }
             chosen = candidate
         }
