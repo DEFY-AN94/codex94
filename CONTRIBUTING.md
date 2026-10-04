@@ -109,9 +109,8 @@ before reporting these features as verified. See [architecture rules](docs/ARCHI
 
 ### Version 4.1.0 behavior
 
-Version `4.1.0 (24)` is an unreleased candidate on
-`claude/4.1.0-local-usage-cache`; the published stable release remains
-`4.0.1 (22)`. The App target and the UI test bundle build locally on Xcode 27.0, and the
+Version `4.1.0 (24)` is the published stable release (2026-10-05,
+Australia/Melbourne); `4.0.1 (22)` is the previous release. The App target and the UI test bundle build locally on Xcode 27.0, and the
 hosted unit suite passed there: 544 tests executed, 1 existing hosted-focus
 skip, 0 failures. The metadata, installer and security-scanner script
 self-tests also passed locally, and `script/release_check.sh` passed
@@ -125,10 +124,10 @@ corrected afterwards (an exact-text assertion predating the cached-data
 prefix, a fixture whose scoped Fable limit was the tightest window and
 relabelled the native item, a new screenshot name missing from the artifact
 allowlist, then a fixture-policy check that still required the CLI opt-in
-to stay on while the smoke itself toggles it), so its rerun, candidate
-acceptance, tag, the CI DMG and publication are pending and must be reported as such. The unpublished
-`4.0.2 (23)` candidate is carried into 4.1.0; keep its changelog entry under
-Unreleased, annotated as unpublished, rather than deleting it.
+to stay on while the smoke itself toggles it); the release commit passed every
+check on final main and the release record lives in [docs/RELEASING.md](docs/RELEASING.md). The unpublished
+`4.0.2 (23)` candidate is carried into 4.1.0; its changelog entry stays nested
+under 4.1.0, annotated as unpublished, rather than being deleted.
 
 Claude has three sources in a fixed order, and Codex behavior is unchanged.
 Claude Code's own local usage cache is primary, the status-line connection

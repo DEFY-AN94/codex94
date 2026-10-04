@@ -2,8 +2,8 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
-released on 2026-10-03 (Australia/Melbourne). It includes the user-triggered
+stable version is [`v4.1.0 (24)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0),
+released on 2026-10-05 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
 The unpublished `4.0.2 (23)` candidate, carried forward into 4.1.0, changes
@@ -15,11 +15,10 @@ browser only when clicked. Codex94 does not inspect that page, its cookies or
 login state. Browser navigation is separate from Codex94's quota reader and
 is not telemetry uploaded by this project.
 
-## 4.1.0 candidate
+## 4.1.0: Claude Code's local usage cache
 
-The unreleased `4.1.0 (24)` candidate has no publication date; the published
-stable version remains `4.0.1 (22)`. Its changes are Claude-side only, and
-Codex quota behavior is unchanged. Codex94 gains a read-only primary Claude
+Version `4.1.0 (24)` was published on 2026-10-05 (Australia/Melbourne). Its
+changes are Claude-side only, and Codex quota behavior is unchanged. Codex94 gains a read-only primary Claude
 source: the plan-usage cache that Claude Code itself writes into its global
 state file after fetching `/usage`, described in the next section. The existing
 status-line connection (the statusline bridge) becomes the backup source and

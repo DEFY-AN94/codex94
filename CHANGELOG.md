@@ -2,11 +2,11 @@
 
 All notable changes to Codex94 are documented here.
 
-## 4.1.0 - 2026-10-05 (candidate, not yet published)
+## 4.1.0 - 2026-10-05
 
-Version `4.1.0 (24)`. Release dates use Australia/Melbourne. It carries forward
-the unpublished `4.0.2 (23)` candidate below. The published stable release
-remains `4.0.1 (22)` until this version's Release is published.
+Version `4.1.0 (24)` is the published stable release. Release dates use
+Australia/Melbourne. It carries forward the unpublished `4.0.2 (23)` candidate
+below; `4.0.1 (22)` is the previous release.
 
 Claude monitoring now reads Claude Code's own local usage cache first. Codex
 behavior is unchanged.
@@ -92,8 +92,13 @@ allowlist, then a fixture-policy check that still required the CLI opt-in
 to stay on while the smoke itself toggles it); the final PR head `f7b197f`
 passed every check in [CI 37192101006](https://github.com/DEFY-AN94/codex94/actions/runs/37192101006)
 and [PR #46](https://github.com/DEFY-AN94/codex94/pull/46) was squash-merged as
-`d0ff9bd`. Candidate acceptance, tag, the CI DMG and publication are pending;
-see [docs/RELEASING.md](docs/RELEASING.md).
+`d0ff9bd`. The release commit `5931618` passed the final-main CI run
+37213593738 (test, five UI smokes and DMG attestation; the display smoke on its
+second attempt after a job-timeout cancellation) and CodeQL run 37213593623.
+The annotated `v4.1.0` tag, the two-asset Release (DMG SHA-256
+`658e00bf5fc24239cbe4fe2a8e71a08614ff8ceac29a9e15f8eae7f0e2a669fc`) and its
+publication as Latest on 2026-10-05 are recorded in
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ### 4.0.2 (23) - unpublished candidate carried into 4.1.0
 

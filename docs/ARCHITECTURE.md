@@ -1,16 +1,15 @@
 # Component ownership and reuse
 
-This describes ownership and reuse constraints, including the unreleased
-`4.1.0 (24)` candidate below and the unpublished `4.0.2 (23)` candidate it
-carries forward. The published stable version remains the
-[`4.0.1 (22)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
-published on 2026-10-03 (Australia/Melbourne).
+This describes ownership and reuse constraints for the published
+[`4.1.0 (24)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0),
+published on 2026-10-05 (Australia/Melbourne), including the unpublished
+`4.0.2 (23)` candidate it carries forward.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
 ## 4.1.0: local usage cache as the primary Claude source
 
-Version `4.1.0 (24)` is the current unreleased candidate. It changes only the
+Version `4.1.0 (24)` is the stable release. It changes only the
 Claude side; Codex ownership, preferences and cache v2 are unchanged.
 
 ### Source tiers
@@ -158,8 +157,8 @@ reader remains a separate default-off option.
 
 ## 4.0.1: independently enabled providers
 
-Version `4.0.1 (22)` is the stable release. The `v4.0.0` tag is retained as an
-unpublished candidate. Passive statusline reports are the
+Version `4.0.1 (22)` was the previous stable release. The `v4.0.0` tag is
+retained as an unpublished candidate. Passive statusline reports are the
 default Claude data source. The earlier optional CLI input-footer compatibility
 fix is retained; it does not make that reader an automatic fallback.
 

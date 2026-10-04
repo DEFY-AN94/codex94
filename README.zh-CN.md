@@ -25,11 +25,11 @@ Claude 默认仅读取已有的本地状态栏报告，不捆绑第三方运行�
 > Codex94 与 OpenAI 或 Anthropic 没有隶属关系，也未获得两者的认可、背书或赞助。
 > Codex `app-server` 是实验性接口；上游更新也可能改变 CLI 和状态栏的数据格式。
 
-## 4.1.0 候选版（尚未发布）
+## 4.1.0 版本
 
-当前开发版本为 **4.1.0 (24)**，分支为 `claude/4.1.0-local-usage-cache`。新版本正式发布
-确认前，下方稳定下载继续指向 4.0.1。`4.0.2 (23)` 候选版（通知回调修复、独立大额度卡片、
-紧凑双圈以及状态栏适用范围说明）已具备合并条件，但从未打标签或发布；4.1.0 原样带入这些改动。
+`4.1.0 (24)` 已于 **2026-10-05**（Australia/Melbourne）正式发布，现为稳定版。`4.0.2 (23)` 候选版
+（通知回调修复、独立大额度卡片、紧凑双圈以及状态栏适用范围说明）已具备合并条件，但从未打标签或发布；
+4.1.0 原样带入这些改动。
 
 4.1.0 只改动 Claude 侧，Codex 行为保持不变。
 
@@ -83,14 +83,15 @@ Claude Code 的 Keychain 条目名、`SecItem`／`SecKeychain` 调用及 OAuth �
 与 display、floating、recovery、usage 四个 UI 烟雾场景通过；providers 场景四次因测试侧原因失败
 并已修正（早于“缓存数据”前缀的精确文本断言；夹具中 Fable 模型限额成为最紧窗口而改变了原生状态项
 的标签；新增截图名未加入产物白名单；夹具策略检查仍要求 CLI 选项全程开启，而该场景本身会切换它），
-其重跑、候选验收、标签、CI 产出的 DMG 和发布均为待完成。
+发布提交随后在最终 main 上通过了全部检查。
 UI 烟雾场景已加入夹具：通过
 `CLAUDE_CONFIG_DIR` 注入合成的 `.claude.json`，并检查关闭 CLI 选项后显示缓存来源且不启动
-CLI；它只有在实际运行后才算证据。下方历史截图与验证结果不代表 4.1.0 已通过验收。
+CLI；它已在发布提交上通过。最终发布验收记录见[发布记录](docs/RELEASING.md)。下方历史截图与
+验证结果早于 4.1.0。
 
-## 4.0.1 版本
+## 早先的 4.0.1 版本
 
-`4.0.1 (22)` 已于 **2026-10-03**（Australia/Melbourne）正式发布，现为稳定版。
+`4.0.1 (22)` 已于 **2026-10-03**（Australia/Melbourne）发布。
 本版保留未公开 4.0.0 候选版的双服务功能；`v4.0.0` 标签原样保留，其 Draft Release
 已移除，下方该候选版的验证结果继续作为历史证据保留。
 
@@ -177,7 +178,7 @@ Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 
 ## 界面截图
 
-所有截图均采用隔离的合成数据，不包含真实账号或实时用量，也不代表 4.1.0 候选版的新布局。
+所有截图均采用隔离的合成数据，不包含真实账号或实时用量，也不代表 4.1.0 的新布局。
 以下**柱状图**与**折线图**采集于 `0.3.0 (14)` 候选测试阶段，使用相同的七天日记录。
 原始合成截图保持不变，
 这些英文界面截图来自
@@ -221,8 +222,8 @@ Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 ## 当前分发状态
 
 - 已发布的稳定版为
-  [`v4.0.1 (22)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1)，
-  于 **2026-10-03**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
+  [`v4.1.0 (24)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0)，
+  于 **2026-10-05**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
   annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
   也不会重新生成已发布的资产。
@@ -236,7 +237,7 @@ Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 - 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
-已发布的 `4.0.1` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+已发布的 `4.1.0` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
 attestation 都不会改变这一 Apple 信任状态。
 
@@ -261,23 +262,23 @@ Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
 
 ## 安装 Universal DMG
 
-请从 [`v4.0.1` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1)
+请从 [`v4.1.0` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.0)
 下载以下两个正式资产：
 
-- `Codex94-4.0.1-macos-universal-unnotarized.dmg`
-- `Codex94-4.0.1-SHA256SUMS.txt`
+- `Codex94-4.1.0-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.0-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-4.0.1-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.0-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-4.0.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.0-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -297,7 +298,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v4.0.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
@@ -459,7 +460,7 @@ Token 统计预览另有独立的来源记录。
 
 ## 安全与隐私
 4.0.1 新增独立、默认关闭的本地 Claude CLI 读取和状态栏额度缓存。预览设置只读；
-安装或移除连接会明确修改 Claude Code 的状态栏设置，并保留恢复材料。4.1.0 候选版
+安装或移除连接会明确修改 Claude Code 的状态栏设置，并保留恢复材料。4.1.0 版本
 另外读取 Claude Code 自己写入的用量缓存（见上文），不新增任何网络路径。
 下图描述的是既有 Codex 数据路径。
 
