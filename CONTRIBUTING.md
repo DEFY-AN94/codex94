@@ -181,9 +181,19 @@ The synthetic terminal accepts only version checks and the fixed `/usage`
 invocation; its log contains only the fixed usage-event/mode schema. The scenario
 does not run a real Claude CLI, install a statusline connection, or operate
 authentication UI. Check exact request counts, independent provider errors,
-single/both native status items, shared popover content, disabled Codex Token
+`single`/`compactBoth`/`both` native status items, shared popover content, disabled Codex Token
 reads and the all-disabled settings entry. Keep these synthetic results separate
 from real CLI compatibility, account acceptance and unattended monitoring.
+
+For the 4.0.2 candidate, use background-thread fake completions for notification
+authorization, permission and delivery; do not test this by changing the user's
+notification settings. Inspect the large Dashboard cards separately from the
+compact popover rows and reset count. Verify that `compactBoth` combines only
+presentation in one item, preserves independent provider states, and does not
+change saved `both` behavior or fetch quota. Verify the official Claude Usage
+Link's fixed destination and that rendering opens no browser and makes no
+additional request. Do not activate the live link, scrape a real Usage page or
+create a Claude session merely to fill the passive display.
 
 The external runner keeps Xcode's test sandbox. Its extra write access is
 limited to the current scenario's synthetic control and artifact directories;

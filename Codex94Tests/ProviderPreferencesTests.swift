@@ -3,6 +3,33 @@ import XCTest
 
 @MainActor
 final class ProviderPreferencesTests: XCTestCase {
+    func testCompactRingsKeepStableOrderUseOneItemAndFallBackWhenServicesAreDisabled() throws {
+        let defaults = try isolatedDefaults()
+        let preferences = PreferencesStore(defaults: defaults)
+        preferences.claudeMonitoringEnabled = true
+        preferences.primaryProvider = .claude
+        preferences.menuBarServiceMode = .compactBoth
+        preferences.menuBarLayout = .dualWindow
+        XCTAssertEqual(preferences.menuBarProviders, [.codex, .claude])
+        XCTAssertEqual(preferences.menuBarStatusItemProviders, [.codex])
+        XCTAssertTrue(preferences.usesCompactProviderRings)
+        XCTAssertFalse(preferences.usesDualWindowMenuBarSelection)
+        XCTAssertEqual(PreferencesStore(defaults: defaults).menuBarServiceMode, .compactBoth)
+        preferences.codexMonitoringEnabled = false
+        XCTAssertEqual(preferences.menuBarStatusItemProviders, [.claude])
+        XCTAssertFalse(preferences.usesCompactProviderRings)
+        XCTAssertTrue(preferences.usesDualWindowMenuBarSelection)
+        preferences.claudeMonitoringEnabled = false
+        XCTAssertEqual(preferences.menuBarStatusItemProviders, [])
+        preferences.codexMonitoringEnabled = true
+        preferences.claudeMonitoringEnabled = true
+        XCTAssertEqual(preferences.menuBarStatusItemProviders, [.codex])
+        preferences.menuBarServiceMode = .single
+        XCTAssertEqual(preferences.menuBarStatusItemProviders, [.claude])
+        preferences.menuBarServiceMode = .both
+        XCTAssertEqual(preferences.menuBarStatusItemProviders, [.claude, .codex])
+    }
+
     func testExistingInstallationDefaultsToOnlyCodexWithoutWritingClaudeSettings() throws {
         let defaults = try isolatedDefaults()
         defaults.set("weekly", forKey: "displayMode")

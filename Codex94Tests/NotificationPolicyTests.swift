@@ -1,4 +1,5 @@
 import XCTest
+import UserNotifications
 @testable import Codex94
 
 final class NotificationPolicyTests: XCTestCase {
@@ -252,5 +253,184 @@ private final class NotificationServiceFake: QuotaNotificationServing {
         deliveryAttempts += 1
         if failDelivery { throw CocoaError(.featureUnsupported) }
         messages.append(body)
+    }
+}
+
+@MainActor
+final class SystemQuotaNotificationServiceTests: XCTestCase {
+    func testAuthorizationMapsStatusesFromBackgroundCallbacks() async {
+        let center = BackgroundNotificationCenterFake()
+        let service = SystemQuotaNotificationService(center: center)
+        let cases: [(Int, NotificationAuthorization)] = [
+            (UNAuthorizationStatus.notDetermined.rawValue, .notDetermined),
+            (UNAuthorizationStatus.denied.rawValue, .denied),
+            (UNAuthorizationStatus.authorized.rawValue, .authorized),
+            (UNAuthorizationStatus.provisional.rawValue, .authorized),
+            (Int.max, .denied)
+        ]
+        for (rawStatus, expected) in cases {
+            center.authorizationStatus = rawStatus
+            let actual = await service.authorization()
+            XCTAssertEqual(actual, expected)
+            XCTAssertTrue(Thread.isMainThread, "The awaiting MainActor caller must resume on its executor")
+        }
+        XCTAssertEqual(center.statusReads, cases.count)
+        assertBackgroundCallbacks(center, expected: Array(repeating: "authorization", count: cases.count))
+    }
+
+    func testPermissionResultsResumeFromBackgroundWithoutChangingRequestedOptions() async throws {
+        let center = BackgroundNotificationCenterFake()
+        let service = SystemQuotaNotificationService(center: center)
+        for granted in [true, false] {
+            center.permissionGranted = granted
+            let actual = try await service.requestAuthorization()
+            XCTAssertEqual(actual, granted)
+            XCTAssertTrue(Thread.isMainThread)
+        }
+        XCTAssertEqual(center.requestedOptions, [[.alert], [.alert]])
+        assertBackgroundCallbacks(center, expected: ["permission", "permission"])
+    }
+
+    func testPermissionErrorFromBackgroundIsPropagated() async {
+        let center = BackgroundNotificationCenterFake()
+        center.permissionError = CocoaError(.userCancelled)
+        let service = SystemQuotaNotificationService(center: center)
+        do {
+            _ = try await service.requestAuthorization()
+            XCTFail("Expected the asynchronous permission error")
+        } catch {
+            XCTAssertEqual((error as NSError).domain, NSCocoaErrorDomain)
+            XCTAssertEqual((error as NSError).code, CocoaError.Code.userCancelled.rawValue)
+            XCTAssertTrue(Thread.isMainThread)
+        }
+        assertBackgroundCallbacks(center, expected: ["permission"])
+    }
+
+    func testDeliverySuccessAndErrorResumeFromBackground() async throws {
+        let center = BackgroundNotificationCenterFake()
+        let service = SystemQuotaNotificationService(center: center)
+        try await service.deliver(title: "Synthetic title", body: "Synthetic body")
+        XCTAssertTrue(Thread.isMainThread)
+        center.deliveryError = CocoaError(.featureUnsupported)
+        do {
+            try await service.deliver(title: "Second title", body: "Second body")
+            XCTFail("Expected the asynchronous delivery error")
+        } catch {
+            XCTAssertEqual((error as NSError).domain, NSCocoaErrorDomain)
+            XCTAssertEqual((error as NSError).code, CocoaError.Code.featureUnsupported.rawValue)
+            XCTAssertTrue(Thread.isMainThread)
+        }
+        XCTAssertEqual(center.requests.map(\.title), ["Synthetic title", "Second title"])
+        XCTAssertEqual(center.requests.map(\.body), ["Synthetic body", "Second body"])
+        XCTAssertTrue(center.requests.allSatisfy(\.hasNoTrigger))
+        XCTAssertEqual(Set(center.requests.map(\.identifier)).count, 2)
+        assertBackgroundCallbacks(center, expected: ["delivery", "delivery"])
+    }
+
+    func testControllerOptInUsesSystemServiceWithBackgroundCenterCallbacks() async throws {
+        let center = BackgroundNotificationCenterFake()
+        let controller = NotificationController(service: SystemQuotaNotificationService(center: center))
+        defer { controller.shutdown() }
+        controller.configure(enabled: false)
+        await Task.yield()
+        XCTAssertEqual(center.statusReads, 0)
+        XCTAssertTrue(center.requestedOptions.isEmpty)
+        XCTAssertTrue(center.requests.isEmpty)
+
+        controller.configure(enabled: true, requestPermission: true)
+        try await wait { controller.authorization == .authorized }
+        XCTAssertFalse(controller.isRequesting)
+        XCTAssertFalse(controller.hasIssue)
+        let event = QuotaNotificationEvent(kind: .low(threshold: 20), bucketName: "Claude",
+                                          window: .fiveHour, remainingPercent: 10)
+        controller.deliver([event], language: .english, provider: .claude)
+        try await wait { center.callbackProbe.entries.count == 4 }
+        XCTAssertEqual(center.statusReads, 2)
+        XCTAssertEqual(center.requestedOptions, [[.alert]])
+        XCTAssertEqual(center.requests.count, 1)
+        XCTAssertTrue(center.requests[0].title.contains("Claude"))
+        XCTAssertTrue(center.requests[0].body.contains("10"))
+        assertBackgroundCallbacks(center, expected: ["authorization", "permission", "authorization", "delivery"])
+    }
+
+    private func assertBackgroundCallbacks(_ center: BackgroundNotificationCenterFake, expected: [String],
+                                           file: StaticString = #filePath, line: UInt = #line) {
+        let entries = center.callbackProbe.entries
+        XCTAssertEqual(entries.map(\.operation), expected, file: file, line: line)
+        XCTAssertTrue(entries.allSatisfy { !$0.ranOnMainThread },
+                      "The injected center must reproduce UserNotifications' off-main completion boundary",
+                      file: file, line: line)
+    }
+
+    private func wait(_ condition: () -> Bool) async throws {
+        let deadline = Date().addingTimeInterval(2)
+        while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertTrue(condition())
+    }
+}
+
+/// The fake sits below SystemQuotaNotificationService's continuation bridges.
+/// It never constructs a UNUserNotificationCenter or accesses system permission.
+@MainActor
+private final class BackgroundNotificationCenterFake: UserNotificationCenterAccess {
+    struct Request {
+        let title: String
+        let body: String
+        let identifier: String
+        let hasNoTrigger: Bool
+    }
+
+    var authorizationStatus = UNAuthorizationStatus.notDetermined.rawValue
+    var permissionGranted = true
+    var permissionError: Error?
+    var deliveryError: Error?
+    private(set) var statusReads = 0
+    private(set) var requestedOptions: [UNAuthorizationOptions] = []
+    private(set) var requests: [Request] = []
+    let callbackProbe = NotificationCallbackProbe()
+    private let callbackQueue = DispatchQueue(label: "Codex94Tests.synthetic-notification-call-out")
+
+    func getAuthorizationStatus(completion: @escaping @Sendable (Int) -> Void) {
+        statusReads += 1
+        let status = authorizationStatus, probe = callbackProbe
+        callbackQueue.async {
+            probe.record("authorization")
+            completion(status)
+        }
+    }
+
+    func requestAuthorization(options: UNAuthorizationOptions, completion: @escaping @Sendable (Bool, Error?) -> Void) {
+        requestedOptions.append(options)
+        let granted = permissionGranted, error = permissionError, probe = callbackProbe
+        if error == nil { authorizationStatus = (granted ? UNAuthorizationStatus.authorized : .denied).rawValue }
+        callbackQueue.async {
+            probe.record("permission")
+            completion(granted, error)
+        }
+    }
+
+    func add(_ request: UNNotificationRequest, completion: @escaping @Sendable (Error?) -> Void) {
+        requests.append(Request(title: request.content.title, body: request.content.body,
+                                identifier: request.identifier, hasNoTrigger: request.trigger == nil))
+        let error = deliveryError, probe = callbackProbe
+        callbackQueue.async {
+            probe.record("delivery")
+            completion(error)
+        }
+    }
+}
+
+/// Records the callback thread before resuming; the lock protects all reads and writes.
+private final class NotificationCallbackProbe: @unchecked Sendable {
+    struct Entry: Sendable {
+        let operation: String
+        let ranOnMainThread: Bool
+    }
+
+    private let lock = NSLock()
+    private var recorded: [Entry] = []
+    var entries: [Entry] { lock.withLock { recorded } }
+    func record(_ operation: String) {
+        lock.withLock { recorded.append(Entry(operation: operation, ranOnMainThread: Thread.isMainThread)) }
     }
 }

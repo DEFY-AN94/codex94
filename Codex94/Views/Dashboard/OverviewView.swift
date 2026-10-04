@@ -22,7 +22,7 @@ struct OverviewView: View {
                 if let snapshot = store.snapshot {
                     let buckets = snapshot.displayableBuckets
                     if buckets.isEmpty {
-                        emptyState("overview.noQuotaData", systemImage: "chart.bar.xaxis")
+                        bucketGroup(snapshot: snapshot, bucket: nil, index: 0)
                     } else {
                         ForEach(buckets.indices, id: \.self) { index in
                             let bucket = buckets[index]
@@ -31,7 +31,7 @@ struct OverviewView: View {
                         }
                     }
                 } else {
-                    emptyState("overview.noSnapshot", systemImage: "exclamationmark.triangle")
+                    bucketGroup(snapshot: nil, bucket: nil, index: 0)
                 }
             }
             if store.preferences.claudeMonitoringEnabled {
@@ -75,7 +75,7 @@ struct OverviewView: View {
                         .fontWeight(.medium)
                     Spacer(minLength: 16)
                     Group {
-                        if store.preferences.menuBarLayout == .dualWindow {
+                        if store.preferences.usesDualWindowMenuBarSelection {
                             MenuBarBucketPicker(store: store)
                         } else {
                             MenuBarQuotaPicker(store: store)
@@ -98,51 +98,34 @@ struct OverviewView: View {
     }
 
     private func bucketGroup(
-        snapshot: QuotaSnapshot,
-        bucket: QuotaBucketSnapshot,
+        snapshot: QuotaSnapshot?,
+        bucket: QuotaBucketSnapshot?,
         index: Int
     ) -> some View {
-        let windows = orderedWindows(in: bucket)
-        return GroupBox {
-            if windows.isEmpty {
-                emptyState("overview.noQuotaData", systemImage: "chart.bar.xaxis")
-            } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(windows.indices, id: \.self) { offset in
-                        let window = windows[offset]
-                        if offset > 0 { Divider() }
-                        QuotaWindowRow(
-                            window: window,
-                            palette: palette,
-                            language: store.preferences.language,
-                            referenceDate: referenceDate,
-                            locale: resetLocale,
-                            calendar: resetCalendar,
-                            timeZone: resetTimeZone,
-                            accessibilityIdentifier: "overview-bucket-\(index)-\(window.kind.rawValue)"
-                        )
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: snapshot.displayName(for: bucket))
-                    .font(.headline)
-                if let planType = normalizedPlanType(bucket.planType) {
-                    Text(verbatim: planType)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let now = referenceDate ?? context.date
+            let presentation = store.menuBarStatusPresentation
+            let bucketName = bucket.flatMap { snapshot?.displayName(for: $0) } ?? "Codex"
+            ProviderQuotaCardContent(
+                provider: .codex, title: bucketName == "Codex" ? "Codex" : "Codex · " + bucketName,
+                sourceTitle: "providers.codexSource", windows: bucket.map(orderedWindows) ?? [],
+                badge: presentation.connectionBadge, usesCachedData: presentation.usesCachedData,
+                statusText: store.isRefreshing ? Text("status.refreshing")
+                    : presentation.issue.map { Text($0.localizedKey) },
+                sourceTimeText: StatusAccessibilityString.statusContext(
+                    presentation, now: now, language: store.preferences.language, bundle: .main
+                ),
+                emptyText: snapshot == nil ? "overview.noSnapshot" : "overview.noQuotaData",
+                refreshLabel: "providers.refreshCodex", detailsLabel: "providers.codexDetails",
+                canRefresh: store.preferences.hasChosenIdentityMode && !store.isRefreshing,
+                showsDetails: false, language: store.preferences.language, now: now, palette: palette,
+                refresh: { store.refresh(trigger: .manual) }, openDetails: {}, timeZone: resetTimeZone,
+                detailSubtitle: normalizedPlanType(bucket?.planType),
+                windowIdentifierPrefix: "overview-bucket-\(index)",
+                resetLocale: resetLocale, resetCalendar: resetCalendar
+            )
         }
         .accessibilityIdentifier("overview-bucket-\(index)")
-    }
-
-    private func emptyState(_ title: LocalizedStringKey, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, minHeight: 72, alignment: .center)
     }
 
     private func orderedWindows(in bucket: QuotaBucketSnapshot) -> [QuotaWindowSnapshot] {

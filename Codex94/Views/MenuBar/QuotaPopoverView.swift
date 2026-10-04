@@ -3,6 +3,7 @@ import SwiftUI
 
 enum QuotaPopoverLayout {
     static let contentWidth: CGFloat = 500
+    static let maximumProviderViewportHeight: CGFloat = 480
 
     @MainActor
     static func install<Content: View>(
@@ -20,6 +21,48 @@ enum QuotaPopoverLayout {
         let contentSize = NSSize(width: contentWidth, height: ceil(measuredHeight))
         guard popover.contentSize != contentSize else { return }
         popover.contentSize = contentSize
+    }
+}
+
+/// A single scroll tree whose viewport follows its actual content up to the
+/// popover limit. Measuring inside the scroll view keeps overflowing content
+/// unconstrained; status/source changes invalidate the same measurement.
+struct QuotaPopoverScrollViewport<Content: View>: View {
+    let content: Content
+    @State private var contentHeight = QuotaPopoverLayout.maximumProviderViewportHeight
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            content
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(key: QuotaPopoverContentHeightKey.self,
+                                               value: geometry.size.height)
+                            .allowsHitTesting(false)
+                    }
+                }
+        }
+        .frame(height: min(contentHeight, QuotaPopoverLayout.maximumProviderViewportHeight), alignment: .top)
+        .onPreferenceChange(QuotaPopoverContentHeightKey.self) { height in
+            guard height.isFinite, height > 0 else { return }
+            let roundedHeight = ceil(height)
+            guard roundedHeight != contentHeight else { return }
+            contentHeight = roundedHeight
+        }
+    }
+}
+
+private struct QuotaPopoverContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
@@ -113,16 +156,16 @@ struct QuotaPopoverView: View {
         header
         if browsableBuckets.count > 1 {
             Divider()
-            modelPicker
+            modelPicker()
         }
         Divider()
         quotaRows
         stateBanner
-        ResetCreditsView(store: store)
+        ResetCreditsView(store: store, compact: true)
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.vertical, 6)
         Divider()
-        menuBarQuotaPicker
+        menuBarQuotaPicker()
     }
 
     private var providerContent: some View {
@@ -130,17 +173,9 @@ struct QuotaPopoverView: View {
             if store.preferences.enabledProviders.isEmpty {
                 ProvidersDisabledView { openDashboard(.providers) }
             } else if store.preferences.codexMonitoringEnabled {
-                ScrollView {
-                    VStack(spacing: 14) {
-                        ProviderQuotaSummaries(
-                            store: store, openDashboard: openDashboard,
-                            referenceDate: referenceDate, resetTimeZone: resetTimeZone
-                        )
-                        providerDetails
-                    }
-                    .padding(14)
+                QuotaPopoverScrollViewport {
+                    providerScrollContent
                 }
-                .frame(height: 480)
                 .accessibilityIdentifier("provider-quota-sections")
             } else {
                 claudeSection
@@ -150,20 +185,34 @@ struct QuotaPopoverView: View {
         }
     }
 
+    /// Kept separate so layout tests can measure the same complete content,
+    /// including selectors and recovery hints, independently of its viewport.
+    var providerScrollContent: some View {
+        VStack(spacing: 14) {
+            ProviderQuotaSummaries(
+                store: store, openDashboard: openDashboard,
+                referenceDate: referenceDate, resetTimeZone: resetTimeZone
+            )
+            providerDetails
+        }
+        .padding(14)
+    }
+
     private var providerDetails: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("providers.codexDetails").font(.headline).padding(.bottom, 8)
             if store.preferences.hasChosenIdentityMode {
-                if browsableBuckets.count > 1 { modelPicker }
+                if browsableBuckets.count > 1 { modelPicker(inset: 0) }
                 stateBanner
-                ResetCreditsView(store: store).padding(.vertical, 10)
-                menuBarQuotaPicker
+                ResetCreditsView(store: store, compact: true).padding(.vertical, 4)
+                menuBarQuotaPicker(inset: 0, includesProvider: true)
             } else {
                 IdentityChoiceView(store: store)
             }
             Divider().padding(.vertical, 10)
-            Text("claude.menuBarQuota").font(.headline).padding(.bottom, 8)
-            claudeMenuBarPicker
+            HStack(spacing: 12) {
+                Text("claude.menuBarQuota").font(.caption).foregroundStyle(.secondary)
+                claudeMenuBarPicker
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("provider-quota-details")
@@ -171,7 +220,7 @@ struct QuotaPopoverView: View {
 
     @ViewBuilder
     private var claudeMenuBarPicker: some View {
-        if store.preferences.menuBarLayout == .dualWindow {
+        if store.preferences.usesDualWindowMenuBarSelection {
             MenuBarBucketPicker(store: store, provider: .claude)
         } else {
             MenuBarQuotaPicker(store: store, provider: .claude)
@@ -183,7 +232,7 @@ struct QuotaPopoverView: View {
             ClaudeQuotaCard(
                 store: store.claudeStore, language: store.preferences.language,
                 openSetup: { openDashboard(.providers) }, referenceDate: referenceDate,
-                accentOverrides: store.preferences.statusAccentOverrides
+                accentOverrides: store.preferences.statusAccentOverrides, compact: true, style: .terminal
             )
             HStack(spacing: 12) {
                 Text("display.label").font(.caption).foregroundStyle(.secondary)
@@ -266,7 +315,7 @@ struct QuotaPopoverView: View {
         ))
     }
 
-    private var modelPicker: some View {
+    private func modelPicker(inset: CGFloat = 18) -> some View {
         let names = store.snapshot.map { QuotaFormatting.bucketMenuNames(in: $0) } ?? [:]
         return HStack(spacing: 12) {
             Text("quota.model")
@@ -289,7 +338,7 @@ struct QuotaPopoverView: View {
             .frame(maxWidth: 300)
             Spacer()
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, inset)
         .padding(.vertical, 11)
     }
 
@@ -384,14 +433,14 @@ struct QuotaPopoverView: View {
             + Text(issue)
     }
 
-    private var menuBarQuotaPicker: some View {
+    private func menuBarQuotaPicker(inset: CGFloat = 18, includesProvider: Bool = false) -> some View {
         HStack(spacing: 12) {
-            Text("display.label")
+            (includesProvider ? Text(verbatim: "Codex · ") + Text("display.label") : Text("display.label"))
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             Group {
-                if store.preferences.menuBarLayout == .dualWindow {
+                if store.preferences.usesDualWindowMenuBarSelection {
                     MenuBarBucketPicker(store: store)
                 } else {
                     MenuBarQuotaPicker(store: store)
@@ -400,11 +449,11 @@ struct QuotaPopoverView: View {
                 .frame(maxWidth: 300)
             Spacer()
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, inset)
         .padding(.vertical, 12)
     }
 
-    private var commandRows: some View {
+    var commandRows: some View {
         VStack(spacing: 2) {
             CommandRow(
                 title: Text(store.preferences.enabledProviders.count > 1 ? "providers.refreshAll" : "command.refresh"),
@@ -458,12 +507,13 @@ struct ProviderQuotaSummaries: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             codexSummary
+            Divider()
             ClaudeQuotaCard(
                 store: store.claudeStore, language: store.preferences.language,
                 openSetup: { openDashboard(.providers) }, referenceDate: referenceDate,
-                accentOverrides: store.preferences.statusAccentOverrides, compact: true
+                accentOverrides: store.preferences.statusAccentOverrides, compact: true, style: .terminal
             )
         }
         .accessibilityIdentifier("provider-quota-summaries")
@@ -494,7 +544,7 @@ struct ProviderQuotaSummaries: View {
                 canRefresh: store.preferences.hasChosenIdentityMode && !store.isRefreshing, showsDetails: true,
                 language: store.preferences.language, now: now, palette: palette,
                 refresh: { store.refresh(trigger: .manual) }, openDetails: { openDashboard(.connection) },
-                timeZone: resetTimeZone, compact: true
+                timeZone: resetTimeZone, compact: true, style: .terminal
             )
         }
     }
@@ -510,12 +560,13 @@ struct MenuBarQuotaPicker: View {
         provider == .codex ? store.preferences.menuBarQuotaSelection : store.preferences.claudeMenuBarQuotaSelection
     }
 
+    var selectionBinding: Binding<MenuBarQuotaSelection> {
+        Binding(get: { selection }, set: { store.setMenuBarQuotaSelection($0, for: provider) })
+    }
+
     var body: some View {
         HStack(spacing: 8) {
-            Picker("display.label", selection: Binding(
-                get: { selection },
-                set: { store.setMenuBarQuotaSelection($0, for: provider) }
-            )) {
+            Picker("display.label", selection: selectionBinding) {
                 ForEach(store.menuBarQuotaOptions(for: provider)) { option in
                     Text(verbatim: optionLabel(option))
                         .help(Text(verbatim: optionLabel(option, abbreviated: false)))
@@ -526,6 +577,7 @@ struct MenuBarQuotaPicker: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
+            .accessibilityIdentifier(provider == .codex ? "menu-bar-quota-picker" : "claude-menu-bar-quota-picker")
 
             if selection != .automatic && snapshot?.resolved(selection) == nil {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -587,7 +639,8 @@ struct QuotaWindowRow: View {
                 window: window,
                 palette: palette,
                 reset: reset,
-                accessibilityIdentifier: accessibilityIdentifier
+                accessibilityIdentifier: accessibilityIdentifier,
+                language: language
             )
         }
     }
@@ -598,10 +651,11 @@ struct QuotaWindowRowContent: View {
     let palette: Codex94Palette
     let reset: QuotaResetPresentation
     var accessibilityIdentifier: String? = nil
+    var language: LanguagePreference = .english
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            QuotaWindowMainRow(window: window, palette: palette, countdown: reset.countdown)
+            QuotaWindowMainRow(window: window, palette: palette, countdown: reset.countdown, language: language)
             QuotaAbsoluteResetLine(text: reset.absolute)
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -616,7 +670,7 @@ struct QuotaWindowRowContent: View {
         StatusAccessibilityText.quotaWindow(window.kind)
             + Text(verbatim: ", ")
             + StatusAccessibilityText.remainingPercent(
-                QuotaFormatting.percent(window.remainingPercent)
+                QuotaFormatting.percent(precise: window.preciseRemainingPercent, language: language)
             )
             + Text(verbatim: ", " + reset.accessibilityLabel)
     }
@@ -626,6 +680,11 @@ struct QuotaWindowMainRow: View {
     let window: QuotaWindowSnapshot
     let palette: Codex94Palette
     let countdown: String
+    var language: LanguagePreference = .english
+
+    var remainingPercentText: String {
+        QuotaFormatting.percent(precise: window.preciseRemainingPercent, language: language)
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -633,7 +692,7 @@ struct QuotaWindowMainRow: View {
                 .foregroundStyle(quotaColor)
                 .frame(width: 58, alignment: .leading)
             QuotaBarView(remainingPercent: window.remainingPercent, color: quotaColor)
-            Text(QuotaFormatting.percent(window.remainingPercent))
+            Text(remainingPercentText)
                 .monospacedDigit()
                 .foregroundStyle(quotaColor)
                 .frame(width: 54, alignment: .trailing)
@@ -645,7 +704,7 @@ struct QuotaWindowMainRow: View {
     }
 
     private var quotaColor: Color {
-        palette.quotaColor(for: QuotaLevel(remainingPercent: window.remainingPercent))
+        palette.quotaColor(for: QuotaLevel(preciseRemainingPercent: window.preciseRemainingPercent))
     }
 }
 

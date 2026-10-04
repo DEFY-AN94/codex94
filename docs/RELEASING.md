@@ -33,6 +33,36 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
+The current candidate is **`4.0.2 (23)`**, with its changelog under **Unreleased**.
+Keep the stable `v4.0.1` download, clone, checksum and attestation references
+until public 4.0.2 publication is verified. Do not move or reuse any existing
+release tag, including the retained `v4.0.0` candidate tag.
+
+For 4.0.2, verify the following changes against its own source and artifacts:
+
+- Invoke authorization, permission and delivery completions from a background
+  fake notification adapter. They must not trigger MainActor isolation checks;
+  disabled defaults and late-result cancellation must remain intact. Do not
+  request real notification permission as part of automated tests.
+- Inspect large dual-service Dashboard cards, compact terminal-style popover
+  rows and the smaller read-only reset count in both languages and themes.
+  Retain unknown/zero/reset-expired and cached-data distinctions.
+- Check all three service-display choices: `single`, new `compactBoth` with
+  one native item and two independent rings, and unchanged `both` with two
+  native items. Existing saved `both` must retain its behavior. Verify either
+  service alone, both, and neither; single-service items hide redundant names.
+  Display changes must not fetch quota, redeem resets or rewrite quota cache.
+- Verify the passive empty state names Claude Code statusline as its source and
+  explains that App/web chats do not supply it. Verify the SwiftUI Link's fixed
+  official Usage destination and that rendering causes no additional request
+  or browser opening; do not activate the live link during CI.
+  There is no new quota API or automatic App/web reader. `/usage` stays
+  separately default-off; do not resume real CLI probing for these checks.
+
+Record actual local tests, synthetic UI results, changed-behavior acceptance,
+final-main checks and package identities separately. No 4.0.2 validation result
+is implied by the historical records below.
+
 Version 4.0.1 follows the revised conditional data-source plan. The OAuth
 authorization prerequisite is not met, so it uses passive statusline reports
 by default. Live `/usage` probing
@@ -50,7 +80,8 @@ do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
 records do not establish validation of these source boundaries. Final checks,
 artifacts and installation need separate records. Public stable links point to 4.0.1.
 
-For this release, the maintainer approved a ten-minute live-observation scope.
+During the earlier 4.0 release work, the maintainer approved a ten-minute
+live-observation scope.
 The earlier 4.0.0 candidate observation lasted 626 seconds: two Codex and one
 Claude background refreshes, plus one popover read per service, all succeeded
 with zero failures. It included interaction and is neither an unattended run
@@ -277,10 +308,10 @@ states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
 Wait for CI, every synthetic UI smoke required by the candidate, and
-Actions/Python/Swift CodeQL on the actual tested revision. The `4.0.1` gate
+Actions/Python/Swift CodeQL on the actual tested revision. The `4.0.2` candidate gate
 includes five UI scenarios: Display, Recovery, Token usage, Floating, and
-Providers. Providers uses only synthetic CLI data; its success does not replace
-separate acceptance of the installed Claude Code version and authenticated profile.
+Providers. Providers uses synthetic data; passing it does not verify real Claude
+account quota, ordinary App/web collection or a restored live CLI reader.
 Skipped, cancelled, unavailable, pending, or failed is not passed. Review the
 synthetic images themselves for UI and privacy. Retain the existing screenshots
 as historical captures unless separately replacing them with reviewed evidence.

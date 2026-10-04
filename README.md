@@ -17,7 +17,7 @@ shows newer stable GitHub Releases; downloading and installing remain manual.
 The quota features introduced in `0.2.2 (13)` remain: four menu-bar layouts,
 including a dual-window view, optional low-quota and recovery alerts, and a
 configurable global shortcut. Either mouse button toggles the same popover.
-The read-only **Manual quota resets** card shows the available reset count in
+The read-only **Manual quota resets** display shows the available reset count in
 the popover and Overview without redeeming a reset.
 
 Codex94 is an MIT-licensed source project. Codex monitoring uses the locally
@@ -30,6 +30,30 @@ and security-scanned before it is tagged.
 > Codex94 is not affiliated with, endorsed by, or sponsored by OpenAI or
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
+
+## 4.0.2 candidate (unreleased)
+
+The development version is **4.0.2 (23)**. Stable downloads below remain on
+4.0.1 until publication of the new release is confirmed.
+
+- Fix notification completion callbacks that may run on a background queue
+  and previously could trigger a MainActor isolation crash.
+- Give the two enabled services large, separate quota cards in Dashboard.
+  The popover uses compact terminal-style rows and a smaller read-only reset
+  count. Single-service menu-bar items omit redundant service names.
+- Add **compact dual rings** (`compactBoth`): one native status item containing
+  the two services' separate rings. **Single service** (`single`) and the existing
+  **two independent items** (`both`) remain separate choices; saved `both`
+  preferences are not converted to the new mode.
+- Clarify that passive reports come from **Claude Code's statusline**. Ordinary
+  Claude App or web chats do not produce that local report. The passive view
+  explains this scope and offers **View official usage** to open
+  [Claude's Usage settings](https://claude.ai/settings/usage) in the system browser.
+
+This candidate adds no quota API or automatic App/web quota reader. The optional
+`/usage` reader remains independently disabled by default. Candidate checks and
+acceptance must be recorded for this version; the historical screenshots and
+release results below are not 4.0.2 validation.
 
 ## Version 4.0.1
 
@@ -46,7 +70,11 @@ included. Live `/usage` probing remains suspended; that reader is a separate,
 default-off option with a quota-consumption warning.
 
 Passive reports arrive when you normally use Claude Code; Codex94 does not start
-a session or send a prompt to produce them. The official status-line schema has
+a session or send a prompt to produce them. Signing in to Claude App or the web
+alone does not generate a Code statusline report. The quota fields appear only
+after Claude Code receives an API response in that session, as documented in the
+[official statusline reference](https://code.claude.com/docs/en/statusline#available-data).
+The official status-line schema has
 no verified account ID. Reports are labelled account-unverified, CLI mode never
 automatically falls back to them, and a different reporting session requires
 explicit adoption. A session fingerprint identifies a report stream, not an
@@ -144,6 +172,7 @@ is limited to its tested Mac and candidate.
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.
+These retained captures do not show the 4.0.2 candidate's revised presentation.
 The chart previews were captured during `0.3.0 (14)` candidate testing and
 show **Bar chart** and **Line chart** over the same seven reported days. These
 original synthetic captures remain unchanged, from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).

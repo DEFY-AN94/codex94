@@ -24,13 +24,19 @@ struct ProviderSettingsView: View {
                         set: { store.preferences.menuBarServiceMode = $0 }
                     )) {
                         Text("providers.menuBar.single").tag(MenuBarServiceMode.single)
+                        Text("providers.menuBar.compactBoth").tag(MenuBarServiceMode.compactBoth)
                         Text("providers.menuBar.both").tag(MenuBarServiceMode.both)
                     }
-                    .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 340)
+                    .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 440)
                     .accessibilityIdentifier("provider-menu-bar-mode")
                     Text("providers.menuBar.help")
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    if store.preferences.menuBarServiceMode == .compactBoth {
+                        Text("providers.menuBar.compactBoth.help")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             SettingsDivider()
@@ -91,7 +97,7 @@ struct ProviderSettingsView: View {
             if store.preferences.claudeMonitoringEnabled {
                 SettingsDivider()
                 SettingsRow("claude.menuBarQuota") {
-                    if store.preferences.menuBarLayout == .dualWindow {
+                    if store.preferences.usesDualWindowMenuBarSelection {
                         MenuBarBucketPicker(store: store, provider: .claude)
                     } else {
                         MenuBarQuotaPicker(store: store, provider: .claude)

@@ -53,10 +53,11 @@ struct MenuBarStatusView: View {
         resolvedQuota: ResolvedQuotaWindow?,
         presentation: StatusPresentation,
         now: Date,
-        provider: QuotaProviderID = .codex
+        provider: QuotaProviderID = .codex,
+        usesSingleWindowSummary: Bool = false
     ) -> String {
         let summary: String
-        if store.preferences.menuBarLayout == .dualWindow {
+        if store.preferences.menuBarLayout == .dualWindow && !usesSingleWindowSummary {
             let bucket = store.providerDualWindowBucket(for: provider)
             summary = dualWindowAccessibilityLabel(
                 bucketName: bucket.flatMap { store.providerSnapshot(for: provider)?.displayName(for: $0) }

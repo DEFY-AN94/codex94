@@ -1,5 +1,9 @@
 import SwiftUI
 
+enum ProviderQuotaDisplayStyle: Equatable {
+    case card, terminal
+}
+
 /// Observes Claude's own state. Reading/rendering this view never refreshes it.
 struct ClaudeQuotaCard: View {
     @ObservedObject var store: ClaudeQuotaStore
@@ -8,6 +12,7 @@ struct ClaudeQuotaCard: View {
     var referenceDate: Date? = nil
     var accentOverrides = StatusAccentOverrides()
     var compact = false
+    var style: ProviderQuotaDisplayStyle = .card
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -27,7 +32,8 @@ struct ClaudeQuotaCard: View {
                 compact: compact,
                 isCLIUsageEnabled: store.isCLIUsageEnabled,
                 statuslineSetupState: store.statuslineSetupState,
-                passiveReportNeedsConfirmation: store.passiveReportNeedsConfirmation
+                passiveReportNeedsConfirmation: store.passiveReportNeedsConfirmation,
+                style: style
             )
         }
     }
@@ -53,6 +59,7 @@ struct ClaudeQuotaCardContent: View {
     var isCLIUsageEnabled = false
     var statuslineSetupState: ClaudeStatuslineSetupState = .notInstalled
     var passiveReportNeedsConfirmation = false
+    var style: ProviderQuotaDisplayStyle = .card
 
     var badge: ConnectionBadge {
         guard isEnabled else { return .none }
@@ -109,6 +116,7 @@ struct ClaudeQuotaCardContent: View {
         if needsSourceConfirmation { return "claude.passive.confirmationRequired" }
         if !isCLIUsageEnabled {
             if issue == .staleData || passiveWindowsExpired { return "claude.passive.expiredEmpty" }
+            if style == .terminal { return "claude.passive.waitingShort" }
             return statuslineSetupState == .notInstalled
                 ? "claude.passive.notConfigured" : "claude.passive.waiting"
         }
@@ -129,7 +137,8 @@ struct ClaudeQuotaCardContent: View {
             refreshLabel: LocalizedStringKey(refreshTitleKey), detailsLabel: "claude.openSetup",
             canRefresh: isEnabled && !isRefreshing, showsDetails: snapshot == nil || issue != nil,
             language: language, now: now, palette: palette,
-            refresh: refresh, openDetails: openSetup, timeZone: timeZone, compact: compact
+            refresh: refresh, openDetails: openSetup, timeZone: timeZone, compact: compact,
+            style: style, explainsPassiveSource: !isCLIUsageEnabled
         )
     }
 
@@ -148,8 +157,8 @@ struct ClaudeQuotaCardContent: View {
 
 }
 
-/// Shared quota geometry for the two compact summaries. Codex's detailed,
-/// single-provider interface stays separate and unchanged.
+/// Shared metadata and actions with roomy Dashboard cards or terminal rows in
+/// the menu popover. Changing presentation never changes a provider's source.
 struct ProviderQuotaCardContent: View {
     let provider: QuotaProviderID
     let title: String
@@ -171,25 +180,40 @@ struct ProviderQuotaCardContent: View {
     let openDetails: () -> Void
     var timeZone: TimeZone = .autoupdatingCurrent
     var compact = false
+    var style: ProviderQuotaDisplayStyle = .card
+    var explainsPassiveSource = false
+    var detailSubtitle: String? = nil
+    var windowIdentifierPrefix: String? = nil
+    var resetLocale: Locale? = nil
+    var resetCalendar = Calendar(identifier: .gregorian)
+
+    private var isTerminal: Bool { style == .terminal }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 9 : 14) {
+        VStack(alignment: .leading, spacing: isTerminal ? 8 : compact ? 9 : 14) {
             HStack(alignment: .center, spacing: 10) {
                 Image(systemName: provider.systemImageName)
-                    .font(.system(size: compact ? 19 : 21, weight: .medium))
+                    .font(.system(size: isTerminal ? 14 : compact ? 19 : 21, weight: .medium))
                     .foregroundStyle(provider == .claude ? Color.orange : palette.connectionAccent)
-                    .frame(width: 26, height: 28)
+                    .frame(width: isTerminal ? 18 : 26, height: isTerminal ? 20 : 28)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: title).font(.headline).lineLimit(1).help(Text(verbatim: title))
+                    Text(verbatim: title)
+                        .font(isTerminal ? .system(size: 13, weight: .semibold, design: .monospaced) : .headline)
+                        .lineLimit(1).help(Text(verbatim: title))
                     Text(sourceTitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        .help(Text(sourceTitle))
+                    if let detailSubtitle {
+                        Text(verbatim: detailSubtitle).font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1).help(Text(verbatim: detailSubtitle))
+                    }
                 }
                 Spacer(minLength: 8)
                 if badge != .none {
                     ConnectionBadgeView(badge: badge, color: palette.connectionBadgeColor(for: badge), size: 11)
                         .accessibilityHidden(true)
                 }
-                if compact {
+                if compact || isTerminal {
                     Button(action: openDetails) { Image(systemName: "info.circle") }
                         .buttonStyle(.borderless)
                         .help(Text(detailsLabel)).accessibilityLabel(Text(detailsLabel))
@@ -203,9 +227,18 @@ struct ProviderQuotaCardContent: View {
 
             if windows.isEmpty {
                 Text(emptyText).font(.callout).foregroundStyle(.secondary)
-                    .lineLimit(compact ? 2 : nil)
+                    .lineLimit(isTerminal || compact ? 2 : nil)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier(provider.rawValue + "-quota-empty")
+            } else if isTerminal {
+                VStack(spacing: 11) {
+                    ForEach(windows.sorted { $0.kind.sortOrder < $1.kind.sortOrder }) { window in
+                        QuotaWindowRowContent(
+                            window: window, palette: palette, reset: resetPresentation(window),
+                            accessibilityIdentifier: windowIdentifier(window), language: language
+                        )
+                    }
+                }
             } else {
                 HStack(alignment: .top, spacing: 18) {
                     ForEach(windows.sorted { $0.kind.sortOrder < $1.kind.sortOrder }) { window in
@@ -214,44 +247,69 @@ struct ProviderQuotaCardContent: View {
                 }
             }
 
+            if provider == .claude && windows.isEmpty {
+                if explainsPassiveSource && !isTerminal {
+                    Text("claude.passive.codeRequired")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Link("claude.officialUsage", destination: Self.officialClaudeUsageURL)
+                    .font(.caption)
+                    .accessibilityIdentifier("claude-official-usage")
+            }
+
             VStack(alignment: .leading, spacing: compact ? 3 : 5) {
                 if let statusText {
                     (usesCachedData ? Text("status.cached") + Text(verbatim: " · ") + statusText : statusText)
                         .foregroundStyle(badge == .refreshing ? palette.connectionAccent
                             : badge == .unavailable ? palette.errorColor : palette.staleAccent)
-                        .lineLimit(compact ? 1 : nil)
+                        .lineLimit(isTerminal || compact ? 1 : nil)
                         .help(statusText)
                         .accessibilityIdentifier(provider.rawValue + "-issue")
                 } else if usesCachedData {
                     Text("status.cached").foregroundStyle(palette.staleAccent)
                 }
                 Text(verbatim: sourceTimeText).foregroundStyle(.secondary)
-                    .lineLimit(compact ? 1 : nil)
+                    .lineLimit(isTerminal || compact ? 1 : nil)
                     .help(Text(verbatim: sourceTimeText))
                     .accessibilityIdentifier(provider.rawValue + "-source-time")
             }
             .font(.caption)
             .fixedSize(horizontal: false, vertical: true)
 
-            if !compact && showsDetails {
+            if !compact && !isTerminal && showsDetails {
                 Button(detailsLabel, action: openDetails).controlSize(.small)
                     .accessibilityIdentifier(provider == .claude ? "claude-open-setup" : "provider-codex-open-details")
             }
         }
-        .padding(compact ? 14 : 16)
+        .padding(isTerminal ? 0 : compact ? 14 : 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.elevated, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(palette.border, lineWidth: 1))
+        .background {
+            if !isTerminal { RoundedRectangle(cornerRadius: 12).fill(palette.elevated) }
+        }
+        .overlay {
+            if !isTerminal { RoundedRectangle(cornerRadius: 12).stroke(palette.border, lineWidth: 1) }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(provider == .claude ? "claude-quota-section" : "codex-quota-section")
+    }
+
+    static let officialClaudeUsageURL = URL(string: "https://claude.ai/settings/usage")!
+
+    private func windowIdentifier(_ window: QuotaWindowSnapshot) -> String {
+        (windowIdentifierPrefix ?? (provider == .claude ? "claude-quota" : "provider-codex-quota"))
+            + "-" + window.kind.rawValue
+    }
+
+    private func resetPresentation(_ window: QuotaWindowSnapshot) -> QuotaResetPresentation {
+        QuotaResetPresentation(resetsAt: window.resetsAt, now: now, language: language,
+                               locale: resetLocale, calendar: resetCalendar, timeZone: timeZone)
     }
 
     private func windowContent(_ window: QuotaWindowSnapshot) -> some View {
         let percent = QuotaFormatting.percent(precise: window.preciseRemainingPercent, language: language)
         let color = palette.quotaColor(for: QuotaLevel(preciseRemainingPercent: window.preciseRemainingPercent))
-        let reset = QuotaResetPresentation(
-            resetsAt: window.resetsAt, now: now, language: language, timeZone: timeZone
-        )
+        let reset = resetPresentation(window)
         return VStack(alignment: .leading, spacing: compact ? 4 : 6) {
             Text(window.kind.localizedKey).font(.caption).foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -265,6 +323,9 @@ struct ProviderQuotaCardContent: View {
             (Text("quota.resets") + Text(verbatim: " " + reset.countdown))
                 .font(.caption2).foregroundStyle(.secondary)
                 .lineLimit(1).help(Text(verbatim: reset.absolute))
+            Text(verbatim: reset.absolute)
+                .font(.caption2).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
@@ -273,7 +334,6 @@ struct ProviderQuotaCardContent: View {
                 + Text(verbatim: ", ") + StatusAccessibilityText.remainingPercent(percent)
                 + Text(verbatim: ", " + reset.accessibilityLabel)
         )
-        .accessibilityIdentifier(provider == .claude ? "claude-quota-" + window.kind.rawValue
-            : "provider-codex-quota-" + window.kind.rawValue)
+        .accessibilityIdentifier(windowIdentifier(window))
     }
 }
