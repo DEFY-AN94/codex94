@@ -601,6 +601,8 @@ final class Codex94UITests: XCTestCase {
         ]), savedChoices, "Disabling and reenabling must preserve both raw presentation choices and Codex quota selection")
         XCTAssertEqual(try selectedQuotaPreference(), savedCodexSelection)
         XCTAssertEqual(try ownedApplicationPID(), applicationPID)
+        XCTAssertEqual(try fixture.preference("claude.cliUsageEnabled.v1") as? Bool, true,
+                       "The smoke must leave the synthetic CLI opt-in on, as seeded")
         try fixture.assertSafePreferences()
         try quitNormally()
         try fixture.writeReport("providers-result.json", fields: [
@@ -3880,14 +3882,18 @@ private struct SyntheticFixture {
             throw UITestFailure("Synthetic quota-only/manual-path/30-minute fixture boundaries changed")
         }
         if scenario == "providers" {
+            // The smoke itself turns the synthetic CLI opt-in off and back on
+            // through the Services toggle, so only its boolean type is fixed here;
+            // assertInitialPreferences requires it to start on and the smoke
+            // asserts that it ends on.
             guard let syntheticCLIEnabled = try preference("claude.cliUsageEnabled.v1") as? NSNumber,
-                  CFGetTypeID(syntheticCLIEnabled) == CFBooleanGetTypeID(), syntheticCLIEnabled.boolValue,
+                  CFGetTypeID(syntheticCLIEnabled) == CFBooleanGetTypeID(),
                   try preference("claude.refreshInterval.v1") as? Int == 30,
                   try preference("codexMonitoringEnabled.v1") is Bool,
                   try preference("claudeMonitoringEnabled.v1") is Bool,
                   let mode = try preference("menuBarServiceMode.v1") as? String,
                   ["single", "compactBoth", "both"].contains(mode) else {
-                throw UITestFailure("Providers must retain the 30-minute fixture policy and explicit synthetic CLI opt-in")
+                throw UITestFailure("Providers must retain the 30-minute fixture policy and a boolean synthetic CLI opt-in")
             }
         }
         guard let style = try preference("tokenUsageChartStyle.v1") as? String,

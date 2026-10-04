@@ -80,9 +80,10 @@ Claude Code 的 Keychain 条目名、`SecItem`／`SecKeychain` 调用及 OAuth �
 执行 544 项，1 项既有托管焦点跳过，0 失败；元数据、安装器与安全扫描脚本的自测同样通过；
 `script/release_check.sh` 也已在本机 Xcode 27.0 上针对 `4.1.0 (24)` 通过，验证了 Universal App
 与未签名 DMG 候选（仅为本机产物，不是发布资产）。CI（Xcode 16.4）上首个 PR 头的 `test` 任务
-与 display、floating、recovery、usage 四个 UI 烟雾场景通过；providers 场景三次因测试侧原因失败
+与 display、floating、recovery、usage 四个 UI 烟雾场景通过；providers 场景四次因测试侧原因失败
 并已修正（早于“缓存数据”前缀的精确文本断言；夹具中 Fable 模型限额成为最紧窗口而改变了原生状态项
-的标签；新增截图名未加入产物白名单），其重跑、候选验收、标签、CI 产出的 DMG 和发布均为待完成。
+的标签；新增截图名未加入产物白名单；夹具策略检查仍要求 CLI 选项全程开启，而该场景本身会切换它），
+其重跑、候选验收、标签、CI 产出的 DMG 和发布均为待完成。
 UI 烟雾场景已加入夹具：通过
 `CLAUDE_CONFIG_DIR` 注入合成的 `.claude.json`，并检查关闭 CLI 选项后显示缓存来源且不启动
 CLI；它只有在实际运行后才算证据。下方历史截图与验证结果不代表 4.1.0 已通过验收。

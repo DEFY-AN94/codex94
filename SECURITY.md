@@ -230,12 +230,13 @@ unsigned DMG candidate (SHA-256
 `9be68277c0f6db6d820da06e3da0b9f8bb29dba7bb99a999d0eeefe9facb9fd0`; a local
 artifact, not the release asset). On CI (Xcode 16.4) the `test` job and the
 display, floating, recovery and usage UI smokes passed for the first PR head;
-the providers smoke failed three times on test-side causes that were
+the providers smoke failed four times on test-side causes that were
 corrected afterwards (an exact-text assertion predating the cached-data
 prefix, a fixture whose scoped Fable limit was the tightest window and
-relabelled the native item, then a new screenshot name missing from the
-artifact allowlist), so its rerun, candidate acceptance, tag, the CI DMG
-and publication are pending.
+relabelled the native item, a new screenshot name missing from the artifact
+allowlist, then a fixture-policy check that still required the CLI opt-in
+to stay on while the smoke itself toggles it), so its rerun, candidate
+acceptance, tag, the CI DMG and publication are pending.
 
 The unpublished `4.0.2 (23)` candidate, carried into 4.1.0, repairs a
 notification callback actor boundary and changes presentation. It adds no
