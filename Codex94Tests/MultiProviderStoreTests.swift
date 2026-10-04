@@ -277,6 +277,7 @@ final class MultiProviderStoreTests: XCTestCase {
         let now = referenceDate
         let claudeStore = ClaudeQuotaStore(
             preferences: preferences, cache: claudeCache, installer: installer,
+            localCache: ClaudeLocalUsageCacheReader(fileURL: directory.appendingPathComponent("claude-state/.claude.json")),
             fetcherFactory: { claude }, notificationController: NotificationController(service: MultiProviderNotificationService()),
             now: { now }, sleep: { try await claudeSleep.sleep($0) }
         )

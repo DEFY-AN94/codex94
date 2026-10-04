@@ -25,6 +25,10 @@ METADATA_HELPER = "script/release_metadata.py"
 # Only these tracked build inputs may enter the disposable recovery source copy.
 # No repository metadata, documentation, scripts, local state or directory copy.
 BUILD_INPUTS = (
+    "Codex94/Services/ClaudeLocalUsageCacheReader.swift",
+    "Codex94/Support/ClaudeQuotaFreshnessPolicy.swift",
+    "Codex94Tests/ClaudeLocalUsageCacheReaderTests.swift",
+    "Codex94Tests/ClaudeQuotaFreshnessPolicyTests.swift",
     "Codex94Tests/ClaudeExecutableLocatorTests.swift",
     "Codex94/Services/ClaudeExecutableLocator.swift",
     "Codex94Tests/ClaudeStatuslineInstallerRecoveryTests.swift",
@@ -481,12 +485,34 @@ def main():
         write_new(claude_executable, claude_bytes, 0o700)
         write_new(claude_log, b"")
         write_new(claude_mode, json_bytes({"mode": "normal"}))
+        # A synthetic Claude Code state file holding only the usage cache. Its
+        # fetch time predates any CLI read so the live CLI wins while enabled,
+        # and the cache becomes the shown source once the CLI option is off.
+        claude_config = root / "claude-config"
+        claude_config.mkdir(mode=0o700)
+        write_new(claude_config / ".claude.json", json_bytes({
+            "numStartups": 1,
+            "cachedUsageUtilization": {
+                "accountUuid": "00000000-0000-4000-8000-000000000001",
+                "fetchedAtMs": 1_767_225_600_000,
+                "utilization": {
+                    "five_hour": {"utilization": 40, "resets_at": "2033-05-19T06:30:00+00:00"},
+                    "seven_day": {"utilization": 25, "resets_at": "2033-05-19T19:00:00+00:00"},
+                    "limits": [
+                        {"kind": "weekly_all", "percent": 25, "resets_at": "2033-05-19T19:00:00+00:00", "scope": None},
+                        {"kind": "weekly_scoped", "percent": 60, "resets_at": "2033-05-19T19:00:00+00:00",
+                         "scope": {"model": {"display_name": "Fable", "id": None}, "surface": None}},
+                    ],
+                },
+            },
+        }))
         version = subprocess.run([str(claude_executable), "--version"], capture_output=True, timeout=3, check=True)
         require(version.stdout == b"2.1.999 (Claude Code)\n", "Synthetic Claude self-check failed")
         manifest.update({
             "claudeExecutable": str(claude_executable),
             "claudeExecutableSHA256": hashlib.sha256(claude_bytes).hexdigest(),
             "claudeRequestLogPath": str(claude_log), "claudeModePath": str(claude_mode),
+            "claudeConfigDirectory": str(claude_config),
             "claudeIsolation": {"realConfigurationAbsent": True, "knownExecutablesAbsent": True},
         })
     write_new(root / "manifest.json", json_bytes(manifest))

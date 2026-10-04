@@ -1,13 +1,133 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints, including the unreleased
-`4.0.2 (23)` candidate below. The published stable version remains the
+`4.1.0 (24)` candidate below and the unpublished `4.0.2 (23)` candidate it
+carries forward. The published stable version remains the
 [`4.0.1 (22)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.0.1),
 published on 2026-10-03 (Australia/Melbourne).
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.0.2 candidate: callback safety and compact presentation
+## 4.1.0: local usage cache as the primary Claude source
+
+Version `4.1.0 (24)` is the current unreleased candidate. It changes only the
+Claude side; Codex ownership, preferences and cache v2 are unchanged.
+
+### Source tiers
+
+Claude data comes from three tiers. `ClaudeQuotaStore` owns one slot per tier,
+the poll schedule and the notification baseline; it never merges slots.
+
+1. **Primary: Claude Code's local usage cache.** Claude Code writes the result
+   of its own plan-usage fetch, the data behind its `/usage` screen, into its
+   global state file under the `cachedUsageUtilization` key; Claude Code
+   2.1.208 and later keep it as "last-known usage". `ClaudeLocalUsageCacheReader`
+   interprets that key and nothing else.
+2. **Backup: the status-line connection (statusline bridge).** The existing
+   passive connection is shown when its report is strictly newer than the
+   cache, or when the cache is absent or unreadable. Producer-fingerprint
+   confirmation is unchanged.
+3. **Last option: the CLI `/usage` read.** It stays default-off behind
+   `claude.cliUsageEnabled.v1` and keeps its quota-consumption warning. When
+   enabled it runs on the existing refresh interval and its result participates
+   in selection; disabling it discards only CLI data. `readOnceWithCLI()` runs
+   the official CLI exactly once regardless of the switch, using a one-shot
+   client that retires afterwards. Claude Code then refreshes its own cache,
+   which the primary tier picks up on the next poll.
+
+This replaces 4.0.1's rule that CLI mode never loads passive reports. That rule
+isolated two mutually exclusive modes whose data could not be compared; 4.1.0
+treats the same sources as tiers of one selection with comparable observation
+times. Explicit mode switches no longer clear the other source's data. Instead
+`ClaudeQuotaFreshnessPolicy.select` decides what is shown. The notification
+baseline is kept across tier switches because every tier describes the same
+account's windows; only an identity change resets it (a different cache
+account, a different status-line producer, or a rejected CLI login). An
+automatic CLI failure is projected while CLI data is shown or while the shown
+passive report is out of date; a one-time read never drives the card.
+
+### `ClaudeLocalUsageCacheReader` ownership
+
+The reader owns the file location, the safe-open rules and the parse. The file
+is `~/.claude.json`, or `$CLAUDE_CONFIG_DIR/.claude.json` when that variable is
+set in Codex94's own environment, mirroring Claude Code. It opens read-only
+with `O_NOFOLLOW`, refuses symlinks anywhere in the path, foreign owners,
+non-regular or hard-linked files and anything over 16 MiB, and never writes.
+It records a size/mtime/inode stamp and returns `.unchanged` without parsing
+when the stamp matches.
+
+From the usage key it keeps `fetchedAtMs` as the report time (when Claude Code
+fetched usage, not when Codex94 read the file), `five_hour`/`seven_day`
+utilization with strict ISO-8601 `resets_at`, and model-scoped weekly limits
+(`weekly_scoped` entries, at most 16; the older `seven_day_opus`/`seven_day_sonnet`
+keys are a fallback). Everything else in the file, including account email,
+organization, project paths and MCP settings, is discarded as soon as the JSON
+is decoded and is never retained, logged or exported. The `accountUuid` is
+returned to the store, which compares it in memory with the previous reading
+only to detect a different login and reset the notification baseline. It is
+never persisted and never enters the diagnostics export; it is not account
+verification for any other purpose.
+
+Bytes that do not decode, for example mid-rewrite, are reported as
+`.unparsable`: the store keeps its last good report as a candidate while the
+published state reads `invalid`, and the completed write changes the stamp and
+is parsed on the next poll. A decoded document without a usable
+`cachedUsageUtilization` (after `/logout` or a layout change) is `.invalid` and
+drops the previous report.
+`ClaudeLocalUsageCacheState` (`absent`, `unreadable`, `invalid`, `valid`) is
+published for Dashboard → Services and for the `claudeLocalCache` diagnostics
+line; no path accompanies it.
+
+### `ClaudeQuotaFreshnessPolicy`
+
+The policy is pure. The store owns slots and schedule; the policy decides which
+report is shown and whether it still counts as current.
+
+- `select(localCache:statusline:cli:)` starts with the cache and lets a backup
+  replace it only when its `reportedAt` is strictly newer; equal times keep the
+  primary. Exactly one report is shown, so percentages from different sources
+  are never averaged or merged.
+- `maximumAge(for:)` is 60 minutes for the cache (Claude Code's own last-known
+  rule), the existing 10-minute baseline for statusline, and
+  `max(10 min, refresh interval + 60 s)` for CLI.
+- `isCurrent` also requires a non-empty snapshot. Windows whose reset time
+  passed disappear and are never shown as 100% remaining. Past the age limit
+  the UI shows the amber cached marker and the data time but keeps the numbers.
+
+### Presentation and models
+
+`ClaudeQuotaSource` gains `localCache` ahead of `statusline` and `cliUsage`.
+`ClaudeQuotaReport` carries optional `modelLimits`; `snapshot(at:)` projects
+them as extra weekly-only buckets with identifiers derived from the display
+name (`claude.model.<slug>`), so a "Fable" weekly limit appears under
+**Per-model weekly limits** on the Claude card, in the menu-bar quota picker
+and in automatic most-constrained selection. Older cached reports without the
+field decode with an empty list. The Claude card shows the source name and the
+**Claude Code fetched** time and has three new empty states: no cache yet (run
+`claude` in a terminal and enter `/usage`, or use the one-time CLI read), cache
+unreadable, and windows expired. Dashboard → Services gains a read-only
+**Claude data sources** section showing the three tiers, the current source
+and the local-cache state.
+
+### Boundaries kept
+
+No preference key, cache file, entitlement, network endpoint or installer step
+is added. `AppUpdateClient.swift` remains the only network client; no HTTP,
+OAuth, Keychain, cookie or token reading exists. `security_check.sh` now also
+forbids `.credentials.json`, the `Claude Code-credentials` Keychain item,
+`SecItemAdd`/`SecItemUpdate`/`SecItemDelete`, `SecKeychain` and the
+`api/oauth/usage` endpoint string in production sources, and requires that the
+literal `claude.json` appears only in `Services/ClaudeLocalUsageCacheReader.swift`.
+
+Codex94 reads only files the official client leaves on the Mac because
+[Anthropic's legal page](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
+(2026-02-20) restricts OAuth tokens to Claude Code and native Anthropic apps
+and forbids third parties from collecting, storing or intermediating Claude.ai
+credentials or session tokens. The paused OAuth work lives in draft PR #44 and
+is not part of 4.1.0. Validation of these boundaries is pending; see
+[RELEASING.md](RELEASING.md).
+
+## 4.0.2 candidate (carried into 4.1.0): callback safety and compact presentation
 
 The system notification adapter accepts callbacks on the system's call-out
 queue through an explicit `@Sendable` boundary. It passes transferable status
@@ -49,9 +169,10 @@ preferences have their own keys. Monitoring defaults to Codex only. A display
 selection never implicitly enables a provider or starts a request.
 `claude.cliUsageEnabled.v1` is a separate default-off opt-in for the optional
 CLI reader. Existing Claude monitoring preferences do not enable it during
-migration. Without it, no CLI client is created and refreshes only load the
-local statusline cache. Turning it off retires in-flight work and clears CLI
-reports while leaving statusline monitoring available.
+migration. Without it, no CLI client is created and refreshes load only the
+passive sources: the local statusline cache and, since 4.1.0, Claude Code's
+local usage cache (see above). Turning it off retires in-flight work and clears
+CLI reports while leaving statusline monitoring available.
 
 Passive statusline is the default data path. The conditional OAuth proposal was
 reviewed against [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
@@ -61,8 +182,9 @@ credential reader or refresh-token flow is added. Consequently, OAuth-specific
 
 The [official statusline schema](https://code.claude.com/docs/en/statusline#available-data)
 provides quota windows and a session identifier, but no verified account identity.
-CLI mode therefore never loads passive reports as automatic fallback. Explicit
-mode switches clear visible data from the previous source. Passive monitoring
+CLI mode therefore never loads passive reports as automatic fallback, and
+explicit mode switches clear visible data from the previous source (4.1.0
+replaces this with tiered selection; see above). Passive monitoring
 persists the selected producer fingerprint; another or unknown producer requires
 explicit adoption and resets notification comparisons. This is report-stream
 isolation, not account authentication, and cannot detect an account change inside
@@ -131,6 +253,8 @@ unattended live monitoring are separate release evidence.
 | `AppUpdateController` | Own the explicit GitHub metadata check and its UI state. It does not poll, download, install, or share quota authentication. |
 | Token image export views/helpers | Render the current prepared chart without interaction controls or identity; own explicit PNG save/copy actions. Pass the pasteboard explicitly so tests can isolate it. |
 | `CodexExecutableLocator` | Own explicit-path precedence, known bundled/standard CLI candidates, and bounded `--version` compatibility checks. Tests inject App roots and synthetic executables. |
+| `ClaudeLocalUsageCacheReader` | Own the Claude Code state-file location (home or `CLAUDE_CONFIG_DIR`), the read-only `O_NOFOLLOW` open with its symlink/owner/type/size refusals, the size/mtime/inode stamp, and parsing of the `cachedUsageUtilization` key only. Return a report, the in-memory account identifier and a state; never write, retain other keys, or start a request. |
+| `ClaudeQuotaFreshnessPolicy` | Own the pure source-tier selection (cache first; a backup replaces it only when strictly newer) and the per-source maximum ages. Decide only what is shown and whether it is current; own no slot, timer or I/O. |
 | Platform and transport services | Own Codex subprocesses, notification delivery, hotkey registration, and the fixed update HTTP request. Keep bounded process-group termination in its existing service. |
 | Pure models and support types | Own parsing, date/count rules, selection projections, chart preparation, formatting inputs, and scheduling decisions without starting I/O. |
 
@@ -168,7 +292,9 @@ unattended live monitoring are separate release evidence.
 
 `AppStoreTests` covers quota ordering, cache/selection effects, wake/Reset
 coordination, and shutdown. `TokenUsageStoreTests` covers request generations
-and retired clients. Parser and presentation tests cover strict values, dates,
+and retired clients. Version `4.1.0` adds `ClaudeLocalUsageCacheReaderTests`
+and `ClaudeQuotaFreshnessPolicyTests` for the safe-open refusals, strict
+parsing, stamp reuse, tier selection and per-source ages; both passed in the local Xcode 27.0 run, and CI on Xcode 16.4 is pending. Parser and presentation tests cover strict values, dates,
 gaps, chart projections, and CSV. External synthetic UI tests cover actual
 window/navigation interactions separately from these model tests. Version
 `3.1.0` adds Floating interactions and Token custom-range controls. Image tests

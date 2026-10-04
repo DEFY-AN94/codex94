@@ -731,6 +731,7 @@ extension ClaudeQuotaSource {
     var localizedKey: LocalizedStringKey { LocalizedStringKey(localizationKey) }
     var localizationKey: String {
         switch self {
+        case .localCache: "claude.source.localCache"
         case .statusline: "claude.source.statusline"
         case .cliUsage: "claude.source.cliUsage"
         }
@@ -751,6 +752,7 @@ extension ClaudeQuotaIssue {
         case .sourceChanged: "claude.issue.sourceChanged"
         case .configurationConflict: "claude.issue.configurationConflict"
         case .unavailable: "claude.issue.unavailable"
+        case .localCacheUnreadable: "claude.issue.localCacheUnreadable"
         }
     }
 }

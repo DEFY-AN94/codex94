@@ -58,25 +58,16 @@ struct ProviderSettingsView: View {
                 )
             }
             SettingsDivider()
+            SettingsRow("claude.sources.title") {
+                ClaudeSourcesSummaryView(store: store.claudeStore, language: store.preferences.language)
+            }
+            SettingsDivider()
             SettingsRow("claude.passive.title") {
                 ClaudeStatuslineSetupView(store: store.claudeStore)
             }
             SettingsDivider()
             SettingsRow("claude.cliUsage.title") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Toggle("claude.cliUsage.enable", isOn: Binding(
-                        get: { store.preferences.claudeCLIUsageEnabled },
-                        set: { store.setClaudeCLIUsageEnabled($0) }
-                    ))
-                    .accessibilityIdentifier("claude-cli-usage-enabled")
-                    Text("claude.cliUsage.help")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Label("claude.cliUsage.warning", systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption).foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("claude-cli-usage-warning")
-                }
+                ClaudeCLIUsageSettingsView(store: store)
             }
             if store.preferences.claudeMonitoringEnabled && store.preferences.claudeCLIUsageEnabled {
                 SettingsDivider()
@@ -129,6 +120,93 @@ struct ProviderSettingsView: View {
             }
             .labelsHidden().frame(maxWidth: 260)
             .accessibilityIdentifier(identifier)
+        }
+    }
+}
+
+/// Read-only explanation of the three Claude sources and which one is shown.
+/// Rendering this view never reads a file or starts a request.
+struct ClaudeSourcesSummaryView: View {
+    @ObservedObject var store: ClaudeQuotaStore
+    let language: LanguagePreference
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("claude.sources.help")
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(verbatim: currentSourceText)
+                .font(.caption)
+                .accessibilityIdentifier("claude-sources-current")
+            if store.isEnabled {
+                // The cache is examined only while monitoring is on.
+                Text(verbatim: localCacheText)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("claude-sources-local-cache")
+            }
+        }
+    }
+
+    private func localized(_ key: String, arguments: [CVarArg] = []) -> String {
+        StatusAccessibilityString.localized(key, arguments: arguments, language: language, bundle: .main)
+    }
+
+    private var currentSourceText: String {
+        guard store.isEnabled else { return localized("claude.monitoring.off") }
+        let name = store.source.map { localized($0.localizationKey) } ?? localized("claude.sources.none")
+        return localized("claude.sources.current %@", arguments: [name])
+    }
+
+    private var localCacheText: String {
+        localized("claude.localCache.status." + store.localCacheState.rawValue)
+    }
+}
+
+/// The optional CLI reader: an automatic switch, its quota warning, and one
+/// explicit read that works regardless of the switch.
+struct ClaudeCLIUsageSettingsView: View {
+    @ObservedObject var store: AppStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle("claude.cliUsage.enable", isOn: Binding(
+                get: { store.preferences.claudeCLIUsageEnabled },
+                set: { store.setClaudeCLIUsageEnabled($0) }
+            ))
+            .accessibilityIdentifier("claude-cli-usage-enabled")
+            Text("claude.cliUsage.help")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Label("claude.cliUsage.warning", systemImage: "exclamationmark.triangle.fill")
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("claude-cli-usage-warning")
+            HStack(spacing: 10) {
+                Button("claude.cliUsage.readOnce") { store.readClaudeOnceWithCLI() }
+                    .disabled(!store.preferences.claudeMonitoringEnabled || !store.claudeStore.canReadOnceWithCLI)
+                    .accessibilityIdentifier("claude-cli-read-once")
+                if store.claudeStore.isRefreshing {
+                    ProgressView().controlSize(.small)
+                    Text("claude.refreshing").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Text("claude.cliUsage.readOnce.help")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let issue = store.claudeStore.lastCLIReadIssue {
+                Text(issue == .noData ? LocalizedStringKey("claude.cliUsage.readOnce.noData") : issue.localizedKey)
+                    .font(.caption).foregroundStyle(issue == .noData ? Color.secondary : Color.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("claude-cli-read-once-issue")
+            } else if let readAt = store.claudeStore.lastCLIReadAt,
+                      let time = QuotaFormatting.automaticRefreshTime(at: readAt) {
+                Text(verbatim: StatusAccessibilityString.localized(
+                    "claude.cliUsage.lastRead %@", arguments: [time],
+                    language: store.preferences.language, bundle: .main
+                ))
+                .font(.caption).foregroundStyle(.secondary)
+                .accessibilityIdentifier("claude-cli-last-read")
+            }
         }
     }
 }

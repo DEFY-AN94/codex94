@@ -25,8 +25,15 @@ final class ProviderViewTests: XCTestCase {
             XCTAssertEqual(content.badge, .none)
             XCTAssertNil(content.statusKey)
             XCTAssertEqual(content.refreshTitleKey, "claude.passive.reread")
-            XCTAssertEqual(content.emptyStateKey, "claude.passive.notConfigured")
+            XCTAssertEqual(content.emptyStateKey, "claude.localCache.absent",
+                           "Without a cache or a status-line connection the card explains how data appears")
             content.statuslineSetupState = .installed
+            XCTAssertEqual(content.emptyStateKey, "claude.passive.waiting")
+            content.statuslineSetupState = .notInstalled
+            content.localCacheState = .invalid
+            XCTAssertEqual(content.emptyStateKey, "claude.localCache.absent",
+                           "A state file without usage data still needs the /usage instruction")
+            content.localCacheState = .valid
             XCTAssertEqual(content.emptyStateKey, "claude.passive.waiting")
         }
         var cli = card(snapshot: nil, source: nil, now: reportedAt, issue: .loginRequired)
@@ -34,6 +41,67 @@ final class ProviderViewTests: XCTestCase {
         XCTAssertEqual(cli.badge, .unavailable)
         XCTAssertEqual(cli.statusKey, "claude.issue.loginRequired")
         XCTAssertEqual(cli.refreshTitleKey, "claude.refresh")
+    }
+
+    func testLocalCacheSourceLabelsItsFetchTimeAndListsModelLimits() throws {
+        let report = ClaudeQuotaReport(
+            source: .localCache, reportedAt: reportedAt, receivedAt: reportedAt.addingTimeInterval(5),
+            windows: [ClaudeQuotaWindow(kind: .fiveHour, usedPercentage: 4.6, resetsAt: reportedAt.addingTimeInterval(12_000)),
+                      ClaudeQuotaWindow(kind: .weekly, usedPercentage: 47.5, resetsAt: reportedAt.addingTimeInterval(20_000))],
+            modelLimits: [ClaudeQuotaModelLimit(modelName: "Fable", usedPercentage: 33,
+                                                resetsAt: reportedAt.addingTimeInterval(20_000))]
+        )
+        let snapshot = try XCTUnwrap(report.snapshot(at: reportedAt))
+        var content = card(snapshot: snapshot, source: .localCache, now: reportedAt.addingTimeInterval(60))
+        content.localCacheState = .valid
+        XCTAssertEqual(content.sourceTitleKey, "claude.source.localCache")
+        XCTAssertTrue(content.sourceTimeText.hasPrefix("Claude Code fetched: "), content.sourceTimeText)
+        XCTAssertEqual(content.badge, .none)
+        XCTAssertNil(content.statusKey)
+        XCTAssertEqual(content.refreshTitleKey, "claude.passive.reread")
+        XCTAssertEqual(ProviderScopedLimit.limits(in: snapshot).map(\.name), ["Fable"])
+        XCTAssertEqual(ProviderScopedLimit.limits(in: snapshot).first?.window.preciseRemainingPercent, 67)
+
+        var stale = card(snapshot: snapshot, source: .localCache, now: reportedAt.addingTimeInterval(4_000), issue: .staleData)
+        stale.localCacheState = .valid
+        XCTAssertEqual(stale.badge, .stale)
+        XCTAssertEqual(stale.statusKey, "claude.issue.staleData")
+
+        // With the CLI option on, the store projects an automatic CLI failure onto
+        // out-of-date passive data; the card names it while keeping the numbers.
+        var staleLogin = card(snapshot: snapshot, source: .localCache, now: reportedAt.addingTimeInterval(4_000), issue: .loginRequired)
+        staleLogin.isCLIUsageEnabled = true
+        XCTAssertEqual(staleLogin.badge, .stale)
+        XCTAssertEqual(staleLogin.statusKey, "claude.issue.loginRequired")
+        XCTAssertEqual(staleLogin.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 95.4)
+        let offLogin = card(snapshot: snapshot, source: .localCache, now: reportedAt.addingTimeInterval(4_000), issue: .loginRequired)
+        XCTAssertNil(offLogin.statusKey, "Without the option a CLI failure never reaches the card")
+
+        var unreadable = card(snapshot: nil, source: nil, now: reportedAt, issue: .localCacheUnreadable)
+        unreadable.localCacheState = .unreadable
+        XCTAssertEqual(unreadable.badge, .unavailable)
+        XCTAssertEqual(unreadable.emptyStateKey, "claude.localCache.unreadable")
+        XCTAssertNil(unreadable.statusKey, "The empty state already explains the unreadable cache")
+
+        let oneShot = ClaudeQuotaCardContent(
+            snapshot: snapshot, source: .localCache, reportedAt: snapshot.fetchedAt, issue: nil,
+            isRefreshing: true, isEnabled: true, language: .english, now: reportedAt.addingTimeInterval(60),
+            palette: .resolve(.system, scheme: .light), refresh: {}, openSetup: {},
+            timeZone: TimeZone(secondsFromGMT: 0)!, localCacheState: .valid
+        )
+        XCTAssertEqual(oneShot.badge, .refreshing, "A one-time CLI read shows progress even with the option off")
+        XCTAssertEqual(oneShot.statusKey, "claude.refreshing")
+
+        let empty = card(snapshot: nil, source: nil, now: reportedAt)
+        XCTAssertEqual(empty.sourceTitleKey, "claude.source.passive")
+        var cli = card(snapshot: nil, source: nil, now: reportedAt)
+        cli.isCLIUsageEnabled = true
+        XCTAssertEqual(cli.emptyStateKey, "claude.quota.empty")
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let localized = StatusAccessibilityString.localized("claude.sources.help", language: language, bundle: .main)
+            XCTAssertFalse(localized.isEmpty)
+            XCTAssertNotEqual(localized, "claude.sources.help", "Both languages must translate the sources help")
+        }
     }
 
     func testUnverifiedAndExpiredPassiveReportsKeepTheirOwnTimeAndUnknownWindows() throws {
@@ -666,6 +734,7 @@ final class ProviderViewTests: XCTestCase {
             installer: ClaudeStatuslineInstaller(settingsURL: directory.appendingPathComponent("settings.json"),
                                                  cache: cache, executableURL: directory.appendingPathComponent("SyntheticCodex94"),
                                                  supportDirectory: directory.appendingPathComponent("bridge")),
+            localCache: ClaudeLocalUsageCacheReader(fileURL: directory.appendingPathComponent("claude-state/.claude.json")),
             fetcherFactory: { claudeFetcher },
             notificationController: NotificationController(service: notifications),
             now: { report.reportedAt.addingTimeInterval(claudeReportAge) },

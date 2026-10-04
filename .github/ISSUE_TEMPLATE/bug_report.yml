@@ -32,8 +32,8 @@ body:
   - type: input
     id: codex-source
     attributes:
-      label: Codex source and version
-      description: For example, ChatGPT.app or Codex.app bundle, Homebrew, or a manually selected codex-cli version. Do not include a private path.
+      label: Codex or Claude source and version
+      description: For Codex, say ChatGPT.app or Codex.app bundle, Homebrew, or a manually selected codex-cli version. For Claude, name which of the three sources the card showed (Claude Code local cache, status line, or CLI /usage) and the Claude Code version. Do not include a private path, email address, or account ID.
     validations:
       required: true
   - type: textarea
