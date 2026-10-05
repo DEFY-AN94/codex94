@@ -26,16 +26,19 @@ Claude 默认读取 Claude Code 本地用量缓存，以符合条件的状态栏
 > Codex94 与 OpenAI 或 Anthropic 没有隶属关系，也未获得两者的认可、背书或赞助。
 > Codex `app-server` 是实验性接口；上游更新也可能改变 CLI 和状态栏的数据格式。
 
-## 4.1.2 展示修正候选版（尚未发布）
+## 4.1.2 版本
 
-`4.1.2 (26)` 会在 Claude 报告的共享额度窗口结束后显示**上次用量记录**。
+`4.1.2 (26)` 已于 **2026-10-05**（Australia/Melbourne）正式发布。
+本版在 Claude 报告的共享额度窗口结束后显示**上次用量记录**。
 菜单弹窗和 Dashboard 保留原报告的剩余／已用百分比、来源时间，并标明**当前额度未知**。
 历史数值不填入当前菜单栏圆环，不参与 Auto 或通知；菜单栏提示、辅助功能和悬浮窗展开区
 只把它作为带说明的历史信息。此功能读取已有报告，不会获取新的云端用量或自动启动 CLI。
 
-验证正在进行，稳定下载和源码入口继续指向 4.1.1。
+本机发布检查通过：582 项执行、1 项既有托管焦点测试跳过、0 失败。
+最终主分支 CI、五组界面场景与 CodeQL 均通过。安装包、安装与观察证据及其范围见
+[发布记录](docs/RELEASING.md)。
 
-## 4.1.1 版本
+## 早先的 4.1.1 版本
 
 `4.1.1 (25)` 已于 **2026-10-05**（Australia/Melbourne）正式发布。
 本版优化 Claude 缓存恢复、账号上下文隔离和本地读取安全：选源前排除
@@ -247,7 +250,7 @@ Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 ## 当前分发状态
 
 - 已发布的稳定版为
-  [`v4.1.1 (25)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1)，
+  [`v4.1.2 (26)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.2)，
   于 **2026-10-05**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
   annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
@@ -262,7 +265,7 @@ Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 - 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
-已发布的 `4.1.1` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+已发布的 `4.1.2` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
 attestation 都不会改变这一 Apple 信任状态。
 
@@ -287,23 +290,23 @@ Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
 
 ## 安装 Universal DMG
 
-请从 [`v4.1.1` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1)
+请从 [`v4.1.2` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.2)
 下载以下两个正式资产：
 
-- `Codex94-4.1.1-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.1-SHA256SUMS.txt`
+- `Codex94-4.1.2-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.2-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-4.1.1-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.2-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-4.1.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -323,7 +326,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v4.1.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：

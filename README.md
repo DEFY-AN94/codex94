@@ -31,19 +31,22 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
-## 4.1.2 display-fix candidate (unreleased)
+## Version 4.1.2
 
-`4.1.2 (26)` shows an accepted Claude report as **Last usage record** when its
-shared windows have ended. The popover and Dashboard retain its original
-remaining/used percentages and source time, with a clear **Current quota unknown**
+`4.1.2 (26)` was published on **2026-10-05** (Australia/Melbourne). It shows an
+accepted Claude report as **Last usage record** when its shared windows have
+ended. The popover and Dashboard retain its original remaining/used percentages and source time, with a clear **Current quota unknown**
 label. Historical numbers do not fill current menu-bar rings, drive Auto or
 send notifications. They appear only as qualified tooltip/accessibility and
 expanded floating-window detail. This rereads existing reports; it does not
 fetch fresh cloud usage or start the optional CLI reader.
 
-Verification is in progress. Stable download and clone links remain on 4.1.1.
+The local release gate passed: 582 tests executed, 1 existing hosted-focus
+skip, 0 failures. Final-main CI, all five UI scenarios and CodeQL passed.
+Package, installation and observation evidence, with their limits, are in the
+[release record](docs/RELEASING.md).
 
-## Version 4.1.1
+## Earlier 4.1.1 release
 
 `4.1.1 (25)` was published on **2026-10-05** (Australia/Melbourne). It improves
 Claude cache recovery, account-context isolation and local read safety. It filters unusable reports before source selection, rechecks
@@ -316,7 +319,7 @@ statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v4.1.1 (25)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1),
+  [`v4.1.2 (26)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.2),
   released on **2026-10-05** (Australia/Melbourne) as a Universal 2 DMG and
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
@@ -335,7 +338,7 @@ statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `4.1.1` DMG itself is completely unsigned, has no Apple Developer ID
+The published `4.1.2` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -366,23 +369,23 @@ precedence; an invalid manual choice is not silently bypassed.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v4.1.1` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1):
+[`v4.1.2` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.2):
 
-- `Codex94-4.1.1-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.1-SHA256SUMS.txt`
+- `Codex94-4.1.2-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.2-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-4.1.1-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.2-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-4.1.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -404,7 +407,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v4.1.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:

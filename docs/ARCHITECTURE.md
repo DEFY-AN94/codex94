@@ -1,13 +1,13 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints for the published
-[`4.1.1 (25)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1),
+[`4.1.2 (26)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.2),
 published on 2026-10-05 (Australia/Melbourne), including the unpublished
 `4.0.2 (23)` candidate it carries forward.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.1.2 display candidate: historical quota is not current quota
+## 4.1.2 display release: historical quota is not current quota
 
 `ClaudeQuotaHistoryPresentation` is an in-memory, display-only value derived from
 one already accepted, selected report when no current snapshot can be produced.

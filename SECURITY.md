@@ -126,9 +126,9 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-4.1.1-SHA256SUMS.txt` before opening the DMG. The optional
+Verify `Codex94-4.1.2-SHA256SUMS.txt` before opening the DMG. The optional
 GitHub command
-`gh attestation verify Codex94-4.1.1-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
+`gh attestation verify Codex94-4.1.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
 can prove repository/workflow/commit provenance for the exact DMG. A matching
 checksum or attestation is not notarization, malware review, a security audit,
 or Gatekeeper approval. If the exact release is trusted, use only Apple's
@@ -252,7 +252,7 @@ Version `4.0.1 (22)` uses passive Claude reports by default with explicit
 report-stream adoption and a separate default-off CLI reader. The retained
 `v4.0.0` tag identifies an unpublished candidate, not a supported stable release.
 
-The supported published stable version is [`v4.1.1 (25)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.1),
+The supported published stable version is [`v4.1.2 (26)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.2),
 released on 2026-10-05 (Australia/Melbourne).
 Feature branches and `main` may contain development work that has not passed
 release acceptance. Current stable-version links identify the published release.

@@ -4,9 +4,8 @@ All notable changes to Codex94 are documented here.
 
 ## 4.1.2 - 2026-10-05
 
-Version `4.1.2 (26)` is a display-fix candidate dated for release in
-Australia/Melbourne. Stable downloads remain on published 4.1.1 until release
-verification completes.
+Version `4.1.2 (26)` is the published stable release. Release dates use
+Australia/Melbourne; `4.1.1 (25)` is the previous release.
 
 ### Changed
 
@@ -28,8 +27,7 @@ warning remain unchanged; this release does not obtain new cloud usage by itself
 
 ## 4.1.1 - 2026-10-05
 
-Version `4.1.1 (25)` is the published stable release. Release dates use
-Australia/Melbourne; `4.1.0 (24)` is the previous release.
+Version `4.1.1 (25)` was published on the date above, following `4.1.0 (24)`.
 
 ### Fixed
 
@@ -158,8 +156,8 @@ publication as Latest on 2026-10-05 are recorded in
 ### 4.0.2 (23) - unpublished candidate carried into 4.1.0
 
 Version `4.0.2 (23)` was prepared as a release candidate but was never tagged
-or published; no date is assigned. Its changes below are carried into
-`4.1.0 (24)` above and remain unreleased.
+or published; no date is assigned. Its changes below were shipped in
+`4.1.0 (24)` above.
 
 #### Fixed
 
