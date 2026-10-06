@@ -8,6 +8,53 @@ import XCTest
 final class MenuBarStatusRendererTests: XCTestCase {
     private let fetchedAt = Date(timeIntervalSince1970: 1_900_000_000)
 
+    func testHistoricalRingStyleZeroAndUnknownKeepNativeGeometryAndColorSpace() throws {
+        let output = try temporaryDirectory()
+        print("CODEX94_HISTORY_RINGS_DIR=\(output.path)")
+        for scheme in [ColorScheme.light, .dark] {
+            for scale: CGFloat in [1, 2] {
+                var history = input(scheme: scheme, scale: scale)
+                history.providerRings = [
+                    .init(provider: .codex, remainingPercent: 85, quotaLevel: .healthy, badge: .none),
+                    .init(provider: .claude, remainingPercent: 83, quotaLevel: .healthy, badge: .stale, isHistorical: true)
+                ]
+                let image = try XCTUnwrap(MenuBarStatusImageRenderer.render(history))
+                try writePNG(try bitmap(image), named: "history-83-\(scheme)-\(Int(scale))x", to: output)
+                XCTAssertEqual(image.size, CGSize(width: 48, height: 22))
+                XCTAssertEqual(history.statusItemWidth, 52)
+                XCTAssertEqual(try bitmap(image).cgImage?.colorSpace?.name, CGColorSpace.sRGB)
+                XCTAssertFalse(image.isTemplate)
+                var current = history
+                current.providerRings[1].isHistorical = false
+                XCTAssertNotEqual(history, current, "Current/history transitions must redraw even at the same number and clock badge")
+                XCTAssertNotEqual(image.tiffRepresentation, try XCTUnwrap(MenuBarStatusImageRenderer.render(current)).tiffRepresentation)
+                var zero = history
+                zero.providerRings[1] = .init(provider: .claude, remainingPercent: 0, quotaLevel: .critical,
+                                               badge: .stale, isHistorical: true)
+                var unknown = history
+                unknown.providerRings[1] = .init(provider: .claude, remainingPercent: nil, quotaLevel: .unknown,
+                                                  badge: .stale, isHistorical: true)
+                XCTAssertNotEqual(zero, unknown)
+                let zeroImage = try XCTUnwrap(MenuBarStatusImageRenderer.render(zero))
+                let unknownImage = try XCTUnwrap(MenuBarStatusImageRenderer.render(unknown))
+                try writePNG(try bitmap(zeroImage), named: "history-zero-\(scheme)-\(Int(scale))x", to: output)
+                try writePNG(try bitmap(unknownImage), named: "history-unknown-\(scheme)-\(Int(scale))x", to: output)
+                XCTAssertGreaterThan(opaquePixelCount(try bitmap(zeroImage)), 50, "An exhausted historical ring still has its track, provider icon and clock")
+                XCTAssertNotEqual(zeroImage.tiffRepresentation, unknownImage.tiffRepresentation)
+            }
+        }
+        for layout in [MenuBarLayout.ringOnly, .ringAndPercentage, .percentageOnly] {
+            let current = input(layout: layout, badge: .stale)
+            var historical = current
+            historical.isHistorical = true
+            XCTAssertNotEqual(current, historical)
+            XCTAssertEqual(current.statusItemWidth, historical.statusItemWidth)
+            let currentImage = try XCTUnwrap(MenuBarStatusImageRenderer.render(current))
+            let historicalImage = try XCTUnwrap(MenuBarStatusImageRenderer.render(historical))
+            XCTAssertNotEqual(currentImage.tiffRepresentation, historicalImage.tiffRepresentation)
+        }
+    }
+
     func testCombinedProviderRingsHaveCompactColorManagedPixelsAndIndependentState() throws {
         let output = try temporaryDirectory()
         for scheme in [ColorScheme.light, .dark] {

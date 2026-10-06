@@ -11,6 +11,7 @@ final class ClaudeQuotaStore: ObservableObject {
     @Published private(set) var historicalReport: ClaudeQuotaHistoryPresentation?
     @Published private(set) var connectionState: ConnectionState = .idle
     @Published private(set) var isRefreshing = false
+    @Published private(set) var isRetiringCLI = false
     @Published private(set) var lastIssue: ClaudeQuotaIssue?
     @Published private(set) var source: ClaudeQuotaSource?
     @Published private(set) var reportedAt: Date?
@@ -25,7 +26,7 @@ final class ClaudeQuotaStore: ObservableObject {
     @Published private(set) var lastCLIReadAt: Date?
     var isStatuslineInstalled: Bool { statuslineSetupState == .installed }
     var isCLIUsageEnabled: Bool { preferences.claudeCLIUsageEnabled }
-    var canReadOnceWithCLI: Bool { isEnabled && !stopped && requestTask == nil }
+    var canReadOnceWithCLI: Bool { isEnabled && !stopped && requestTask == nil && !isRetiringCLI }
     let notificationController: NotificationController
 
     private let preferences: PreferencesStore
@@ -54,6 +55,8 @@ final class ClaudeQuotaStore: ObservableObject {
     private var pendingPassiveReport: ClaudeQuotaReport?
     private var policy = QuotaNotificationPolicy()
     private var requestTask: Task<Void, Never>?
+    private var retirementTask: Task<Void, Never>?
+    private var pendingAutomaticCLITrigger: RefreshTrigger?
     private var pollingTask: Task<Void, Never>?
     private var generation = 0
     private var stopped = false
@@ -91,6 +94,7 @@ final class ClaudeQuotaStore: ObservableObject {
 
     deinit {
         requestTask?.cancel()
+        retirementTask?.cancel()
         pollingTask?.cancel()
         fetcher?.shutdown()
         cleanup.sync {}
@@ -98,8 +102,6 @@ final class ClaudeQuotaStore: ObservableObject {
 
     func start() {
         guard !stopped, !isEnabled, preferences.claudeMonitoringEnabled else { return }
-        fetcher = preferences.claudeCLIUsageEnabled ? fetcherFactory() : nil
-        oneShotFetcher = false
         isEnabled = true
         logger.info("monitor=started")
         notificationController.configure(enabled: preferences.claudeNotifications.isEnabled)
@@ -159,11 +161,16 @@ final class ClaudeQuotaStore: ObservableObject {
         guard isEnabled, !stopped else { return }
         readLocalCache()
         loadBridgeReport()
-        guard preferences.claudeCLIUsageEnabled, requestTask == nil, let currentFetcher = fetcher else {
+        guard preferences.claudeCLIUsageEnabled, requestTask == nil, !isRetiringCLI else {
+            // Only automatic-mode intents may wait behind cleanup. A one-time
+            // read never schedules a second read when its client retires.
+            if preferences.claudeCLIUsageEnabled, isRetiringCLI { pendingAutomaticCLITrigger = trigger }
             projectReport(at: now())
             updateNextAutomaticRefresh()
             return
         }
+        let currentFetcher = fetcher ?? fetcherFactory()
+        fetcher = currentFetcher
         startCLIRead(using: currentFetcher, trigger: trigger, oneShot: false)
     }
 
@@ -173,6 +180,12 @@ final class ClaudeQuotaStore: ObservableObject {
         guard canReadOnceWithCLI else { return }
         readLocalCache()
         loadBridgeReport()
+        // Local identity inspection may have retired the previous idle client.
+        guard canReadOnceWithCLI else {
+            if preferences.claudeCLIUsageEnabled, isRetiringCLI { pendingAutomaticCLITrigger = .manual }
+            projectReport(at: now())
+            return
+        }
         let client: any ClaudeQuotaFetching
         if let fetcher {
             client = fetcher
@@ -223,12 +236,13 @@ final class ClaudeQuotaStore: ObservableObject {
             guard let self, generation == expectedGeneration, !stopped else { return }
             lastCLIReadAt = now()
             isRefreshing = false
+            let finishedRequest = requestTask
             requestTask = nil
             if oneShotFetcher, !preferences.claudeCLIUsageEnabled {
                 let retired = fetcher
                 fetcher = nil
                 oneShotFetcher = false
-                cleanup.async { retired?.shutdown() }
+                beginCLIRetirement(fetcher: retired, request: finishedRequest)
             }
             updateNextAutomaticRefresh()
         }
@@ -276,7 +290,6 @@ final class ClaudeQuotaStore: ObservableObject {
         cliReport = nil
         resetNotificationBaseline()
         guard isEnabled else { updateNextAutomaticRefresh(); return }
-        if enabled { fetcher = fetcherFactory() }
         armPolling()
         projectReport(at: now())
         if enabled { refresh(trigger: .preferenceChange) }
@@ -284,13 +297,45 @@ final class ClaudeQuotaStore: ObservableObject {
 
     private func retireCLIRequest() {
         generation += 1
-        requestTask?.cancel()
+        pendingAutomaticCLITrigger = nil
+        let retiredRequest = requestTask
+        retiredRequest?.cancel()
         requestTask = nil
         isRefreshing = false
         let retired = fetcher
         fetcher = nil
         oneShotFetcher = false
-        cleanup.async { retired?.shutdown() }
+        beginCLIRetirement(fetcher: retired, request: retiredRequest)
+    }
+
+    private func beginCLIRetirement(fetcher retired: (any ClaudeQuotaFetching)?, request retiredRequest: Task<Void, Never>?) {
+        // No new client is created while this gate is held, so repeated toggles
+        // have nothing else to retire and cannot replace the existing barrier.
+        guard retired != nil || retiredRequest != nil else { return }
+        precondition(retirementTask == nil)
+        assign(\.isRetiringCLI, true)
+        // Enqueue synchronously, before returning to the actor. shutdown() can
+        // therefore drain the queue even if the async waiter has not started.
+        let shutdownFinished = AsyncStream<Void> { continuation in
+            cleanup.async {
+                retired?.shutdown()
+                continuation.finish()
+            }
+        }
+        retirementTask = Task { [weak self] in
+            for await _ in shutdownFinished {}
+            // shutdown can finish before a queued fetch unwinds its continuation.
+            // Releasing the slot requires both operations to have completed.
+            await retiredRequest?.value
+            guard let self else { return }
+            retirementTask = nil
+            assign(\.isRetiringCLI, false)
+            let trigger = pendingAutomaticCLITrigger
+            pendingAutomaticCLITrigger = nil
+            guard !Task.isCancelled, isEnabled, !stopped, preferences.claudeCLIUsageEnabled,
+                  let trigger else { return }
+            refresh(trigger: trigger)
+        }
     }
 
     func adoptPendingPassiveReport(expectedConfirmationID: UUID) {
@@ -492,7 +537,6 @@ final class ClaudeQuotaStore: ObservableObject {
         clearResetSchedule()
         resetNotificationBaseline()
         if isEnabled {
-            if preferences.claudeCLIUsageEnabled { fetcher = fetcherFactory() }
             // Retiring the CLI changes generation; the previous poll must not
             // silently stop all subsequent local-file observations.
             armPolling()

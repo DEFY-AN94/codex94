@@ -49,6 +49,8 @@ final class Codex94UITests: XCTestCase {
         try capture(popover, named: "popover-startup.png")
         try assertStatusItemWidth(58)
         try assertNoRecoveryAction(in: popover)
+        try require(!identified("menu-bar-quota-picker", in: popover).exists,
+                    "Menu-bar quota settings now belong to Dashboard Display")
         try assertQuotaLayout(in: popover, spark: false)
         try assertColor("FF8C42", in: identified("quota-window-weekly", in: popover))
 
@@ -137,9 +139,12 @@ final class Codex94UITests: XCTestCase {
         try fixture.setMode("normal")
         try manualRefresh(in: popover)
         try chooseModel(fixture.sparkName, in: popover)
-        try withoutRequests("Selecting a specific menu-bar bucket") {
-            try chooseQuota("\(fixture.sparkName) · Weekly", in: popover)
+        dashboard = try openDashboard(from: popover)
+        try selectPage(.display, in: dashboard)
+        try withoutRequests("Selecting a specific menu-bar bucket in Display") {
+            try chooseQuota("\(fixture.sparkName) · Weekly", in: dashboard)
         }
+        popover = try openPopoverWithConnectedData()
         let savedSparkSelection = try selectedQuotaPreference()
         try require(savedSparkSelection != originalSelection, "The test must save an explicit Spark selection")
 
@@ -513,6 +518,57 @@ final class Codex94UITests: XCTestCase {
         XCTAssertEqual(try fixture.requestCount(), codexBeforeFailure)
         XCTAssertEqual(try fixture.cacheFingerprint(), cacheBeforeFailure)
 
+        // 4.1.4: history has an explicit native display channel, never a current snapshot.
+        dashboard = try openDashboard(from: popover)
+        try selectPage(.providers, in: dashboard)
+        try setClaudeCLIUsageEnabled(false, in: dashboard)
+        try setProviderMenuMode("compactBoth", in: dashboard)
+        try fixture.setClaudeLocalCacheExpired(true)
+        popover = try openProviderPopover(service: "combined", marker: "provider-quota-sections")
+        try uniqueIdentified("claude-refresh", in: popover).click()
+        try waitUntil("Compact rings must receive accepted historical quota", timeout: 25) {
+            self.identified("claude-history-weekly", in: popover).exists
+                && !self.identified("claude-quota-weekly", in: popover).exists
+        }
+        try require(!identified("menu-bar-quota-picker", in: popover).exists
+                    && !identified("claude-menu-bar-quota-picker", in: popover).exists,
+                    "Quota configuration must not remain in the compact popover")
+        let historyCounts = try providerRequestCounts()
+        let historyNative = try providerStatusItem("combined")
+        try waitUntil("Historical Auto must identify the weekly record and unknown current quota") {
+            historyNative.label.contains("Weekly: last remaining 75%")
+                && historyNative.label.contains("Current quota unknown")
+        }
+        try require((48...56).contains(historyNative.frame.width), "History must retain the compact native width")
+        try fixture.writeArtifact(historyNative.screenshot().pngRepresentation, named: "providers-history-rings-en.png")
+        dashboard = try openDashboard(from: popover)
+        try selectPage(.display, in: dashboard)
+        try require(identified("menu-bar-quota-picker", in: dashboard).exists
+                    && identified("claude-menu-bar-quota-picker", in: dashboard).exists,
+                    "Display must expose both provider quota selections")
+        let historyAuto = identified("claude-auto-quota-selection", in: dashboard)
+        try require([historyAuto.label, historyAuto.title, historyAuto.value as? String ?? ""]
+            .contains { $0.contains("History") && $0.contains("Weekly") },
+                    "Dashboard must explain the separate historical Auto rule")
+        let claudeHistoryPicker = try picker(id: "claude-menu-bar-quota-picker", label: "Menu bar quota",
+                                             values: ["Auto"], in: dashboard)
+        try choose("Claude · 5h · History", in: claudeHistoryPicker, container: dashboard)
+        try waitUntil("A manual historical five-hour choice must reach the native item") {
+            try self.providerStatusItem("combined").label.contains("5h: last remaining 60%")
+        }
+        try choose("Auto", in: claudeHistoryPicker, container: dashboard)
+        try waitUntil("Historical Auto must restore the shared weekly record") {
+            try self.providerStatusItem("combined").label.contains("Weekly: last remaining 75%")
+        }
+        XCTAssertEqual(try providerRequestCounts(), historyCounts,
+                       "Historical selection and rendering must not read either provider")
+        try selectPage(.providers, in: dashboard)
+        try fixture.setClaudeLocalCacheExpired(false)
+        try setProviderMenuMode("both", in: dashboard)
+        try setClaudeCLIUsageEnabled(true, in: dashboard)
+        popover = try openProviderPopover(service: "claude", marker: "provider-quota-sections")
+        try waitForProviderCards(in: popover, codex: true)
+
         dashboard = try openDashboard(from: popover)
         try selectPage(.providers, in: dashboard)
         let disabledCodexCount = try fixture.requestCount()
@@ -579,9 +635,11 @@ final class Codex94UITests: XCTestCase {
         let historyTimeElement = identified("claude-source-time", in: popover)
         try require([historyTimeElement.label, historyTimeElement.title, historyTimeElement.value as? String ?? ""]
             .contains { $0.contains(priorSourceTime) }, "Expiry must retain the original source time")
-        let autoSelection = identified("claude-auto-quota-selection", in: popover)
-        try require([autoSelection.label, autoSelection.title, autoSelection.value as? String ?? ""]
-            .contains { $0.contains("Waiting for quota") }, "History must not become Auto's current quota")
+        try require(!identified("claude-menu-bar-quota-picker", in: popover).exists,
+                    "Historical quota configuration belongs to Dashboard")
+        let reportAge = identified("claude-source-age", in: popover)
+        try require(reportAge.exists && [reportAge.label, reportAge.title, reportAge.value as? String ?? ""]
+            .contains { $0.contains("Last report:") }, "The original report age must have its own line")
         try captureProviderPopover(popover, marker: "claude-quota-section", named: "providers-history-en.png")
         XCTAssertEqual(try fixture.claudeUsageRequestCount(), cliReadsBeforeOff)
         XCTAssertEqual(try fixture.requestCount(), disabledCodexCount)
@@ -602,11 +660,26 @@ final class Codex94UITests: XCTestCase {
         }
         XCTAssertEqual(try fixture.claudeUsageRequestCount(), cliReadsBeforeOff)
         XCTAssertEqual(try fixture.requestCount(), disabledCodexCount)
+        // The menu shortcut uses the fixed synthetic CLI exactly once while opt-in is off.
+        let onceBefore = try fixture.claudeUsageRequestCount()
+        let onceButton = try uniqueIdentified("claude-cli-read-once", in: popover)
+        try require(identified("claude-cli-read-once-warning", in: popover).exists,
+                    "The menu must show its quota-consumption warning beside the action")
+        try reveal(onceButton, in: popover)
+        try waitUntil("The single-read shortcut must become available after cleanup") { onceButton.isEnabled }
+        onceButton.click()
+        try waitUntil("The menu shortcut must finish one synthetic CLI read", timeout: 30) {
+            try self.fixture.claudeUsageRequestCount() == onceBefore + 1
+                && onceButton.isEnabled && self.identified("claude-cli-last-read", in: popover).exists
+        }
+        XCTAssertEqual(try fixture.preference("claude.cliUsageEnabled.v1") as? Bool, false)
+        XCTAssertEqual(try fixture.requestCount(), disabledCodexCount)
         dashboard = try openDashboard(from: popover)
         try selectPage(.providers, in: dashboard)
+        let beforeRegularCLI = try fixture.claudeUsageRequestCount()
         try setClaudeCLIUsageEnabled(true, in: dashboard)
         try waitUntil("Re-enabling the CLI option must perform one read", timeout: 30) {
-            try self.fixture.claudeUsageRequestCount() == cliReadsBeforeOff + 1
+            try self.fixture.claudeUsageRequestCount() == beforeRegularCLI + 1
         }
         let beforeAllOff = try providerRequestCounts()
         try setProviderEnabled("claude", enabled: false, in: dashboard)
@@ -652,6 +725,8 @@ final class Codex94UITests: XCTestCase {
         try quitNormally()
         try fixture.writeReport("providers-result.json", fields: [
             "scenario": "providers", "completed": true, "language": "en",
+            "historicalNativeRingSelectionVerified": true, "quotaPickersOnlyInDisplay": true,
+            "menuSingleCLIFakeReadVerified": true, "reportAgeSeparateLineVerified": true,
             "defaultCodexOnlyVerified": true, "defaultClaudeUsageRequests": 0,
             "singlePrimaryProviderSwitchVerified": true, "twoNativeStatusItemsVerified": true,
             "compactCombinedNativeItemVerified": true, "compactNativeWidth": Double(compactWidth),
@@ -1052,9 +1127,11 @@ final class Codex94UITests: XCTestCase {
         // Opening with recent data is separate from the fetch-free bucket choices.
         let popoverBaseline = try fixture.requestCount()
         let quotaPopover = try openPopoverWithConnectedData()
+        let quotaDashboard = try openDashboard(from: quotaPopover)
+        try selectPage(.display, in: quotaDashboard)
         let quotaSelectorRequests = try fixture.requestCount() - popoverBaseline
         try withoutRequests("Selecting a real dual-window bucket for the floating quota") {
-            try chooseQuota("\(fixture.sparkName) · \(language.weekly)", in: quotaPopover)
+            try chooseQuota("\(fixture.sparkName) · \(language.weekly)", in: quotaDashboard)
             try waitUntil("A bucket with a reported 5-hour window must produce the dual-width panel") {
                 abs(floating.frame.width - 680) <= 1
                     && self.identified("floating-quota-fiveHour", in: floating).exists
@@ -1072,7 +1149,7 @@ final class Codex94UITests: XCTestCase {
         try captureFloating(floating, named: "floating-dual-window-en.png")
         let dualSelection = try selectedQuotaPreference()
         try withoutRequests("Returning the floating quota to the weekly-only bucket") {
-            try chooseQuota("Codex · \(language.weekly)", in: quotaPopover)
+            try chooseQuota("Codex · \(language.weekly)", in: quotaDashboard)
             try waitUntil("A weekly-only bucket must remove the 5-hour node and use the compact width") {
                 abs(floating.frame.width - 480) <= 1
                     && !self.identified("floating-quota-fiveHour", in: floating).exists
@@ -1087,13 +1164,12 @@ final class Codex94UITests: XCTestCase {
                         "Returning to one column must reuse the same floating window")
         }
         try captureFloating(floating, named: "floating-single-window-en.png")
-        try withoutRequests("Closing the quota selector after the shape round trip") {
-            try require(identified("quota-popover-header", in: application).exists,
-                        "The known quota selector must still be open before its close-only action")
-            try statusItem().click()
-            try waitUntil("The quota selector must close before further floating interactions") {
-                !self.identified("quota-popover-header", in: self.application).exists
-            }
+        try withoutRequests("Closing Dashboard after the quota shape round trip") {
+            let close = quotaDashboard.buttons[XCUIIdentifierCloseWindow]
+            try require(close.exists && close.isEnabled && close.isHittable,
+                        "The owned Dashboard must expose its standard close control")
+            close.click()
+            try waitUntil("Dashboard must close before further floating interactions") { !quotaDashboard.exists }
         }
 
         try withoutRequests("Unpinning and pinning the same floating window") {
@@ -2882,7 +2958,7 @@ final class Codex94UITests: XCTestCase {
         let values = [language.automatic] + names.flatMap { name in
             ["\(name) · \(language.weekly)", "\(name) · \(language.fiveHourChoice)"]
         }
-        try choose(option, in: picker(label: language.menuBarQuota, values: values, in: root), container: root)
+        try choose(option, in: picker(id: "menu-bar-quota-picker", label: language.menuBarQuota, values: values, in: root), container: root)
     }
 
     private func setLanguage(_ next: UILanguage, in dashboard: XCUIElement) throws {
@@ -4298,7 +4374,7 @@ private struct SyntheticFixture {
         let providers: Set<String> = scenario == "providers" ? [
             "providers-both-en.png", "providers-compact-en.png", "providers-claude-error-en.png",
             "providers-claude-only-en.png", "providers-local-cache-en.png", "providers-disabled-en.png",
-            "providers-history-en.png", "dashboard-providers-history-en.png",
+            "providers-history-en.png", "dashboard-providers-history-en.png", "providers-history-rings-en.png",
             "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
             "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
             "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",

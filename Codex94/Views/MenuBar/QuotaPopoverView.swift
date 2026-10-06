@@ -164,8 +164,6 @@ struct QuotaPopoverView: View {
         ResetCreditsView(store: store, compact: true)
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
-        Divider()
-        menuBarQuotaPicker()
     }
 
     private var providerContent: some View {
@@ -186,7 +184,7 @@ struct QuotaPopoverView: View {
     }
 
     /// Kept separate so layout tests can measure the same complete content,
-    /// including selectors and recovery hints, independently of its viewport.
+    /// including browsing and recovery hints, independently of its viewport.
     var providerScrollContent: some View {
         VStack(spacing: 14) {
             ProviderQuotaSummaries(
@@ -204,27 +202,12 @@ struct QuotaPopoverView: View {
                 if browsableBuckets.count > 1 { modelPicker(inset: 0) }
                 stateBanner
                 ResetCreditsView(store: store, compact: true).padding(.vertical, 4)
-                menuBarQuotaPicker(inset: 0, includesProvider: true)
             } else {
                 IdentityChoiceView(store: store)
-            }
-            Divider().padding(.vertical, 10)
-            HStack(spacing: 12) {
-                Text("claude.menuBarQuota").font(.caption).foregroundStyle(.secondary)
-                claudeMenuBarPicker
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("provider-quota-details")
-    }
-
-    @ViewBuilder
-    private var claudeMenuBarPicker: some View {
-        if store.preferences.usesDualWindowMenuBarSelection {
-            MenuBarBucketPicker(store: store, provider: .claude)
-        } else {
-            MenuBarQuotaPicker(store: store, provider: .claude)
-        }
     }
 
     private var claudeSection: some View {
@@ -234,10 +217,6 @@ struct QuotaPopoverView: View {
                 openSetup: { openDashboard(.providers) }, referenceDate: referenceDate,
                 accentOverrides: store.preferences.statusAccentOverrides, compact: true, style: .terminal
             )
-            HStack(spacing: 12) {
-                Text("display.label").font(.caption).foregroundStyle(.secondary)
-                claudeMenuBarPicker
-            }
         }
         .padding(14)
     }
@@ -433,26 +412,6 @@ struct QuotaPopoverView: View {
             + Text(issue)
     }
 
-    private func menuBarQuotaPicker(inset: CGFloat = 18, includesProvider: Bool = false) -> some View {
-        HStack(spacing: 12) {
-            (includesProvider ? Text(verbatim: "Codex · ") + Text("display.label") : Text("display.label"))
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            Group {
-                if store.preferences.usesDualWindowMenuBarSelection {
-                    MenuBarBucketPicker(store: store)
-                } else {
-                    MenuBarQuotaPicker(store: store)
-                }
-            }
-                .frame(maxWidth: 300)
-            Spacer()
-        }
-        .padding(.horizontal, inset)
-        .padding(.vertical, 12)
-    }
-
     var commandRows: some View {
         VStack(spacing: 2) {
             CommandRow(
@@ -463,6 +422,12 @@ struct QuotaPopoverView: View {
             )
             .disabled(store.preferences.enabledProviders.isEmpty)
             .keyboardShortcut("r", modifiers: .command)
+
+            if store.preferences.claudeMonitoringEnabled {
+                ClaudeReadOnceActionView(store: store, compact: true)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+            }
 
             CommandRow(
                 title: Text("command.dashboard"),
@@ -580,7 +545,9 @@ struct MenuBarQuotaPicker: View {
                 .pickerStyle(.menu)
                 .accessibilityIdentifier(provider == .codex ? "menu-bar-quota-picker" : "claude-menu-bar-quota-picker")
 
-                if selection != .automatic && snapshot?.resolved(selection) == nil {
+                if selection != .automatic && !store.menuBarQuotaOptions(for: provider).contains(where: {
+                    $0.selection == selection && $0.isAvailable
+                }) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                         .help("display.selectionUnavailable")
@@ -609,6 +576,10 @@ struct MenuBarQuotaPicker: View {
         func localized(_ key: String, arguments: [CVarArg] = []) -> String {
             StatusAccessibilityString.localized(key, arguments: arguments, language: language, bundle: .main)
         }
+        if let display = store.providerMenuBarDisplay(for: provider), display.isHistorical {
+            let window = localized(display.kind == .fiveHour ? "quota.fiveHourShort" : "quota.weeklyShort")
+            return localized("claude.autoSelection.history %@", arguments: [window])
+        }
         guard let snapshot, let resolved = store.providerMenuBarQuota(for: provider) else {
             return localized("claude.autoSelection.unavailable")
         }
@@ -630,18 +601,36 @@ struct MenuBarQuotaPicker: View {
             return localized("display.auto")
         }
         let suffix = " · " + localized(kind == .fiveHour ? "quota.fiveHourShort" : "quota.weeklyShort")
+            + (option.isHistorical && option.isAvailable ? " · " + localized("quota.history.short") : "")
             + (option.isAvailable ? "" : " · " + localized("status.unavailable"))
         let fullName = option.bucketName ?? localized("display.savedQuota")
         guard abbreviated else { return fullName + suffix }
 
         let limit = 30 - suffix.count
-        let names = option.isAvailable
-            ? snapshot.map { QuotaFormatting.bucketMenuNames(in: $0, limit: limit) } ?? [:]
-            : [:]
+        let names: [String: String]
+        if option.isHistorical && option.isAvailable {
+            var seen: Set<String> = []
+            let buckets: [(id: String, name: String)] = store.menuBarQuotaOptions(for: provider).compactMap { item in
+                guard item.isHistorical, item.isAvailable, let name = item.bucketName else { return nil }
+                let id: String
+                switch item.selection {
+                case .automatic: return nil
+                case .defaultBucket: id = ClaudeQuotaReport.defaultLimitID
+                case let .bucket(limitID, _): id = limitID
+                }
+                guard seen.insert(id).inserted else { return nil }
+                return (id, name)
+            }
+            names = QuotaFormatting.bucketMenuNames(buckets: buckets, limit: limit)
+        } else {
+            names = option.isAvailable
+                ? snapshot.map { QuotaFormatting.bucketMenuNames(in: $0, limit: limit) } ?? [:]
+                : [:]
+        }
         let bucketID: String?
         switch option.selection {
         case .automatic: bucketID = nil
-        case .defaultBucket: bucketID = snapshot?.defaultLimitID
+        case .defaultBucket: bucketID = option.isHistorical ? ClaudeQuotaReport.defaultLimitID : snapshot?.defaultLimitID
         case let .bucket(limitID, _): bucketID = limitID
         }
         let name = bucketID.flatMap { names[$0] } ?? QuotaFormatting.shortBucketName(fullName, limit: limit)
@@ -686,10 +675,12 @@ struct QuotaWindowRowContent: View {
     let reset: QuotaResetPresentation
     var accessibilityIdentifier: String? = nil
     var language: LanguagePreference = .english
+    var showsResetCountdown = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            QuotaWindowMainRow(window: window, palette: palette, countdown: reset.countdown, language: language)
+            QuotaWindowMainRow(window: window, palette: palette, countdown: reset.countdown,
+                               language: language, showsResetCountdown: showsResetCountdown)
             QuotaAbsoluteResetLine(text: reset.absolute)
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -715,6 +706,7 @@ struct QuotaWindowMainRow: View {
     let palette: Codex94Palette
     let countdown: String
     var language: LanguagePreference = .english
+    var showsResetCountdown = true
 
     var remainingPercentText: String {
         QuotaFormatting.percent(precise: window.preciseRemainingPercent, language: language)
@@ -724,7 +716,11 @@ struct QuotaWindowMainRow: View {
         QuotaMeterRow(
             title: Text(window.kind.localizedKey), remainingPercent: window.remainingPercent,
             percentageText: remainingPercentText, color: quotaColor,
-            trailing: (Text("quota.resets") + Text(verbatim: " " + countdown)).foregroundStyle(.secondary)
+            trailing: Group {
+                if showsResetCountdown {
+                    (Text("quota.resets") + Text(verbatim: " " + countdown)).foregroundStyle(.secondary)
+                }
+            }
         )
     }
 

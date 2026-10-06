@@ -39,6 +39,20 @@ The latest menu-display release is **`4.1.3 (27)`**, published on
 was merged through PR #43 and carried into 4.1.0 without a separate release.
 Never move or reuse existing tags, including the retained `v4.0.0` candidate.
 
+The next candidate is **4.1.4 (28)**, dated **2026-10-07**
+(Australia/Melbourne). Verify current/history/unknown native inputs, historical
+weekly-first Auto and manual zero/missing choices, time-only tooltip updates,
+Dashboard-only quota pickers, the separate report-age line and Claude-only
+five-hour countdown suppression. Verify one-time menu clicks against a fake
+CLI, and slow shutdown/fetch completion in both orders with no overlapping
+clients or automatic one-shot retry. All routine tests use synthetic data.
+The maintainer authorized at most two real CLI acceptance attempts for this
+update, with failed starts/timeouts included; prefer one and stop after success.
+Keep automatic CLI off, record attempts before launch, and never retry in a loop.
+A production-client harness is separate evidence from the Store/UI fake tests;
+report its process-cleanup and quota-consumption limitations accurately. OAuth
+remains paused. Stable links stay on 4.1.3 until publication is verified.
+
 The **4.1.3 (27)** release checks validate shared meter geometry for current Codex/Claude
 and historical Claude rows in both languages/themes, including 0/100, fractional
 percentages and long names. History must keep its original time and remain

@@ -31,6 +31,16 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
+## 4.1.4 menu and single-read candidate
+
+`4.1.4 (28)` adds explicitly marked historical Claude values to compact rings
+and single-window menu-bar layouts. Historical Auto prefers weekly, then
+five-hour; current quota, notifications and scheduling remain separate.
+Quota selection moves to Dashboard → Display, and the popover gains a warned
+single-CLI-read action. Claude report age has its own line, and its five-hour
+countdown is hidden. CLI cleanup finishes before another client can start.
+Verification is in progress; stable downloads remain on 4.1.3.
+
 ## Version 4.1.3
 
 `4.1.3 (27)` was published on **2026-10-07** (Australia/Melbourne). It renders

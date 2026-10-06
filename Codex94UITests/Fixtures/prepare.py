@@ -28,6 +28,8 @@ BUILD_INPUTS = (
     "Codex94/Services/ClaudeLocalUsageCacheReader.swift",
     "Codex94/Support/ClaudeQuotaFreshnessPolicy.swift",
     "Codex94/Support/ClaudeQuotaHistoryFormatting.swift",
+    "Codex94/Models/MenuBarQuotaDisplay.swift",
+    "Codex94/Views/Components/ClaudeReadOnceActionView.swift",
     "Codex94Tests/ClaudeLocalUsageCacheReaderTests.swift",
     "Codex94Tests/ClaudeQuotaFreshnessPolicyTests.swift",
     "Codex94Tests/ClaudeExecutableLocatorTests.swift",

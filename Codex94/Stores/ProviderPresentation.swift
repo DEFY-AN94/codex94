@@ -7,7 +7,8 @@ extension AppStore {
     func menuBarQuotaOptions(for provider: QuotaProviderID) -> [MenuBarQuotaOption] {
         ProviderQuotaSelection.options(
             snapshot: provider == .codex ? snapshot : claudeStore.snapshot,
-            preferred: provider == .codex ? preferences.menuBarQuotaSelection : preferences.claudeMenuBarQuotaSelection
+            preferred: provider == .codex ? preferences.menuBarQuotaSelection : preferences.claudeMenuBarQuotaSelection,
+            history: providerHistoricalReport(for: provider)
         )
     }
 
@@ -16,11 +17,22 @@ extension AppStore {
         return provider == .codex ? snapshot : claudeStore.snapshot
     }
 
-    /// Historical text is a separate channel. It must never become an Auto
-    /// candidate, a current gauge value, or an input to floating-window sizing.
+    /// Historical presentation is a separate channel. It must never become a
+    /// current quota candidate or an input to floating-window sizing.
     func providerHistoricalReport(for provider: QuotaProviderID) -> ClaudeQuotaHistoryPresentation? {
         guard provider == .claude, preferences.claudeMonitoringEnabled, claudeStore.snapshot == nil else { return nil }
         return claudeStore.historicalReport
+    }
+
+    func providerMenuBarDisplay(for provider: QuotaProviderID) -> MenuBarQuotaDisplay? {
+        guard preferences.isMonitoringEnabled(for: provider) else { return nil }
+        if let snapshot = providerSnapshot(for: provider) {
+            // Preserve current quota's existing saved-selection/Auto fallback.
+            guard let resolved = providerMenuBarQuota(for: provider) else { return nil }
+            return .current(resolved, in: snapshot)
+        }
+        guard let history = providerHistoricalReport(for: provider) else { return nil }
+        return .historical(history, selection: preferences.claudeMenuBarQuotaSelection)
     }
 
     func providerMenuBarQuota(for provider: QuotaProviderID) -> ResolvedQuotaWindow? {
@@ -82,8 +94,11 @@ extension AppStore {
 }
 
 enum ProviderQuotaSelection {
-    static func options(snapshot: QuotaSnapshot?, preferred: MenuBarQuotaSelection) -> [MenuBarQuotaOption] {
-        var options = [MenuBarQuotaOption(selection: .automatic, bucketName: nil, kind: nil, isAvailable: true)]
+    static func options(snapshot: QuotaSnapshot?, preferred: MenuBarQuotaSelection,
+                        history: ClaudeQuotaHistoryPresentation? = nil) -> [MenuBarQuotaOption] {
+        let historical = snapshot == nil ? history : nil
+        var options = [MenuBarQuotaOption(selection: .automatic, bucketName: nil, kind: nil,
+                                         isAvailable: true, isHistorical: historical != nil)]
         if let snapshot {
             for bucket in snapshot.displayableBuckets {
                 for window in bucket.windows.sorted(by: { $0.kind.sortOrder < $1.kind.sortOrder }) {
@@ -92,6 +107,15 @@ enum ProviderQuotaSelection {
                     options.append(MenuBarQuotaOption(selection: selection, bucketName: snapshot.displayName(for: bucket),
                                                       kind: window.kind, isAvailable: true))
                 }
+            }
+        } else if let historical {
+            for window in historical.windows.sorted(by: { $0.kind.sortOrder < $1.kind.sortOrder }) {
+                options.append(MenuBarQuotaOption(selection: .defaultBucket(window.kind),
+                    bucketName: QuotaProviderID.claude.displayName, kind: window.kind, isAvailable: true, isHistorical: true))
+            }
+            for model in historical.modelLimits {
+                options.append(MenuBarQuotaOption(selection: .bucket(limitID: model.limitID, kind: .weekly),
+                    bucketName: model.modelName, kind: .weekly, isAvailable: true, isHistorical: true))
             }
         }
         if !options.contains(where: { $0.selection == preferred }) {
@@ -107,7 +131,7 @@ enum ProviderQuotaSelection {
             }
             if let kind {
                 options.append(MenuBarQuotaOption(selection: preferred, bucketName: bucketName,
-                                                  kind: kind, isAvailable: false))
+                                                  kind: kind, isAvailable: false, isHistorical: historical != nil))
             }
         }
         return options

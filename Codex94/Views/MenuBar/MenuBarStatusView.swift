@@ -56,6 +56,32 @@ struct MenuBarStatusView: View {
         provider: QuotaProviderID = .codex,
         usesSingleWindowSummary: Bool = false
     ) -> String {
+        let supportsHistory = store.preferences.menuBarLayout != .dualWindow || usesSingleWindowSummary
+        if provider == .claude, supportsHistory, let history = store.providerHistoricalReport(for: provider) {
+            var parts: [String] = []
+            if let display = store.providerMenuBarDisplay(for: provider) {
+                let window = StatusAccessibilityString.localized(
+                    display.kind == .fiveHour ? "quota.fiveHourShort" : "quota.weeklyShort",
+                    language: store.preferences.language, bundle: .main
+                )
+                let selectedName = display.bucketName == provider.displayName ? window : display.bucketName + " · " + window
+                parts.append(provider.displayName + ", " + StatusAccessibilityString.localized("menuBar.history.selection %@ %@",
+                    arguments: [selectedName,
+                                QuotaFormatting.percent(precise: display.preciseRemainingPercent, language: store.preferences.language)],
+                    language: store.preferences.language, bundle: .main))
+            } else {
+                parts.append(provider.displayName + ", " + StatusAccessibilityString.localized("menuBar.history.selectionUnavailable",
+                    language: store.preferences.language, bundle: .main))
+            }
+            parts.append(ClaudeQuotaHistoryFormatting.summary(history, now: now, language: store.preferences.language))
+            if presentation.connectionBadge == .refreshing {
+                parts.append(StatusAccessibilityString.localized("status.refreshing", language: store.preferences.language, bundle: .main))
+            }
+            if let issue = store.claudeStore.lastIssue, issue != .noData {
+                parts.append(StatusAccessibilityString.localized(issue.localizationKey, language: store.preferences.language, bundle: .main))
+            }
+            return parts.joined(separator: "\n")
+        }
         let summary: String
         if store.preferences.menuBarLayout == .dualWindow && !usesSingleWindowSummary {
             let bucket = store.providerDualWindowBucket(for: provider)
@@ -91,6 +117,10 @@ struct MenuBarStatusView: View {
             var text = context.isEmpty ? summary : summary + ", " + context
             if let history = store.providerHistoricalReport(for: provider) {
                 text += "\n" + ClaudeQuotaHistoryFormatting.summary(history, now: now, language: store.preferences.language)
+                if !supportsHistory {
+                    text += "\n" + StatusAccessibilityString.localized("menuBar.history.dualWindow",
+                        language: store.preferences.language, bundle: .main)
+                }
             }
             return text
         }
@@ -164,10 +194,11 @@ struct MenuBarStatusContent: View {
     let badge: ConnectionBadge
     let palette: Codex94Palette
     var dualWindowBucket: QuotaBucketSnapshot? = nil
+    var isHistorical: Bool = false
 
     var body: some View {
         let metrics = layout.metrics
-        let color = palette.quotaColor(for: quotaLevel)
+        let color = palette.quotaColor(for: quotaLevel).opacity(isHistorical ? 0.78 : 1)
         let percentText = QuotaFormatting.percent(remainingPercent)
 
         ZStack(alignment: .topLeading) {
