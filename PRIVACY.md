@@ -2,9 +2,13 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v4.1.2 (26)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.2),
-released on 2026-10-05 (Australia/Melbourne). It includes the user-triggered
+stable version is [`v4.1.3 (27)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3),
+released on 2026-10-07 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
+
+Version `4.1.3 (27)` reuses the quota meter layout for historical values in
+the menu popover. It changes no source, original report time, stored data
+or request behavior; the optional CLI reader stays default-off.
 
 Version `4.1.2 (26)` displays a last accepted Claude report as historical
 values when no shared window remains valid. It preserves the source time
