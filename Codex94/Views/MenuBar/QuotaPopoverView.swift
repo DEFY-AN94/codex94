@@ -721,20 +721,11 @@ struct QuotaWindowMainRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Text(window.kind.localizedKey)
-                .foregroundStyle(quotaColor)
-                .frame(width: 58, alignment: .leading)
-            QuotaBarView(remainingPercent: window.remainingPercent, color: quotaColor)
-            Text(remainingPercentText)
-                .monospacedDigit()
-                .foregroundStyle(quotaColor)
-                .frame(width: 54, alignment: .trailing)
-            (Text("quota.resets") + Text(verbatim: " " + countdown))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .font(.system(size: 14, weight: .medium, design: .monospaced))
+        QuotaMeterRow(
+            title: Text(window.kind.localizedKey), remainingPercent: window.remainingPercent,
+            percentageText: remainingPercentText, color: quotaColor,
+            trailing: (Text("quota.resets") + Text(verbatim: " " + countdown)).foregroundStyle(.secondary)
+        )
     }
 
     private var quotaColor: Color {

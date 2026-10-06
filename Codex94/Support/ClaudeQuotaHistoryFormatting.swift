@@ -1,6 +1,6 @@
 import Foundation
 
-/// History is text-only. These functions never construct current quota windows,
+/// Text describing historical values. These functions never construct current quota windows,
 /// change selection, or infer that an expired window has recovered.
 enum ClaudeQuotaHistoryFormatting {
     static func sourceTime(source: ClaudeQuotaSource?, reportedAt: Date?, language: LanguagePreference,

@@ -39,6 +39,16 @@ The latest display-fix release is **`4.1.2 (26)`**, published on
 was merged through PR #43 and carried into 4.1.0 without a separate release.
 Never move or reuse existing tags, including the retained `v4.0.0` candidate.
 
+The next candidate is **4.1.3 (27)**, dated **2026-10-07**
+(Australia/Melbourne). Validate shared meter geometry for current Codex/Claude
+and historical Claude rows in both languages/themes, including 0/100, fractional
+percentages and long names. History must keep its original time and remain
+separate from current snapshots, Auto, notifications and native rings. Reuse
+existing synthetic rendering and Providers scenarios; do not invoke real
+`/usage` or write test data into the user's cache. Record the local candidate,
+brief background observation, PR checks and final-main CI assets separately.
+Stable links stay on 4.1.2 until publication is verified.
+
 The **4.1.2 (26)** release checks use synthetic data to verify that fully expired
 accepted reports retain values and source time in historical UI, while current snapshots/rings/Auto/notifications
 remain empty or unchanged. Check source switching, account invalidation, disable,

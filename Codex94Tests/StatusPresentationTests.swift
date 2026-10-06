@@ -27,6 +27,14 @@ final class StatusPresentationTests: XCTestCase {
             let later = ClaudeQuotaHistoryFormatting.reportTime(history, now: now.addingTimeInterval(3_600),
                                                                 language: language, timeZone: TimeZone(secondsFromGMT: 0)!)
             XCTAssertTrue(later.hasPrefix(original), "Rendering later changes relative age, not the original source timestamp")
+            let monthLater = ClaudeQuotaHistoryFormatting.summary(
+                history, now: lastSuccess.addingTimeInterval(30 * 86_400), language: language,
+                timeZone: TimeZone(secondsFromGMT: 0)!
+            )
+            XCTAssertTrue(monthLater.contains(original), "Long-lived history must retain the source timestamp")
+            XCTAssertTrue(monthLater.contains("75.5%") && monthLater.contains("24.5%"))
+            XCTAssertTrue(monthLater.contains(language == .english ? "30 days ago" : "30 天前"), monthLater)
+            XCTAssertEqual(history.reportedAt, lastSuccess)
         }
     }
 
