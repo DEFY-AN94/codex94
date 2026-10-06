@@ -830,16 +830,69 @@ final class Codex94UITests: XCTestCase {
     private func setProviderMenuMode(_ mode: String, in dashboard: XCUIElement) throws {
         let titles = ["single": "One service", "compactBoth": "Compact rings", "both": "Both services"]
         guard let title = titles[mode] else { throw UITestFailure("Unknown provider status-item mode") }
-        let group = try uniqueIdentified("provider-menu-bar-mode", in: dashboard)
-        let candidates = group.descendants(matching: .any).matching(NSPredicate(
-            format: "label == %@ OR title == %@", title, title
-        )).allElementsBoundByIndex.filter { $0.elementType == .radioButton || $0.elementType == .button }
-        try require(candidates.count == 1, "The provider mode must have one native segmented choice")
-        try reveal(candidates[0], in: dashboard)
-        try require(candidates[0].isEnabled && candidates[0].isHittable, "The provider mode choice must be visible")
-        candidates[0].click()
-        try waitUntil("The menu-bar service mode did not persist") {
-            try self.fixture.preference("menuBarServiceMode.v1") as? String == mode
+        var lastFrame: CGRect = .zero
+        var lastViewport: CGRect = .zero
+        var candidateCount = 0
+        var clicked = false
+        func choice() throws -> XCUIElement {
+            let group = try uniqueIdentified("provider-menu-bar-mode", in: dashboard)
+            let candidates = group.descendants(matching: .any).matching(NSPredicate(
+                format: "label == %@ OR title == %@", title, title
+            )).allElementsBoundByIndex.filter { $0.elementType == .radioButton || $0.elementType == .button }
+            candidateCount = candidates.count
+            try require(candidates.count == 1, "The provider mode must have one native segmented choice")
+            return candidates[0]
+        }
+        do {
+            let scroll = try uniqueIdentified("provider-settings-page", in: dashboard)
+            try require(scroll.elementType == .scrollView, "Provider mode navigation must use its own Settings scroll view")
+            var previous: CGRect?
+            var stable = 0
+            var ready = false
+            let deadline = Date().addingTimeInterval(20)
+            for _ in 0..<18 where Date() < deadline {
+                let control = try choice()
+                let frame = control.frame
+                let viewport = scroll.frame.intersection(dashboard.frame).insetBy(dx: 1, dy: 12)
+                lastFrame = frame; lastViewport = viewport
+                let finite = [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
+                if finite && !frame.isEmpty && viewport.contains(frame) && control.isEnabled && control.isHittable {
+                    stable = previous == frame ? stable + 1 : 1
+                    previous = frame
+                    if stable >= 2 { ready = true; break }
+                    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+                } else {
+                    stable = 0; previous = nil
+                    // AX uses top-left screen coordinates. Positive scroll moves
+                    // back toward earlier settings; negative reveals later rows.
+                    let delta: CGFloat = frame.minY < viewport.minY ? 240 : -240
+                    scroll.scroll(byDeltaX: 0, deltaY: delta)
+                }
+            }
+            try require(ready, "The mode control must be fully visible at a stable position")
+            let control = try choice()
+            try require(lastViewport.contains(control.frame) && control.frame == lastFrame && control.isHittable,
+                        "The exact provider mode control moved before clicking")
+            control.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+            clicked = true
+            try waitUntil("The menu-bar service mode did not persist") {
+                let selected = try choice()
+                let nativeSelected = selected.isSelected || (selected.value as? String) == "1"
+                    || (selected.value as? Int) == 1
+                let savedMode = try self.fixture.preference("menuBarServiceMode.v1") as? String
+                return nativeSelected && savedMode == mode
+            }
+        } catch {
+            let current = try? fixture.preference("menuBarServiceMode.v1") as? String
+            try fixture.writeReport("providers-mode-\(mode).json", fields: [
+                "scenario": "providers", "requestedMode": mode,
+                "currentMode": current.flatMap { titles[$0] == nil ? nil : $0 } ?? "unknown",
+                "candidateCount": candidateCount, "singleClickAttempted": clicked,
+                "fullyInsideViewport": lastViewport.contains(lastFrame) && !lastFrame.isEmpty,
+                "controlWidth": Double(lastFrame.width), "controlHeight": Double(lastFrame.height),
+                "rawAXTextIncluded": false, "globalCoordinatesIncluded": false
+            ])
+            throw error
         }
     }
 
@@ -4381,7 +4434,7 @@ private struct SyntheticFixture {
             "providers-viewport-three-geometry-failure.png", "providers-viewport-four-geometry-failure.png",
             "providers-reopen-codex-left-geometry-failure.png", "providers-reopen-codex-right-geometry-failure.png",
             "providers-reopen-claude-left-geometry-failure.png", "providers-reopen-claude-right-geometry-failure.png",
-            "providers-settings-entry.json"
+            "providers-settings-entry.json", "providers-mode-single.json", "providers-mode-compactBoth.json", "providers-mode-both.json"
         ] : []
         let floating: Set<String> = scenario == "floating" ? [
             "floating-cold-en.png", "floating-compact-en.png", "floating-expanded-en.png",

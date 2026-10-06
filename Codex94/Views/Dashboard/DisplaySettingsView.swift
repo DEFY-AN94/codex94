@@ -30,7 +30,6 @@ struct DisplaySettingsView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .accessibilityIdentifier("display-provider-quota-settings")
             }
 
             SettingsDivider()
