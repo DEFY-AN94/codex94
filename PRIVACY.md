@@ -2,9 +2,16 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v4.1.3 (27)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3),
+stable version is [`v4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4),
 released on 2026-10-07 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
+
+Version `4.1.4 (28)` adds qualified historical menu-bar presentation and
+moves quota selection to Dashboard Display. Its menu single-read action
+uses the existing CLI reader with the same quota-consumption warning and
+does not enable automatic reading. CLI retirement blocks a replacement
+client until shutdown and the old fetch task finish. No new quota source,
+endpoint, credential reader or persistent report data is introduced.
 
 Version `4.1.3 (27)` reuses the quota meter layout for historical values in
 the menu popover. It changes no source, original report time, stored data

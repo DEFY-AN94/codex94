@@ -1,6 +1,6 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v4.1.3 (27)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3),
+The published stable version is [`v4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4),
 released on 2026-10-07 (Australia/Melbourne). Later docs-only commits do not
 move its tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
@@ -33,14 +33,13 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
-The latest menu-display release is **`4.1.3 (27)`**, published on
-**2026-10-07** (Australia/Melbourne) from PR #53. Stable downloads point to
-`v4.1.3`; the verified package and installation record appears below. The `4.0.2 (23)` candidate
+The latest menu and single-read release is **`4.1.4 (28)`**, published on
+**2026-10-07** (Australia/Melbourne) from PR #55. Stable downloads point to
+`v4.1.4`; the verified package and installation record appears below. The `4.0.2 (23)` candidate
 was merged through PR #43 and carried into 4.1.0 without a separate release.
 Never move or reuse existing tags, including the retained `v4.0.0` candidate.
 
-The next candidate is **4.1.4 (28)**, dated **2026-10-07**
-(Australia/Melbourne). Verify current/history/unknown native inputs, historical
+The **4.1.4 (28)** release checks verify current/history/unknown native inputs, historical
 weekly-first Auto and manual zero/missing choices, time-only tooltip updates,
 Dashboard-only quota pickers, the separate report-age line and Claude-only
 five-hour countdown suppression. Verify one-time menu clicks against a fake
@@ -51,7 +50,7 @@ update, with failed starts/timeouts included; prefer one and stop after success.
 Keep automatic CLI off, record attempts before launch, and never retry in a loop.
 A production-client harness is separate evidence from the Store/UI fake tests;
 report its process-cleanup and quota-consumption limitations accurately. OAuth
-remains paused. Stable links stay on 4.1.3 until publication is verified.
+remains paused. The final source, package and installation evidence is recorded below.
 
 The **4.1.3 (27)** release checks validate shared meter geometry for current Codex/Claude
 and historical Claude rows in both languages/themes, including 0/100, fractional
@@ -216,7 +215,7 @@ reports by default and a separate, explicitly enabled CLI option.
 The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
 do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
 records do not establish validation of these source boundaries. Final checks,
-artifacts and installation need separate records. Its release records remain historical; current stable links point to 4.1.3.
+artifacts and installation need separate records. Its release records remain historical; current stable links point to 4.1.4.
 
 During the earlier 4.0 release work, the maintainer approved a ten-minute
 live-observation scope.
@@ -299,7 +298,7 @@ separate and tied to the revision actually tested.
 Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
 Its historical tag and DMG remain bound to
 `ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`. Current download and clone
-instructions point to `v4.1.3`. The 3.0.1 maintenance release isolates quota
+instructions point to `v4.1.4`. The 3.0.1 maintenance release isolates quota
 request contexts, shares strict
 service-value parsing, reuses chart preparation/formatting, retires old Token
 clients outside the main actor, and validates development-script arguments
@@ -447,7 +446,7 @@ states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
 Wait for CI, every synthetic UI smoke required by the candidate, and
-Actions/Python/Swift CodeQL on the actual tested revision. The `4.1.3` release gate
+Actions/Python/Swift CodeQL on the actual tested revision. The `4.1.4` release gate
 includes five UI scenarios: Display, Recovery, Token usage, Floating, and
 Providers. Providers uses synthetic data, including a synthetic local usage
 cache under `CLAUDE_CONFIG_DIR`; passing it does not verify real Claude account
@@ -1112,3 +1111,71 @@ Later documentation commits do not move the tag or replace release assets.
   The previous App was preserved for rollback. No quarantine was removed; none
   was present on the installed App. Fresh-account first-launch Gatekeeper
   acceptance remains unverified.
+
+### 4.1.4 menu history and single-read release — 2026-10-07
+
+- Version/build: `4.1.4 (28)`. [PR #55](https://github.com/DEFY-AN94/codex94/pull/55).
+  Release source: `bd6eed21806f4d710992ae1628c2bc31fd4dd380`; tree `c11d6e5a54395e35f8238b2a11471367278f29a8`.
+  PR head `50358d914ea7ee0e5121c1624c951fabfb59a412` and tested merge `3e386737554e944bea33b1178695bc79ed72db29`
+  are bound to the reviewed evidence; the tested merge and release have the same tree.
+- Local full gate: **594 tests executed, 1 existing hosted-focus skip,
+  0 failures**, with Universal build and package checks. A skip is not a pass.
+  Focused verification passed 153 tests with zero failures.
+  Latest local verification executable SHA-256: `b8cb51a99d6d814d761bdb2e7d2771040bc33a035a5bb29f5ae165260b162aa6`.
+  Latest local verification DMG SHA-256: `c70bd72a8e8d584c881724033b3c076b6d1f99060a78c8eb521d60d5db1a12b3`.
+  These are local validation artifacts, not the public release bytes; they do
+  not inherit the initial candidate's observation or CLI-harness evidence below.
+- PR [CI 37505828108](https://github.com/DEFY-AN94/codex94/actions/runs/37505828108) and
+  [CodeQL 37505822967](https://github.com/DEFY-AN94/codex94/actions/runs/37505822967) passed.
+  Final-main [CI 37509015940](https://github.com/DEFY-AN94/codex94/actions/runs/37509015940) and
+  [CodeQL 37509015141](https://github.com/DEFY-AN94/codex94/actions/runs/37509015141) passed,
+  including all five UI scenarios and main-only DMG attestation.
+- Historical native rendering uses `MenuBarQuotaDisplay`, separate from current
+  snapshots, notification policy and reset scheduling. Historical Auto chooses
+  shared weekly before five-hour; manual zero and missing selections retain their
+  meaning. Legacy dual-window metrics stay current-only.
+- Dashboard Display is the single quota-picker entry. Menu and Services share
+  the warned one-time CLI action. Retirement blocks a new client until shutdown
+  and the old fetch both finish; manual repeated clicks are not queued or retried.
+  Claude menu age is a separate line based on the accepted report's original time.
+  Only its five-hour countdown text is hidden; absolute reset time/data and the
+  Dashboard presentation remain. Synthetic UI and delayed-cleanup tests cover
+  these paths; they do not establish manual native interaction or Gatekeeper acceptance.
+- Real CLI budget: 1 of 2 authorized attempts started; failed starts
+  and timeouts count toward this cap.
+  Source scope: 5c80586 production reader before the accessibility-identifier-only follow-up; unchanged reader on 50358d9; not a Store/UI click test.
+  Attempt 1 (production-client harness): fetch success; validation passed;
+  owned-process cleanup verified exited; trace valid.
+  fetch calls: 1; version processes: 1; usage-session processes: 1.
+  The recorded live CLI validation passed within the scope above.
+  A production-client harness is not a Store/UI human-click acceptance test.
+  Its result is bound only to the recorded source scope, not to a later
+  local App or final installed executable hash.
+  Neither a successful report nor cleanup proves zero Token or subscription
+  quota consumption. No live result is substituted for the synthetic Store/UI checks.
+- Initial local candidate observation: 610 seconds, 2 successful
+  Codex background reads, 0 failures and 0 Claude CLI read starts.
+  Observation scope: 5c80586 candidate before accessibility-identifier-only follow-up; reader and scheduler unchanged.
+  Observed initial App executable SHA-256: `8e3d5d851ac9447ca813b676adb47703c6f1c76bc0116c5cb340fce6f14d64da`.
+  Initial local DMG SHA-256: `016a229ee1e59f924cd38286649f548caf1ed7eecdda6683bc1fad1d86ff5d3e`.
+  This is not a 610-second observation of the later accessibility
+  follow-up App or the final CI executable.
+  Automatic CLI was off before and after. These counts describe the candidate
+  App observation separately from the explicit CLI attempts above.
+  Additional popover reads during that observation: 1.
+- Final CI artifact `11435815568` supplied the two manual assets.
+  DMG SHA-256: `182ca01c2efa1b8412d31f2c0e67866036d88df5c3591b89d24112ae77a70c46`.
+  Checksum-file SHA-256: `5afeb772cd6f54319d2651fb7de63f17280ced184b86cc4f6a1fd1703a5b18eb`.
+  [Attestation](https://github.com/DEFY-AN94/codex94/attestations/53289771) was verified for the frozen source and main workflow.
+  Annotated tag object `5f48d0cdbe6f6fe4da7388c917dc8e3d71bf2b57` peels to the release source.
+- [Public v4.1.4 Release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4), ID `405033167`,
+  published `2026-10-06T18:40:50Z`, was verified as public, stable and latest.
+  Draft and public asset downloads matched final CI bytes. Public ZIP and TAR
+  matched the frozen source's 177 tracked blobs and executable modes.
+- The final CI App was installed and its startup verified. Installed executable
+  SHA-256: `17c7e37382d42eaf1b16b1238cc5f15199433ea8787fcc61b388bf144c98c18e`; the installed bundle matches CI.
+  This is separate from the local candidate and any observation record above.
+  No ten-minute observation or live CLI run is inferred for this final CI hash.
+  Distribution remains an unsigned, unnotarized DMG with an ad-hoc signed inner App;
+  attestation does not establish Apple trust. No automatic installation was added.
+  OAuth remains paused and automatic CLI reading remains default-off.

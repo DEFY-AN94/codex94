@@ -26,15 +26,21 @@ Claude 默认读取 Claude Code 本地用量缓存，以符合条件的状态栏
 > Codex94 与 OpenAI 或 Anthropic 没有隶属关系，也未获得两者的认可、背书或赞助。
 > Codex `app-server` 是实验性接口；上游更新也可能改变 CLI 和状态栏的数据格式。
 
-## 4.1.4 菜单与单次读取候选版
+## 4.1.4 版本
 
-`4.1.4 (28)` 让紧凑双圈及单窗口菜单栏样式显示带小钟的 Claude 历史额度。
+`4.1.4 (28)` 已于 **2026-10-07**（Australia/Melbourne）正式发布。
+本版让紧凑双圈及单窗口菜单栏样式显示带小钟的 Claude 历史额度。
 历史 Auto 优先每周、其次五小时；当前额度、通知与调度仍独立。
 额度选择统一到 Dashboard「显示」，弹窗增加带消耗提示的单次 CLI 按钮。
 Claude 报告年龄另起一行，五小时倒计时隐藏；旧 CLI 客户端清理完成后才可启动下一次。
-验证正在进行，稳定下载仍指向 4.1.3。
+原生菜单栏历史显示使用独立展示值，不回填当前额度快照；旧双窗口样式仍只显示当前额度。
+五小时倒计时仅在弹窗中隐藏，绝对重置时间与底层数据保留。自动 CLI 仍默认关闭，OAuth 继续暂停。
 
-## 4.1.3 版本
+本机发布检查通过：594 项执行、1 项既有托管焦点测试跳过、0 失败。
+最终主分支 CI、五组界面场景与 CodeQL 均通过。准确的安装包、安装与有限真实 CLI 验证
+证据见[发布记录](docs/RELEASING.md)。
+
+## 早先的 4.1.3 版本
 
 `4.1.3 (27)` 已于 **2026-10-07**（Australia/Melbourne）正式发布。
 本版将菜单弹窗中的 Claude 历史额度改为与 Codex 一致的分段进度条和
@@ -271,7 +277,7 @@ Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 ## 当前分发状态
 
 - 已发布的稳定版为
-  [`v4.1.3 (27)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3)，
+  [`v4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4)，
   于 **2026-10-07**（Australia/Melbourne）发布，提供 Universal 2 DMG 与来自同一个
   annotated 标签的源码。
 - 下方下载和源码 clone 指令均指向该正式版本。后续文档提交不会移动其标签，
@@ -286,7 +292,7 @@ Popover、连接页及菜单栏提示会显示自动尝试时刻。对应
 - 安装脚本要求先退出所有 Codex94 副本，使用安装锁并验证独立的暂存副本，
   替换成功前保留旧 App 以便回滚。回滚失败时保留恢复文件，但不维护各版本归档。
 
-已发布的 `4.1.3` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
+已发布的 `4.1.4` DMG 外层本身完全未签名，没有 Apple Developer ID 签名，也未经过 Apple
 公证。其中的 `Codex94.app` 只有 ad-hoc 签名。SHA-256 与 GitHub artifact
 attestation 都不会改变这一 Apple 信任状态。
 
@@ -311,23 +317,23 @@ Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
 
 ## 安装 Universal DMG
 
-请从 [`v4.1.3` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3)
+请从 [`v4.1.4` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4)
 下载以下两个正式资产：
 
-- `Codex94-4.1.3-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.3-SHA256SUMS.txt`
+- `Codex94-4.1.4-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.4-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-4.1.3-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.4-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-4.1.3-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.4-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -347,7 +353,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v4.1.3 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：

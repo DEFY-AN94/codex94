@@ -31,17 +31,26 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
-## 4.1.4 menu and single-read candidate
+## Version 4.1.4
 
-`4.1.4 (28)` adds explicitly marked historical Claude values to compact rings
+`4.1.4 (28)` was published on **2026-10-07** (Australia/Melbourne). It adds
+explicitly marked historical Claude values to compact rings
 and single-window menu-bar layouts. Historical Auto prefers weekly, then
 five-hour; current quota, notifications and scheduling remain separate.
 Quota selection moves to Dashboard → Display, and the popover gains a warned
 single-CLI-read action. Claude report age has its own line, and its five-hour
 countdown is hidden. CLI cleanup finishes before another client can start.
-Verification is in progress; stable downloads remain on 4.1.3.
+Historical native display uses a separate presentation value, never a current
+quota snapshot; the legacy dual-window layout remains current-only. Hiding
+the five-hour countdown changes only that popover text: its absolute reset
+time and reset data remain. Automatic CLI stays default-off; OAuth is paused.
 
-## Version 4.1.3
+The local release gate passed: 594 tests executed, 1 existing hosted-focus
+skip, 0 failures. Final-main CI, all five UI scenarios and CodeQL passed.
+Exact package, installation and limited real-CLI evidence are in the
+[release record](docs/RELEASING.md).
+
+## Earlier 4.1.3 release
 
 `4.1.3 (27)` was published on **2026-10-07** (Australia/Melbourne). It renders
 Claude's accepted historical quota in the menu popover with
@@ -344,7 +353,7 @@ statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v4.1.3 (27)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3),
+  [`v4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4),
   released on **2026-10-07** (Australia/Melbourne) as a Universal 2 DMG and
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
@@ -363,7 +372,7 @@ statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `4.1.3` DMG itself is completely unsigned, has no Apple Developer ID
+The published `4.1.4` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -394,23 +403,23 @@ precedence; an invalid manual choice is not silently bypassed.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v4.1.3` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3):
+[`v4.1.4` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4):
 
-- `Codex94-4.1.3-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.3-SHA256SUMS.txt`
+- `Codex94-4.1.4-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.4-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-4.1.3-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.4-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-4.1.3-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.4-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -432,7 +441,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v4.1.3 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
