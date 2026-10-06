@@ -1,7 +1,7 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v4.1.2 (26)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.2),
-released on 2026-10-05 (Australia/Melbourne). Later docs-only commits do not
+The published stable version is [`v4.1.3 (27)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3),
+released on 2026-10-07 (Australia/Melbourne). Later docs-only commits do not
 move its tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -33,21 +33,20 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
-The latest display-fix release is **`4.1.2 (26)`**, published on
-**2026-10-05** (Australia/Melbourne) from PR #51. Stable downloads point to
-`v4.1.2`; the verified package and installation record appears below. The `4.0.2 (23)` candidate
+The latest menu-display release is **`4.1.3 (27)`**, published on
+**2026-10-07** (Australia/Melbourne) from PR #53. Stable downloads point to
+`v4.1.3`; the verified package and installation record appears below. The `4.0.2 (23)` candidate
 was merged through PR #43 and carried into 4.1.0 without a separate release.
 Never move or reuse existing tags, including the retained `v4.0.0` candidate.
 
-The next candidate is **4.1.3 (27)**, dated **2026-10-07**
-(Australia/Melbourne). Validate shared meter geometry for current Codex/Claude
+The **4.1.3 (27)** release checks validate shared meter geometry for current Codex/Claude
 and historical Claude rows in both languages/themes, including 0/100, fractional
 percentages and long names. History must keep its original time and remain
 separate from current snapshots, Auto, notifications and native rings. Reuse
 existing synthetic rendering and Providers scenarios; do not invoke real
 `/usage` or write test data into the user's cache. Record the local candidate,
 brief background observation, PR checks and final-main CI assets separately.
-Stable links stay on 4.1.2 until publication is verified.
+The verified 4.1.3 source, package and installation are recorded below.
 
 The **4.1.2 (26)** release checks use synthetic data to verify that fully expired
 accepted reports retain values and source time in historical UI, while current snapshots/rings/Auto/notifications
@@ -203,7 +202,7 @@ reports by default and a separate, explicitly enabled CLI option.
 The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
 do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
 records do not establish validation of these source boundaries. Final checks,
-artifacts and installation need separate records. Its release records remain historical; current stable links point to 4.1.2.
+artifacts and installation need separate records. Its release records remain historical; current stable links point to 4.1.3.
 
 During the earlier 4.0 release work, the maintainer approved a ten-minute
 live-observation scope.
@@ -286,7 +285,7 @@ separate and tied to the revision actually tested.
 Version `3.0.1 (15)` was published on 2026-09-21 (Australia/Melbourne).
 Its historical tag and DMG remain bound to
 `ab6d48e5011eba2c10e9f31f51e4ef1f3c166307`. Current download and clone
-instructions point to `v4.1.2`. The 3.0.1 maintenance release isolates quota
+instructions point to `v4.1.3`. The 3.0.1 maintenance release isolates quota
 request contexts, shares strict
 service-value parsing, reuses chart preparation/formatting, retires old Token
 clients outside the main actor, and validates development-script arguments
@@ -434,7 +433,7 @@ states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
 Wait for CI, every synthetic UI smoke required by the candidate, and
-Actions/Python/Swift CodeQL on the actual tested revision. The `4.1.2` release gate
+Actions/Python/Swift CodeQL on the actual tested revision. The `4.1.3` release gate
 includes five UI scenarios: Display, Recovery, Token usage, Floating, and
 Providers. Providers uses synthetic data, including a synthetic local usage
 cache under `CLAUDE_CONFIG_DIR`; passing it does not verify real Claude account
@@ -1048,6 +1047,52 @@ Later documentation commits do not move the tag or replace release assets.
 - The final CI App was installed and its startup verified. Installed executable
   SHA-256: `fa0aedc77ce90cc88c72f3f9e773c7f04f190c35d0dc7b61d6627a35e5368af9`; the installed bundle matches CI.
   This is separate from the local candidate and its observation record above.
+  Distribution remains an unsigned, unnotarized DMG with an ad-hoc signed inner App;
+  attestation does not establish Apple trust. No automatic installation was added.
+  The previous App was preserved for rollback. No quarantine was removed; none
+  was present on the installed App. Fresh-account first-launch Gatekeeper
+  acceptance remains unverified.
+
+### 4.1.3 shared quota meter release — 2026-10-07
+
+- Version/build: `4.1.3 (27)`. [PR #53](https://github.com/DEFY-AN94/codex94/pull/53).
+  Release source: `a1eb34d30b36e31365817c77f90dfda4f96e4a8d`; tree `4e5621a3f016cbd203445f3095ec35cbc76d7eb9`.
+  PR head `d5c2903fa4e0011313df7e1e93eebc36a3d6da80` and tested merge `584c24a22167d1d1312b3b36e763909a7fb0eebc`
+  are bound to the reviewed evidence; the tested merge and release have the same tree.
+- Local full gate: **582 tests executed, 1 existing hosted-focus skip,
+  0 failures**, with Universal build and package checks. A skip is not a pass.
+  Local executable SHA-256: `b74a2b6084c757f077f18c807f1a0244fa8911cc895f5b56db07b72618a1b2de`.
+  Local DMG SHA-256: `a10b99c36eca621fc3e4444745a4cf0f99626569789f492164d58a1681000bc1`.
+  These are local validation artifacts, not the public release bytes.
+- PR [CI 37474226344](https://github.com/DEFY-AN94/codex94/actions/runs/37474226344) and
+  [CodeQL 37474186049](https://github.com/DEFY-AN94/codex94/actions/runs/37474186049) passed.
+  Final-main [CI 37477924191](https://github.com/DEFY-AN94/codex94/actions/runs/37477924191) and
+  [CodeQL 37477923781](https://github.com/DEFY-AN94/codex94/actions/runs/37477923781) passed,
+  including all five UI scenarios and main-only DMG attestation.
+- Local candidate observation: 610 seconds, 2 successful
+  Codex background reads, 0 failures and 0 Claude CLI read starts.
+  The CLI preference was off before and after. This records background behavior,
+  not manual native interaction or a cloud-usage comparison.
+- The shared `QuotaMeterRow` change is presentation-only. Synthetic checks cover
+  bilingual/theme geometry, precise percentages, long names and the unchanged
+  original time of historical reports. Dashboard history keeps its text layout;
+  native rings, Auto selection and notifications still exclude historical data.
+  Existing test methods were extended; no new test count is inferred from them.
+- Automated checks are not manual native UI, keyboard, Spaces or fresh-account
+  Gatekeeper acceptance. No live `/usage` validation is claimed; the optional
+  CLI reader stays default-off and OAuth work remains paused.
+- Final CI artifact `11419738051` supplied the two manual assets.
+  DMG SHA-256: `4528c745cff87bcad6af4ae717297273f2b71f1520aaac5a06332389230a20c2`.
+  Checksum-file SHA-256: `c3f5424f86dbf58f06322737f54ece45330676e9c798d003bc7f61d025f5fd27`.
+  [Attestation](https://github.com/DEFY-AN94/codex94/attestations/53209179) was verified for the frozen source and main workflow.
+  Annotated tag object `ddf6488ed1f09be7ba127665ad0e615e9e1d6be9` peels to the release source.
+- [Public v4.1.3 Release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3), ID `404845580`,
+  published `2026-10-06T14:53:53Z`, was verified as public, stable and latest.
+  Draft and public asset downloads matched final CI bytes. Public ZIP and TAR
+  matched the frozen source's 175 tracked blobs and executable modes.
+- The final CI App was installed and its startup verified. Installed executable
+  SHA-256: `ff48901c2df031dd3986968b571bd4c74e44331858151d79b64cd57207f42a59`; the installed bundle matches CI.
+  This is separate from the local candidate and any observation record above.
   Distribution remains an unsigned, unnotarized DMG with an ad-hoc signed inner App;
   attestation does not establish Apple trust. No automatic installation was added.
   The previous App was preserved for rollback. No quarantine was removed; none

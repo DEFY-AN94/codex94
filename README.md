@@ -31,16 +31,22 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
-## 4.1.3 menu-display candidate
+## Version 4.1.3
 
-`4.1.3 (27)` renders Claude's accepted historical quota in the menu popover with
+`4.1.3 (27)` was published on **2026-10-07** (Australia/Melbourne). It renders
+Claude's accepted historical quota in the menu popover with
 Codex-style segmented bars and precise percentages. The history heading,
 current-quota-unknown label and original source time remain visible. Current
 and historical rows share their layout; Dashboard history keeps its text style.
-This adds no cloud read or automatic CLI use. Verification is in progress;
-stable downloads remain on 4.1.2 until publication is confirmed.
+This adds no cloud read or automatic CLI use. OAuth remains paused.
 
-## Version 4.1.2
+The local release gate passed: 582 tests executed, 1 existing hosted-focus
+skip, 0 failures. Final-main CI, all five UI scenarios and CodeQL passed.
+This release reuses the stateless meter row; it does not change Dashboard
+history or current-quota selection. Package and acceptance evidence are in
+the [release record](docs/RELEASING.md).
+
+## Earlier 4.1.2 release
 
 `4.1.2 (26)` was published on **2026-10-05** (Australia/Melbourne). It shows an
 accepted Claude report as **Last usage record** when its shared windows have
@@ -328,8 +334,8 @@ statistics and update UI.
 ## Distribution status
 
 - The published stable release is
-  [`v4.1.2 (26)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.2),
-  released on **2026-10-05** (Australia/Melbourne) as a Universal 2 DMG and
+  [`v4.1.3 (27)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3),
+  released on **2026-10-07** (Australia/Melbourne) as a Universal 2 DMG and
   source from the same annotated tag.
 - Download and source-clone instructions below refer to this published release.
   Later documentation commits do not move its tag or regenerate its assets.
@@ -347,7 +353,7 @@ statistics and update UI.
   old App for rollback until replacement succeeds. It leaves recovery files
   intact if rollback fails; it does not maintain a version archive.
 
-The published `4.1.2` DMG itself is completely unsigned, has no Apple Developer ID
+The published `4.1.3` DMG itself is completely unsigned, has no Apple Developer ID
 signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
 signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
 trust status.
@@ -378,23 +384,23 @@ precedence; an invalid manual choice is not silently bypassed.
 ## Install the Universal DMG
 
 Download both stable assets from the
-[`v4.1.2` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.2):
+[`v4.1.3` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3):
 
-- `Codex94-4.1.2-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.2-SHA256SUMS.txt`
+- `Codex94-4.1.3-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.3-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-4.1.2-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.3-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-4.1.2-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.3-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -416,7 +422,7 @@ flow. Do not remove quarantine attributes or disable Gatekeeper.
 Clone the published stable source tag:
 
 ```bash
-git clone --branch v4.1.2 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.3 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:

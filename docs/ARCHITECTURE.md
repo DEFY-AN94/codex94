@@ -1,13 +1,13 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints for the published
-[`4.1.2 (26)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.2),
-published on 2026-10-05 (Australia/Melbourne), including the unpublished
+[`4.1.3 (27)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3),
+published on 2026-10-07 (Australia/Melbourne), including the unpublished
 `4.0.2 (23)` candidate it carries forward.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.1.3 candidate: shared quota meter layout
+## 4.1.3 release: shared quota meter layout
 
 `QuotaMeterRow` owns only label/bar/percentage/trailing-content geometry. It
 accepts presentation values, not a snapshot, source, timer or action. Current
