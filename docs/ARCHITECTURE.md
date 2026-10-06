@@ -7,6 +7,16 @@ published on 2026-10-05 (Australia/Melbourne), including the unpublished
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
+## 4.1.3 candidate: shared quota meter layout
+
+`QuotaMeterRow` owns only label/bar/percentage/trailing-content geometry. It
+accepts presentation values, not a snapshot, source, timer or action. Current
+quota callers provide their reset countdown; the historical menu caller keeps
+its explicit history heading and original time outside the meter. Exact
+percentage text and colors use the unrounded value, while segmented fill keeps
+the same integer projection as current quota. No historical meter updates the
+native status-item rings, Auto, notifications or reset scheduling.
+
 ## 4.1.2 display release: historical quota is not current quota
 
 `ClaudeQuotaHistoryPresentation` is an in-memory, display-only value derived from

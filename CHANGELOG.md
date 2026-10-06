@@ -2,6 +2,25 @@
 
 All notable changes to Codex94 are documented here.
 
+## 4.1.3 - 2026-10-07
+
+Version `4.1.3 (27)` is a menu-display candidate. Stable downloads remain on
+4.1.2 until publication is verified. Release dates use Australia/Melbourne.
+
+### Changed
+
+- Show accepted Claude history in the menu popover with the same segmented bars,
+  quota colors and precise percentage alignment as Codex. Shared windows and
+  per-model weekly limits retain the history heading and original source time.
+- Reuse a stateless meter-row layout for current and historical quota displays,
+  keeping column widths and typography consistent. Long historical model names
+  truncate cleanly, with full names and used/remaining values in help and
+  accessibility text. Dashboard history keeps its text layout.
+- Historical values remain separate from current snapshots, native rings,
+  Auto selection, notifications and reset scheduling. No new data read,
+  preference or persistent history is added; CLI usage remains default-off
+  and OAuth work remains paused.
+
 ## 4.1.2 - 2026-10-05
 
 Version `4.1.2 (26)` is the published stable release. Release dates use

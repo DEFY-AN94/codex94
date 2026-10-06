@@ -31,6 +31,15 @@ and security-scanned before it is tagged.
 > Anthropic. Codex `app-server` is experimental; CLI and status-line formats
 > may change between upstream releases.
 
+## 4.1.3 menu-display candidate
+
+`4.1.3 (27)` renders Claude's accepted historical quota in the menu popover with
+Codex-style segmented bars and precise percentages. The history heading,
+current-quota-unknown label and original source time remain visible. Current
+and historical rows share their layout; Dashboard history keeps its text style.
+This adds no cloud read or automatic CLI use. Verification is in progress;
+stable downloads remain on 4.1.2 until publication is confirmed.
+
 ## Version 4.1.2
 
 `4.1.2 (26)` was published on **2026-10-05** (Australia/Melbourne). It shows an
