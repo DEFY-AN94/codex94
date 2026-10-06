@@ -2,6 +2,41 @@
 
 All notable changes to Codex94 are documented here.
 
+## 4.1.4 - 2026-10-07
+
+Version `4.1.4 (28)` is a menu and single-read candidate. Stable downloads
+remain on 4.1.3 until publication is verified. Dates use Australia/Melbourne.
+
+### Changed
+
+- Let native compact provider rings and single-window quota layouts show accepted
+  Claude history with a clock and qualified tooltip. Historical Auto prefers the
+  shared weekly record, then five-hour; manual zero is preserved and a missing
+  historical selection stays unknown. Current quota selection is unchanged.
+- Keep historical rendering independent of current snapshots, notifications,
+  reset scheduling and floating-window metrics. The legacy dual-window layout
+  still uses only current quota and explains its historical-display limitation.
+- Consolidate Codex and Claude menu-bar quota pickers in Dashboard → Display,
+  including clearly labelled historical options. Preserve saved preferences;
+  remove quota pickers from the popover, Overview and Services duplicates.
+- Put an explicit Claude single-CLI-read action in the popover with a visible
+  quota-consumption warning, progress, cleanup state and result. The same action
+  component serves Services. It never enables automatic CLI reading.
+- Show Claude's original report time and relative age on separate popover lines.
+  Hide only the Claude five-hour row's reset countdown, retaining its absolute
+  reset time and data. Dashboard and Codex reset presentation remain unchanged.
+
+### Fixed
+
+- Hold new CLI reads until both the retiring client's shutdown and the previous
+  fetch task have completed. Coalesce automatic-mode intent while cleanup is
+  pending; repeated one-time clicks are not queued, and disabling monitoring or
+  CLI mode clears pending automatic work. No automatic one-shot retry is added.
+
+OAuth remains paused. No new network endpoint, credential reader, preference
+key or cache schema is added. Real CLI acceptance is limited to at most two
+explicit attempts, with failures counting toward that cap.
+
 ## 4.1.3 - 2026-10-07
 
 Version `4.1.3 (27)` is the published stable release. Release dates use

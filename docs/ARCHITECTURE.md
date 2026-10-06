@@ -7,6 +7,26 @@ published on 2026-10-07 (Australia/Melbourne), including the unpublished
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
+## 4.1.4 candidate: menu display and single-CLI ownership
+
+`MenuBarQuotaDisplay` is a separate menu presentation value. Current display
+reuses the current resolver; accepted history is eligible only when the current
+snapshot is absent. Historical Auto selects the shared week before five-hour,
+models require explicit selection, and missing manual choices remain unknown.
+Native image input carries historical styling; source dates update tooltip and
+accessibility text without invalidating unchanged pixels. Historical data does
+not enter `QuotaSnapshot`, current Auto, notification policy or reset schedules.
+Legacy dual-window metrics remain current-only. Historical options may be saved
+through the existing quota-selection keys without manufacturing a snapshot.
+
+Dashboard Display owns provider quota configuration. `ClaudeReadOnceActionView`
+shares the existing action across Services and the popover. Report age uses the
+accepted observation time, not file-read time; hiding the five-hour countdown is
+view-only. `ClaudeQuotaStore.isRetiringCLI` blocks admission until shutdown and
+fetch completion both settle. Auto-mode intent is coalesced behind cleanup;
+manual one-time requests are never queued or automatically retried. The CLI
+command/client and its owned-process termination mechanism are unchanged.
+
 ## 4.1.3 release: shared quota meter layout
 
 `QuotaMeterRow` owns only label/bar/percentage/trailing-content geometry. It

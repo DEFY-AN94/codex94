@@ -87,14 +87,6 @@ struct ProviderSettingsView: View {
             }
             if store.preferences.claudeMonitoringEnabled {
                 SettingsDivider()
-                SettingsRow("claude.menuBarQuota") {
-                    if store.preferences.usesDualWindowMenuBarSelection {
-                        MenuBarBucketPicker(store: store, provider: .claude)
-                    } else {
-                        MenuBarQuotaPicker(store: store, provider: .claude)
-                    }
-                }
-                SettingsDivider()
                 NotificationSettingsView(store: store, provider: .claude)
             }
         }
@@ -187,32 +179,7 @@ struct ClaudeCLIUsageSettingsView: View {
                 .font(.caption).foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("claude-cli-usage-warning")
-            HStack(spacing: 10) {
-                Button("claude.cliUsage.readOnce") { store.readClaudeOnceWithCLI() }
-                    .disabled(!store.preferences.claudeMonitoringEnabled || !store.claudeStore.canReadOnceWithCLI)
-                    .accessibilityIdentifier("claude-cli-read-once")
-                if store.claudeStore.isRefreshing {
-                    ProgressView().controlSize(.small)
-                    Text("claude.refreshing").font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            Text("claude.cliUsage.readOnce.help")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let issue = store.claudeStore.lastCLIReadIssue {
-                Text(issue == .noData ? LocalizedStringKey("claude.cliUsage.readOnce.noData") : issue.localizedKey)
-                    .font(.caption).foregroundStyle(issue == .noData ? Color.secondary : Color.red)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("claude-cli-read-once-issue")
-            } else if let readAt = store.claudeStore.lastCLIReadAt,
-                      let time = QuotaFormatting.automaticRefreshTime(at: readAt) {
-                Text(verbatim: StatusAccessibilityString.localized(
-                    "claude.cliUsage.lastRead %@", arguments: [time],
-                    language: store.preferences.language, bundle: .main
-                ))
-                .font(.caption).foregroundStyle(.secondary)
-                .accessibilityIdentifier("claude-cli-last-read")
-            }
+            ClaudeReadOnceActionView(store: store)
         }
     }
 }

@@ -201,6 +201,7 @@ struct MenuBarQuotaOption: Equatable, Identifiable, Sendable {
     let bucketName: String?
     let kind: QuotaWindowKind?
     let isAvailable: Bool
+    var isHistorical: Bool = false
 
     var id: MenuBarQuotaSelection { selection }
 }

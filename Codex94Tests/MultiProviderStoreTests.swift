@@ -6,7 +6,7 @@ import XCTest
 
 @MainActor
 final class MultiProviderStoreTests: XCTestCase {
-    func testHistoricalClaudeTextDoesNotPopulateCurrentQuotaAutoOrNativeRing() async throws {
+    func testHistoricalClaudeDisplayStaysSeparateFromCurrentQuotaAndScheduling() async throws {
         let fixture = try makeFixture(codexEnabled: false, claudeEnabled: true, claudeCLIEnabled: false)
         let url = fixture.directory.appendingPathComponent("claude-state/.claude.json")
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -37,7 +37,14 @@ final class MultiProviderStoreTests: XCTestCase {
         XCTAssertNil(fixture.store.providerDualWindowBucket(for: .claude))
         XCTAssertTrue(fixture.store.providerActiveQuotas(for: .claude).isEmpty)
         XCTAssertNil(fixture.store.floatingBucket)
-        XCTAssertEqual(fixture.store.menuBarQuotaOptions(for: .claude).map(\.selection), [.automatic])
+        let options = fixture.store.menuBarQuotaOptions(for: .claude)
+        XCTAssertEqual(options.map(\.selection), [.automatic, .defaultBucket(.fiveHour), .defaultBucket(.weekly)])
+        XCTAssertTrue(options.allSatisfy(\.isHistorical))
+        let display = try XCTUnwrap(fixture.store.providerMenuBarDisplay(for: .claude))
+        XCTAssertEqual(display.kind, .weekly)
+        XCTAssertEqual(display.preciseRemainingPercent, 38.8, accuracy: 0.001)
+        XCTAssertTrue(display.isHistorical)
+        XCTAssertNil(fixture.store.providerNextAutomaticRefreshAt(for: .claude))
 
         let item = NSStatusBar.system.statusItem(withLength: 58)
         defer { NSStatusBar.system.removeStatusItem(item) }
@@ -48,7 +55,9 @@ final class MultiProviderStoreTests: XCTestCase {
         }
         defer { renderer.shutdown() }
         renderer.update(now: referenceDate)
-        XCTAssertNil(imageInputs.last?.remainingPercent, "Historical percentages cannot enter the native image input")
+        XCTAssertEqual(imageInputs.last?.remainingPercent, 39, "Only the independent historical display may feed the image")
+        XCTAssertEqual(imageInputs.last?.badge, .stale, "History has a clock, not an unavailable error badge")
+        XCTAssertEqual(imageInputs.last?.isHistorical, true)
         XCTAssertNil(imageInputs.last?.dualWindowBucket)
         let tooltip = try XCTUnwrap(item.button?.toolTip)
         XCTAssertEqual(tooltip, item.button?.accessibilityLabel())
@@ -75,6 +84,172 @@ final class MultiProviderStoreTests: XCTestCase {
         XCTAssertNil(fixture.store.providerHistoricalReport(for: .claude))
         let after = await fixture.claude.requestCount()
         XCTAssertEqual(after, 0)
+        XCTAssertEqual(fixture.claudeNotifications.deliveries, 0)
+    }
+
+    func testHistoricalAutoPrefersSharedWeekAndManualMissingRemainsUnknown() throws {
+        func history(_ windows: [ClaudeQuotaWindow]) throws -> ClaudeQuotaHistoryPresentation {
+            try XCTUnwrap(ClaudeQuotaHistoryPresentation(report: ClaudeQuotaReport(
+                source: .localCache, reportedAt: referenceDate.addingTimeInterval(-30_000),
+                receivedAt: referenceDate.addingTimeInterval(-30_000), windows: windows,
+                modelLimits: [.init(modelName: "Synthetic model", usedPercentage: 100, resetsAt: nil)]
+            ), at: referenceDate))
+        }
+        let five = ClaudeQuotaWindow(kind: .fiveHour, usedPercentage: 100, resetsAt: referenceDate.addingTimeInterval(-1))
+        let week = ClaudeQuotaWindow(kind: .weekly, usedPercentage: 17, resetsAt: referenceDate.addingTimeInterval(-1))
+        let both = try history([five, week])
+        let automatic = try XCTUnwrap(MenuBarQuotaDisplay.historical(both, selection: .automatic))
+        XCTAssertEqual(automatic.selection, .defaultBucket(.weekly))
+        XCTAssertEqual(automatic.preciseRemainingPercent, 83)
+        XCTAssertEqual(automatic.bucketName, "Claude", "An exhausted model does not override shared-week historical Auto")
+        let manualZero = try XCTUnwrap(MenuBarQuotaDisplay.historical(both, selection: .defaultBucket(.fiveHour)))
+        XCTAssertEqual(manualZero.remainingPercent, 0)
+        XCTAssertEqual(manualZero.preciseRemainingPercent, 0)
+        let model = try XCTUnwrap(MenuBarQuotaDisplay.historical(both, selection: .bucket(limitID: "claude.model.synthetic-model", kind: .weekly)))
+        XCTAssertEqual(model.remainingPercent, 0)
+        XCTAssertEqual(model.bucketName, "Synthetic model")
+        XCTAssertNil(MenuBarQuotaDisplay.historical(both, selection: .bucket(limitID: "missing", kind: .weekly)))
+        XCTAssertNil(MenuBarQuotaDisplay.historical(both, selection: .bucket(limitID: "claude.model.synthetic-model", kind: .fiveHour)))
+        XCTAssertEqual(MenuBarQuotaDisplay.historical(try history([five]), selection: .automatic)?.remainingPercent, 0)
+        XCTAssertNil(MenuBarQuotaDisplay.historical(try history([week]), selection: .defaultBucket(.fiveHour)))
+        let zeroWeek = ClaudeQuotaWindow(kind: .weekly, usedPercentage: 100, resetsAt: referenceDate.addingTimeInterval(-1))
+        XCTAssertEqual(MenuBarQuotaDisplay.historical(try history([five, zeroWeek]), selection: .automatic)?.kind, .weekly)
+    }
+
+    func testHistoricalPickerDisambiguatesLongNamesWithoutLosingFullAccessibleLabels() async throws {
+        let fixture = try makeFixture(codexEnabled: false, claudeEnabled: true, claudeCLIEnabled: false)
+        let url = fixture.directory.appendingPathComponent("claude-state/.claude.json")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let prefix = "Synthetic historical model identical long prefix "
+        let names = [prefix + "Alpha", prefix + "Beta", prefix + "(1)"]
+        let reset = ISO8601DateFormatter().string(from: referenceDate.addingTimeInterval(-1))
+        let models: [[String: Any]] = names.map {
+            ["kind": "weekly_scoped", "percent": 20, "resets_at": reset, "scope": ["model": ["display_name": $0]]]
+        }
+        try JSONSerialization.data(withJSONObject: ["cachedUsageUtilization": [
+            "accountUuid": "00000000-0000-4000-8000-000000000001",
+            "fetchedAtMs": Int(referenceDate.addingTimeInterval(-30_000).timeIntervalSince1970 * 1_000),
+            "utilization": ["seven_day": ["utilization": 17, "resets_at": reset], "limits": models]
+        ]]).write(to: url, options: .atomic)
+        fixture.store.start()
+        XCTAssertNil(fixture.store.providerSnapshot(for: .claude))
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            fixture.preferences.language = language
+            let picker = MenuBarQuotaPicker(store: fixture.store, provider: .claude)
+            let options = fixture.store.menuBarQuotaOptions(for: .claude).filter {
+                if case .bucket = $0.selection { return true }
+                return false
+            }
+            XCTAssertEqual(options.count, 3)
+            XCTAssertTrue(options.allSatisfy { $0.isHistorical && $0.isAvailable })
+            let missing = MenuBarQuotaOption(selection: .bucket(limitID: "missing", kind: .weekly),
+                                              bucketName: "Saved historical model", kind: .weekly,
+                                              isAvailable: false, isHistorical: true)
+            XCTAssertLessThanOrEqual(picker.optionLabel(missing).count, 30,
+                                     "Unavailable history must not stack two long suffixes")
+            let labels = options.map { picker.optionLabel($0) }
+            XCTAssertEqual(Set(labels).count, 3, "Historical choices with matching prefixes must stay distinguishable")
+            XCTAssertTrue(labels.allSatisfy { $0.count <= 30 })
+            for (option, name) in zip(options, names) {
+                XCTAssertTrue(picker.optionLabel(option, abbreviated: false).contains(name),
+                              "Help/accessibility must retain the exact original name, including its natural suffix")
+            }
+        }
+        let calls = await fixture.claude.requestCount()
+        XCTAssertEqual(calls, 0)
+        XCTAssertEqual(fixture.codex.requestCount, 0)
+    }
+
+    func testCompactHistorySelectionAndTimeChangesNeverCreateCurrentQuotaOrRequests() async throws {
+        let fixture = try makeFixture(codexEnabled: true, claudeEnabled: true, claudeCLIEnabled: false,
+                                      cached: codexSnapshot(used: 40))
+        fixture.preferences.language = .english
+        fixture.preferences.menuBarServiceMode = .compactBoth
+        fixture.preferences.menuBarLayout = .dualWindow
+        fixture.preferences.primaryProvider = .claude
+        let url = fixture.directory.appendingPathComponent("claude-state/.claude.json")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let formatter = ISO8601DateFormatter()
+        func writeCache(age: TimeInterval, currentFiveHourOnly: Bool = false) throws {
+            let reset = formatter.string(from: referenceDate.addingTimeInterval(currentFiveHourOnly ? 3_600 : -1))
+            var utilization: [String: Any] = ["five_hour": ["utilization": 100, "resets_at": reset]]
+            if !currentFiveHourOnly { utilization["seven_day"] = ["utilization": 17, "resets_at": reset] }
+            try JSONSerialization.data(withJSONObject: ["cachedUsageUtilization": [
+                "accountUuid": "00000000-0000-4000-8000-000000000001",
+                "fetchedAtMs": Int(referenceDate.addingTimeInterval(-age).timeIntervalSince1970 * 1_000),
+                "utilization": utilization
+            ]]).write(to: url, options: .atomic)
+        }
+        try writeCache(age: 30_000)
+        fixture.store.claudeStore.start() // Codex remains the already-loaded synthetic cache.
+        let item = NSStatusBar.system.statusItem(withLength: 58)
+        defer { NSStatusBar.system.removeStatusItem(item) }
+        var inputs: [MenuBarStatusImageInput] = []
+        let renderer = MenuBarStatusRenderer(store: fixture.store, statusItem: item) { input in
+            inputs.append(input)
+            return NSImage(size: input.contentSize)
+        }
+        defer { renderer.shutdown() }
+        renderer.update(now: referenceDate)
+        XCTAssertEqual(item.length, 52)
+        XCTAssertEqual(inputs.last?.providerRings.map(\.provider), [.codex, .claude])
+        XCTAssertEqual(inputs.last?.providerRings.last?.remainingPercent, 83)
+        XCTAssertEqual(inputs.last?.providerRings.last?.isHistorical, true)
+        XCTAssertEqual(inputs.last?.providerRings.last?.badge, .stale)
+        let imagesBeforeTimeChange = inputs.count
+        let textBeforeTimeChange = item.button?.toolTip
+        try writeCache(age: 60_000)
+        fixture.store.refreshProvider(.claude)
+        renderer.update(now: referenceDate)
+        XCTAssertEqual(inputs.count, imagesBeforeTimeChange, "Original timestamp changes update text without rerendering identical pixels")
+        XCTAssertNotEqual(item.button?.toolTip, textBeforeTimeChange)
+        XCTAssertEqual(item.button?.toolTip, item.button?.accessibilityLabel())
+
+        fixture.store.setMenuBarQuotaSelection(.defaultBucket(.fiveHour), for: .claude)
+        renderer.update(now: referenceDate)
+        XCTAssertEqual(fixture.preferences.claudeMenuBarQuotaSelection, .defaultBucket(.fiveHour))
+        XCTAssertEqual(inputs.last?.providerRings.last?.remainingPercent, 0, "Explicit historical zero is not skipped")
+        XCTAssertTrue(try XCTUnwrap(item.button?.toolTip).contains("5h: last remaining 0%"))
+        let manualMissing = MenuBarQuotaSelection.bucket(limitID: "missing", kind: .weekly)
+        fixture.preferences.claudeMenuBarQuotaSelection = manualMissing // Existing unavailable saved preference.
+        renderer.update(now: referenceDate)
+        XCTAssertNil(fixture.store.providerMenuBarDisplay(for: .claude))
+        XCTAssertNil(inputs.last?.providerRings.last?.remainingPercent)
+        XCTAssertEqual(inputs.last?.providerRings.last?.badge, .stale)
+        XCTAssertFalse(fixture.store.menuBarQuotaOptions(for: .claude).last?.isAvailable ?? true)
+        XCTAssertEqual(fixture.preferences.claudeMenuBarQuotaSelection, manualMissing)
+        XCTAssertTrue(try XCTUnwrap(item.button?.toolTip).contains("saved choice is absent"))
+        XCTAssertNil(fixture.store.providerMenuBarQuota(for: .claude))
+        XCTAssertNil(fixture.store.providerDualWindowBucket(for: .claude))
+        XCTAssertNil(fixture.store.claudeStore.snapshot)
+        XCTAssertNil(fixture.store.claudeStore.nextAutomaticRefreshAt)
+
+        fixture.store.setMenuBarQuotaSelection(.defaultBucket(.weekly), for: .claude)
+        fixture.preferences.menuBarServiceMode = .single
+        let dualItem = NSStatusBar.system.statusItem(withLength: 72)
+        defer { NSStatusBar.system.removeStatusItem(dualItem) }
+        var dualInput: MenuBarStatusImageInput?
+        let dualRenderer = MenuBarStatusRenderer(store: fixture.store, statusItem: dualItem, provider: .claude) { input in
+            dualInput = input
+            return NSImage(size: input.contentSize)
+        }
+        defer { dualRenderer.shutdown() }
+        XCTAssertNil(dualInput?.dualWindowBucket, "Historical display must not fabricate a dual-window snapshot")
+        XCTAssertEqual(dualInput?.isHistorical, false)
+        XCTAssertTrue(try XCTUnwrap(dualItem.button?.toolTip).contains("single-window or compact ring layouts"))
+
+        try writeCache(age: 0, currentFiveHourOnly: true)
+        fixture.store.refreshProvider(.claude)
+        let current = try XCTUnwrap(fixture.store.providerMenuBarDisplay(for: .claude))
+        XCTAssertFalse(current.isHistorical)
+        XCTAssertEqual(current.kind, .fiveHour, "Current quota retains its existing Auto fallback for a missing saved Weekly choice")
+        XCTAssertEqual(fixture.preferences.claudeMenuBarQuotaSelection, .defaultBucket(.weekly))
+        XCTAssertNil(fixture.store.providerHistoricalReport(for: .claude))
+        XCTAssertFalse(fixture.store.menuBarQuotaOptions(for: .claude).contains(where: \.isHistorical))
+        let calls = await fixture.claude.requestCount()
+        XCTAssertEqual(calls, 0)
+        XCTAssertEqual(fixture.codex.requestCount, 0)
+        XCTAssertEqual(fixture.notifications.deliveries, 0)
         XCTAssertEqual(fixture.claudeNotifications.deliveries, 0)
     }
 

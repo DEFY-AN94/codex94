@@ -390,9 +390,11 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try await wait { await fixture.fetcher.count() == 1 }
         fixture.store.stop()
         fixture.store.start()
-        try await wait { await fixture.fetcher.count() == 2 }
+        XCTAssertTrue(fixture.store.isRetiringCLI)
+        let retiringCalls = await fixture.fetcher.count()
+        XCTAssertEqual(retiringCalls, 1, "Re-enable waits for the old fetch tail, even after shutdown returns")
         await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 99)))
-        try await Task.sleep(for: .milliseconds(50))
+        try await wait { await fixture.fetcher.count() == 2 }
         XCTAssertNil(fixture.store.snapshot)
         XCTAssertTrue(fixture.store.isRefreshing)
         await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 20)))
@@ -827,7 +829,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertEqual(fixture.store.lastCLIReadIssue, .loginRequired)
         XCTAssertNil(fixture.store.lastIssue, "A one-time failure never becomes the card's state")
         XCTAssertEqual(fixture.store.connectionState, .idle)
-        try await wait { fixture.fetcher.shutdowns.read() == 1 }
+        try await wait { fixture.fetcher.shutdowns.read() == 1 && !fixture.store.isRetiringCLI }
         fixture.store.readOnceWithCLI()
         try await wait { await fixture.fetcher.count() == 2 }
         await fixture.fetcher.complete(.success(.init(source: .statusline, reportedAt: fixture.clock.read(),
@@ -906,7 +908,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertNil(fixture.store.lastCLIReadIssue)
         XCTAssertNil(fixture.store.nextAutomaticRefreshAt, "A one-time read does not schedule automatic CLI reads")
         XCTAssertFalse(fixture.preferences.claudeCLIUsageEnabled)
-        try await wait { fixture.fetcher.shutdowns.read() == 1 }
+        try await wait { fixture.fetcher.shutdowns.read() == 1 && !fixture.store.isRetiringCLI }
         XCTAssertTrue(fixture.store.canReadOnceWithCLI)
 
         fixture.store.readOnceWithCLI()
@@ -1377,6 +1379,154 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: f.localCacheURL.path))
     }
 
+    func testOneTimeReadCoalescesClicksAndNeverRetriesAfterTimeoutWhileAutomaticCLIIsOff() async throws {
+        let f = try fixture(cliEnabled: false)
+        f.store.start()
+        for _ in 0..<4 { f.store.readOnceWithCLI() }
+        try await wait { await f.fetcher.count() == 1 }
+        for _ in 0..<3 {
+            f.clock.advance(600)
+            f.store.readOnceWithCLI()
+            f.store.refresh(trigger: .popover)
+            f.store.handleSystemWake(now: f.clock.read())
+            try await poll(f)
+        }
+        let pendingCalls = await f.fetcher.count()
+        XCTAssertEqual(pendingCalls, 1)
+        XCTAssertFalse(f.store.canReadOnceWithCLI)
+        await f.fetcher.complete(.failure(.timedOut))
+        try await wait { !f.store.isRefreshing && !f.store.isRetiringCLI }
+        for _ in 0..<4 {
+            f.clock.advance(3_600)
+            try await poll(f)
+            f.store.refresh(trigger: .quotaReset)
+            f.store.popoverWillOpen(now: f.clock.read())
+            f.store.handleSystemWake(now: f.clock.read())
+        }
+        let afterTimeout = await f.fetcher.count()
+        XCTAssertEqual(afterTimeout, 1, "Timeout and later timer/reset/wake events cannot repeat a one-time read")
+        XCTAssertEqual(f.factoryCalls.read(), 1)
+        XCTAssertFalse(f.preferences.claudeCLIUsageEnabled)
+        XCTAssertNil(f.store.nextAutomaticRefreshAt)
+        f.store.readOnceWithCLI()
+        try await wait { await f.fetcher.count() == 2 }
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 30)))
+        try await wait { !f.store.isRefreshing && !f.store.isRetiringCLI }
+        XCTAssertEqual(f.factoryCalls.read(), 2, "Only another explicit click starts a new one-time client")
+    }
+
+    func testFinishedOneTimeReadKeepsTheButtonClosedUntilShutdownCompletes() async throws {
+        let pool = ClaudeRetirementTestPool()
+        let f = try fixture(cliEnabled: false, fetcherFactory: { _ in pool.make() })
+        addTeardownBlock { pool.releaseAndFinishAll() }
+        f.store.start()
+        f.store.readOnceWithCLI()
+        try await wait { pool.client(0)?.fetches.read() == 1 }
+        let first = try XCTUnwrap(pool.client(0))
+        first.complete(.success(report(at: f.clock.read(), used: 30)))
+        try await wait { first.shutdownStarted.read() == 1 }
+        XCTAssertFalse(f.store.isRefreshing)
+        XCTAssertTrue(f.store.isRetiringCLI)
+        XCTAssertFalse(f.store.canReadOnceWithCLI)
+        for _ in 0..<3 {
+            f.store.readOnceWithCLI()
+            f.store.refresh(trigger: .background)
+            f.store.handleSystemWake(now: f.clock.read())
+        }
+        XCTAssertEqual(pool.count, 1)
+        first.allowShutdown()
+        try await wait { !f.store.isRetiringCLI }
+        XCTAssertTrue(f.store.canReadOnceWithCLI)
+        XCTAssertEqual(pool.count, 1, "Clicks rejected while retiring cannot become deferred one-time reads")
+        f.store.readOnceWithCLI()
+        try await wait { pool.client(1)?.fetches.read() == 1 }
+        XCTAssertEqual(pool.maximumActive, 1)
+        let second = try XCTUnwrap(pool.client(1))
+        second.complete(.success(report(at: f.clock.read(), used: 20)))
+        try await wait { !f.store.isRefreshing && !f.store.isRetiringCLI }
+        XCTAssertEqual(pool.active, 0)
+        XCTAssertNil(f.store.nextAutomaticRefreshAt)
+        XCTAssertFalse(first.shutdownTimedOut)
+    }
+
+    func testRetirementWaitsForBothShutdownAndFetchTailBeforeOneCoalescedAutomaticRead() async throws {
+        for shutdownFirst in [true, false] {
+            let pool = ClaudeRetirementTestPool()
+            let f = try fixture(cliEnabled: false, fetcherFactory: { _ in pool.make() })
+            addTeardownBlock { pool.releaseAndFinishAll() }
+            f.store.start()
+            f.store.readOnceWithCLI()
+            try await wait { pool.client(0)?.fetches.read() == 1 }
+            let first = try XCTUnwrap(pool.client(0))
+            let start = ContinuousClock.now
+            f.store.setCLIUsageEnabled(true)
+            XCTAssertLessThan(start.duration(to: ContinuousClock.now), .milliseconds(200), "Retirement cannot block MainActor")
+            try await wait { first.shutdownStarted.read() == 1 }
+            for _ in 0..<3 {
+                f.store.setCLIUsageEnabled(false)
+                f.store.setCLIUsageEnabled(true)
+                f.store.refresh(trigger: .background)
+                f.store.handleSystemWake(now: f.clock.read())
+                f.store.readOnceWithCLI()
+            }
+            XCTAssertTrue(f.store.isRetiringCLI)
+            XCTAssertFalse(f.store.canReadOnceWithCLI)
+            XCTAssertEqual(pool.count, 1, "No replacement may even be constructed while cleanup owns the gate")
+            if shutdownFirst {
+                first.allowShutdown()
+                try await wait { first.shutdownFinished.read() == 1 }
+            } else {
+                first.complete(.success(report(at: f.clock.read(), used: 99)))
+                try await wait { first.fetchReturned.read() == 1 }
+            }
+            XCTAssertTrue(f.store.isRetiringCLI, "Completing just one half must not release the gate")
+            XCTAssertEqual(pool.count, 1)
+            if shutdownFirst { first.complete(.success(report(at: f.clock.read(), used: 99))) }
+            else { first.allowShutdown() }
+            try await wait { pool.client(1)?.fetches.read() == 1 }
+            let second = try XCTUnwrap(pool.client(1))
+            XCTAssertFalse(f.store.isRetiringCLI)
+            XCTAssertNil(f.store.snapshot, "The retired generation's late success cannot publish")
+            XCTAssertEqual(pool.count, 2, "Rapid automatic-mode intents coalesce into one replacement")
+            XCTAssertEqual(pool.maximumActive, 1)
+            second.complete(.success(report(at: f.clock.read(), used: 20)))
+            try await wait { !f.store.isRefreshing }
+            XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 80)
+            f.store.stop()
+            try await wait { !f.store.isRetiringCLI }
+            XCTAssertEqual(pool.active, 0)
+            XCTAssertFalse(first.shutdownTimedOut)
+            XCTAssertTrue(f.notifications.deliveries.isEmpty)
+        }
+    }
+
+    func testStopAndShutdownDiscardTheAutomaticIntentWaitingForAnOldFetchTail() async throws {
+        for terminal in [false, true] {
+            let pool = ClaudeRetirementTestPool()
+            let f = try fixture(cliEnabled: false, fetcherFactory: { _ in pool.make() })
+            addTeardownBlock { pool.releaseAndFinishAll() }
+            f.store.start()
+            f.store.readOnceWithCLI()
+            try await wait { pool.client(0)?.fetches.read() == 1 }
+            let first = try XCTUnwrap(pool.client(0))
+            f.store.setCLIUsageEnabled(true)
+            try await wait { first.shutdownStarted.read() == 1 }
+            first.allowShutdown()
+            try await wait { first.shutdownFinished.read() == 1 }
+            XCTAssertTrue(f.store.isRetiringCLI, "The old async tail is still outstanding")
+            if terminal { f.store.shutdown() } else { f.store.stop() }
+            first.complete(.success(report(at: f.clock.read(), used: 99)))
+            try await wait { !f.store.isRetiringCLI }
+            f.store.refresh(trigger: .background)
+            f.store.readOnceWithCLI()
+            XCTAssertEqual(pool.count, 1)
+            XCTAssertEqual(pool.active, 0)
+            XCTAssertNil(f.store.snapshot)
+            XCTAssertNil(f.store.nextAutomaticRefreshAt)
+            XCTAssertFalse(first.shutdownTimedOut)
+        }
+    }
+
     private func writeLocalCacheBytes(_ fixture: Fixture, _ contents: String) throws {
         try FileManager.default.createDirectory(at: fixture.localCacheURL.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
@@ -1552,4 +1702,79 @@ private final class ClaudeStoreTestNotifications: QuotaNotificationServing {
     func authorization() async -> NotificationAuthorization { .authorized }
     func requestAuthorization() async throws -> Bool { XCTFail("No real permissions in tests"); return false }
     func deliver(title: String, body: String) async throws { deliveries.append(title + " " + body) }
+}
+
+/// Separate completion controls prove that process shutdown and an async fetch
+/// tail are both required. All processes here are counters, not executable CLIs.
+private final class ClaudeRetirementTestPool: @unchecked Sendable {
+    private let lock = NSLock()
+    private var clients: [ClaudeRetirementTestFetcher] = []
+    private var activeCount = 0
+    private var peakCount = 0
+    var count: Int { lock.withLock { clients.count } }
+    var active: Int { lock.withLock { activeCount } }
+    var maximumActive: Int { lock.withLock { peakCount } }
+    func client(_ index: Int) -> ClaudeRetirementTestFetcher? {
+        lock.withLock { clients.indices.contains(index) ? clients[index] : nil }
+    }
+    func make() -> ClaudeRetirementTestFetcher {
+        lock.withLock {
+            let value = ClaudeRetirementTestFetcher(holdShutdown: clients.isEmpty,
+                began: { [weak self] in self?.begin() }, ended: { [weak self] in self?.end() })
+            clients.append(value)
+            return value
+        }
+    }
+    private func begin() { lock.withLock { activeCount += 1; peakCount = max(peakCount, activeCount) } }
+    private func end() { lock.withLock { activeCount -= 1 } }
+    func releaseAndFinishAll() {
+        let values = lock.withLock { clients }
+        values.forEach { $0.allowShutdown(); $0.complete(.failure(.unavailable)) }
+    }
+}
+
+private final class ClaudeRetirementTestFetcher: ClaudeQuotaFetching, @unchecked Sendable {
+    let fetches = ClaudeStoreTestCounter()
+    let fetchReturned = ClaudeStoreTestCounter()
+    let shutdownStarted = ClaudeStoreTestCounter()
+    let shutdownFinished = ClaudeStoreTestCounter()
+    private let gate: DispatchSemaphore
+    private let lock = NSLock()
+    private let began: @Sendable () -> Void
+    private let ended: @Sendable () -> Void
+    private var pending: CheckedContinuation<ClaudeQuotaReport, Error>?
+    private var didShutDown = false
+    private var timedOut = false
+    var shutdownTimedOut: Bool { lock.withLock { timedOut } }
+    init(holdShutdown: Bool, began: @escaping @Sendable () -> Void, ended: @escaping @Sendable () -> Void) {
+        gate = DispatchSemaphore(value: holdShutdown ? 0 : 1)
+        self.began = began
+        self.ended = ended
+    }
+    func fetch() async throws -> ClaudeQuotaReport {
+        began()
+        defer { fetchReturned.increment() }
+        return try await withCheckedThrowingContinuation { continuation in
+            lock.withLock { pending = continuation }
+            fetches.increment()
+        }
+    }
+    func complete(_ value: Result<ClaudeQuotaReport, ClaudeQuotaIssue>) {
+        let continuation = lock.withLock { let value = pending; pending = nil; return value }
+        guard let continuation else { return }
+        switch value {
+        case let .success(report): continuation.resume(returning: report)
+        case let .failure(issue): continuation.resume(throwing: issue)
+        }
+    }
+    func allowShutdown() { gate.signal() }
+    func shutdown() {
+        let first = lock.withLock { if didShutDown { return false }; didShutDown = true; return true }
+        guard first else { return }
+        shutdownStarted.increment()
+        let result = gate.wait(timeout: .now() + 10)
+        lock.withLock { timedOut = result == .timedOut }
+        if fetches.read() > 0 { ended() }
+        shutdownFinished.increment()
+    }
 }

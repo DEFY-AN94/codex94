@@ -70,22 +70,6 @@ struct OverviewView: View {
 
                 Divider()
 
-                HStack(alignment: .firstTextBaseline, spacing: 16) {
-                    Text("display.label")
-                        .fontWeight(.medium)
-                    Spacer(minLength: 16)
-                    Group {
-                        if store.preferences.usesDualWindowMenuBarSelection {
-                            MenuBarBucketPicker(store: store)
-                        } else {
-                            MenuBarQuotaPicker(store: store)
-                        }
-                    }
-                        .frame(maxWidth: 360)
-                }
-
-                Divider()
-
                 ResetCreditsView(store: store)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -196,18 +196,29 @@ struct ClaudeQuotaCardContent: View {
             scopedLimits: ProviderScopedLimit.limits(in: snapshot),
             refreshHelp: LocalizedStringKey(refreshHelpKey),
             sourceTimeHelp: sourceTimeHelpKey.map { LocalizedStringKey($0) },
-            historicalReport: displayedHistory
+            historicalReport: displayedHistory,
+            sourceAgeText: reportAgeText
         )
     }
 
     var sourceTimeText: String {
-        if let displayedHistory {
+        if style != .terminal, let displayedHistory {
             return ClaudeQuotaHistoryFormatting.reportTime(
                 displayedHistory, now: now, language: language, timeZone: timeZone
             )
         }
         return ClaudeQuotaHistoryFormatting.sourceTime(
-            source: source, reportedAt: reportedAt, language: language, timeZone: timeZone
+            source: displayedSource, reportedAt: displayedHistory?.reportedAt ?? reportedAt,
+            language: language, timeZone: timeZone
+        )
+    }
+
+    var reportAgeText: String? {
+        guard style == .terminal, let date = displayedHistory?.reportedAt ?? reportedAt else { return nil }
+        return StatusAccessibilityString.localized(
+            "claude.reportAge %@", arguments: [ClaudeQuotaHistoryFormatting.relativeAge(
+                since: date, now: now, language: language
+            )], language: language, bundle: .main
         )
     }
 
@@ -246,6 +257,7 @@ struct ProviderQuotaCardContent: View {
     var refreshHelp: LocalizedStringKey? = nil
     var sourceTimeHelp: LocalizedStringKey? = nil
     var historicalReport: ClaudeQuotaHistoryPresentation? = nil
+    var sourceAgeText: String? = nil
 
     private var isTerminal: Bool { style == .terminal }
 
@@ -297,7 +309,8 @@ struct ProviderQuotaCardContent: View {
                     ForEach(windows.sorted { $0.kind.sortOrder < $1.kind.sortOrder }) { window in
                         QuotaWindowRowContent(
                             window: window, palette: palette, reset: resetPresentation(window),
-                            accessibilityIdentifier: windowIdentifier(window), language: language
+                            accessibilityIdentifier: windowIdentifier(window), language: language,
+                            showsResetCountdown: !(provider == .claude && window.kind == .fiveHour)
                         )
                     }
                 }
@@ -348,6 +361,11 @@ struct ProviderQuotaCardContent: View {
                     .lineLimit(historicalReport != nil ? nil : isTerminal || compact ? 1 : nil)
                     .help(sourceTimeTooltip)
                     .accessibilityIdentifier(provider.rawValue + "-source-time")
+                if let sourceAgeText {
+                    Text(verbatim: sourceAgeText).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier(provider.rawValue + "-source-age")
+                }
             }
             .font(.caption)
             .fixedSize(horizontal: false, vertical: true)

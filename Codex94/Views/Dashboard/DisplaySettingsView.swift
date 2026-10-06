@@ -9,18 +9,26 @@ struct DisplaySettingsView: View {
     var body: some View {
         SettingsPage(title: "dashboard.display") {
             SettingsRow("display.label") {
-                if store.preferences.usesDualWindowMenuBarSelection {
-                    VStack(alignment: .leading, spacing: 7) {
-                        MenuBarBucketPicker(store: store)
-                            .frame(maxWidth: 360)
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(store.preferences.enabledProviders) { provider in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(verbatim: provider.displayName).font(.caption.weight(.semibold))
+                            if store.preferences.usesDualWindowMenuBarSelection {
+                                MenuBarBucketPicker(store: store, provider: provider)
+                            } else {
+                                MenuBarQuotaPicker(store: store, provider: provider)
+                            }
+                        }
+                        .frame(maxWidth: 360, alignment: .leading)
+                    }
+                    if store.preferences.enabledProviders.isEmpty {
+                        Text("providers.noneEnabled").foregroundStyle(.secondary)
+                    } else if store.preferences.usesDualWindowMenuBarSelection {
                         Text("display.dualWindow.help")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                } else {
-                    MenuBarQuotaPicker(store: store)
-                        .frame(maxWidth: 360)
                 }
             }
 

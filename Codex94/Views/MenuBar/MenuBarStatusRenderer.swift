@@ -7,6 +7,7 @@ struct MenuBarProviderRingInput: Equatable {
     let remainingPercent: Int?
     let quotaLevel: QuotaLevel
     let badge: ConnectionBadge
+    var isHistorical: Bool = false
 }
 
 /// Equality describes pixels only. Bucket names, resets and fetch timestamps
@@ -23,6 +24,7 @@ struct MenuBarStatusImageInput: Equatable {
     var providerLabel: QuotaProviderID? = nil
     var preciseRemainingPercent: Double? = nil
     var providerRings: [MenuBarProviderRingInput] = []
+    var isHistorical: Bool = false
 
     var contentSize: CGSize {
         if !providerRings.isEmpty {
@@ -44,7 +46,7 @@ struct MenuBarStatusImageInput: Equatable {
         guard lhs.layout == rhs.layout, lhs.badge == rhs.badge,
               lhs.colorScheme == rhs.colorScheme, lhs.accentOverrides == rhs.accentOverrides,
               lhs.localeIdentifier == rhs.localeIdentifier, lhs.scale == rhs.scale,
-              lhs.providerLabel == rhs.providerLabel,
+              lhs.providerLabel == rhs.providerLabel, lhs.isHistorical == rhs.isHistorical,
               QuotaLevel(preciseRemainingPercent: lhs.preciseRemainingPercent)
                 == QuotaLevel(preciseRemainingPercent: rhs.preciseRemainingPercent) else { return false }
         if lhs.layout == .dualWindow {
@@ -71,7 +73,8 @@ enum MenuBarStatusImageRenderer {
             layout: input.layout, remainingPercent: input.remainingPercent,
             quotaLevel: input.preciseRemainingPercent.map { QuotaLevel(preciseRemainingPercent: $0) }
                 ?? QuotaLevel(remainingPercent: input.remainingPercent),
-            badge: input.badge, palette: palette, dualWindowBucket: input.dualWindowBucket
+            badge: input.badge, palette: palette, dualWindowBucket: input.dualWindowBucket,
+            isHistorical: input.isHistorical
         )
         .environment(\.colorScheme, input.colorScheme)
         .environment(\.locale, Locale(identifier: input.localeIdentifier))
@@ -127,13 +130,14 @@ private struct CompactProviderRing: View {
     let palette: Codex94Palette
 
     var body: some View {
+        let color = palette.quotaColor(for: input.quotaLevel).opacity(input.isHistorical ? 0.78 : 1)
         ZStack {
             RingGaugeView(remainingPercent: input.remainingPercent,
-                          color: palette.quotaColor(for: input.quotaLevel), lineWidth: 2)
+                          color: color, lineWidth: 2)
                 .frame(width: 18, height: 18)
             Image(systemName: input.provider.systemImageName)
                 .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(palette.quotaColor(for: input.quotaLevel))
+                .foregroundStyle(color)
             ConnectionBadgeView(badge: input.badge,
                                 color: palette.connectionBadgeColor(for: input.badge), size: 6)
                 .offset(x: 7, y: -7)
@@ -201,24 +205,34 @@ final class MenuBarStatusRenderer {
         case .terminalLight: .light
         }
         let scale = button.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
+        let supportsHistory = store.preferences.menuBarLayout != .dualWindow || store.preferences.usesCompactProviderRings
+        let display = supportsHistory ? store.providerMenuBarDisplay(for: provider) : nil
+        let historical = supportsHistory && store.providerHistoricalReport(for: provider) != nil
+        let presentation = store.providerStatusPresentation(for: provider)
+        func displayBadge(_ original: ConnectionBadge, historical: Bool) -> ConnectionBadge {
+            original == .refreshing ? .refreshing : historical ? .stale : original
+        }
         let input = MenuBarStatusImageInput(
             layout: store.preferences.menuBarLayout,
-            remainingPercent: store.providerMenuBarQuota(for: provider)?.window.remainingPercent,
-            badge: store.providerStatusPresentation(for: provider).connectionBadge,
+            remainingPercent: supportsHistory ? display?.remainingPercent : store.providerMenuBarQuota(for: provider)?.window.remainingPercent,
+            badge: displayBadge(presentation.connectionBadge, historical: historical),
             dualWindowBucket: store.providerDualWindowBucket(for: provider),
             colorScheme: scheme, accentOverrides: store.preferences.statusAccentOverrides,
             localeIdentifier: store.preferences.language.locale.identifier, scale: scale,
             providerLabel: store.preferences.menuBarServiceMode == .both
                 && store.preferences.enabledProviders.count > 1 ? provider : nil,
-            preciseRemainingPercent: store.providerMenuBarQuota(for: provider)?.window.preciseRemainingPercent,
+            preciseRemainingPercent: supportsHistory ? display?.preciseRemainingPercent
+                : store.providerMenuBarQuota(for: provider)?.window.preciseRemainingPercent,
             providerRings: store.preferences.usesCompactProviderRings ? store.preferences.enabledProviders.map { service in
-                let window = store.providerMenuBarQuota(for: service)?.window
+                let reading = store.providerMenuBarDisplay(for: service)
+                let history = store.providerHistoricalReport(for: service) != nil
                 return MenuBarProviderRingInput(
-                    provider: service, remainingPercent: window?.remainingPercent,
-                    quotaLevel: QuotaLevel(preciseRemainingPercent: window?.preciseRemainingPercent),
-                    badge: store.providerStatusPresentation(for: service).connectionBadge
+                    provider: service, remainingPercent: reading?.remainingPercent,
+                    quotaLevel: QuotaLevel(preciseRemainingPercent: reading?.preciseRemainingPercent),
+                    badge: displayBadge(store.providerStatusPresentation(for: service).connectionBadge, historical: history),
+                    isHistorical: history
                 )
-            } : []
+            } : [], isHistorical: historical
         )
         let itemWidth = input.statusItemWidth
         if item.length != itemWidth { item.length = itemWidth }

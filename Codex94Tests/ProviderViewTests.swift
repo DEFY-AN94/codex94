@@ -119,6 +119,141 @@ final class ProviderViewTests: XCTestCase {
         XCTAssertNil(card(snapshot: snapshot, source: .cliUsage, now: reportedAt).sourceTimeHelpKey)
     }
 
+    func testClaudeMenuReportAgeUsesAcceptedTimeWithoutDuplicatingTheAbsoluteLine() throws {
+        let snapshot = try claudeSnapshot()
+        let history = try historicalReport(at: reportedAt.addingTimeInterval(30 * 86_400))
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            func current(at date: Date) -> ClaudeQuotaCardContent {
+                ClaudeQuotaCardContent(
+                    snapshot: snapshot, source: .localCache, reportedAt: reportedAt, issue: nil,
+                    isRefreshing: false, isEnabled: true, language: language, now: date,
+                    palette: .resolve(.system, scheme: .light), refresh: {}, openSetup: {},
+                    timeZone: TimeZone(secondsFromGMT: 0)!, style: .terminal
+                )
+            }
+            let first = current(at: reportedAt.addingTimeInterval(125))
+            let later = current(at: reportedAt.addingTimeInterval(245))
+            XCTAssertEqual(first.sourceTimeText, later.sourceTimeText,
+                           "The local reread/render time must not replace the source's timestamp")
+            XCTAssertEqual(first.reportAgeText, language == .english ? "Last report: 2 minutes ago" : "上次报告：2 分钟前")
+            XCTAssertEqual(later.reportAgeText, language == .english ? "Last report: 4 minutes ago" : "上次报告：4 分钟前")
+            XCTAssertFalse(first.sourceTimeText.contains(language == .english ? "ago" : "前"))
+            let rollback = current(at: reportedAt.addingTimeInterval(-60))
+            XCTAssertEqual(rollback.reportAgeText, language == .english ? "Last report: Age unavailable" : "上次报告：无法确定距今时间")
+
+            var historic = ClaudeQuotaCardContent(
+                snapshot: nil, source: .statusline, reportedAt: reportedAt.addingTimeInterval(29 * 86_400), issue: .sourceChanged,
+                isRefreshing: false, isEnabled: true, language: language, now: reportedAt.addingTimeInterval(30 * 86_400),
+                palette: .resolve(.system, scheme: .light), refresh: {}, openSetup: {},
+                timeZone: TimeZone(secondsFromGMT: 0)!, passiveReportNeedsConfirmation: true,
+                style: .terminal, historicalReport: history
+            )
+            XCTAssertEqual(historic.sourceTimeText, first.sourceTimeText,
+                           "A pending source cannot replace the accepted historical source or its time")
+            XCTAssertEqual(historic.reportAgeText, language == .english ? "Last report: 30 days ago" : "上次报告：30 天前")
+            XCTAssertEqual(historic.statusKey, "claude.issue.sourceChanged")
+            historic.style = .card
+            XCTAssertNil(historic.reportAgeText, "Dashboard retains its existing inline historical age")
+            XCTAssertTrue(historic.sourceTimeText.contains(language == .english ? "30 days ago" : "30 天前"))
+        }
+        var noReport = card(snapshot: nil, source: nil, now: reportedAt)
+        noReport.style = .terminal
+        XCTAssertNil(noReport.reportAgeText, "No report must not become a just-now observation")
+    }
+
+    func testClaudeMenuCurrentRowsRenderWithoutFiveHourCountdownAndKeepTheResetDate() throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let snapshot = try claudeSnapshot(used: 24.5)
+        let originalReset = try XCTUnwrap(snapshot.defaultBucket?.window(.fiveHour)?.resetsAt)
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            for dark in [false, true] {
+                let content = ClaudeQuotaCardContent(
+                    snapshot: snapshot, source: .localCache, reportedAt: reportedAt, issue: nil,
+                    isRefreshing: false, isEnabled: true, language: language, now: reportedAt.addingTimeInterval(125),
+                    palette: .resolve(.system, scheme: dark ? .dark : .light),
+                    refresh: { XCTFail("Rendering cannot start a read") },
+                    openSetup: { XCTFail("Rendering cannot navigate") },
+                    timeZone: TimeZone(secondsFromGMT: 0)!, compact: true, style: .terminal
+                )
+                XCTAssertEqual(content.snapshot?.defaultBucket?.window(.fiveHour)?.resetsAt, originalReset)
+                XCTAssertNotNil(content.reportAgeText)
+                let size = try render(content.padding(14), width: 500, dark: dark, language: language,
+                                      name: "claude-menu-report-age-\(language.rawValue)-\(dark ? "dark" : "light")", output: directory)
+                XCTAssertEqual(size.width, 500, accuracy: 1)
+                XCTAssertLessThan(size.height, 330)
+            }
+        }
+    }
+
+    func testReadOnceBusyAndRetiringStatesDisableDuplicatesAndKeepTheirOwnProgress() {
+        func content(refreshing: Bool = false, retiring: Bool = false, issue: ClaudeQuotaIssue? = nil) -> ClaudeReadOnceActionContent {
+            ClaudeReadOnceActionContent(
+                canRead: true, isRefreshing: refreshing, isRetiringCLI: retiring, regularCLIEnabled: false,
+                issue: issue, lastReadAt: reportedAt, language: .english,
+                readOnce: { XCTFail("Value presentation must not execute the action") },
+                timeZone: TimeZone(secondsFromGMT: 0)!
+            )
+        }
+        let idle = content()
+        XCTAssertTrue(idle.canStartRead)
+        XCTAssertNil(idle.progressKey)
+        XCTAssertTrue(idle.lastReadText?.hasPrefix("Last CLI read: ") == true)
+        let refreshing = content(refreshing: true, issue: .timedOut)
+        XCTAssertFalse(refreshing.canStartRead)
+        XCTAssertEqual(refreshing.progressKey, "claude.refreshing")
+        XCTAssertNil(refreshing.resultIssueKey)
+        XCTAssertNil(refreshing.lastReadText)
+        for refreshing in [false, true] {
+            let retiring = content(refreshing: refreshing, retiring: true, issue: .timedOut)
+            XCTAssertFalse(retiring.canStartRead, "Retirement remains busy even after the read finishes")
+            XCTAssertEqual(retiring.progressKey, "claude.cliUsage.stopping")
+            XCTAssertNil(retiring.resultIssueKey)
+            XCTAssertNil(retiring.lastReadText)
+        }
+        XCTAssertEqual(content(issue: .noData).resultIssueKey, "claude.cliUsage.readOnce.noData")
+        XCTAssertEqual(content(issue: .timedOut).resultIssueKey, "claude.issue.timedOut")
+    }
+
+    func testReadOnceActionRendersSharedWarningProgressAndResultsWithoutExecutingActions() throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let states: [(String, Bool, Bool, Bool, ClaudeQuotaIssue?, Date?)] = [
+            ("Idle", false, false, false, nil, nil),
+            ("Reading", true, false, false, .timedOut, reportedAt),
+            ("Stopping", false, true, false, nil, reportedAt),
+            ("Failed", false, false, false, .timedOut, nil),
+            ("Completed", false, false, false, nil, reportedAt),
+            ("Background enabled", false, false, true, nil, reportedAt)
+        ]
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            for dark in [false, true] {
+                for compact in [false, true] {
+                    let matrix = VStack(alignment: .leading, spacing: 20) {
+                        ForEach(states.indices, id: \.self) { index in
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(verbatim: states[index].0).font(.caption).foregroundStyle(.secondary)
+                                ClaudeReadOnceActionContent(
+                                    canRead: true, isRefreshing: states[index].1, isRetiringCLI: states[index].2,
+                                    regularCLIEnabled: states[index].3, issue: states[index].4,
+                                    lastReadAt: states[index].5, language: language,
+                                    readOnce: { XCTFail("Rendering cannot invoke Claude") }, compact: compact,
+                                    timeZone: TimeZone(secondsFromGMT: 0)!
+                                )
+                            }
+                        }
+                    }.padding(14)
+                    let width: CGFloat = compact ? 500 : 400
+                    let size = try render(matrix, width: width, dark: dark, language: language,
+                                          name: "claude-read-once-\(compact ? "menu" : "settings")-\(language.rawValue)-\(dark ? "dark" : "light")",
+                                          output: directory)
+                    XCTAssertEqual(size.width, width, accuracy: 1)
+                    XCTAssertLessThan(size.height, 1_500)
+                }
+            }
+        }
+    }
+
     func testClaudeAutoCaptionTracksTheResolvedWindowWithoutStartingRequests() async throws {
         let directory = try temporaryDirectory()
         print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")

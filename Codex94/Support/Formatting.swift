@@ -144,8 +144,15 @@ enum QuotaFormatting {
     /// Reserve the initial labels as well as generated ones so a natural "(1)"
     /// suffix cannot collide with a suffix introduced for another bucket.
     static func bucketMenuNames(in snapshot: QuotaSnapshot, limit: Int = 30) -> [String: String] {
-        let buckets = snapshot.displayableBuckets
-        let fullNames = buckets.map { snapshot.displayName(for: $0) }
+        bucketMenuNames(buckets: snapshot.displayableBuckets.map {
+            (id: $0.limitID, name: snapshot.displayName(for: $0))
+        }, limit: limit)
+    }
+
+    /// Name disambiguation also serves history-only display options, without
+    /// manufacturing a current quota snapshot just to label a menu.
+    static func bucketMenuNames(buckets: [(id: String, name: String)], limit: Int = 30) -> [String: String] {
+        let fullNames = buckets.map { $0.name }
         let shortNames = fullNames.map { shortBucketName($0, limit: limit) }
         let counts = Dictionary(grouping: shortNames, by: { $0 }).mapValues(\.count)
         var reserved = Set(shortNames)
@@ -161,7 +168,7 @@ enum QuotaFormatting {
                 } while reserved.contains(label)
                 reserved.insert(label)
             }
-            result[bucket.limitID] = label
+            result[bucket.id] = label
         }
         return result
     }
