@@ -4,8 +4,8 @@ All notable changes to Codex94 are documented here.
 
 ## 4.1.4 - 2026-10-07
 
-Version `4.1.4 (28)` is a menu and single-read candidate. Stable downloads
-remain on 4.1.3 until publication is verified. Dates use Australia/Melbourne.
+Version `4.1.4 (28)` is the published stable release. Release dates use
+Australia/Melbourne; `4.1.3 (27)` is the previous release.
 
 ### Changed
 
@@ -39,8 +39,7 @@ explicit attempts, with failures counting toward that cap.
 
 ## 4.1.3 - 2026-10-07
 
-Version `4.1.3 (27)` is the published stable release. Release dates use
-Australia/Melbourne; `4.1.2 (26)` is the previous release.
+Version `4.1.3 (27)` was published on the date above, following `4.1.2 (26)`.
 
 ### Changed
 

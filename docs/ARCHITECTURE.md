@@ -1,13 +1,13 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints for the published
-[`4.1.3 (27)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.3),
+[`4.1.4 (28)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4),
 published on 2026-10-07 (Australia/Melbourne), including the unpublished
 `4.0.2 (23)` candidate it carries forward.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.1.4 candidate: menu display and single-CLI ownership
+## 4.1.4 release: menu display and single-CLI ownership
 
 `MenuBarQuotaDisplay` is a separate menu presentation value. Current display
 reuses the current resolver; accepted history is eligible only when the current
