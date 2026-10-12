@@ -19,9 +19,13 @@ Claude Code cloud environments are Linux containers without Xcode.
   smoke as passed from a cloud session; list them as pending CI.
 - `script/tests/test_install.sh` sources `script/install.sh`, which relies on
   BSD `stat`/`mv` and `codesign`; treat it as macOS-only.
-- Before `security_check.sh`, run `git rev-parse --is-shallow-repository`. If it
-  prints `true`, run `git fetch --unshallow` so the history scans cover every
-  commit.
+- The SessionStart hook `.claude/hooks/session-start.sh` (registered in
+  `.claude/settings.json`) runs `git fetch --unshallow` when a cloud session
+  starts from a shallow clone and reports the result in the session context.
+  Outside cloud sessions it exits without touching the clone.
+- A failed fetch only prints a warning, so before `security_check.sh` still run
+  `git rev-parse --is-shallow-repository`. If it prints `true`, run
+  `git fetch --unshallow` so the history scans cover every commit.
 - Checks expected to run without Xcode, from the repository root:
   - `python3 -I script/tests/test_release_metadata.py`
   - `python3 -I script/tests/test_security_check.py`
