@@ -173,7 +173,8 @@ main() {
   trap 'exit 130' INT
   trap 'exit 143' TERM
   install_begin "$directory"
-  "$root/script/security_check.sh"
+  # The README installs a published tag from a shallow clone.
+  "$root/script/security_check.sh" --allow-shallow-history
   /bin/mkdir -p "$root/.build/ModuleCache"
   export CLANG_MODULE_CACHE_PATH="$root/.build/ModuleCache"
   export SWIFT_MODULE_CACHE_PATH="$root/.build/ModuleCache"

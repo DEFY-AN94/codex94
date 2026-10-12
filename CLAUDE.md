@@ -25,7 +25,8 @@ Claude Code cloud environments are Linux containers without Xcode.
 - Checks expected to run without Xcode, from the repository root:
   - `python3 -I script/tests/test_release_metadata.py`
   - `python3 -I script/tests/test_security_check.py`
-  - `./script/security_check.sh` (needs ripgrep and git)
+  - `./script/security_check.sh` (needs ripgrep, git and a complete history; it
+    refuses a shallow clone)
   - `jq empty Codex94/Localizable.xcstrings`
   - `python3 -I -c "import plistlib; plistlib.load(open('Codex94/Info.plist', 'rb'))"`
     (stands in for `plutil -lint`)

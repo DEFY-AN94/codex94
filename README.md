@@ -744,6 +744,12 @@ Contributor and release checks also require `jq`:
 brew install ripgrep jq
 ```
 
+`script/security_check.sh` scans every commit, so contributor and release
+checks need a complete clone: in a shallow clone it stops and asks for
+`git fetch --unshallow`. `install.sh` is the exception, because the source
+installation above uses a shallow tag clone; it then scans only the fetched
+commits and says so.
+
 Build and run a Debug app:
 
 ```bash

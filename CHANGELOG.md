@@ -2,6 +2,17 @@
 
 All notable changes to Codex94 are documented here.
 
+## Unreleased
+
+### Changed
+
+- Make `script/security_check.sh` refuse a shallow Git clone, where its history
+  scans would otherwise pass without the older commits, and ask for
+  `git fetch --unshallow`. `install.sh` passes `--allow-shallow-history`
+  because the README installs a published tag from a shallow clone; the scanner
+  then notes that it covered only the fetched commits. Unknown scanner arguments
+  are rejected.
+
 ## 4.1.4 - 2026-10-07
 
 Version `4.1.4 (28)` is the published stable release. Release dates use

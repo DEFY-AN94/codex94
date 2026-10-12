@@ -215,6 +215,11 @@ test preferences, caches, and output paths separate from daily app data.
   Codex94 processes and launches a Debug app; `install.sh` requires running
   copies to be quit, replaces the source App at `~/Applications/Codex94.app`,
   and may launch it. These scripts are not read-only source checks.
+- `security_check.sh` scans every commit, so it refuses a shallow clone until
+  `git fetch --unshallow` completes the history. Only `install.sh` passes
+  `--allow-shallow-history`, because the README installs a published tag from a
+  shallow clone; the scanner then covers only the fetched commits and says so.
+  Do not add that flag to `release_check.sh`, CI, or other checks.
 - `package_dmg.sh` has the narrow `create` and `verify` interface. It packages
   the exact App supplied by `release_check.sh`; it must not build, call
   `install.sh`, stop/launch a user App, read the home directory, alter
