@@ -1,0 +1,18 @@
+{
+  "description": "Prepare Codex94 Git history for Codex sessions.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "^(startup|resume|clear|compact)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "root=\"$(unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_SHALLOW_FILE; git rev-parse --show-toplevel)\" && python3 -I \"$root/script/codex_prepare.py\" --hook",
+            "timeout": 60,
+            "statusMessage": "Checking Codex94 Git history"
+          }
+        ]
+      }
+    ]
+  }
+}

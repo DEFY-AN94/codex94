@@ -1,10 +1,29 @@
 # Changelog
 
-All notable changes to Codex94 are documented here.
+All notable changes to Codex94 are documented here. For the current feature
+set and installation instructions, see [README.md](README.md) or
+[README.zh-CN.md](README.zh-CN.md). Exact candidate, CI, artifact and installation
+evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
+below applies only to its recorded version and does not validate later releases.
 
 ## Unreleased
 
 ### Changed
+
+- Add Codex-only session preparation: a project SessionStart hook for supported
+  local sessions, a repository Start skill for Codex Cloud, and a shared bounded
+  Git-history helper. Complete checkouts remain unchanged; shallow checkouts
+  fetch from the configured origin and verify the result. Strict cloud/manual
+  preparation fails on errors; the local hook warns while the security gate
+  continues to reject incomplete history. Keep Claude's hook unchanged and
+  document cloud environment setup/publication separately from repository files.
+  Add focused synthetic tests to the release gate.
+
+- Reorganize the English and Simplified Chinese READMEs around current product
+  capabilities, setup and installation. Describe the stable 4.1.4 service modes,
+  Claude source/history behavior and Codex statistics together; keep older
+  screenshots explicitly historical. Consolidate version-specific changes and
+  validation summaries here instead of stacking them above the product guide.
 
 - Make `script/security_check.sh` refuse a shallow Git clone, where its history
   scans would otherwise pass without the older commits, and ask for
@@ -48,6 +67,13 @@ OAuth remains paused. No new network endpoint, credential reader, preference
 key or cache schema is added. Real CLI acceptance is limited to at most two
 explicit attempts, with failures counting toward that cap.
 
+### Validation record
+
+The local release gate executed 594 tests, with 1 existing hosted-focus skip
+and 0 failures. Final-main CI, all five UI scenarios and CodeQL passed.
+Exact package/installation results and the limits of real-CLI acceptance are
+recorded in [docs/RELEASING.md](docs/RELEASING.md).
+
 ## 4.1.3 - 2026-10-07
 
 Version `4.1.3 (27)` was published on the date above, following `4.1.2 (26)`.
@@ -65,6 +91,12 @@ Version `4.1.3 (27)` was published on the date above, following `4.1.2 (26)`.
   Auto selection, notifications and reset scheduling. No new data read,
   preference or persistent history is added; CLI usage remains default-off
   and OAuth work remains paused.
+
+### Validation record
+
+The local release gate executed 582 tests, with 1 existing hosted-focus skip
+and 0 failures. Final-main CI, all five UI scenarios and CodeQL passed.
+Package and acceptance evidence is in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## 4.1.2 - 2026-10-05
 
@@ -87,6 +119,13 @@ Version `4.1.2 (26)` was published on the date above, following `4.1.1 (25)`.
 There is no new request, history database, preference, cache schema, OAuth
 integration or automatic CLI usage query. Existing CLI opt-in and its quota
 warning remain unchanged; this release does not obtain new cloud usage by itself.
+
+### Validation record
+
+The local release gate executed 582 tests, with 1 existing hosted-focus skip
+and 0 failures. Final-main CI, all five UI scenarios and CodeQL passed.
+Package, installation and observation evidence, with its limits, is in
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ## 4.1.1 - 2026-10-05
 
@@ -117,6 +156,13 @@ Version `4.1.1 (25)` was published on the date above, following `4.1.0 (24)`.
   by Auto. CLI quota-consumption warnings and the default-off setting remain.
 - Correct stale current-version and cache-reading descriptions in documentation.
   No OAuth, new data source, preference or cache schema is introduced.
+
+### Validation record
+
+Local and final-main gates passed: 565 tests, 1 existing hosted-focus skip,
+0 failures, all five UI scenarios and CodeQL. A 610-second local observation
+recorded two successful background refreshes with CLI reading off. Package
+provenance and acceptance limits are in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## 4.1.0 - 2026-10-05
 
@@ -275,6 +321,13 @@ remains suspended.
 - Carry forward the dual-provider features below from the unpublished 4.0.0
   candidate. The `v4.0.0` tag is retained unchanged; its Draft Release was removed.
 
+### Validation record
+
+At this release's passive-mode acceptance, the local connection was configured
+but no naturally produced report had been observed. Real passive quota was
+therefore unverified; synthetic tests do not establish real-account accuracy.
+Final release acceptance is recorded in [docs/RELEASING.md](docs/RELEASING.md).
+
 ## 4.0.0 - 2026-10-03 (unpublished candidate; tag retained)
 
 Version `4.0.0 (21)` was not published as a stable Release. Its tag remains for
@@ -308,6 +361,18 @@ history. Release dates use Australia/Melbourne.
 - Existing Codex preferences and quota-cache compatibility. Claude Token/cost
   analytics and multi-account aggregation are outside this release.
 
+### Validation record
+
+Candidate `c9e7c01` executed 486 tests, with 1 existing hosted-focus skip and
+0 failures, and passed Universal packaging, all five synthetic UI scenarios
+and Actions/Python/Swift CodeQL. The maintainer accepted the real dual-provider
+popover, menu items and Claude floating strip for that candidate. Its reader
+fetched real quotas using native Claude Code 2.1.286 with a default Max profile.
+A 626-second observation recorded two Codex and one Claude background refreshes,
+plus one popover-triggered read per service, all successful. It included
+interaction and does not establish long-term unattended stability. These are
+historical candidate results, not validation of 4.0.1 or later release artifacts.
+
 ## 3.1.4 - 2026-09-28
 
 Version `3.1.4 (20)`. Release dates use Australia/Melbourne.
@@ -320,6 +385,14 @@ Version `3.1.4 (20)`. Release dates use Australia/Melbourne.
   transient failures, retaining single-flight reads and cancellation guards.
 - Show the next scheduled automatic attempt alongside cached-data recovery
   information, and retain fixed failure-stage timing in diagnostic logs.
+
+### Validation record
+
+The suite executed 396 tests, with 1 existing hosted-focus skip and 0 failures.
+Final-main checks, public-asset verification and local background-refresh
+observation are recorded in [docs/RELEASING.md](docs/RELEASING.md).
+The original fix is [PR #37](https://github.com/DEFY-AN94/codex94/pull/37) for
+[issue #36](https://github.com/DEFY-AN94/codex94/issues/36).
 
 ## 3.1.3 - 2026-09-28
 
@@ -337,6 +410,18 @@ Version `3.1.3 (19)`. Release dates use Australia/Melbourne.
   verified that the reported Spaces-transition color flash is resolved on the
   tested Mac; this acceptance is separate from automated rendering tests.
 
+### Validation record
+
+The suite executed 381 tests, including 11 menu-bar renderer tests, with
+1 hosted-focus skip and 0 failures. [Release CI](https://github.com/DEFY-AN94/codex94/actions/runs/36345607838)
+passed four synthetic UI scenarios; [CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/36345607726)
+passed Actions, Python and Swift. The Spaces-color acceptance above applies only
+to the tested Mac and exact reviewed CI candidate, not every macOS version,
+fullscreen configuration or keyboard path. Final-main assets and installation
+are separate records in [docs/RELEASING.md](docs/RELEASING.md). The original fix is
+[PR #34](https://github.com/DEFY-AN94/codex94/pull/34) for
+[issue #33](https://github.com/DEFY-AN94/codex94/issues/33).
+
 ## 3.1.2 - 2026-09-27
 
 Version `3.1.2 (18)`. Release dates use Australia/Melbourne.
@@ -350,6 +435,14 @@ Version `3.1.2 (18)`. Release dates use Australia/Melbourne.
   fails.
 - Retain the legacy bundled executable as a fallback and preserve explicit
   manual-path precedence and the existing Homebrew and standard CLI fallbacks.
+
+### Validation record
+
+Local validation executed 353 tests, with 1 hosted-focus skip and 0 failures.
+Final-main checks, published assets and installed-App acceptance are recorded
+separately in [docs/RELEASING.md](docs/RELEASING.md). The compatibility fix is
+[PR #31](https://github.com/DEFY-AN94/codex94/pull/31) for
+[issue #30](https://github.com/DEFY-AN94/codex94/issues/30).
 
 ## 3.1.1 - 2026-09-23
 
@@ -366,6 +459,14 @@ Version `3.1.1 (17)`. Release dates use Australia/Melbourne.
   snapshot and make no request.
 - Allow local security checks in linked Git worktrees by excluding only the
   Git administration entry; source and history scanning remain enabled.
+
+### Validation record
+
+Local validation executed 345 tests, with 1 hosted-focus skip and 0 failures;
+the skip is not a pass. External UI, security, final-main packaging and
+installed-artifact results are recorded separately for this version in
+[docs/RELEASING.md](docs/RELEASING.md); the preceding release's results are not
+substitutes.
 
 ## 3.1.0 - 2026-09-23
 
@@ -398,6 +499,17 @@ Version `3.1.0 (16)`. Release dates use Australia/Melbourne.
   pasteboards. Native
   NSPanel behavior across Spaces and fullscreen apps needs separate validation.
 
+### Validation record
+
+The local suite executed 340 tests, with 1 skipped and 0 failures. The hosted
+keyboard-focus check could not establish a key window and is not a pass.
+PNG checks included actual-image stale/fresh text recognition and isolated
+pasteboard verification. The release record separately identifies the four
+external UI scenarios, Actions/Python/Swift CodeQL and final source/artifact
+acceptance. Native keyboard focus, Spaces and fullscreen behavior remain
+separate from rendering and panel-flag checks; earlier screenshots and
+interaction records retain their original provenance.
+
 ## 3.0.1 - 2026-09-21
 
 Version `3.0.1 (15)`. Release dates use Australia/Melbourne. This maintenance
@@ -422,6 +534,15 @@ release prepares shared parsing and presentation boundaries for later features.
 
 No new feature, broad timer/store rewrite, cache migration, signing-policy
 change, or automatic installation is part of this maintenance scope.
+
+### Validation record
+
+This release's evidence includes 315 hosted tests, Display/Recovery/Token usage
+CI scenarios, Actions/Python/Swift CodeQL and verification of its final-main
+Universal App and DMG. Unchanged 0.3.0 screenshots and maintainer interaction
+records retain their original provenance; they are not new 3.0.1 manual
+acceptance. Final CI-package acceptance is recorded separately in
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ## 0.3.0 - 2026-09-21
 
@@ -457,6 +578,14 @@ calendar; GitHub publication timestamps are recorded in UTC.
   usage data, uses no cookies or credential-store access, and persists no update
   results. Add no background update polling, automatic app download/install,
   system profiling, signing-key storage, or third-party runtime dependency.
+
+### Documentation evidence
+
+The retained bar/line screenshots were captured with synthetic May 2033 daily
+records during candidate testing in [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
+Their exact provenance remains in [PROVENANCE.md](docs/images/readme/PROVENANCE.md).
+The published tag and distribution assets remain bound to this release; later
+documentation does not replace its evidence or validate later versions.
 
 ## 0.2.2 - 2026-09-20
 
@@ -629,6 +758,12 @@ Version `0.2.2 (13)`.
   metadata and isolated copying, Reset target/single-flight/wake/clock behavior,
   live menu-bar layout changes, and committed-metadata UI fixture preparation.
 
+- [PR #11](https://github.com/DEFY-AN94/codex94/pull/11) retains the exact-head
+  test, Display/Recovery UI, Actions/Python/Swift CodeQL and final App acceptance
+  record. The retained synthetic Overview capture was reviewed for layout and
+  privacy. Keyboard activation, AXPress and hosted tooltip exposure were not
+  claimed as passed.
+
 ## 0.1.8 - 2026-08-29
 
 ### Added
@@ -670,6 +805,12 @@ Version `0.2.2 (13)`.
   and report CI, GUI, and screenshot validation separately. Replace the four
   popover/Dashboard images with reviewed synthetic release captures; retain
   the unchanged default menu-bar example from the previous stable version.
+
+### Validation record
+
+This release passed the full GitHub test/release job, synthetic Display and
+click-functional Recovery UI jobs, and Actions/Swift CodeQL. Screenshot sources
+remain recorded in [PROVENANCE.md](docs/images/readme/PROVENANCE.md).
 
 ## 0.1.7 - 2026-08-28
 
