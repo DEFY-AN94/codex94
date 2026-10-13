@@ -2,313 +2,204 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-## Overview
+Codex94 is an independent, unofficial macOS menu-bar app for **Codex and Claude
+Code quota monitoring**, with **Codex Token usage statistics**. See remaining
+quota, reset times and report freshness without a Dock icon; open the shared
+popover, Dashboard or floating strip when you want more detail.
 
-Codex94 is an unofficial, independent macOS app for **Codex and Claude Code
-quota monitoring**, with **Codex Token usage statistics**. Codex is on by default;
-Claude is optional and defaults to passive local reports. Remaining quota and
-reset times stay in the menu bar without a Dock icon, with details in one
-popover and Dashboard.
+Codex monitoring is on by default. Claude is optional and reads Claude Code's
+existing local usage reports by default; automatic Claude CLI reads are a
+separate, default-off choice. The app is MIT-licensed, built with SwiftUI/AppKit,
+and bundles no third-party runtime frameworks.
 
-Version `0.3.0 (14)` adds Codex service-reported summary cards, switchable **bar
-and line charts**, and **CSV export** of daily Token records. A manual update check
-shows newer stable GitHub Releases; downloading and installing remain manual.
+**Latest stable:** [`4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4)
+· macOS 14+ · Apple Silicon and Intel · English and Simplified Chinese
 
-The quota features introduced in `0.2.2 (13)` remain: four menu-bar layouts,
-including a dual-window view, optional low-quota and recovery alerts, and a
-configurable global shortcut. Either mouse button toggles the same popover.
-The read-only **Manual quota resets** display shows the available reset count in
-the popover and Overview without redeeming a reset.
-
-Codex94 is an MIT-licensed source project. Codex monitoring uses the locally
-installed Codex CLI; Claude defaults to reading Claude Code's local usage cache,
-with eligible statusline reports as a backup. No third-party runtime frameworks are bundled.
-
-**Vibe-built with Codex.** Each release is still maintainer-reviewed, tested,
-and security-scanned before it is tagged.
+[Features](#features) · [Screenshots](#screenshots) · [Install](#installation)
+· [Privacy](#security-and-privacy) · [Development](#development-and-build)
+· [Changelog](CHANGELOG.md)
 
 > Codex94 is not affiliated with, endorsed by, or sponsored by OpenAI or
-> Anthropic. Codex `app-server` is experimental; CLI and status-line formats
-> may change between upstream releases.
-
-## Version 4.1.4
-
-`4.1.4 (28)` was published on **2026-10-07** (Australia/Melbourne). It adds
-explicitly marked historical Claude values to compact rings
-and single-window menu-bar layouts. Historical Auto prefers weekly, then
-five-hour; current quota, notifications and scheduling remain separate.
-Quota selection moves to Dashboard → Display, and the popover gains a warned
-single-CLI-read action. Claude report age has its own line, and its five-hour
-countdown is hidden. CLI cleanup finishes before another client can start.
-Historical native display uses a separate presentation value, never a current
-quota snapshot; the legacy dual-window layout remains current-only. Hiding
-the five-hour countdown changes only that popover text: its absolute reset
-time and reset data remain. Automatic CLI stays default-off; OAuth is paused.
-
-The local release gate passed: 594 tests executed, 1 existing hosted-focus
-skip, 0 failures. Final-main CI, all five UI scenarios and CodeQL passed.
-Exact package, installation and limited real-CLI evidence are in the
-[release record](docs/RELEASING.md).
-
-## Earlier 4.1.3 release
-
-`4.1.3 (27)` was published on **2026-10-07** (Australia/Melbourne). It renders
-Claude's accepted historical quota in the menu popover with
-Codex-style segmented bars and precise percentages. The history heading,
-current-quota-unknown label and original source time remain visible. Current
-and historical rows share their layout; Dashboard history keeps its text style.
-This adds no cloud read or automatic CLI use. OAuth remains paused.
-
-The local release gate passed: 582 tests executed, 1 existing hosted-focus
-skip, 0 failures. Final-main CI, all five UI scenarios and CodeQL passed.
-This release reuses the stateless meter row; it does not change Dashboard
-history or current-quota selection. Package and acceptance evidence are in
-the [release record](docs/RELEASING.md).
-
-## Earlier 4.1.2 release
-
-`4.1.2 (26)` was published on **2026-10-05** (Australia/Melbourne). It shows an
-accepted Claude report as **Last usage record** when its shared windows have
-ended. The popover and Dashboard retain its original remaining/used percentages and source time, with a clear **Current quota unknown**
-label. Historical numbers do not fill current menu-bar rings, drive Auto or
-send notifications. They appear only as qualified tooltip/accessibility and
-expanded floating-window detail. This rereads existing reports; it does not
-fetch fresh cloud usage or start the optional CLI reader.
-
-The local release gate passed: 582 tests executed, 1 existing hosted-focus
-skip, 0 failures. Final-main CI, all five UI scenarios and CodeQL passed.
-Package, installation and observation evidence, with their limits, are in the
-[release record](docs/RELEASING.md).
-
-## Earlier 4.1.1 release
-
-`4.1.1 (25)` was published on **2026-10-05** (Australia/Melbourne). It improves
-Claude cache recovery, account-context isolation and local read safety. It filters unusable reports before source selection, rechecks
-future timestamps when time catches up, and reduces repeated parsing and
-unchanged UI publications. The UI distinguishes local re-reading from Claude
-Code fetching new data and shows which quota Auto selected. Scheduled CLI
-reading stays optional and default-off; the independent one-time action keeps
-its quota-consumption warning. OAuth remains paused.
-
-The full local and final-main gates passed: 565 tests, 1 existing hosted-focus
-skip, 0 failures, all five UI scenarios and CodeQL. A 610-second local observation
-recorded two successful background refreshes with CLI off. See the
-[release record](docs/RELEASING.md) for package provenance and acceptance limits.
-
-## Earlier 4.1.0 release
-
-`4.1.0 (24)` was released on **2026-10-05**
-(Australia/Melbourne). The `4.0.2 (23)` candidate (the notification-callback
-fix, large separate service cards, compact dual rings and the statusline-scope
-explanation) was merged through PR #43 but never tagged or published; 4.1.0 carries
-those changes forward unchanged.
-
-4.1.0 changes the Claude side only. Codex behavior is unchanged.
-
-- **Claude Code's local usage cache becomes the primary source.** Claude Code
-  writes the result of its own plan-usage fetch (the data behind its `/usage`
-  screen) into its global state file `~/.claude.json` under the key
-  `cachedUsageUtilization`; Claude Code 2.1.208 and later keep this last-known
-  usage. Codex94 reads only that key and shows the 5-hour and 7-day
-  utilization, their reset times, and the time Claude Code fetched them. If
-  `CLAUDE_CONFIG_DIR` is set in Codex94's own environment, the file is read
-  from that directory instead, mirroring Claude Code.
-- **Three tiers, one report at a time.** The existing status-line connection
-  becomes the backup: it is used when its report is strictly newer than the
-  cache, or when the cache is absent or unreadable. The optional CLI `/usage`
-  read stays default-off with its quota-consumption warning and becomes the
-  last option; it is no longer mutually exclusive with the passive sources, its
-  result simply joins the selection, and disabling it discards only CLI data.
-  The newest valid report wins and the cache wins ties. Percentages from
-  different sources are never averaged or merged. Eligible reports share a
-  notification baseline within the observed context; cross-source account
-  identity is not proven. Version 4.1.1 also resets that baseline on
-  context loss and suppresses notifications from older fallback observations.
-- **Read once with the CLI.** Dashboard → **Services** gains a button that runs
-  the official CLI exactly once regardless of the CLI switch, with the same
-  warning. If Claude Code writes an updated cache, the primary source reads
-  it on a later poll. Codex94 does not write or force-refresh that file.
-- **Per-model weekly limits.** Model-scoped weekly limits from the cache (for
-  example a Fable weekly limit) appear as extra Claude quota buckets: listed
-  under **Per-model weekly limits** on the card, selectable in the menu-bar
-  quota picker, and eligible for the automatic most-constrained selection.
-- **Freshness and presentation.** A cache report counts as current for 60
-  minutes after Claude Code fetched it, matching Claude Code's own last-known
-  rule; after that the amber cached marker and the data time appear while the
-  numbers stay visible. Status-line reports keep the existing 10-minute rule;
-  CLI reads keep the larger of 10 minutes and the refresh interval plus 60
-  seconds. Windows whose reset time has passed disappear and are never shown
-  as 100% remaining. The card names the source (**Claude Code local cache**),
-  shows **Claude Code fetched** with the fetch time, and has explicit empty
-  states for no cache yet (run `claude` in a terminal and enter `/usage`, or
-  use the one-time CLI read), an unreadable cache, and expired windows.
-  Services gains a read-only **Claude data sources** section describing the
-  three tiers and showing the current source and local-cache state.
-  Diagnostics export gains a `claudeLocalCache` line
-  (absent/valid/unreadable/invalid, or none while Claude monitoring is off)
-  with no path or account identifier.
-
-**Privacy boundary.** `~/.claude.json` also contains the account email,
-organization, project paths and MCP settings. Codex94 opens it read-only with
-`O_NOFOLLOW`, refuses symlinks, hard-linked files, foreign owners, non-regular
-files and files over 16 MiB. It decodes the JSON document, interprets only
-`cachedUsageUtilization`, and discards all other decoded fields immediately; nothing from the file beyond the quota fields
-above is retained, logged or exported. The account UUID is compared in memory
-only to detect a different login, which resets the notification baseline, and
-is never persisted. The reader never writes the file and re-parses it only
-when its size, modification time or inode changes. Version 4.1.1 additionally
-revalidates future timestamps and transient reads without requiring a file change. Preference keys are unchanged
-(`claude.cliUsageEnabled.v1` keeps its meaning); no new preference, cache file,
-entitlement, network endpoint or installer step is added.
-
-**No OAuth or credential access.** [Anthropic's legal page](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
-(2026-02-20) restricts OAuth tokens to Claude Code and native Anthropic apps
-and forbids third parties from collecting, storing or intermediating Claude.ai
-credentials or session tokens. Codex94 therefore reads only files that the
-official client leaves on the Mac. `AppUpdateClient.swift` remains the only
-network client; no HTTP/OAuth client, Keychain, cookie or token reading was
-added. `script/security_check.sh` additionally rejects credential-file names,
-the Claude Code Keychain item name, `SecItem`/`SecKeychain` calls and the OAuth
-usage endpoint string in production sources, and allows the literal
-`claude.json` only in the cache reader. The paused OAuth work lives in draft
-[PR #44](https://github.com/DEFY-AN94/codex94/pull/44) and is not part of 4.1.0.
-
-The App target and the UI test bundle build locally on Xcode 27.0, and the
-hosted unit suite passed there: 544 tests executed, 1 existing hosted-focus
-skip, 0 failures. The metadata, installer and security-scanner script
-self-tests also passed locally, and `script/release_check.sh` passed locally on
-Xcode 27.0 for `4.1.0 (24)`, verifying the Universal App and an unsigned DMG
-candidate (a local artifact, not the release asset). On CI (Xcode 16.4) the
-`test` job and four of the five UI smokes passed for the first PR heads; the
-providers smoke failed four times on test-side causes that were corrected
-afterwards (an exact-text assertion predating the cached-data prefix, a fixture
-whose scoped Fable limit was the tightest window and relabelled the native item,
-a new screenshot name missing from the artifact allowlist, then a fixture-policy
-check that still required the CLI opt-in to stay on while the smoke itself
-toggles it), and the release commit passed every check on final main. The
-Providers UI smoke fixture seeds a synthetic `.claude.json` through
-`CLAUDE_CONFIG_DIR` and checks that turning the CLI option off shows the cache
-source without launching the CLI; it passed on the release commit. Final
-release acceptance is recorded in [RELEASING.md](docs/RELEASING.md). The
-historical screenshots and release results below predate 4.1.0.
-
-## Earlier 4.0.1 release
-
-`4.0.1 (22)` was released on **2026-10-03** (Australia/Melbourne). It carried
-forward the dual-provider features from the unpublished 4.0.0 candidate. The `v4.0.0` tag remains unchanged and its Draft
-Release was removed; its validation records below remain historical.
-
-Claude uses **passive local status-line reports by default**. Direct
-OAuth access is deferred: [Anthropic's credential-use rules](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
-do not establish permission for this third-party app to reuse subscription
-credentials. No OAuth credential reader, token refresh or Claude HTTP client is
-included. Live `/usage` probing remains suspended; that reader is a separate,
-default-off option with a quota-consumption warning.
-
-Passive reports arrive when you normally use Claude Code; Codex94 does not start
-a session or send a prompt to produce them. Signing in to Claude App or the web
-alone does not generate a Code statusline report. The quota fields appear only
-after Claude Code receives an API response in that session, as documented in the
-[official statusline reference](https://code.claude.com/docs/en/statusline#available-data).
-The official status-line schema has
-no verified account ID. Reports are labelled account-unverified, CLI mode never
-automatically falls back to them, and a different reporting session requires
-explicit adoption. A session fingerprint identifies a report stream, not an
-account. Unchanged reports keep their original local report time; expired windows
-become unknown rather than being reset to 100%.
-
-- **Codex is on by default; Claude is off.** Enable Claude in Dashboard →
-  **Services**. Each service has its own refresh tasks, quota selection, source,
-  freshness, failures and opt-in notification settings. One service's failure
-  does not replace the other's quota.
-- Choose **one menu-bar service** or **two independent status items**. Either
-  item opens the same scrollable popover containing all enabled services as
-  separate sections. Overview also shows the enabled services. The Codex group
-  picker, account options and read-only reset-credit display remain available.
-- Choose the floating window's service separately from the primary menu-bar
-  service. Disabling a service stops its monitoring and reminders. With both
-  off, a neutral status item keeps Services settings reachable.
-- Claude quota can come from a **status-line connection**, or the official CLI's
-  **`/usage` screen** only after separately enabling the CLI option. The card identifies the source and
-  report time, preserves reported fractions, and leaves missing quota/reset
-  values unknown. It does not combine Codex and Claude percentages.
-- A status-line report is local information emitted by Claude Code, not a new
-  cloud quota sample. Rereading an unchanged report does not update its report
-  time. Services settings can preview and install a wrapper that preserves the
-  existing status-line command; removal restores it only if the configuration
-  still matches. Turning monitoring off leaves that connection installed but
-  stops quota capture; removing it is a separate action.
-- **Token statistics, charts, CSV/PNG export and chart copying remain Codex
-  only.** Disabling Codex monitoring disables that page's data reads. Claude
-  token/cost analytics are not part of this implementation.
-
-## Earlier 3.1.4 release
-
-`3.1.4 (20)` was released on **2026-09-28** (Australia/Melbourne). It gave
-Codex quota reads more time to complete; these features remain. Transient
-failures retry after 5, 20 and 60 seconds. Between attempts, the last successful
-quota remains visible with an amber cached indicator and the failure reason.
-The popover, Connection page and menu-bar tooltip show the next automatic
-attempt when its scheduled time is known. See
-[issue #36](https://github.com/DEFY-AN94/codex94/issues/36) and [fix PR](https://github.com/DEFY-AN94/codex94/pull/37).
-
-### Earlier 3.1.3 release
-
-`3.1.3 (19)` was released on **2026-09-28**
-(Australia/Melbourne). It reads quota before optional account details, keeps
-valid quota when optional identity is slow, and recovers transient quota
-failures with a bounded retry budget. Reopening a connected popover with data
-less than 60 seconds old reuses that snapshot. Cached status has an independent
-amber clock; active refresh remains blue. Colored menu-bar content now uses a
-transparent, sRGB, non-template native button image, with freshness in its
-tooltip. See [issue #33](https://github.com/DEFY-AN94/codex94/issues/33) and
-[fix PR #34](https://github.com/DEFY-AN94/codex94/pull/34).
-
-The maintainer confirmed that the reported menu-bar color flash while switching
-Spaces was resolved on the tested Mac with the exact reviewed CI candidate.
-This acceptance does not establish behavior on every macOS version, fullscreen
-configuration, or keyboard path. The candidate identity and scope are recorded
-in the [release record](docs/RELEASING.md).
-
-The bundled-CLI compatibility fix introduced in `3.1.2 (18)` is retained,
-including discovery of the known ChatGPT/Codex App layouts, legacy fallbacks,
-and explicit manual-path precedence. Its original record remains
-[issue #30](https://github.com/DEFY-AN94/codex94/issues/30) and
-[PR #31](https://github.com/DEFY-AN94/codex94/pull/31).
+> Anthropic. Codex `app-server` is experimental; upstream CLI and statusline
+> formats may change. Distribution is unsigned/unnotarized as explained below.
 
 ## Features
 
-The service controls above extend these existing Codex and display features.
+The following describes the current stable app. Release-by-release changes live
+in [CHANGELOG.md](CHANGELOG.md); candidate checks and installation evidence live
+in the [release records](docs/RELEASING.md).
 
-- The floating quota strip targets **480 × 90 logical points** for weekly-only
-  or cold data and **680 × 90** when a 5-hour window is reported. It supports
-  pin, drag, hide, and expand controls. It reuses existing quota data; hovering or focusing
-  the update-time control reveals manual refresh. It adds no polling or credit
-  redemption, and the existing global shortcut still toggles the popover.
-- **Custom** start/end dates join the three existing Token ranges. Dates use
-  source calendar-day labels. Reported average, selected-interval peak, and
-  coverage stay separate from the service summary cards. Comparison includes
-  the preceding equal-length interval's reported total and coverage; a growth
-  percentage requires complete data in both intervals and a nonzero baseline.
-- **Export PNG…** and **Copy chart image** use the current range, bar/line style,
-  language, and theme. The image contains the chart, date range, fetch time,
-  coverage, and any stale-data notice, without identity. Copying writes to the
-  system clipboard only when clicked; CSV export remains available.
-- Floating preferences save pin state and position; 4.0 also saves the selected
-  service. Adaptive width is still derived from quota data. The app has no
-  statistics history database, and distribution signing and manual installation
-  remain unchanged.
+### Two services, one place to check quota
 
-Validation includes a fourth synthetic **Floating** UI scenario and Token
-controls/image checks. Evidence is listed below. Native keyboard focus,
-floating-panel behavior across Spaces, and fullscreen behavior remain separate
-from rendered images and panel flags; the earlier 3.1.3 menu-bar color acceptance
-is limited to its tested Mac and candidate.
+- Enable Codex and Claude independently in **Dashboard → Services**. Each keeps
+  its own data source, refresh work, quota selection, failures and notification
+  settings. Their percentages are never combined. Turning a service off stops
+  its monitoring and reminders; a neutral status item keeps settings reachable
+  when both are off.
+- Choose **one service**, **compact dual rings in one menu-bar item**, or **two
+  separate menu-bar items**. Either item opens the same scrollable popover, with
+  a separate section for each enabled service. Dashboard **Overview** shows
+  larger service cards and all displayable quota buckets.
+- Choose each service's menu-bar quota in **Dashboard → Display**. Current-quota
+  **Auto** selects the lowest remaining percentage among available buckets and
+  windows; manual choices pin one bucket/window. Codex's popover bucket browser
+  is independent of that menu-bar choice.
+- Show only returned **5-hour and Weekly** windows, plus Claude per-model weekly
+  limits when reported. Weekly-only data is valid; missing values stay unknown
+  rather than becoming `0%` or an invented quota. Default Codex quota and named
+  model buckets remain separate.
+- Codex's read-only **Manual quota resets** display shows the reported available
+  count, including a real zero. Missing counts stay unavailable and retained
+  counts are marked cached. The app has no reset-redemption action.
+
+### Menu bar, floating window and appearance
+
+- In single-service or separate-item modes, choose **Ring + Percentage**,
+  **Percentage Only**, **Ring Only**, or a **dual-window** layout that shows one
+  bucket's 5-hour and Weekly values together. Dual-window selection is saved
+  separately. Compact dual-service mode uses its own pair of rings.
+- Left-click or right-click toggles the popover. An optional global shortcut
+  does the same; it is unset by default and must include Control or Option,
+  optionally with Command and Shift. Clicking elsewhere closes the popover
+  without consuming that click or requiring Accessibility permission.
+- The floating quota strip supports **pin, drag, hide and expand**, and can show
+  a different service from the primary menu-bar item. It reuses existing quota
+  data; hover or focus its update-time control to reveal manual refresh. Its
+  compact layout targets 480 × 90 logical points for weekly-only/cold data and
+  680 × 90 with both windows, with screen fitting. Pin state, position
+  and service choice are saved; visibility and expansion are session-only.
+- Customize independent healthy, warning, critical and unavailable colors.
+  Quota color thresholds remain 50% and 20%; notification thresholds are
+  configured separately. Restoring colors leaves other preferences unchanged.
+- Use **System, Terminal Dark or Terminal Light** appearance and **English or
+  Simplified Chinese**. Dashboard size presets are 900×600, 1280×720, 1440×810
+  and 1920×1080 logical points, fitted to the current screen.
+- **Launch at login** is available from either supported installation location.
+  **About** shows and copies the exact running version/build; **Diagnostics**
+  offers a user-triggered redacted copy for troubleshooting.
+
+### Codex quota refresh and recovery
+
+- Read quota through the local Codex CLI. **Quota only** omits account details;
+  **Quota + account** requests optional identity after quota, so a slow identity
+  read does not discard valid quota. Monitoring uses the current Codex login;
+  multi-account management and alternate `CODEX_HOME` directories are not supported.
+- Refresh at launch and at the selected **1, 5, 15 or 30 minute** interval.
+  Opening a connected popover reuses successful data less than 60 seconds old.
+  Manual refresh remains available, and concurrent requests share one read.
+- After wake, refresh if there is no successful snapshot or it is at least
+  60 seconds old. Schedule one refresh no earlier than five seconds after the
+  next future reset; clock changes and repeated targets are reconciled without
+  a persistent reset ledger.
+- Transient failures can retry after **5, 20 and 60 seconds**. Authentication,
+  executable-discovery and malformed-data failures do not automatically retry.
+  While waiting, show the failure reason and next known automatic attempt time.
+- Keep the last successful quota after a failed read and mark it with an amber
+  cached clock; active refresh uses a separate blue indicator. With no usable
+  snapshot, show `--`. Relative data age and reset dates also appear in tooltips
+  and accessibility descriptions.
+- Reset details include the full local date/time and UTC offset, including
+  daylight-saving changes. A fresh successful Codex report that no longer
+  contains a pinned selection switches it to Auto; cached or failed reads do
+  not rewrite that selection. Connection and Diagnostics actions open the
+  relevant Dashboard page; signing in remains the official client's job.
+
+### Claude sources, freshness and historical quota
+
+Claude monitoring reads **one accepted report at a time**:
+
+| Source | How it works |
+| --- | --- |
+| **Claude Code local usage cache — primary** | Reads the quota data Claude Code already fetched into its local state file. Shows shared 5-hour/weekly windows, reset times, fetch time and any per-model weekly limits. |
+| **Statusline connection — backup** | Uses an eligible local report if it is newer than the cache, or the cache is absent/unreadable. Services can preview, install and remove a wrapper while preserving an existing statusline command. |
+| **Official CLI `/usage` — optional** | Automatic reading is off by default and has a quota-consumption warning. **Read once with the CLI** in Services or the popover runs one explicit read regardless of that switch; it does not enable automatic reading. |
+
+The newest valid eligible report wins, with the local cache winning ties;
+percentages from different reports are never averaged or merged. Disabling
+CLI reading discards only CLI data. CLI cleanup finishes before another client
+can start; repeated one-time clicks do not queue extra reads.
+
+- A local-cache report is fresh for **60 minutes** after Claude Code fetched it;
+  statusline reports use **10 minutes**, and CLI reports use the larger of
+  10 minutes and the refresh interval plus 60 seconds. Older reports show a
+  cached marker and their original source time. Rereading a local file does
+  not fetch fresh cloud usage or make its timestamp newer.
+- Ordinary Claude App/web chats do not produce Claude Code statusline reports.
+  Statusline quota appears only after that Code session receives an API response.
+  Its account identity is unverified; a different reporting session requires
+  explicit adoption. A report-stream fingerprint does not prove account identity.
+- When shared windows expire, accepted data appears as **Last usage record**
+  with **Current quota unknown**, original percentages and source time. The
+  popover uses segmented bars; Dashboard retains its historical text view.
+- Compact provider rings and single-window menu-bar layouts can display this
+  history with a clock and qualified tooltip. Historical Auto prefers weekly,
+  then five-hour. The legacy dual-window layout stays current-only; the floating
+  strip can describe history in its expanded detail while its main values stay
+  unknown. History never drives current-quota notifications or reset scheduling.
+- Claude report age has a separate popover line. Its five-hour row hides only
+  the countdown, retaining the absolute reset time. Missing or expired windows
+  are never presented as a fresh 100% remaining.
+- Services explains the active source and cache state. With automatic CLI off,
+  normal refresh only rereads local files; use Claude Code to obtain new data,
+  or deliberately choose the warned one-time CLI action. No OAuth integration
+  or direct Claude quota HTTP client is included.
+
+### Codex Token statistics and exports
+
+- **Dashboard → Token usage** loads service-reported summaries and daily records
+  on first entry or manual statistics refresh, independently of quota polling.
+  It shows lifetime tokens, peak daily tokens, current/longest streaks and the
+  longest turn duration when returned. Unsupported CLI versions have a separate
+  message and do not break quota monitoring.
+- Switch between remembered **bar and line charts**, inspect exact values on
+  hover/selection, and browse the daily table. Choose **7 days, 30 days, All
+  returned or Custom** inclusive dates. Presets end at the latest reported day;
+  gaps remain gaps, explicit zero stays zero, and line charts break at missing days.
+- See reported average, selected-range peak and coverage, plus the preceding
+  equal-length interval's total and coverage. Percentage growth requires
+  complete records for both intervals and a nonzero baseline. Service summary
+  cards may cover a different period; reporting timezone and complete historical
+  coverage are unspecified.
+- **Export CSV** saves reported dates and exact counts in the selected range.
+  **Export PNG** and **Copy chart image** follow the current range, chart style,
+  language and theme, including fetch time, coverage and stale-data notices but
+  no identity. Copying writes to the clipboard only when clicked.
+- Statistics stay in memory except for those explicit exports/copies. Refresh
+  replaces a snapshot instead of accumulating it. Disabling Codex stops this
+  page's data reads. Claude Token/cost analytics and model/project/input/output/
+  hourly breakdowns are not provided.
+
+### Optional alerts and manual updates
+
+- Quota notifications are **off by default** and request macOS notification
+  permission only when enabled. Default warning thresholds are **20% and 10%**
+  remaining; each can be adjusted or disabled. Select additional buckets and
+  recovery alerts as needed. Only fresh successful observations drive alerts;
+  deduplication and baselines stay in memory.
+- **About → Check for updates** reads this repository's latest public stable
+  GitHub Release only when clicked. It displays the version and plain-text
+  notes and can open the Release page. **Downloads and installation are manual**;
+  there is no background update polling or automatic installation. Users of
+  `0.2.2`, which has no update-check command, must manually install a later release.
+  See [update checks and maintenance](docs/updating.md).
+
+## Getting started
+
+1. Install the app using one of the methods below and sign in with the official
+   Codex client. On first launch, choose **Quota only** or **Quota + account**.
+2. To monitor Claude, enable it in **Dashboard → Services**. Claude Code must
+   already have a local usage report, for example after opening its `/usage`
+   screen. Enable or install the optional sources only if you need them.
+3. Choose menu-bar services in **Services**, quota/layout/colors in **Display**,
+   and the floating-window service independently. Set alerts and the shortcut
+   only if desired.
+4. Open **Token usage** for Codex statistics. If data is missing, check source,
+   report age and sign-in guidance before using **Refresh** or **Diagnostics**.
 
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.
-These retained captures do not show 4.1.0's revised presentation.
+These are historical captures, not screenshots of the current 4.1.4 interface.
 The chart previews were captured during `0.3.0 (14)` candidate testing and
 show **Bar chart** and **Line chart** over the same seven reported days. These
 original synthetic captures remain unchanged, from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
@@ -350,34 +241,19 @@ statistics and update UI.
 
 </details>
 
-## Distribution status
+## Installation
 
-- The published stable release is
-  [`v4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4),
-  released on **2026-10-07** (Australia/Melbourne) as a Universal 2 DMG and
-  source from the same annotated tag.
-- Download and source-clone instructions below refer to this published release.
-  Later documentation commits do not move its tag or regenerate its assets.
-- `3.0.1 (15)` is a maintenance release for request-context correctness and
-  focused reuse of parsing, chart preparation, and cleanup. It preserves the
-  features introduced in `0.3.0` without a broad architecture rewrite.
-- This public repository can be cloned without GitHub authentication.
-- Users of `0.2.2`, which has no update-check command, must manually install
-  `0.3.0` or a later published release to gain that command. Update downloads
-  and installation remain manual.
-- `script/install.sh` builds a local Release app, applies an ad-hoc Hardened
-  Runtime signature, and installs it at `~/Applications/Codex94.app`.
-- The installer requires every Codex94 copy to be quit first. It
-  verifies a unique staged copy, uses an installation lock, and preserves the
-  old App for rollback until replacement succeeds. It leaves recovery files
-  intact if rollback fails; it does not maintain a version archive.
+The published stable release is
+[`v4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4),
+released on **2026-10-07** (Australia/Melbourne), with a Universal 2 DMG and source
+from the same annotated tag. The download and clone instructions below use
+that release; later documentation commits do not move its tag or replace assets.
 
-The published `4.1.4` DMG itself is completely unsigned, has no Apple Developer ID
-signature, and is not notarized by Apple. The `Codex94.app` inside is ad-hoc
-signed only. Neither SHA-256 nor GitHub artifact attestation changes that Apple
-trust status.
+The DMG is **unsigned and not notarized by Apple**. The app inside has only an
+ad-hoc Hardened Runtime signature, with no Apple Developer ID. SHA-256 and
+GitHub artifact attestation do not change this Apple trust status.
 
-## Requirements
+### Requirements
 
 - macOS 14 or later.
 - Codex monitoring requires a compatible Codex executable and a current Codex
@@ -400,7 +276,7 @@ locations before the legacy `Contents/Resources/codex` paths, then retains
 Homebrew and standard CLI fallbacks. Explicit manual-path selection keeps its
 precedence; an invalid manual choice is not silently bypassed.
 
-## Install the Universal DMG
+### Install the Universal DMG
 
 Download both stable assets from the
 [`v4.1.4` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4):
@@ -436,9 +312,10 @@ follow Apple's official
 [Privacy & Security → Open Anyway](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/26/mac/26)
 flow. Do not remove quarantine attributes or disable Gatekeeper.
 
-## Install from source
+### Install from source
 
-Clone the published stable source tag:
+This public repository needs no GitHub authentication. Clone the published
+stable source tag:
 
 ```bash
 git clone --branch v4.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
@@ -456,9 +333,11 @@ sudo xcodebuild -runFirstLaunch
 ./script/install.sh
 ```
 
-Quit all Codex94 copies before installing. The installer builds, signs,
-installs, and opens `~/Applications/Codex94.app`. Pass `--no-launch` to
-install without opening it:
+Quit all Codex94 copies before installing. The installer locks the destination,
+verifies a unique staged copy and retains the old app for rollback until replacement
+succeeds. If rollback fails, recovery files remain; it does not keep a version archive.
+The installer builds, signs, installs, and opens `~/Applications/Codex94.app`.
+Pass `--no-launch` to install without opening it:
 
 ```bash
 ./script/install.sh --no-launch
@@ -469,272 +348,43 @@ On first launch, choose whether Codex94 may request **Quota + account** or
 `/Applications/Codex94.app` and `~/Applications/Codex94.app` locations. The
 source installer does not migrate or remove a DMG-installed copy.
 
-## Main behavior
-
-### Token statistics and manual update checks
-
-- Dashboard → **Token usage** loads the service's `account/usage/read` data on
-  first entry or a manual statistics refresh, independently of quota polling.
-  Statistics errors do not turn a working menu-bar quota into a connection error.
-- Summary cards show the returned lifetime tokens, peak daily tokens, current
-  and longest streaks, and longest running turn. Missing values remain unknown.
-  These service-reported summaries may cover a different period from the daily
-  records; the app does not invent model, project, input/output, cost, or hourly
-  breakdowns.
-- Switch freely between **Bar chart / Line chart**; the app remembers the choice.
-  Selection guides line up with bar centers and line points. The line breaks
-  across dates with no returned record.
-- The daily charts and table offer **7 days / 30 days / All returned / Custom**.
-  The three preset ranges end at the latest reported day, not today; Custom uses
-  the chosen inclusive dates. The chart preserves actual
-  date gaps; an omitted day is not zero usage. Hover or click to inspect exact
-  values. Reporting time zone and complete historical coverage are unspecified.
-- **Export CSV…** saves only reported daily records in the selected range, with
-  original source dates and exact token counts, to a user-selected file. The app
-  keeps statistics in memory apart from explicit CSV/PNG exports and chart-image
-  copying; refreshes replace the snapshot rather than accumulate the same usage.
-- Dashboard → **About → Check for updates** requests this repository's latest
-  public stable release from GitHub only when clicked. It displays the version
-  and plain-text release notes, and can open the validated GitHub Release page
-  in the system browser. Downloading and installing remain manual; the app does
-  not poll for updates, download/install an app, or relaunch itself.
-  See [update checks and release maintenance](docs/updating.md) for the fixed
-  endpoint, first-install migration, and future automatic-installation conditions.
-
-### Existing quota behavior
-
-The quota features introduced in `0.2.2 (13)` remain, with the freshness and
-recovery refinements described below. The **Earlier quota
-interface** gallery retains older captures; the new Token usage previews have
-their own provenance above.
-
-- A new Dashboard window starts on **Overview**, which reuses the current
-  connection status, freshness context, and menu-bar quota picker, then shows
-  every displayable bucket in the existing display order and only the 5-hour or Weekly
-  windows actually returned. Missing data has an explicit empty state rather than a fabricated
-  `0%`. Opening, browsing, or scrolling Overview does not refresh or write the
-  quota cache, and the page does not expose email, executable paths, or raw
-  bucket identifiers; the existing Dashboard toolbar remains its refresh entry.
-- Choose from four layouts in Dashboard → Display: **Ring + Percentage**,
-  **Percentage Only**, **Ring Only**, and the new dual-window layout.
-  The original three layouts retain their existing behavior. The running
-  menu-bar item changes layout and width immediately without being recreated.
-  A status badge is centered in
-  a visible ring or occupies a fixed trailing slot in Percentage Only.
-- Version `0.2.2` adds a fourth dual-window layout, showing the
-  selected bucket's 5-hour and Weekly values together. Its saved bucket choice
-  is independent of the original three layouts' quota selection. Switching
-  layouts preserves those existing choices; an unavailable window is not
-  invented or combined with another window.
-- Left-clicking or right-clicking the menu-bar item toggles the same popover.
-  Opening follows the freshness-gated refresh path described below. A configurable
-  global keyboard shortcut also toggles that popover and is **unset by default**.
-  It must include Control or Option; Command and Shift may be added.
-- Optional local quota notifications are **off by default**. Explicitly enabling
-  them requests macOS notification permission. Remaining-quota warning levels
-  start at **20% and 10%** and can be adjusted or disabled. The default bucket
-  is monitored, with optional additional buckets and optional recovery alerts.
-  Only fresh successful snapshots drive alerts; baselines and per-window-cycle
-  deduplication stay in memory. Messages contain the bucket name, window, and
-  percentage, without email. macOS Notification Center manages delivered
-  notifications and their retention.
-- Popover and Overview include a distinct, read-only **Manual quota resets**
-  card with a prominent available count. It is an informational card with no
-  reset action. Its value comes from the authoritative
-  `rateLimitResetCredits.availableCount` in the existing quota response. Zero
-  means zero; missing or null data remains unavailable, not zero. Before the
-  first live result the card says it has not been fetched; a retained value after
-  failure is marked cached. The count stays in memory and is not written to the
-  quota cache. Codex94 has no reset-redemption action or consume request.
-- Customize four independent colors for healthy
-  (50–100%), warning (20–49%), critical (0–19%), and hard-unavailable error
-  states. These color thresholds cannot be changed and are separate from the
-  configurable notification thresholds. Colors update immediately and are
-  stored as opaque sRGB, normalized six-digit uppercase `RRGGBB` values without alpha.
-  Critical and error remain independent even when both default to theme red.
-  **Restore Default Colors** removes only the four overrides, preserving
-  layout, theme, language, quota selection, executable path, and window size.
-- Quota rows show a separate absolute **Reset** line
-  with the full date, hour/minute, and UTC offset at the reset instant,
-  including daylight-saving changes. The existing countdown remains; a
-  missing reset is unavailable and a past date stays visible with a zero
-  countdown. Dates follow the app language's locale and the current time zone.
-  Dashboard → Connection shows the actual resolved menu-bar bucket/window,
-  rather than the popover's browsed model.
-- Issue banners offer **Open Connection** or
-  **Open Diagnostics**, reusing the same Dashboard window. Ordinary Dashboard
-  opening preserves its current page. These buttons only navigate; use the
-  existing **Refresh** to retry. A signed-out state explains that you must
-  sign in in Codex, then return and refresh; Codex94 does not perform login.
-- Layout/color changes, Overview rendering, Reset text rendering, and recovery
-  navigation do not themselves trigger quota requests, write quota cache, or
-  change connection state. Opening the popover and the separate post-reset
-  schedule follow their documented refresh behavior below.
-- Refreshes at launch and every 1, 5, 15, or 30 minutes according to the
-  selected setting. Opening a connected popover reuses successful data less
-  than 60 seconds old; otherwise it uses the existing single-flight refresh.
-  Explicit **Refresh** remains available and coalesces an already active read.
-- Transient quota failures may receive at most three additional read attempts,
-  after delays of 5, 20 and 60 seconds (four attempts including the initial read).
-  The same bounded budget can follow a Reset-triggered attempt. Authentication,
-  discovery and malformed-data errors
-  do not automatically retry; a later normal refresh starts a new budget.
-- While waiting after a transient failure, the popover, Connection page and
-  native menu-bar tooltip/accessibility text show the next scheduled automatic
-  attempt as local `HH:mm:ss`. This uses the earliest known retry, background
-  or post-reset deadline. An unknown schedule, including after a clock change,
-  hides the timestamp; the existing failure and cached-data information remain.
-- After the Mac wakes, refreshes once when there is no successful snapshot or
-  the last success is at least 60 seconds old. A fresher snapshot is kept, and
-  wake, background, manual, and popover requests share the same single-flight
-  refresh path.
-- After each successful snapshot, schedules one in-memory refresh for the
-  earliest future Reset across displayable windows, strictly at `resetsAt + 5`
-  seconds or later. Equal targets are deduplicated, adjacent requests reuse the
-  same single-flight path, and a consumed target gets no Reset-specific retry.
-  A session-only consumed-target watermark prevents clock rollback from
-  rearming an already attempted Reset. Wake and system-clock changes reconcile
-  the one-shot schedule without a persistent ledger or new background cadence.
-- Uses `account/rateLimits/read` for live quota data before the optional
-  `account/read` request in **Quota + account** mode, with `refreshToken: false`.
-  Quota requests have a 10-second request budget and a 20-second transaction
-  budget; Token usage retains 5 and 15 seconds respectively. The optional
-  account read keeps its 2-second cap and preserves valid quota if identity is slow;
-  missing identity is shown separately, without reusing an earlier account's
-  details or Token snapshot. Explicit authentication failures still fail the read.
-- Keeps the standard/default quota bucket separate from additional named model
-  buckets returned by Codex. The default bucket is shown as **Codex**; named
-  buckets use service-provided names. No model's availability or retirement
-  date is hard-coded. Historical synthetic screenshots may show older names.
-- The popover model picker browses one bucket at a time and is independent from
-  the menu-bar selection. Browsing a model does not change the menu-bar ring.
-  If its browsed bucket disappears, the popover uses the available default
-  bucket, or the first displayable bucket when the default has no windows.
-  Long bucket names remain distinguishable in the selection menu.
-- The dynamic menu-bar quota menu offers `Auto` plus each available bucket and
-  window. `Auto` chooses the lowest remaining percentage across all displayable
-  buckets and windows. When a fresh successful snapshot no longer contains a
-  pinned bucket/window, the saved preference becomes `Auto`. It stays Auto
-  if that option later returns; cache loading and failed requests do not
-  change the saved selection.
-- Supports only the returned 5-hour and Weekly windows. Weekly-only data is
-  valid: missing rows and selections are hidden without inferring entitlement
-  from plan type. It never estimates or combines independent quota windows.
-- Keeps quota severity separate from connection and data freshness: quota
-  rings, percentages, and bars share the same resolved healthy/warning/critical
-  colors, defaulting to green, amber, and red. Refreshing keeps the blue/cyan
-  connection accent; cached status uses its own amber clock, independent of
-  the user's quota warning-color override. A hard-unavailable badge, banner, or
-  Dashboard error dot uses its independent error color,
-  defaulting to the theme red before any critical override.
-- Keeps the last successful quota value after a refresh failure and marks it as
-  cached; when no snapshot is available, it shows a gray `--` instead of `0%`.
-- Shows the relative age of the last successful quota data in the popover
-  header. Refreshing with an existing snapshot reports the last success, while
-  refreshing or unavailable states without a snapshot use explicit no-success
-  wording. The same freshness context is included in menu-bar and popover
-  accessibility descriptions and the native menu-bar button's tooltip.
-- Closes the transient popover when the user clicks elsewhere without consuming
-  the original click or requesting Accessibility permission.
-- Locates Codex in this order: explicit manual path, the known ChatGPT/Codex
-  nested bundled locations, their legacy paths, Homebrew, `/usr/local/bin`,
-  `~/.local/bin`, then absolute `PATH` entries.
-- Offers Dashboard window presets at 900x600, 1280x720, 1440x810, and 1920x1080
-  logical points, with proportional fitting to the current display. Screen
-  fitting preserves the requested preset; a user resize still updates it.
-- Dashboard → Startup refreshes Launch at Login status when returning to
-  the app and shows a localized failure if a requested change fails. Automated
-  tests use a fake service and never change real Login Items.
-- The executable picker follows the app's selected language.
-- Dashboard → About shows the running app's exact version and build. A
-  user-triggered copy action preserves that string, and the project link targets
-  `https://github.com/DEFY-AN94/codex94`. Opening that link uses the system browser;
-  the separate manual update-check flow is described above.
-- Supports system, Terminal Dark, and Terminal Light themes plus English and
-  Simplified Chinese.
-- Codex monitoring uses only the current Codex login. It does not manage multiple accounts or
-  alternate `CODEX_HOME` directories, or collect a local quota-history ledger.
-
 ## Security and privacy
-Version 4.0.1 adds a separate, default-off local Claude CLI reader and a
-status-line quota cache. Previewing setup is read-only; installing or removing
-the connection explicitly edits Claude Code's status-line setting and retains
-recovery material. Version 4.1.0 additionally reads the usage cache that
-Claude Code itself writes, as described above, without any new network path.
-The diagram below describes the existing Codex path.
 
+- **Authentication stays in the official clients.** Codex94 starts Codex with
+  `codex -s read-only -a never app-server --stdio` and uses local stdio JSON-RPC
+  for quota and Token summaries. Codex owns its login and network access.
+  The optional Claude CLI owns its own authentication. Codex94 does not read
+  credential files, browser cookies, Keychain entries, session logs or SQLite
+  databases, and does not implement OAuth or direct quota HTTP requests.
+- **Claude local data is read-only and bounded.** The cache reader opens
+  `~/.claude.json` (or the location selected by Codex94's own `CLAUDE_CONFIG_DIR`)
+  read-only, rejecting symlinks, hard links, foreign owners, non-regular files
+  and files over 16 MiB. It interprets only `cachedUsageUtilization`; other
+  decoded fields are discarded. An account UUID is compared only in memory to
+  detect a login change and is never stored, logged or exported. Installing or
+  removing the optional statusline connection explicitly changes that setting,
+  preserves recovery material and checks for conflicts before restoration.
+- **Local storage is limited.** The owner-only Codex cache contains quota
+  buckets, plan/window metadata, percentages, resets and fetch time. Email is
+  memory-only in account mode and removed when switching to quota-only mode.
+  Interface choices are saved locally; notification baselines, reset credits
+  and Token snapshots stay in memory. Explicit CSV/PNG exports and clipboard
+  copies are user-directed outputs. Notification Center may retain delivered
+  quota messages, which omit email.
+- **No telemetry or automatic updater.** There is no analytics, advertising,
+  crash-reporting SDK, system profiling or project-operated server. The sole
+  direct network client is the user-triggered public GitHub release check,
+  which sends no account or usage data. Release-page navigation belongs to the
+  system browser. The app never reads or uploads the clipboard or diagnostics;
+  review copied diagnostics before sharing.
+- **Trust the executable you select.** App Sandbox is disabled so the Codex
+  subprocess can access its own login. Hardened Runtime, fixed arguments,
+  minimal environment, bounded output, deadlines and process-group cleanup
+  remain in place. CLI version validation checks compatibility, not publisher
+  identity. Release packages exclude account data, preferences, caches and logs.
 
-```mermaid
-flowchart LR
-    A["Codex94"] <-->|"local stdio JSON-RPC"| B["Codex app-server"]
-    B -->|"Codex-owned login"| C["OpenAI account service"]
-    A --> D["quota-only local cache"]
-    A -->|"opt-in local alerts"| E["macOS Notification Center"]
-    A -->|"0.3.0: user-initiated update check"| F["GitHub public latest-release API"]
-```
-
-The Codex provider starts its validated executable with fixed arguments:
-
-```text
-codex -s read-only -a never app-server --stdio
-```
-
-Codex itself owns authentication and may contact OpenAI services. Codex94 does
-not implement OAuth, receive an access or refresh token, make a direct quota
-HTTP request, or read authentication files, browser cookies, Keychain entries,
-Codex session logs, or SQLite databases.
-
-The versioned local cache stores only quota-bucket identifiers and optional
-names, plan type, window duration and type, percentage, reset time, and fetch
-time with owner-only permissions. Email is memory-only in **Quota + account**
-mode and is removed from the in-memory snapshot after switching to **Quota
-only**. UserDefaults stores interface choices, including the preferred menu-bar
-quota selection, and an optional manually selected executable path. Version
-0.1.8 introduced `menuBarLayout.v1` and `statusAccentOverrides.v1` for layout
-and four color overrides; subsequent releases reuse those keys and migration.
-Version 0.2.1 changes an unavailable pinned selection to Auto only after a
-successful fresh snapshot, using the existing preference key. Reset text and the in-memory post-reset
-schedule use the existing reset timestamp, with no additional cache fields or
-persistent ledger. Overview uses the existing snapshot without storing new
-identity data. The popover's browsed model and the Dashboard's selected section
-are session-only; Dashboard frame autosave is unchanged.
-Version `0.2.2` adds `dualWindowBucketSelection.v1`, `globalHotKey.v1`,
-and `notifications.v1` preferences for the independent dual-window bucket,
-chosen shortcut, and alert settings. Notification baselines, deduplication, and
-the reset-credit count are memory-only; cache schema v2 is unchanged. The
-shortcut uses system hotkey registration and does not record typed text.
-Opt-in notifications use the local macOS notification service, which can retain
-delivered bucket/window/percentage messages in Notification Center. This is an
-explicit new permission and local system data flow, not remote telemetry.
-Token statistics in `0.3.0` remain in memory unless the user exports CSV.
-Its separate update check makes a direct request to GitHub's fixed public
-latest-release API only after user action, without sending account or usage
-data. Update results stay in memory. Codex94 has no analytics, advertising,
-telemetry upload, crash-reporting SDK, system profiling, or project-operated
-server. Opening the Release page hands navigation to the system browser.
-
-Version 0.2.0 added distribution packaging and the second stable installation
-path. Version 0.2.1 retains the same data and permission boundaries. The DMG, checksum, and CI artifact contain the App, not account data,
-credentials, preferences, cache, logs, or real quota. Browser download and
-Gatekeeper quarantine handling are macOS distribution behavior. Version `0.3.0`
-adds an explicit update-network path; it does not change how
-Codex credentials or quota data are accessed.
-
-App Sandbox is intentionally disabled because the Codex child process must
-access its own login state. Hardened Runtime remains enabled; subprocess
-arguments are fixed, the environment is minimized, output is bounded, requests
-time out, and the process group is terminated after each refresh or during app
-shutdown with bounded cleanup. Version validation checks protocol compatibility,
-not publisher identity, so users must trust the ChatGPT/Codex installation and
-any executable they select.
-
-The Diagnostics and About copy buttons write only after a user action. Copied
-diagnostics normalize the executable path and version; About copies the exact
-displayed version and build. Users should still review diagnostics before
-sharing them. Codex94 never reads or uploads clipboard contents or diagnostics.
-
-See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md) for the complete
-boundaries.
+See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md) for the full storage,
+process, network and distribution boundaries and private vulnerability reporting.
 
 ## Development and build
 
@@ -744,11 +394,12 @@ Contributor and release checks also require `jq`:
 brew install ripgrep jq
 ```
 
-`script/security_check.sh` scans every commit, so contributor and release
-checks need a complete clone: in a shallow clone it stops and asks for
-`git fetch --unshallow`. `install.sh` is the exception, because the source
-installation above uses a shallow tag clone; it then scans only the fetched
-commits and says so.
+In this development checkout, `script/security_check.sh` requires complete Git
+history for contributor and release checks. In a shallow clone it stops and
+asks for `git fetch --unshallow`. Only `install.sh` explicitly permits shallow
+history for source installation, prints the limited scan scope and scans the
+fetched commits. This guard and installer warning are unreleased changes; the
+stable `v4.1.4` tag above retains its original scanner.
 
 Build and run a Debug app:
 
@@ -787,79 +438,17 @@ signature and payload validation:
 ./script/release_check.sh
 ```
 
-Version 0.1.8 passed the full GitHub test/release job, synthetic Display and
-click-functional Recovery UI jobs, and Actions/Swift CodeQL. For `0.1.9 (10)`,
-PR #11 remains the historical record for exact-head test, Display/Recovery UI,
-Actions/Python/Swift CodeQL, and final App acceptance. The synthetic Overview
-capture embedded above has been reviewed for layout and privacy. Keyboard
-activation, AXPress, and hosted tooltip exposure are not claimed as passed.
-Version [`0.3.0 (14)`](https://github.com/DEFY-AN94/codex94/releases/tag/v0.3.0)
-was published on 2026-09-21 (Australia/Melbourne). Its source and distribution
-artifacts remain bound to that release tag. Later documentation changes do not
-replace the recorded evidence, and future versions require their own validation.
+For Codex contributors, see [Codex setup and session hooks](docs/CODEX.md).
+Build and test requirements, safe fixtures and contribution rules are in
+[CONTRIBUTING.md](CONTRIBUTING.md); component ownership is in
+[ARCHITECTURE.md](docs/ARCHITECTURE.md). This project is **vibe-built with Codex**,
+with maintainer review, testing and security checks before each release.
 
-Historical validation for [`3.0.1 (15)`](https://github.com/DEFY-AN94/codex94/releases/tag/v3.0.1)
-includes **315 hosted tests**, the Display/Recovery/Token usage CI scenarios,
-Actions/Python/Swift CodeQL, and verification of its final-main Universal App
-and DMG. These are this maintenance release's own results. The unchanged
-`0.3.0` screenshots and maintainer interaction records retain their original
-provenance; they are not relabelled as fresh `3.0.1` manual acceptance. Final
-CI-package acceptance is recorded separately in the `3.0.1` release record.
-
-The local `3.1.0 (16)` unit suite recorded **340 tests executed, 1 skipped,
-0 failures**. The hosted keyboard-focus check was skipped because its test
-process could not establish a key window; it is not counted as a pass. PNG
-checks include actual-image stale/fresh text recognition and isolated
-pasteboard verification. The `3.1.0` release record separately identifies the
-four external UI scenarios (Display, Recovery, Token usage, Floating),
-Actions/Python/Swift CodeQL, and final source/artifact acceptance. Prior release
-screenshots and interaction records retain their original provenance.
-
-Local validation for `3.1.1 (17)` recorded **345 tests executed, 1 skipped,
-0 failures**. The hosted focus skip is not a pass. External UI, security,
-final-main packaging and installed-artifact results need their own records for
-this version; the preceding `3.1.0` evidence does not stand in for those checks.
-
-Local validation for `3.1.2 (18)` recorded **353 tests executed, 1 skipped,
-0 failures**. The skipped check is not a pass. Final-main checks, published
-assets, and installed-App acceptance are recorded separately in the
-[release record](docs/RELEASING.md).
-
-Validation for `3.1.3 (19)` recorded **381 tests executed, 1 skipped,
-0 failures**, including 11 menu-bar renderer tests. The hosted focus skip is
-not a pass. [release CI](https://github.com/DEFY-AN94/codex94/actions/runs/36345607838)
-passed the four synthetic UI scenarios, and
-[release CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/36345607726) passed
-Actions, Python and Swift. The maintainer's Spaces color acceptance applies
-only to the reviewed CI candidate on the tested Mac; final-main assets and
-installation are separate records in [RELEASING.md](docs/RELEASING.md).
-
-Historical validation for `3.1.4 (20)`: **396 tests executed, 1 existing hosted-focus skip,
-0 failures**. Exact final-main checks, public asset verification and local background-refresh observation are recorded in
-[RELEASING.md](docs/RELEASING.md).
-
-The unpublished `4.0.0 (21)` product candidate `c9e7c01` passed **486 tests executed,
-1 existing hosted-focus skip, 0 failures**, Universal packaging, all five
-synthetic UI scenarios and Actions/Python/Swift CodeQL. The maintainer accepted
-the real dual-provider popover, menu items and Claude floating strip for that
-candidate. Its reader fetched real quotas using native Claude Code 2.1.286 with
-a default Max profile. The requested ten-minute observation lasted 626 seconds:
-two Codex and one Claude background refreshes, plus one popover-triggered read
-per service, all succeeded with zero failures. This included interaction and
-does not establish long-term unattended stability. These are historical 4.0.0
-results, not validation of the 4.0.1 fix or its final release artifacts.
-
-Passive-mode runtime acceptance currently confirms the local connection is
-configured, but no naturally produced report has yet been observed. Live
-passive quota has therefore not been verified; synthetic tests do not establish
-real-account quota accuracy. Final release acceptance is recorded separately
-in [RELEASING.md](docs/RELEASING.md).
-
-SwiftUI owns views and state presentation; AppKit owns the native status items, popover,
-application appearance, and Dashboard window lifecycle. See the
-[component ownership and reuse rules](docs/ARCHITECTURE.md),
-[CONTRIBUTING.md](CONTRIBUTING.md) and [docs/RELEASING.md](docs/RELEASING.md)
-for contribution and release workflows.
+Historical test counts and release changes belong in [CHANGELOG.md](CHANGELOG.md).
+Exact CI runs, candidate identities, artifact hashes, installation outcomes and
+validation limits belong in [RELEASING.md](docs/RELEASING.md). Old screenshots or
+passing tests are not evidence of a new release's native keyboard, Spaces,
+fullscreen or Gatekeeper behavior.
 
 ## Uninstall
 
