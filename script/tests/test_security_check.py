@@ -51,9 +51,10 @@ class SecurityCheckFixtureTests(unittest.TestCase):
         self.git("add", "--all")
         self.git("commit", "--quiet", "-m", "Synthetic scanner fixture")
 
-    def scan(self, expected_error=None):
-        result = subprocess.run(["/bin/bash", str(self.root / "script/security_check.sh")],
-                                cwd=self.root, env=self.environment, stdin=subprocess.DEVNULL,
+    def scan(self, expected_error=None, root=None, arguments=()):
+        root = root or self.root
+        result = subprocess.run(["/bin/bash", str(root / "script/security_check.sh"), *arguments],
+                                cwd=root, env=self.environment, stdin=subprocess.DEVNULL,
                                 capture_output=True, text=True, timeout=30)
         if expected_error is None:
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -61,12 +62,25 @@ class SecurityCheckFixtureTests(unittest.TestCase):
         else:
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(expected_error, result.stderr)
+        return result
 
     def historical_only(self, relative, text):
         self.write(relative, text)
         self.commit()
         self.write(relative, "// Removed synthetic observation.\n")
         self.commit()
+
+    def shallow_clone(self):
+        # A root commit has no parent to cut off, so add one before cloning.
+        self.write("Codex94Tests/Fixture.swift", "// Latest synthetic fixture.\n")
+        self.commit()
+        parent = tempfile.TemporaryDirectory(prefix="Codex94SecurityShallow-")
+        self.addCleanup(parent.cleanup)
+        clone = Path(parent.name) / "clone"
+        self.git("clone", "--quiet", "--depth", "1", self.root.as_uri(), str(clone))
+        self.assertEqual(self.git("-C", str(clone), "rev-parse", "--is-shallow-repository").stdout,
+                         "true\n")
+        return clone
 
     def test_exact_trust_path_and_private_alias_allowed_in_current_and_history_tests(self):
         self.scan()
@@ -120,6 +134,22 @@ class SecurityCheckFixtureTests(unittest.TestCase):
     def test_credentials_remain_rejected_in_test_history(self):
         self.historical_only("Codex94Tests/Fixture.swift", TOKEN + "\n")
         self.scan("possible credential or private key exists in Git history")
+
+    def test_shallow_clone_is_refused_instead_of_hiding_older_history(self):
+        self.historical_only("Codex94Tests/Fixture.swift", TOKEN + "\n")
+        clone = self.shallow_clone()
+        self.scan("shallow Git clone", root=clone)
+        self.git("-C", str(clone), "fetch", "--quiet", "--unshallow")
+        self.scan("possible credential or private key exists in Git history", root=clone)
+
+    def test_installer_flag_scans_only_the_fetched_commits_of_a_shallow_clone(self):
+        note = "history scans cover only the fetched commits"
+        self.assertNotIn(note, self.scan(arguments=["--allow-shallow-history"]).stdout)
+        clone = self.shallow_clone()
+        self.assertIn(note, self.scan(root=clone, arguments=["--allow-shallow-history"]).stdout)
+
+    def test_unknown_argument_is_rejected(self):
+        self.scan("unknown argument '--skip-history'", arguments=["--skip-history"])
 
 
 if __name__ == "__main__":

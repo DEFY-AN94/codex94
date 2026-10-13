@@ -587,6 +587,10 @@ ChatGPT/Codex 安装以及手动选择的可执行文件。
 brew install ripgrep jq
 ```
 
+`script/security_check.sh` 会扫描每一个提交，因此贡献与发布检查需要完整克隆：
+在浅克隆中它会停止，并提示先执行 `git fetch --unshallow`。`install.sh` 是例外，
+因为上文的源码安装使用浅克隆的标签；此时它只扫描已下载的提交，并会明确提示。
+
 构建并运行 Debug App：
 
 ```bash

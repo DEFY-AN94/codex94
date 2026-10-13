@@ -10,6 +10,17 @@ PII_PATTERN='(/Users/[A-Za-z0-9._/-]+)|(/(private/)?var/folders/[A-Za-z0-9._/-]+
 # trust-alias fixture path. This allowlist applies only to tests, including history.
 ALLOWED_FIXTURE_PII='^(/Users/(example|private|another-person)(/[A-Za-z0-9._/-]+)?|/Users/synthetic/runtime|(user|test|private|account|first|late|second)@example[.]com)$'
 
+ALLOW_SHALLOW_HISTORY=false
+for argument in "$@"; do
+  case "$argument" in
+    --allow-shallow-history) ALLOW_SHALLOW_HISTORY=true ;;
+    *)
+      echo "Security check failed: unknown argument '$argument'." >&2
+      exit 1
+      ;;
+  esac
+done
+
 for required_command in rg git sort; do
   if ! command -v "$required_command" >/dev/null 2>&1; then
     echo "Security check failed: required command '$required_command' is unavailable." >&2
@@ -101,6 +112,28 @@ append_matches() {
 }
 
 cd "$ROOT_DIR"
+
+# A shallow clone hides older commits from every history scan below, so refuse
+# it rather than pass on partial history. Only the source installer opts in: the
+# README installs a published tag from a shallow clone.
+if ! shallow_repository="$(git rev-parse --is-shallow-repository)"; then
+  echo "Security check failed: Git shallow-clone state could not be determined." >&2
+  exit 1
+fi
+case "$shallow_repository" in
+  false) ;;
+  true)
+    if [[ "$ALLOW_SHALLOW_HISTORY" != true ]]; then
+      echo "Security check failed: shallow Git clone; history scans would miss older commits. Run 'git fetch --unshallow' and retry." >&2
+      exit 1
+    fi
+    echo "Security check note: shallow Git clone; history scans cover only the fetched commits."
+    ;;
+  *)
+    echo "Security check failed: unexpected Git shallow-clone state '$shallow_repository'." >&2
+    exit 1
+    ;;
+esac
 
 # The anonymous, user-triggered GitHub release checker is the only direct
 # network client. Credential/cookie/reset-consumption bans still apply to it.
