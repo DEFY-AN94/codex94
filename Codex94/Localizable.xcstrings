@@ -239,6 +239,40 @@
         }
       }
     },
+    "claude.history.remaining": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "last remaining"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次剩余"
+          }
+        }
+      }
+    },
+    "claude.history.used %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previously used %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当时已用 %@"
+          }
+        }
+      }
+    },
     "claude.history.quota %@ %@": {
       "extractionState": "manual",
       "localizations": {

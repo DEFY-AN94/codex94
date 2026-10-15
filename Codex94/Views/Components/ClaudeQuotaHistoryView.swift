@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// An accepted report is useful as history without becoming current quota again.
-/// The menu popover visualizes previous values; the history heading and source time
+/// Both display styles visualize previous values; the history heading and source time
 /// still qualify them. This content has no countdowns or refresh action.
 struct ClaudeQuotaHistoryView: View {
     let report: ClaudeQuotaHistoryPresentation
@@ -12,6 +12,9 @@ struct ClaudeQuotaHistoryView: View {
     private var isTerminal: Bool { style == .terminal }
 
     var body: some View {
+        let windowLayout = isTerminal
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 7))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 18))
         VStack(alignment: .leading, spacing: isTerminal ? 7 : 10) {
             Label("claude.history.title", systemImage: "clock")
                 .font(.caption.weight(.semibold))
@@ -21,14 +24,16 @@ struct ClaudeQuotaHistoryView: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .accessibilityIdentifier("claude-history-current-unknown")
 
-            ForEach(report.windows.sorted { $0.kind.sortOrder < $1.kind.sortOrder }, id: \.kind) { window in
-                historyRow(
-                    title: StatusAccessibilityString.localized(
-                        window.kind == .fiveHour ? "quota.fiveHourShort" : "quota.weeklyShort",
-                        language: language, bundle: .main),
-                    usedPercentage: window.usedPercentage,
-                    identifier: "claude-history-" + window.kind.rawValue
-                )
+            windowLayout {
+                ForEach(report.windows.sorted { $0.kind.sortOrder < $1.kind.sortOrder }, id: \.kind) { window in
+                    historyRow(
+                        title: StatusAccessibilityString.localized(
+                            window.kind == .fiveHour ? "quota.fiveHourShort" : "quota.weeklyShort",
+                            language: language, bundle: .main),
+                        usedPercentage: window.usedPercentage,
+                        identifier: "claude-history-" + window.kind.rawValue
+                    )
+                }
             }
             if !report.modelLimits.isEmpty {
                 Text("claude.modelLimits.title")
@@ -52,10 +57,10 @@ struct ClaudeQuotaHistoryView: View {
     private func historyRow(title: String, usedPercentage: Double, identifier: String,
                             terminalTitle: String? = nil) -> some View {
         let quota = ClaudeQuotaHistoryFormatting.quotaText(usedPercentage: usedPercentage, language: language)
+        let remaining = 100 - usedPercentage
+        let color = palette.quotaColor(for: QuotaLevel(preciseRemainingPercent: remaining))
         return Group {
             if isTerminal {
-                let remaining = 100 - usedPercentage
-                let color = palette.quotaColor(for: QuotaLevel(preciseRemainingPercent: remaining))
                 QuotaMeterRow(
                     title: Text(verbatim: terminalTitle ?? title),
                     remainingPercent: 100 - Int(usedPercentage.rounded()),
@@ -66,19 +71,20 @@ struct ClaudeQuotaHistoryView: View {
                 )
                 .help(Text(verbatim: title + ", " + quota))
             } else {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(verbatim: title)
-                        .lineLimit(2).help(Text(verbatim: title))
-                        .frame(width: 120, alignment: .leading)
-                    Text(verbatim: quota)
-                        .fontWeight(.medium)
-                        .foregroundStyle(Color.primary.opacity(0.78))
-                        .monospacedDigit()
+                        .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    QuotaCardMeter(
+                        remainingPercent: remaining,
+                        percentageText: QuotaFormatting.percent(precise: remaining, language: language),
+                        color: color, remainingLabel: "claude.history.remaining"
+                    )
+                    Text("claude.history.used \(QuotaFormatting.percent(precise: usedPercentage, language: language))")
+                        .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .accessibilityElement(children: .ignore)

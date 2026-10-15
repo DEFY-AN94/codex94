@@ -411,14 +411,8 @@ struct ProviderQuotaCardContent: View {
         let reset = resetPresentation(window)
         return VStack(alignment: .leading, spacing: compact ? 4 : 6) {
             Text(window.kind.localizedKey).font(.caption).foregroundStyle(.secondary)
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text(verbatim: percent)
-                    .font(.system(size: compact ? 23 : 25, weight: .semibold, design: .rounded))
-                    .monospacedDigit().foregroundStyle(color)
-                Text("floating.remaining").font(.caption2).foregroundStyle(.secondary)
-            }
-            ProgressView(value: window.preciseRemainingPercent, total: 100)
-                .tint(color).controlSize(.small).accessibilityHidden(true)
+            QuotaCardMeter(remainingPercent: window.preciseRemainingPercent,
+                           percentageText: percent, color: color, compact: compact)
             (Text("quota.resets") + Text(verbatim: " " + reset.countdown))
                 .font(.caption2).foregroundStyle(.secondary)
                 .lineLimit(1).help(Text(verbatim: reset.absolute))

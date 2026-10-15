@@ -7,6 +7,17 @@ published on 2026-10-07 (Australia/Melbourne), including the unpublished
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
+## Unreleased: Dashboard history meters
+
+`QuotaCardMeter` shares large percentage and continuous progress-bar geometry
+between current Dashboard quotas and Claude history. It accepts only presentation
+values; callers own current versus historical labels and accessibility text.
+History uses the precise remaining percentage, retains its original source time
+and current-unknown notice, and adds no countdown, snapshot, request or schedule.
+Shared historical windows use the same side-by-side layout as current windows;
+historical model limits use full-width meters below them. The terminal-style
+popover continues to use `QuotaMeterRow`.
+
 ## 4.1.4 release: menu display and single-CLI ownership
 
 `MenuBarQuotaDisplay` is a separate menu presentation value. Current display
