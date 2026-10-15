@@ -10,6 +10,13 @@ below applies only to its recorded version and does not validate later releases.
 
 ### Changed
 
+- Show Claude historical Dashboard quotas with the same large percentages and
+  horizontal progress meters as current quota cards. Place shared five-hour and
+  weekly windows side by side, with model limits below. Keep last-remaining and
+  previously-used labels, the current-quota-unknown notice and original source
+  time. Historical values remain separate from current snapshots, selection,
+  notifications and refresh work; the menu popover keeps its existing layout.
+
 - Add Codex-only session preparation: a project SessionStart hook for supported
   local sessions, a repository Start skill for Codex Cloud, and a shared bounded
   Git-history helper. Complete checkouts remain unchanged; shallow checkouts

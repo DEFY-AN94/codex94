@@ -20,6 +20,9 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 > Codex `app-server` 为实验性接口，上游 CLI 与状态栏数据格式可能变化。
 > 分发包未签名／未公证，具体信任边界见下方安装说明。
 
+尚未发布的源码版本还会在 Dashboard 中以大百分比和横向进度条展示 Claude 历史额度；
+详见 [Unreleased 更新记录](CHANGELOG.md#unreleased)。
+
 ## 功能详情
 
 以下介绍当前稳定版的完整使用能力。逐版变更集中在 [CHANGELOG.md](CHANGELOG.md)，

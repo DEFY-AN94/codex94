@@ -1,5 +1,28 @@
 import SwiftUI
 
+/// Dashboard meter shared by current quota and explicitly labelled history.
+/// Source, timestamps and accessibility semantics belong to the caller.
+struct QuotaCardMeter: View {
+    let remainingPercent: Double
+    let percentageText: String
+    let color: Color
+    var remainingLabel: LocalizedStringKey = "floating.remaining"
+    var compact = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? 4 : 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(verbatim: percentageText)
+                    .font(.system(size: compact ? 23 : 25, weight: .semibold, design: .rounded))
+                    .monospacedDigit().foregroundStyle(color)
+                Text(remainingLabel).font(.caption2).foregroundStyle(.secondary)
+            }
+            ProgressView(value: remainingPercent, total: 100)
+                .tint(color).controlSize(.small).accessibilityHidden(true)
+        }
+    }
+}
+
 /// Shared meter geometry for current quotas and explicitly labelled history.
 /// Callers retain ownership of source/time semantics and accessibility text.
 struct QuotaMeterRow<Trailing: View>: View {

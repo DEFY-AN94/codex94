@@ -23,6 +23,9 @@ and bundles no third-party runtime frameworks.
 > Anthropic. Codex `app-server` is experimental; upstream CLI and statusline
 > formats may change. Distribution is unsigned/unnotarized as explained below.
 
+Unreleased source builds also show Claude history in Dashboard with large
+percentages and horizontal progress bars; see [Unreleased](CHANGELOG.md#unreleased).
+
 ## Features
 
 The following describes the current stable app. Release-by-release changes live
