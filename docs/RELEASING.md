@@ -33,6 +33,17 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
+The **4.1.5 (29)** candidate targets **2026-10-18** (Australia/Melbourne),
+as confirmed by the maintainer. It includes the changes since 4.1.4 in
+`CHANGELOG.md`, plus model-limit meters and the shrinking provider viewport fix.
+Verify English/Chinese, light/dark, fresh/cached/history and model quota
+extremes with synthetic inputs. Exercise both content growth and shrinkage in
+the same popover, including disappearing five-hour rows. Candidate App,
+PR CI/UI/CodeQL, final-main CI/attestation, exact two-file assets and final
+installation acceptance are separate checks and remain pending until recorded.
+If publication crosses a Melbourne date boundary, update the reviewed date
+before tagging. Public stable links remain on 4.1.4 until 4.1.5 is published.
+
 The latest menu and single-read release is **`4.1.4 (28)`**, published on
 **2026-10-07** (Australia/Melbourne) from PR #55. Stable downloads point to
 `v4.1.4`; the verified package and installation record appears below. The `4.0.2 (23)` candidate

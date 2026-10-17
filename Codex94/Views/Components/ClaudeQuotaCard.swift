@@ -430,24 +430,37 @@ struct ProviderQuotaCardContent: View {
         .accessibilityIdentifier(windowIdentifier(window))
     }
 
-    /// One compact line per model: name, remaining share and reset countdown.
+    /// Model limits use the same meters as shared windows in each surface.
     private func scopedLimitRow(_ limit: ProviderScopedLimit) -> some View {
         let percent = QuotaFormatting.percent(precise: limit.window.preciseRemainingPercent, language: language)
         let color = palette.quotaColor(for: QuotaLevel(preciseRemainingPercent: limit.window.preciseRemainingPercent))
         let reset = resetPresentation(limit.window)
-        return HStack(spacing: 8) {
-            Text(verbatim: limit.name).fontWeight(.medium).lineLimit(1).truncationMode(.tail)
-                .frame(maxWidth: 180, alignment: .leading)
-            Text(verbatim: percent).monospacedDigit().foregroundStyle(color)
-                .fixedSize(horizontal: true, vertical: false).layoutPriority(2)
-            Text("floating.remaining").foregroundStyle(.secondary)
-                .fixedSize(horizontal: true, vertical: false).layoutPriority(2)
-            (Text("quota.resets") + Text(verbatim: " " + reset.countdown))
-                .foregroundStyle(.secondary).lineLimit(1).layoutPriority(1)
-            Spacer(minLength: 0)
+        return VStack(alignment: .leading, spacing: isTerminal ? 7 : 6) {
+            if isTerminal {
+                QuotaMeterRow(
+                    title: Text(verbatim: limit.name), remainingPercent: limit.window.remainingPercent,
+                    percentageText: percent, color: color,
+                    trailing: (Text("quota.resets") + Text(verbatim: " " + reset.countdown))
+                        .foregroundStyle(.secondary),
+                    titleLineLimit: 1
+                )
+                QuotaAbsoluteResetLine(text: reset.absolute)
+            } else {
+                Text(verbatim: limit.name).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                QuotaCardMeter(remainingPercent: limit.window.preciseRemainingPercent,
+                               percentageText: percent, color: color, compact: compact)
+                (Text("quota.resets") + Text(verbatim: " " + reset.countdown))
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: reset.absolute)
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .font(isTerminal ? .system(size: 12, design: .monospaced) : .caption)
-        .help(Text(verbatim: reset.absolute))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .help(Text(verbatim: limit.name + ", " + reset.absolute))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             Text(verbatim: limit.name + ", ")

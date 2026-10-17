@@ -23,8 +23,9 @@ and bundles no third-party runtime frameworks.
 > Anthropic. Codex `app-server` is experimental; upstream CLI and statusline
 > formats may change. Distribution is unsigned/unnotarized as explained below.
 
-Unreleased source builds also show Claude history in Dashboard with large
-percentages and horizontal progress bars; see [Unreleased](CHANGELOG.md#unreleased).
+The 4.1.5 source candidate adds Dashboard history meters, progress bars for
+Claude model limits and a popover that shrinks with its content; see
+[4.1.5 changes](CHANGELOG.md#415---2026-10-18).
 
 ## Features
 
