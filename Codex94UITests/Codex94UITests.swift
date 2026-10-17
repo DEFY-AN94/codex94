@@ -523,6 +523,15 @@ final class Codex94UITests: XCTestCase {
         try selectPage(.providers, in: dashboard)
         try setClaudeCLIUsageEnabled(false, in: dashboard)
         try setProviderMenuMode("compactBoth", in: dashboard)
+        popover = try openProviderPopover(service: "combined", marker: "provider-quota-sections")
+        try waitUntil("Disabling CLI reads must reveal the cached shared quota", timeout: 10) {
+            self.identified("claude-quota-weekly", in: popover).exists
+        }
+        try exerciseFablePopoverToggle(
+            in: popover, marker: "provider-quota-sections", nativeServices: ["combined"], historical: false,
+            enabledScreenshot: "providers-mixed-fable-en.png"
+        )
+        try closeProviderPopover(service: "combined", marker: "provider-quota-sections")
         try fixture.setClaudeLocalCacheExpired(true)
         popover = try openProviderPopover(service: "combined", marker: "provider-quota-sections")
         try uniqueIdentified("claude-refresh", in: popover).click()
@@ -530,6 +539,10 @@ final class Codex94UITests: XCTestCase {
             self.identified("claude-history-weekly", in: popover).exists
                 && !self.identified("claude-quota-weekly", in: popover).exists
         }
+        try exerciseFablePopoverToggle(
+            in: popover, marker: "provider-quota-sections", nativeServices: ["combined"], historical: true,
+            enabledScreenshot: "providers-mixed-history-fable-en.png"
+        )
         try require(!identified("menu-bar-quota-picker", in: popover).exists
                     && !identified("claude-menu-bar-quota-picker", in: popover).exists,
                     "Quota configuration must not remain in the compact popover")
@@ -593,7 +606,8 @@ final class Codex94UITests: XCTestCase {
         try selectPage(.providers, in: dashboard)
 
         // 4.1.0: with the CLI option off, Claude Code's own usage cache is the
-        // shown source. Nothing is launched and the cached per-model limit appears.
+        // shown source. Model limits remain in Dashboard while the popover's
+        // persistent Fable option starts off.
         let cliReadsBeforeOff = try fixture.claudeUsageRequestCount()
         try setClaudeCLIUsageEnabled(false, in: dashboard)
         try waitUntil("Turning the CLI option off must select the local usage cache") {
@@ -608,16 +622,24 @@ final class Codex94UITests: XCTestCase {
         }
         try assertProviderMetric("claude-quota-fiveHour", percent: "60%", in: popover)
         try assertProviderMetric("claude-quota-weekly", percent: "75%", in: popover)
-        try require(identified("claude-model-limit-claude.model.fable", in: popover).exists,
-                    "The cached per-model weekly limit must be listed")
-        try assertProviderMetric("claude-model-limit-claude.model.fable", percent: "70%", in: popover)
-        // A percentage alone contains too few accent pixels to satisfy this.
-        // The synthetic 70% model meter must paint its segmented fill as well.
-        try assertColor("27C8FF", in: identified("claude-model-limit-claude.model.fable", in: popover),
-                        minimumPixels: 200)
+        try exerciseFablePopoverToggle(
+            in: popover, marker: "claude-quota-section", nativeServices: ["claude"], historical: false,
+            enabledScreenshot: "providers-local-cache-en.png"
+        )
+        try captureProviderPopover(popover, marker: "claude-quota-section", named: "providers-local-cache-fable-off-en.png")
         XCTAssertEqual(try fixture.claudeUsageRequestCount(), cliReadsBeforeOff,
                        "Reading the local usage cache must never launch the CLI")
-        try captureProviderPopover(popover, marker: "claude-quota-section", named: "providers-local-cache-en.png")
+        dashboard = try openDashboard(from: popover)
+        try selectPage(.overview, in: dashboard)
+        try assertProviderMetric("claude-model-limit-claude.model.fable", percent: "70%", in: dashboard)
+        try require(!identified("claude-popover-shows-fable", in: dashboard).exists,
+                    "The Fable display option must be confined to the menu popover")
+        XCTAssertEqual(try fixture.preference("claude.popoverShowsFable.v1") as? Bool, false,
+                       "Dashboard must show Fable while the popover option is off")
+        try selectPage(.providers, in: dashboard)
+        popover = try openProviderPopover(service: "claude", marker: "claude-quota-section")
+        try require(!identified("claude-model-limit-claude.model.fable", in: popover).exists,
+                    "Reopening must preserve the saved off choice")
 
         // 4.1.2: expiry changes presentation only. The original source time and
         // percentages remain visible as history, never as selectable current quota.
@@ -635,6 +657,10 @@ final class Codex94UITests: XCTestCase {
         }
         try assertProviderMetric("claude-history-fiveHour", percent: "60%", in: popover)
         try assertProviderMetric("claude-history-weekly", percent: "75%", in: popover)
+        try exerciseFablePopoverToggle(
+            in: popover, marker: "claude-quota-section", nativeServices: ["claude"], historical: true,
+            enabledScreenshot: "providers-history-fable-en.png"
+        )
         try require(identified("claude-history-current-unknown", in: popover).exists,
                     "Historical values must explicitly say current quota is unknown")
         let historyTimeElement = identified("claude-source-time", in: popover)
@@ -652,6 +678,9 @@ final class Codex94UITests: XCTestCase {
         try selectPage(.overview, in: dashboard)
         try require(identified("claude-quota-history", in: dashboard).waitForExistence(timeout: 5),
                     "Dashboard must share the same historical presentation")
+        try assertProviderMetric("claude-history-model-claude.model.fable", percent: "70%", in: dashboard)
+        XCTAssertEqual(try fixture.preference("claude.popoverShowsFable.v1") as? Bool, false,
+                       "Dashboard history must retain Fable while the popover option is off")
         try capture(dashboard, named: "dashboard-providers-history-en.png")
         // Overview intentionally shares the provider section identifier. Leave
         // that page before the strict app-wide popover-closed precondition.
@@ -748,6 +777,11 @@ final class Codex94UITests: XCTestCase {
             "onlyFixedSyntheticClaudeUsed": true, "statuslineInstallAttempted": false,
             "expiredClaudeHistoryVerified": true, "historyDoesNotBecomeCurrentQuota": true,
             "historyPreservesSourceTimeAndRequestCounts": true, "usableReportReplacesHistory": true,
+            "fablePopoverDefaultOffVerified": true, "fablePopoverBooleanPersistenceVerified": true,
+            "fableRepeatedToggleSameOpenPopoverVerified": true,
+            "fableToggleMixedAndClaudeOnlyCurrentAndHistoryVerified": true,
+            "fableTogglePreservesNativeItemsRequestsAndCaches": true,
+            "fableCurrentSegmentedMeterPixelsVerified": true, "fableDashboardWhilePopoverOffVerified": true,
             "authenticationUIOperated": false, "realAccountDataUsed": false,
             "keyboardAcceptance": "not-tested", "spacesAndFullscreenAcceptance": "not-tested",
             "rawTestResultsUploaded": false
@@ -829,6 +863,106 @@ final class Codex94UITests: XCTestCase {
         toggle.click()
         try waitUntil("The CLI option did not persist") {
             try self.fixture.preference(key) as? Bool == enabled
+        }
+    }
+
+    /// Exercise the real switch without dismissing or reopening the supplied
+    /// popover. Hosted layout tests cover uncapped growth/shrinkage; this external
+    /// scenario also covers mixed content that legitimately reaches the cap.
+    private func exerciseFablePopoverToggle(
+        in popover: XCUIElement, marker: String, nativeServices: Set<String>, historical: Bool,
+        enabledScreenshot: String
+    ) throws {
+        let preferenceKey = "claude.popoverShowsFable.v1"
+        let rowID = historical ? "claude-history-model-claude.model.fable" : "claude-model-limit-claude.model.fable"
+        let sharedPrefix = historical ? "claude-history-" : "claude-quota-"
+        try require((try fixture.preference(preferenceKey) as? Bool ?? false) == false,
+                    "Each Fable presentation check must start with the saved option off")
+        let modelRows = popover.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ OR identifier BEGINSWITH %@",
+            "claude-model-limit-", "claude-history-model-"
+        ))
+        try require(modelRows.count == 0, "The default popover must hide every model-scoped quota row")
+        try assertProviderMetric(sharedPrefix + "fiveHour", percent: "60%", in: popover)
+        try assertProviderMetric(sharedPrefix + "weekly", percent: "75%", in: popover)
+        let sourceTime = try uniqueIdentified("claude-source-time", in: popover)
+        let originalTime = [sourceTime.label, sourceTime.title, sourceTime.value as? String ?? ""]
+        try require(originalTime.contains { $0.contains("Claude Code fetched:") },
+                    "Fable toggle checks require the original synthetic local-cache source time")
+        let originalRequests = try providerRequestCounts()
+        let originalCodexCache = try fixture.cacheFingerprint()
+        let originalClaudeCache = try fixture.claudeCacheFingerprint()
+        let originalItems = try providerStatusItems(expected: nativeServices)
+        let originalItemIDs = originalItems.mapValues(\.identifier)
+        let originalItemWidths = originalItems.mapValues { $0.frame.width }
+        let originalPopoverWidth = popover.frame.width
+        let originalWindowNumber = try ownedWindowNumber(popover)
+
+        for (index, enabled) in [true, false, true, false].enumerated() {
+            let toggle = try uniqueIdentified("claude-popover-shows-fable", in: popover)
+            try reveal(toggle, in: popover)
+            try require(toggle.isEnabled && toggle.isHittable,
+                        "The Fable option must be an interactive control inside the same popover")
+            try require(try ownedWindowNumber(popover) == originalWindowNumber,
+                        "Each Fable click must target the original native popover window")
+            toggle.click()
+            try waitUntil("The Fable option must persist and update the same open popover") {
+                guard popover.exists, self.identified(marker, in: popover).exists,
+                      let value = try self.fixture.preference(preferenceKey) as? NSNumber,
+                      CFGetTypeID(value) == CFBooleanGetTypeID(), value.boolValue == enabled else { return false }
+                return modelRows.count == (enabled ? 1 : 0)
+                    && self.identified(rowID, in: popover).exists == enabled
+            }
+            // SwiftUI publishes rows before AppKit asynchronously synchronizes
+            // the popover size. Wait for matching AX/CG geometry at the same ID.
+            try waitUntil("Changing Fable visibility must preserve the original native popover window") {
+                guard let owned = try? self.currentProviderPopover(marker: marker) else { return false }
+                return (try? self.ownedWindowNumber(owned)) == originalWindowNumber
+            }
+            try require(abs(popover.frame.width - originalPopoverWidth) <= 1,
+                        "Changing Fable visibility must preserve the popover width")
+            let viewports = popover.scrollViews.allElementsBoundByIndex.filter {
+                abs($0.frame.width - 500) <= 2 && $0.frame.height.isFinite
+                    && $0.frame.height > 0 && $0.frame.height <= 482
+            }
+            try require(viewports.count == 1, "Fable changes must retain one quota viewport capped at 480pt")
+            let items = try providerStatusItems(expected: nativeServices)
+            XCTAssertEqual(items.mapValues(\.identifier), originalItemIDs,
+                           "Fable visibility must preserve the same native provider identifiers")
+            for service in nativeServices {
+                let item = try XCTUnwrap(items[service])
+                let width = try XCTUnwrap(originalItemWidths[service])
+                XCTAssertEqual(item.frame.width, width, accuracy: 1,
+                               "Fable visibility must not change native quota selection or status-item width")
+            }
+            try assertProviderMetric(sharedPrefix + "fiveHour", percent: "60%", in: popover)
+            try assertProviderMetric(sharedPrefix + "weekly", percent: "75%", in: popover)
+            let time = try uniqueIdentified("claude-source-time", in: popover)
+            XCTAssertEqual([time.label, time.title, time.value as? String ?? ""], originalTime,
+                           "The display option must preserve the original source timestamp")
+            if historical {
+                try require(identified("claude-history-current-unknown", in: popover).exists,
+                            "Toggling historical Fable must retain the current-quota-unknown warning")
+            }
+            if enabled {
+                try assertProviderMetric(rowID, percent: "70%", in: popover)
+                let row = try uniqueIdentified(rowID, in: popover)
+                try reveal(row, in: popover)
+                if !historical {
+                    // A percentage alone has too few accent pixels to pass;
+                    // this verifies the synthetic 70% segmented meter's fill.
+                    try assertColor("27C8FF", in: row, minimumPixels: 200)
+                }
+                if index == 0 {
+                    try captureProviderPopover(popover, marker: marker, named: enabledScreenshot)
+                }
+            }
+            XCTAssertEqual(try providerRequestCounts(), originalRequests,
+                           "Fable display changes must not read either provider")
+            XCTAssertEqual(try fixture.cacheFingerprint(), originalCodexCache,
+                           "Fable display changes must not rewrite the Codex quota cache")
+            XCTAssertEqual(try fixture.claudeCacheFingerprint(), originalClaudeCache,
+                           "Fable display changes must not modify the synthetic Claude cache")
         }
     }
 
@@ -1149,7 +1283,7 @@ final class Codex94UITests: XCTestCase {
             _ = try floatingWindow()
         }
         var floating = try floatingWindow()
-        let originalWindowNumber = try ownedFloatingWindowNumber(floating)
+        let originalWindowNumber = try ownedWindowNumber(floating)
         try assertFloatingGeometry(floating, expanded: false)
         try assertFloatingMetric("floating-quota-weekly", contains: "--", in: floating)
         try assertFloatingMetric("floating-refresh", contains: "Refresh failed", in: floating)
@@ -1201,7 +1335,7 @@ final class Codex94UITests: XCTestCase {
             try assertFloatingMetric("floating-quota-weekly", contains: "80%", in: floating)
             try require(floating.frame.origin.equalToWithinOnePoint(shapeOrigin),
                         "Growing within available space must preserve the floating top-left position")
-            try require(try ownedFloatingWindowNumber(floating) == originalWindowNumber,
+            try require(try ownedWindowNumber(floating) == originalWindowNumber,
                         "A quota shape change must reuse the original floating window")
         }
         try captureFloating(floating, named: "floating-dual-window-en.png")
@@ -1218,7 +1352,7 @@ final class Codex94UITests: XCTestCase {
             try assertFloatingMetric("floating-quota-weekly", contains: "32%", in: floating)
             try require(floating.frame.origin.equalToWithinOnePoint(shapeOrigin),
                         "Returning to one column must preserve the floating top-left position")
-            try require(try ownedFloatingWindowNumber(floating) == originalWindowNumber,
+            try require(try ownedWindowNumber(floating) == originalWindowNumber,
                         "Returning to one column must reuse the same floating window")
         }
         try captureFloating(floating, named: "floating-single-window-en.png")
@@ -1309,7 +1443,7 @@ final class Codex94UITests: XCTestCase {
                         "The Dashboard floating toggle must be enabled and visible")
             toggle.click()
             floating = try floatingWindow()
-            try require(try ownedFloatingWindowNumber(floating) == originalWindowNumber,
+            try require(try ownedWindowNumber(floating) == originalWindowNumber,
                         "Reopening must reuse the same owned floating window")
             try require(floating.frame.origin.equalToWithinOnePoint(draggedOrigin),
                         "Reopening must retain the dragged floating position")
@@ -1634,10 +1768,13 @@ final class Codex94UITests: XCTestCase {
         return visible
     }
 
-    private func ownedFloatingWindowNumber(_ window: XCUIElement) throws -> Int {
+    /// Resolve an app-owned surface to its native window, so a replacement at
+    /// the same position cannot satisfy a continuity assertion via a live AX query.
+    private func ownedWindowNumber(_ window: XCUIElement) throws -> Int {
         let pid = try ownedApplicationPID()
+        let windowFrame = window.frame
         guard let values = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else {
-            throw UITestFailure("Could not inspect the owned floating window identity")
+            throw UITestFailure("Could not inspect the owned window identity")
         }
         // Immediately filter to the validated AUT process. Never persist or
         // include another process's window metadata in a failure or report.
@@ -1645,12 +1782,12 @@ final class Codex94UITests: XCTestCase {
         let matches = owned.compactMap { value -> Int? in
             guard let bounds = value[kCGWindowBounds as String] as? [String: Any],
                   let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary),
-                  frame.origin.equalToWithinOnePoint(window.frame.origin),
-                  abs(frame.width - window.frame.width) <= 1, abs(frame.height - window.frame.height) <= 1,
+                  frame.origin.equalToWithinOnePoint(windowFrame.origin),
+                  abs(frame.width - windowFrame.width) <= 1, abs(frame.height - windowFrame.height) <= 1,
                   let number = value[kCGWindowNumber as String] as? NSNumber else { return nil }
             return number.intValue
         }
-        try require(matches.count == 1, "The identified floating surface must match one owned system window")
+        try require(matches.count == 1, "The identified app surface must match one owned system window")
         return matches[0]
     }
 
@@ -4039,11 +4176,12 @@ private struct SyntheticFixture {
         if scenario == "providers" {
             guard let syntheticCLIEnabled = try preference("claude.cliUsageEnabled.v1") as? NSNumber,
                   CFGetTypeID(syntheticCLIEnabled) == CFBooleanGetTypeID(), syntheticCLIEnabled.boolValue,
+                  try preference("claude.popoverShowsFable.v1") == nil,
                   try preference("codexMonitoringEnabled.v1") as? Bool == true,
                   try preference("claudeMonitoringEnabled.v1") as? Bool == false,
                   try preference("menuBarServiceMode.v1") as? String == "single",
                   try preference("primaryProvider.v1") as? String == "codex" else {
-                throw UITestFailure("Providers must start Codex-only with one status item and explicit synthetic CLI opt-in")
+                throw UITestFailure("Providers must start Codex-only with explicit synthetic CLI opt-in and no saved Fable option")
             }
         }
         try assertSafePreferences()
@@ -4076,6 +4214,11 @@ private struct SyntheticFixture {
                   ["single", "compactBoth", "both"].contains(mode) else {
                 throw UITestFailure("Providers must retain the 30-minute fixture policy and a boolean synthetic CLI opt-in")
             }
+            if let showsFable = try preference("claude.popoverShowsFable.v1") {
+                guard let number = showsFable as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else {
+                    throw UITestFailure("The optional Fable presentation preference must be a strict boolean")
+                }
+            }
         }
         guard let style = try preference("tokenUsageChartStyle.v1") as? String,
               UITokenChartStyle(rawValue: style) != nil else {
@@ -4095,7 +4238,7 @@ private struct SyntheticFixture {
         if scenario == "providers" {
             allowed.formUnion(["codexMonitoringEnabled.v1", "claudeMonitoringEnabled.v1",
                                "menuBarServiceMode.v1", "primaryProvider.v1", "floatingProvider.v1",
-                               "claude.refreshInterval.v1", "claude.cliUsageEnabled.v1"])
+                               "claude.refreshInterval.v1", "claude.cliUsageEnabled.v1", "claude.popoverShowsFable.v1"])
         }
         guard allowed.contains(key) else { throw UITestFailure("Refuse to read a non-allowlisted preference key") }
         // Exact AUT/current-user/any-host domain only; no runner-container,
@@ -4140,6 +4283,26 @@ private struct SyntheticFixture {
         }
         return [
             "exists": true,
+            "sha256": SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined(),
+            "modified": modified, "inode": inode,
+        ] as NSDictionary
+    }
+
+    func claudeCacheFingerprint() throws -> NSDictionary {
+        guard scenario == "providers", let directory = claudeConfigDirectory,
+              directory == root.appendingPathComponent("control/claude-config", isDirectory: true) else {
+            throw UITestFailure("Claude cache inspection is restricted to the fixed Providers fixture")
+        }
+        try Self.validate(directory, type: .typeDirectory, mode: 0o700)
+        let file = directory.appendingPathComponent(".claude.json")
+        try Self.validate(file, type: .typeRegular, mode: 0o600)
+        let bytes = try Self.read(file, maximumBytes: 65_536)
+        let info = try FileManager.default.attributesOfItem(atPath: file.path)
+        guard let modified = info[.modificationDate] as? Date,
+              let inode = info[.systemFileNumber] as? NSNumber else {
+            throw UITestFailure("The synthetic Claude cache metadata is unavailable")
+        }
+        return [
             "sha256": SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined(),
             "modified": modified, "inode": inode,
         ] as NSDictionary
@@ -4433,6 +4596,8 @@ private struct SyntheticFixture {
             "providers-both-en.png", "providers-compact-en.png", "providers-claude-error-en.png",
             "providers-claude-only-en.png", "providers-local-cache-en.png", "providers-disabled-en.png",
             "providers-history-en.png", "dashboard-providers-history-en.png", "providers-history-rings-en.png",
+            "providers-mixed-fable-en.png", "providers-mixed-history-fable-en.png",
+            "providers-history-fable-en.png", "providers-local-cache-fable-off-en.png",
             "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
             "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
             "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",

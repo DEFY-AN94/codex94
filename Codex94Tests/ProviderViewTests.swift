@@ -200,13 +200,14 @@ final class ProviderViewTests: XCTestCase {
             for dark in [false, true] {
                 for style in [ProviderQuotaDisplayStyle.terminal, .card] {
                     let palette = Codex94Palette.resolve(.system, scheme: dark ? .dark : .light)
-                    let content = ClaudeQuotaCardContent(
+                    var content = ClaudeQuotaCardContent(
                         snapshot: snapshot, source: .localCache, reportedAt: reportedAt, issue: nil,
                         isRefreshing: false, isEnabled: true, language: language, now: reportedAt,
                         palette: palette, refresh: { XCTFail("Rendering must not fetch") },
                         openSetup: { XCTFail("Rendering must not navigate") },
                         timeZone: TimeZone(secondsFromGMT: 0)!, compact: style == .terminal, style: style
                     )
+                    content.modelLimitVisibility = style == .terminal ? .popover(showFable: true) : .all
                     let name = "current-model-\(style)-\(language.rawValue)-\(dark ? "dark" : "light")"
                     _ = try render(content.padding(style == .terminal ? 14 : 0), width: 500,
                                    dark: dark, language: language, name: name, output: directory)
@@ -233,6 +234,92 @@ final class ProviderViewTests: XCTestCase {
                     XCTAssertEqual(try XCTUnwrap(ProviderScopedLimit.limits(in: snapshot).first)
                         .window.preciseRemainingPercent, 49.5, accuracy: 0.001)
                 }
+            }
+        }
+    }
+
+    func testPopoverModelVisibilityMatchesOnlyTheExactFableIdentifier() {
+        let identifiers = ["claude.model.fable", "claude.model.sonnet", "claude.model.fable-2",
+                           "claude.model.fable-only", "codex.model.fable", "Fable", ""]
+        XCTAssertEqual(identifiers.filter { ClaudeModelLimitVisibility.all.includes($0) }, identifiers)
+        XCTAssertEqual(identifiers.filter { ClaudeModelLimitVisibility.popover(showFable: false).includes($0) }, [])
+        XCTAssertEqual(identifiers.filter { ClaudeModelLimitVisibility.popover(showFable: true).includes($0) },
+                       ["claude.model.fable"])
+    }
+
+    func testCurrentAndHistoricalModelVisibilityPreservesDashboardAndOriginalReports() throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let reset = reportedAt.addingTimeInterval(600)
+        let fable = ClaudeQuotaModelLimit(modelName: "Fable", usedPercentage: 50.5, resetsAt: reset)
+        let sonnet = ClaudeQuotaModelLimit(modelName: "Sonnet", usedPercentage: 0, resetsAt: reset)
+        for historical in [false, true] {
+            let now = reportedAt.addingTimeInterval(historical ? 1_200 : 10)
+            func content(_ limits: [ClaudeQuotaModelLimit], style: ProviderQuotaDisplayStyle,
+                         visibility: ClaudeModelLimitVisibility = .all) throws -> ClaudeQuotaCardContent {
+                let report = ClaudeQuotaReport(
+                    source: .localCache, reportedAt: reportedAt, receivedAt: reportedAt,
+                    windows: [.init(kind: .fiveHour, usedPercentage: 24.5, resetsAt: reset),
+                              .init(kind: .weekly, usedPercentage: 61.2, resetsAt: reset)],
+                    modelLimits: limits
+                )
+                let snapshot = report.snapshot(at: now)
+                let history: ClaudeQuotaHistoryPresentation?
+                if historical {
+                    history = try XCTUnwrap(ClaudeQuotaHistoryPresentation(report: report, at: now))
+                } else {
+                    history = nil
+                }
+                var result = ClaudeQuotaCardContent(
+                    snapshot: snapshot, source: .localCache, reportedAt: reportedAt,
+                    issue: historical ? .noData : nil, isRefreshing: false, isEnabled: true,
+                    language: .english, now: now, palette: .resolve(.system, scheme: .light),
+                    refresh: { XCTFail("Visibility must not request quota") },
+                    openSetup: { XCTFail("Visibility must not navigate") },
+                    timeZone: TimeZone(secondsFromGMT: 0)!, compact: style == .terminal,
+                    style: style, localCacheState: .valid, historicalReport: history
+                )
+                XCTAssertEqual(result.modelLimitVisibility, .all, "Dashboard must keep all model rows by default")
+                let originalTime = result.sourceTimeText
+                result.modelLimitVisibility = visibility
+                XCTAssertEqual(result.snapshot, snapshot)
+                XCTAssertEqual(result.displayedHistory, history)
+                XCTAssertEqual(result.sourceTimeText, originalTime)
+                return result
+            }
+            func height(_ limits: [ClaudeQuotaModelLimit], style: ProviderQuotaDisplayStyle = .terminal,
+                        visibility: ClaudeModelLimitVisibility = .all, name: String) throws -> CGFloat {
+                try render(content(limits, style: style, visibility: visibility).padding(14),
+                           width: 500, dark: false, language: .english,
+                           name: "model-visibility-\(historical ? "history" : "current")-\(name)",
+                           output: directory).height
+            }
+            let sharedOnly = try height([], name: "shared")
+            let fableOnly = try height([fable], name: "fable")
+            let hidden = try height([fable, sonnet], visibility: .popover(showFable: false), name: "off")
+            let optedIn = try height([fable, sonnet], visibility: .popover(showFable: true), name: "on")
+            let missingFable = try height([sonnet], visibility: .popover(showFable: true), name: "missing")
+            XCTAssertEqual(hidden, sharedOnly, accuracy: 1,
+                           "Default-off must remove the model section and its heading in both report states")
+            XCTAssertEqual(optedIn, fableOnly, accuracy: 1, "Opting in must show Fable without showing other models")
+            XCTAssertEqual(missingFable, sharedOnly, accuracy: 1, "Opting in cannot manufacture an unavailable Fable row")
+            XCTAssertGreaterThan(optedIn, hidden)
+            let dashboardAll = try height([fable, sonnet], style: .card, name: "dashboard-all")
+            let dashboardFable = try height([fable], style: .card, name: "dashboard-fable")
+            XCTAssertGreaterThan(dashboardAll, dashboardFable, "Dashboard must retain other reported models too")
+
+            if historical {
+                let full = try content([fable, sonnet], style: .card)
+                let history = try XCTUnwrap(full.displayedHistory)
+                var historyView = ClaudeQuotaHistoryView(
+                    report: history, language: .english, palette: .resolve(.system, scheme: .light)
+                )
+                XCTAssertEqual(historyView.displayedModelLimits, [fable, sonnet])
+                historyView.modelLimitVisibility = .popover(showFable: false)
+                XCTAssertTrue(historyView.displayedModelLimits.isEmpty)
+                historyView.modelLimitVisibility = .popover(showFable: true)
+                XCTAssertEqual(historyView.displayedModelLimits, [fable])
+                XCTAssertEqual(historyView.report, history, "The display policy must not rewrite the accepted report")
             }
         }
     }
@@ -722,7 +809,7 @@ final class ProviderViewTests: XCTestCase {
         for language in [LanguagePreference.english, .simplifiedChinese] {
             for dark in [false, true] {
                 for style in [ProviderQuotaDisplayStyle.card, .terminal] {
-                    let content = ClaudeQuotaCardContent(
+                    var content = ClaudeQuotaCardContent(
                         snapshot: nil, source: history.source, reportedAt: history.reportedAt, issue: .noData,
                         isRefreshing: false, isEnabled: true, language: language, now: now,
                         palette: .resolve(.system, scheme: dark ? .dark : .light),
@@ -731,6 +818,7 @@ final class ProviderViewTests: XCTestCase {
                         timeZone: TimeZone(secondsFromGMT: 0)!, compact: style == .terminal,
                         style: style, localCacheState: .valid, historicalReport: history
                     )
+                    content.modelLimitVisibility = style == .terminal ? .popover(showFable: true) : .all
                     XCTAssertEqual(content.badge, .stale)
                     XCTAssertNil(content.statusKey, "The history heading already explains the no-current-quota state")
                     XCTAssertNil(content.snapshot)
@@ -899,8 +987,9 @@ final class ProviderViewTests: XCTestCase {
             let view = QuotaPopoverView(store: fixture.store, openDashboard: { _ in }, quit: {},
                                        referenceDate: reportedAt, showFloatingWindow: {})
             let controller = QuotaPopoverHostingController(rootView: view)
-            let naturalContent = NSHostingController(rootView:
-                view.providerScrollContent.codex94Environment(fixture.preferences))
+            let naturalContent = ProviderNaturalContentMeasurement {
+                view.providerScrollContent.codex94Environment(fixture.preferences)
+            }
             let footer = NSHostingController(rootView:
                 VStack(spacing: 0) { Divider(); view.commandRows }
                     .codex94Environment(fixture.preferences))
@@ -909,19 +998,18 @@ final class ProviderViewTests: XCTestCase {
             let proposal = NSSize(width: 500, height: CGFloat.greatestFiniteMagnitude)
 
             func naturalHeight() -> CGFloat {
-                naturalContent.view.layoutSubtreeIfNeeded()
-                return ceil(naturalContent.sizeThatFits(in: proposal).height)
+                naturalContent.height()
             }
             func expectedHeight() -> CGFloat {
                 ceil(min(naturalHeight(), QuotaPopoverLayout.maximumProviderViewportHeight)
                      + footer.sizeThatFits(in: proposal).height)
             }
+            try await waitForProviderLayout(controller, matching: { expectedHeight() })
             let firstNaturalHeight = naturalHeight()
             if !bothCodexWindows {
                 XCTAssertLessThan(firstNaturalHeight, 480,
                                   "One weekly quota plus waiting Claude is genuinely shorter than the viewport cap")
             }
-            try await waitForProviderLayout(controller, matching: { expectedHeight() })
             XCTAssertEqual(popover.contentSize.height, expectedHeight(), accuracy: 1,
                            "The footer follows natural content instead of a fixed 480pt empty viewport")
             let firstHeight = popover.contentSize.height
@@ -999,14 +1087,15 @@ final class ProviderViewTests: XCTestCase {
         let view = QuotaPopoverView(store: fixture.store, openDashboard: { _ in }, quit: {},
                                    referenceDate: reportedAt.addingTimeInterval(900), showFloatingWindow: {})
         let controller = QuotaPopoverHostingController(rootView: view)
-        let naturalContent = NSHostingController(rootView:
-            view.providerScrollContent.codex94Environment(fixture.preferences))
+        let naturalContent = ProviderNaturalContentMeasurement {
+            view.providerScrollContent.codex94Environment(fixture.preferences)
+        }
         let footer = NSHostingController(rootView:
             VStack(spacing: 0) { Divider(); view.commandRows }.codex94Environment(fixture.preferences))
         let popover = NSPopover()
         controller.install(in: popover)
         let proposal = NSSize(width: 500, height: CGFloat.greatestFiniteMagnitude)
-        func naturalHeight() -> CGFloat { ceil(naturalContent.sizeThatFits(in: proposal).height) }
+        func naturalHeight() -> CGFloat { naturalContent.height() }
         func expectedHeight() -> CGFloat {
             ceil(min(naturalHeight(), QuotaPopoverLayout.maximumProviderViewportHeight)
                  + footer.sizeThatFits(in: proposal).height)
@@ -1051,52 +1140,117 @@ final class ProviderViewTests: XCTestCase {
         XCTAssertEqual(fixture.notificationService.deliveries, 0)
     }
 
-    func testClaudeOnlyPopoverCapsManyModelMetersAndShrinksWhenTheyDisappear() async throws {
+    func testFableToggleRepeatedlyResizesTheSamePopoverInBothProviderAndReportStates() async throws {
         let directory = try temporaryDirectory()
         print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
-        let state = directory.appendingPathComponent("claude-only-models")
-        try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true,
-                                               attributes: [.posixPermissions: 0o700])
-        let fixture = try makeFixture(directory: state)
-        defer { fixture.cleanUp() }
-        fixture.preferences.codexMonitoringEnabled = false
-        fixture.preferences.claudeCLIUsageEnabled = false
-        fixture.preferences.claudeMonitoringEnabled = true
-        _ = try writeAutoCaptionCache(in: state, includeModel: true, includeFiveHour: false, modelCount: 16)
-        fixture.claude.start()
-        let view = QuotaPopoverView(store: fixture.store, openDashboard: { _ in }, quit: {},
-                                   referenceDate: reportedAt, showFloatingWindow: {})
-        let controller = QuotaPopoverHostingController(rootView: view)
-        let footer = NSHostingController(rootView:
-            VStack(spacing: 0) { Divider(); view.commandRows }.codex94Environment(fixture.preferences))
-        let popover = NSPopover()
-        controller.install(in: popover)
-        let proposal = NSSize(width: 500, height: CGFloat.greatestFiniteMagnitude)
-        let maximumHeight = ceil(QuotaPopoverLayout.maximumProviderViewportHeight
-                                 + footer.sizeThatFits(in: proposal).height)
-        try await waitForProviderLayout(controller, matching: { maximumHeight })
-        XCTAssertEqual(ProviderScopedLimit.limits(in: fixture.claude.snapshot).count, 16)
-        XCTAssertEqual(popover.contentSize.height, maximumHeight, accuracy: 1,
-                       "All accepted model limits must remain scrollable with commands outside the viewport")
-        _ = try render(view, width: 500, dark: true, language: .english,
-                       name: "claude-only-sixteen-models", output: directory)
-        _ = try writeAutoCaptionCache(in: state, includeModel: true, includeFiveHour: false)
-        fixture.claude.refresh(trigger: .manual)
-        let natural = NSHostingController(rootView:
-            ClaudeQuotaCard(store: fixture.claude, language: .english, openSetup: {},
-                            referenceDate: reportedAt, compact: true, style: .terminal)
-                .padding(14).codex94Environment(fixture.preferences))
-        let shortHeight = ceil(natural.sizeThatFits(in: proposal).height + footer.sizeThatFits(in: proposal).height)
-        try await waitForProviderLayout(controller, matching: { shortHeight })
-        XCTAssertEqual(ProviderScopedLimit.limits(in: fixture.claude.snapshot).count, 1)
-        XCTAssertLessThan(popover.contentSize.height, maximumHeight)
-        XCTAssertIdentical(popover.contentViewController, controller)
-        let cliReads = await fixture.claudeFetcher.calls
-        let codexReads = await fixture.codexFetcher.calls
-        XCTAssertEqual(cliReads, 0)
-        XCTAssertEqual(codexReads, 0)
-        _ = try render(view, width: 500, dark: true, language: .english,
-                       name: "claude-only-one-model", output: directory)
+        for mixed in [false, true] {
+            for historical in [false, true] {
+                let name = "fable-toggle-\(mixed ? "mixed" : "claude-only")-\(historical ? "history" : "current")"
+                let state = directory.appendingPathComponent(name)
+                try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true,
+                                                       attributes: [.posixPermissions: 0o700])
+                let age: TimeInterval = historical ? 30_000 : 10
+                let now = reportedAt.addingTimeInterval(age)
+                let fixture = try makeFixture(directory: state, claudeReportAge: age)
+                defer { fixture.cleanUp() }
+                fixture.preferences.codexMonitoringEnabled = mixed
+                fixture.preferences.claudeCLIUsageEnabled = false
+                fixture.preferences.claudeMonitoringEnabled = true
+                let cacheURL = try writeAutoCaptionCache(in: state, includeModel: true, includeFiveHour: false, modelCount: 16)
+                fixture.claude.start()
+                XCTAssertEqual(fixture.claude.historicalReport != nil, historical)
+                XCTAssertEqual(fixture.claude.snapshot != nil, !historical)
+                let originalSnapshot = fixture.claude.snapshot
+                let originalHistory = fixture.claude.historicalReport
+                let originalSelection = fixture.store.providerMenuBarDisplay(for: .claude)
+                let originalCache = try Data(contentsOf: cacheURL)
+                let codexCacheURL = state.appendingPathComponent("codex-quota.json")
+                let originalCodexCache = try Data(contentsOf: codexCacheURL)
+                XCTAssertEqual(historical ? originalHistory?.modelLimits.count
+                    : ProviderScopedLimit.limits(in: originalSnapshot).count, 16)
+
+                let view = QuotaPopoverView(store: fixture.store, openDashboard: { _ in }, quit: {},
+                                           referenceDate: now, showFloatingWindow: {})
+                let controller = QuotaPopoverHostingController(rootView: view)
+                let naturalContent = ProviderNaturalContentMeasurement {
+                    Group {
+                        if mixed {
+                            view.providerScrollContent
+                        } else {
+                            ClaudePopoverQuotaSection(store: fixture.store, openSetup: {}, referenceDate: now).padding(14)
+                        }
+                    }.codex94Environment(fixture.preferences)
+                }
+                let footer = NSHostingController(rootView:
+                    VStack(spacing: 0) { Divider(); view.commandRows }.codex94Environment(fixture.preferences))
+                let dashboard = NSHostingController(rootView:
+                    ClaudeQuotaCard(store: fixture.claude, language: .english, openSetup: {}, referenceDate: now)
+                        .codex94Environment(fixture.preferences))
+                let popover = NSPopover()
+                controller.install(in: popover)
+                let proposal = NSSize(width: 500, height: CGFloat.greatestFiniteMagnitude)
+                func naturalHeight() -> CGFloat {
+                    naturalContent.height()
+                }
+                func expectedHeight() -> CGFloat {
+                    ceil(min(naturalHeight(), QuotaPopoverLayout.maximumProviderViewportHeight)
+                         + footer.sizeThatFits(in: proposal).height)
+                }
+                try await waitForProviderLayout(controller, matching: { expectedHeight() })
+                let offHeight = popover.contentSize.height
+                let offNaturalHeight = naturalHeight()
+                let dashboardHeight = dashboard.sizeThatFits(in: proposal).height
+                XCTAssertGreaterThan(dashboardHeight, offNaturalHeight,
+                                     "All sixteen model rows must remain available in Dashboard")
+                for (index, enabled) in [false, true, false, true, false].enumerated() {
+                    fixture.preferences.claudePopoverShowsFable = enabled
+                    let deadline = Date().addingTimeInterval(2)
+                    while Date() < deadline {
+                        let measured = naturalHeight()
+                        if enabled ? measured > offNaturalHeight : abs(measured - offNaturalHeight) <= 1 { break }
+                        try await Task.sleep(for: .milliseconds(10))
+                    }
+                    try await waitForProviderLayout(controller, matching: { expectedHeight() })
+                    XCTAssertEqual(popover.contentSize.height, expectedHeight(), accuracy: 1)
+                    XCTAssertEqual(popover.contentSize.width, 500, accuracy: 0.5)
+                    XCTAssertIdentical(popover.contentViewController, controller)
+                    if enabled {
+                        XCTAssertGreaterThan(naturalHeight(), offNaturalHeight)
+                        if offNaturalHeight < QuotaPopoverLayout.maximumProviderViewportHeight {
+                            XCTAssertGreaterThan(popover.contentSize.height, offHeight,
+                                                 "The same popover must grow when Fable is enabled")
+                        }
+                    } else {
+                        XCTAssertEqual(naturalHeight(), offNaturalHeight, accuracy: 1)
+                        XCTAssertEqual(popover.contentSize.height, offHeight, accuracy: 1,
+                                       "Disabling Fable must release its space every time")
+                    }
+                    XCTAssertEqual(dashboard.sizeThatFits(in: proposal).height, dashboardHeight, accuracy: 1)
+                    XCTAssertEqual(fixture.claude.snapshot, originalSnapshot)
+                    XCTAssertEqual(fixture.claude.historicalReport, originalHistory)
+                    XCTAssertEqual(fixture.store.providerMenuBarDisplay(for: .claude), originalSelection)
+                    XCTAssertEqual(try Data(contentsOf: cacheURL), originalCache)
+                    XCTAssertEqual(try Data(contentsOf: codexCacheURL), originalCodexCache)
+                    if index < 2 {
+                        _ = try render(view, width: 500, dark: true, language: .english,
+                                       name: "\(name)-\(enabled ? "on" : "off")-en-dark", output: directory)
+                    }
+                }
+                fixture.preferences.language = .simplifiedChinese
+                fixture.preferences.theme = .terminalLight
+                for enabled in [false, true] {
+                    fixture.preferences.claudePopoverShowsFable = enabled
+                    _ = try render(view, width: 500, dark: false, language: .simplifiedChinese,
+                                   name: "\(name)-\(enabled ? "on" : "off")-zh-light", output: directory)
+                }
+                let cliReads = await fixture.claudeFetcher.calls
+                let codexReads = await fixture.codexFetcher.calls
+                XCTAssertEqual(cliReads, 0)
+                XCTAssertEqual(codexReads, 0)
+                XCTAssertEqual(fixture.notificationService.permissionRequests, 0)
+                XCTAssertEqual(fixture.notificationService.deliveries, 0)
+            }
+        }
     }
 
     private func waitForProviderLayout<Content: View>(
@@ -1112,7 +1266,9 @@ final class ProviderViewTests: XCTestCase {
             }
             try await Task.sleep(for: .milliseconds(10))
         }
-        XCTFail("The provider viewport did not settle at its measured content height")
+        let size = controller.sizeThatFits(in: NSSize(width: 500, height: CGFloat.greatestFiniteMagnitude))
+        XCTFail("The provider viewport did not settle at its measured content height: "
+                + "fitted=\(size.height) expected=\(expected()) frame=\(controller.view.frame.height)")
     }
 
     func testBothProviderSummaryLayoutsFitTheFirstViewport() async throws {
@@ -1397,6 +1553,38 @@ final class ProviderViewTests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
         return size
+    }
+}
+
+/// Measure laid-out content in an independent, fixed viewport. A dry
+/// sizeThatFits proposal can retain native switch estimates and fractional
+/// text heights that differ from the scroll view's actual pixel geometry.
+/// The ample fixed viewport is independent of the production height cap.
+@MainActor
+private final class ProviderNaturalContentMeasurement {
+    private final class Geometry {
+        var height: CGFloat = 0
+    }
+
+    private let geometry: Geometry
+    private let host: NSView
+
+    init<Content: View>(@ViewBuilder content: () -> Content) {
+        let geometry = Geometry()
+        self.geometry = geometry
+        let content = content()
+        host = NSHostingView(rootView: ScrollView {
+            content
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { geometry.height = $0 }
+        })
+        host.frame = NSRect(x: 0, y: 0, width: 500, height: 1_200)
+    }
+
+    func height() -> CGFloat {
+        host.layoutSubtreeIfNeeded()
+        return ceil(geometry.height)
     }
 }
 

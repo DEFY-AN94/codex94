@@ -24,6 +24,7 @@ final class PreferencesStore: ObservableObject {
         static let codexMonitoringEnabled = "codexMonitoringEnabled.v1"
         static let claudeMonitoringEnabled = "claudeMonitoringEnabled.v1"
         static let claudeCLIUsageEnabled = "claude.cliUsageEnabled.v1"
+        static let claudePopoverShowsFable = "claude.popoverShowsFable.v1"
         static let claudePassiveProducerID = "claude.passiveProducerID.v1"
         static let menuBarServiceMode = "menuBarServiceMode.v1"
         static let primaryProvider = "primaryProvider.v1"
@@ -50,6 +51,9 @@ final class PreferencesStore: ObservableObject {
     }
     @Published var claudeCLIUsageEnabled: Bool {
         didSet { defaults.set(claudeCLIUsageEnabled, forKey: Key.claudeCLIUsageEnabled) }
+    }
+    @Published var claudePopoverShowsFable: Bool {
+        didSet { defaults.set(claudePopoverShowsFable, forKey: Key.claudePopoverShowsFable) }
     }
     @Published private(set) var claudePassiveProducerID: String? {
         didSet {
@@ -139,6 +143,7 @@ final class PreferencesStore: ObservableObject {
         codexMonitoringEnabled = Self.loadBoolean(from: defaults, key: Key.codexMonitoringEnabled, fallback: true)
         claudeMonitoringEnabled = Self.loadBoolean(from: defaults, key: Key.claudeMonitoringEnabled, fallback: false)
         claudeCLIUsageEnabled = Self.loadBoolean(from: defaults, key: Key.claudeCLIUsageEnabled, fallback: false)
+        claudePopoverShowsFable = Self.loadBoolean(from: defaults, key: Key.claudePopoverShowsFable, fallback: false)
         claudePassiveProducerID = ClaudePassiveProducerID.normalized(defaults.string(forKey: Key.claudePassiveProducerID))
         menuBarServiceMode = MenuBarServiceMode(rawValue: defaults.string(forKey: Key.menuBarServiceMode) ?? "") ?? .single
         primaryProvider = QuotaProviderID(rawValue: defaults.string(forKey: Key.primaryProvider) ?? "") ?? .codex

@@ -199,13 +199,9 @@ struct QuotaPopoverView: View {
     }
 
     private var claudeSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ClaudeQuotaCard(
-                store: store.claudeStore, language: store.preferences.language,
-                openSetup: { openDashboard(.providers) }, referenceDate: referenceDate,
-                accentOverrides: store.preferences.statusAccentOverrides, compact: true, style: .terminal
-            )
-        }
+        ClaudePopoverQuotaSection(
+            store: store, openSetup: { openDashboard(.providers) }, referenceDate: referenceDate
+        )
         .padding(14)
     }
 
@@ -450,6 +446,33 @@ struct QuotaPopoverView: View {
     }
 }
 
+/// Both popover paths share the same opt-in and leave Dashboard cards unchanged.
+struct ClaudePopoverQuotaSection: View {
+    @ObservedObject var store: AppStore
+    let openSetup: () -> Void
+    var referenceDate: Date? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ClaudeQuotaCard(
+                store: store.claudeStore, language: store.preferences.language,
+                openSetup: openSetup, referenceDate: referenceDate,
+                accentOverrides: store.preferences.statusAccentOverrides, compact: true, style: .terminal,
+                modelLimitVisibility: .popover(showFable: store.preferences.claudePopoverShowsFable)
+            )
+            Toggle("claude.popoverShowsFable", isOn: Binding(
+                get: { store.preferences.claudePopoverShowsFable },
+                set: { store.preferences.claudePopoverShowsFable = $0 }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .font(.caption)
+            .help(Text("claude.popoverShowsFable.help"))
+            .accessibilityIdentifier("claude-popover-shows-fable")
+        }
+    }
+}
+
 /// The complete first block of the multi-service scroll view. Sharing this
 /// view lets layout tests measure the same two summaries that users see.
 struct ProviderQuotaSummaries: View {
@@ -463,10 +486,8 @@ struct ProviderQuotaSummaries: View {
         VStack(spacing: 12) {
             codexSummary
             Divider()
-            ClaudeQuotaCard(
-                store: store.claudeStore, language: store.preferences.language,
-                openSetup: { openDashboard(.providers) }, referenceDate: referenceDate,
-                accentOverrides: store.preferences.statusAccentOverrides, compact: true, style: .terminal
+            ClaudePopoverQuotaSection(
+                store: store, openSetup: { openDashboard(.providers) }, referenceDate: referenceDate
             )
         }
         .accessibilityIdentifier("provider-quota-summaries")

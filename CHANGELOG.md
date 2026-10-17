@@ -6,6 +6,28 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
+## 4.1.6 - 2026-10-18
+
+Candidate version: `4.1.6 (30)`, following published `4.1.5 (29)`. Release dates
+use Australia/Melbourne. Publication and validation evidence remain pending
+until the release checks complete; the date is rechecked before tagging.
+
+### Changed
+
+- Keep all reported Claude model limits, including Fable, visible in Dashboard.
+  Default Claude popover quota rows to the shared five-hour and Weekly windows.
+- Add a Fable switch inside the popover, off by default for new and existing
+  installations. Turning it on adds the reported Fable row for current, cached
+  and historical reports; other model limits remain in Dashboard. Save this
+  choice across restarts as `claude.popoverShowsFable.v1`.
+- Apply visibility changes to the existing popover without a new quota read.
+  Preserve native menu-bar Auto/manual quota selection, report timestamps,
+  freshness/history labels, notifications and refresh behavior.
+
+No new quota source, credential reader, network endpoint, cache field,
+entitlement or automatic CLI read is introduced. Validation for this version is
+recorded separately in [docs/RELEASING.md](docs/RELEASING.md).
+
 ## 4.1.5 - 2026-10-18
 
 Version `4.1.5 (29)` was published on the date above, following `4.1.4 (28)`.

@@ -4,6 +4,19 @@ enum ProviderQuotaDisplayStyle: Equatable {
     case card, terminal
 }
 
+/// A presentation preference only; reports and quota selection retain every model.
+enum ClaudeModelLimitVisibility: Equatable {
+    case all
+    case popover(showFable: Bool)
+
+    func includes(_ limitID: String) -> Bool {
+        switch self {
+        case .all: return true
+        case .popover(let showFable): return showFable && limitID == "claude.model.fable"
+        }
+    }
+}
+
 /// A model-scoped weekly limit shown beneath the shared windows.
 struct ProviderScopedLimit: Identifiable, Equatable {
     let id: String
@@ -30,6 +43,7 @@ struct ClaudeQuotaCard: View {
     var accentOverrides = StatusAccentOverrides()
     var compact = false
     var style: ProviderQuotaDisplayStyle = .card
+    var modelLimitVisibility: ClaudeModelLimitVisibility = .all
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -52,7 +66,8 @@ struct ClaudeQuotaCard: View {
                 passiveReportNeedsConfirmation: store.passiveReportNeedsConfirmation,
                 style: style,
                 localCacheState: store.localCacheState,
-                historicalReport: store.historicalReport
+                historicalReport: store.historicalReport,
+                modelLimitVisibility: modelLimitVisibility
             )
         }
     }
@@ -81,6 +96,7 @@ struct ClaudeQuotaCardContent: View {
     var style: ProviderQuotaDisplayStyle = .card
     var localCacheState: ClaudeLocalUsageCacheState = .absent
     var historicalReport: ClaudeQuotaHistoryPresentation? = nil
+    var modelLimitVisibility: ClaudeModelLimitVisibility = .all
 
     /// History is a separate surface, never a replacement for an active window.
     var displayedHistory: ClaudeQuotaHistoryPresentation? {
@@ -197,7 +213,8 @@ struct ClaudeQuotaCardContent: View {
             refreshHelp: LocalizedStringKey(refreshHelpKey),
             sourceTimeHelp: sourceTimeHelpKey.map { LocalizedStringKey($0) },
             historicalReport: displayedHistory,
-            sourceAgeText: reportAgeText
+            sourceAgeText: reportAgeText,
+            modelLimitVisibility: modelLimitVisibility
         )
     }
 
@@ -258,6 +275,11 @@ struct ProviderQuotaCardContent: View {
     var sourceTimeHelp: LocalizedStringKey? = nil
     var historicalReport: ClaudeQuotaHistoryPresentation? = nil
     var sourceAgeText: String? = nil
+    var modelLimitVisibility: ClaudeModelLimitVisibility = .all
+
+    var displayedScopedLimits: [ProviderScopedLimit] {
+        scopedLimits.filter { modelLimitVisibility.includes($0.id) }
+    }
 
     private var isTerminal: Bool { style == .terminal }
 
@@ -298,7 +320,10 @@ struct ProviderQuotaCardContent: View {
             }
 
             if provider == .claude, windows.isEmpty, let historicalReport {
-                ClaudeQuotaHistoryView(report: historicalReport, language: language, palette: palette, style: style)
+                ClaudeQuotaHistoryView(
+                    report: historicalReport, language: language, palette: palette, style: style,
+                    modelLimitVisibility: modelLimitVisibility
+                )
             } else if windows.isEmpty {
                 Text(emptyText).font(.callout).foregroundStyle(.secondary)
                     .lineLimit(isTerminal || compact ? 2 : nil)
@@ -322,12 +347,12 @@ struct ProviderQuotaCardContent: View {
                 }
             }
 
-            if !windows.isEmpty, !scopedLimits.isEmpty {
+            if !windows.isEmpty, !displayedScopedLimits.isEmpty {
                 VStack(alignment: .leading, spacing: isTerminal ? 4 : 6) {
                     Text("claude.modelLimits.title")
                         .font(isTerminal ? .system(size: 11, design: .monospaced) : .caption)
                         .foregroundStyle(.secondary)
-                    ForEach(scopedLimits) { limit in
+                    ForEach(displayedScopedLimits) { limit in
                         scopedLimitRow(limit)
                     }
                 }

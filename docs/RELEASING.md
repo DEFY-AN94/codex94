@@ -33,6 +33,45 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
+The **4.1.6 (30)** candidate follows published **4.1.5 (29)**. Its changelog
+records the current Melbourne release date, **2026-10-18**; recheck that date
+before tagging. Public stable/download/source-clone references remain
+on 4.1.5 until 4.1.6 publication is confirmed. The new Boolean preference is
+`claude.popoverShowsFable.v1`, default off; it adds only the reported Fable row
+to the popover's shared five-hour/Weekly rows. Dashboard retains every reported
+model limit, and native menu-bar quota selection remains independent.
+
+Candidate validation checklist; all items start **pending** and must be tied to
+the revision and artifacts actually checked:
+
+- Verify fresh and existing preference stores default to off, on/off choices
+  survive restart, and unrelated provider/menu-bar preferences remain intact.
+- Use synthetic current, cached and historical reports to verify the default
+  shared-only rows, Fable opt-in, missing Fable, other model names, absent shared
+  windows, zero/100/fractional percentages and long labels. Keep Dashboard's
+  complete model list, original report time and current-quota-unknown notice.
+- Verify the toggle in Claude-only and combined provider popovers, with English
+  and Simplified Chinese and both themes. Exercise repeated growth/shrinkage in
+  the same open popover, scrolling, and the command area with no blank tail.
+- Verify toggling causes no provider read, CLI launch or quota-cache write and
+  does not change native Auto/manual selection, notification inputs or refresh
+  scheduling. Extend the existing synthetic Providers smoke; never seed real
+  app/Claude data or bypass its fresh-hosted-runner restrictions.
+- Record focused tests, the full local release gate, actual visual review, PR
+  CI/all five UI smokes/Actions-Python-Swift CodeQL, and final-main
+  CI/attestation separately. Earlier release test counts do not validate this
+  candidate.
+- Verify the frozen annotated tag and final-main CI DMG/checksum, both public
+  API digests and downloads, package version/build, source archives and public
+  Latest/non-prerelease status. After publication, audit English/Chinese
+  READMEs, privacy preference inventory, supported-version references, templates
+  and release records without moving the tag or replacing published assets.
+
+Package verification does not establish native interaction, installation or
+manual Gatekeeper acceptance. Record those checks as unperformed when they
+are outside the authorized release work; do not install/replace the user's App
+or operate System Settings as a side effect of these candidate checks.
+
 The **4.1.5 (29)** release was published on **2026-10-18**
 (Australia/Melbourne). It includes Dashboard history meters, Codex session
 preparation and Git-history scan guards, model-limit meters and the shrinking
