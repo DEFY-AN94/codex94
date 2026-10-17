@@ -218,15 +218,18 @@ final class ProviderViewTests: XCTestCase {
                         var matches = 0
                         for x in stride(from: 0, to: bitmap.pixelsWide, by: 2) {
                             guard let pixel = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
-                            if abs(pixel.redComponent - target.redComponent) < 0.09,
-                               abs(pixel.greenComponent - target.greenComponent) < 0.09,
-                               abs(pixel.blueComponent - target.blueComponent) < 0.09,
+                            // Native ProgressView shades its tint differently across macOS
+                            // versions. Match its chromatic band, then require a wide fill;
+                            // literal RGB equality would only find the percentage text.
+                            if abs(pixel.hueComponent - target.hueComponent) < 0.04,
+                               pixel.saturationComponent > 0.35,
+                               pixel.brightnessComponent > 0.2,
                                pixel.alphaComponent > 0.8 { matches += 1 }
                         }
                         maximumRowMatches = max(maximumRowMatches, matches)
                     }
                     XCTAssertGreaterThan(Double(maximumRowMatches) / Double(bitmap.pixelsWide), 0.06,
-                                         "The model's warning-colored filled bar must span a row; percentage text alone is insufficient")
+                                         "\(name): the model's warning-colored filled bar must span a row; percentage text alone is insufficient")
                     XCTAssertEqual(try XCTUnwrap(ProviderScopedLimit.limits(in: snapshot).first)
                         .window.preciseRemainingPercent, 49.5, accuracy: 0.001)
                 }
