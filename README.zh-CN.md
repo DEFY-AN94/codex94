@@ -10,7 +10,7 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 自动调用 Claude CLI 是独立且默认关闭的选项。项目采用 MIT 许可，以 SwiftUI/AppKit 构建，
 不捆绑第三方运行时框架。
 
-**最新稳定版：**[`4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4)
+**最新稳定版：**[`4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5)
 · macOS 14+ · Apple Silicon 与 Intel · English 与简体中文
 
 [功能详情](#功能详情) · [界面截图](#界面截图) · [安装](#安装)
@@ -20,8 +20,9 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 > Codex `app-server` 为实验性接口，上游 CLI 与状态栏数据格式可能变化。
 > 分发包未签名／未公证，具体信任边界见下方安装说明。
 
-4.1.5 源码候选版新增 Dashboard 历史额度条和 Claude 模型限额进度条，并修复弹窗
-内容减少后的多余留白；详见 [4.1.5 更新记录](CHANGELOG.md#415---2026-10-18)。
+4.1.5 新增 Dashboard 历史额度条和 Claude 模型限额进度条，并修复弹窗内容减少后的
+多余留白。开发流程新增 Codex 会话准备与明确的 Git 历史扫描边界；详见
+[4.1.5 更新记录](CHANGELOG.md#415---2026-10-18)。
 
 ## 功能详情
 
@@ -34,8 +35,9 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
   额度选择、错误和通知设置，不合并百分比。关闭服务会停止其监控与提醒；全部关闭时仍保留
   中性菜单栏项，方便返回设置。
 - 菜单栏可显示**单个服务**、**一个状态项中的紧凑双圈**，或**两个独立状态项**。
-  点击任一项都会打开同一个可滚动面板，按服务分区展示；Dashboard **总览**使用较大的
-  服务卡片展示全部可显示额度桶。
+  点击任一项都会打开同一个按服务分区的面板。启用 Claude 时，额度区随内容增减调整高度，
+  必要时滚动，操作按钮保留在滚动区外；Dashboard **总览**使用较大的服务卡片展示全部
+  可显示额度桶。
 - 在 **Dashboard → 显示**中选择各服务的菜单栏额度。当前额度的**自动**模式选取可用
   额度桶与窗口中剩余比例最低的一项，也可手动固定。Codex 弹窗中的额度桶浏览器独立于
   菜单栏选择，浏览模型不会改变菜单栏显示。
@@ -102,7 +104,9 @@ Claude 监控每次只显示**一份已接受的报告**：
   才会产生相应额度字段。状态栏账号身份未经验证，换报告会话需明确采用；报告流指纹
   不能证明账号身份一致。
 - 共享窗口过期后，已接受的数据会显示为**上次用量记录**，明确标注**当前额度未知**，
-  保留原百分比与获取时间。弹窗采用分段进度条，Dashboard 保留历史文字视图。
+  保留原百分比与获取时间。弹窗采用分段进度条；Dashboard 使用大百分比与横向额度条，
+  共享窗口并排、模型限额列在下方。当前、缓存和历史模型限额与共享窗口使用一致的额度条
+  布局，并保留各自的新鲜度标记。
 - 紧凑双圈及单窗口菜单栏样式可显示带小钟和说明的历史额度；历史自动选择优先每周、
   其次 5 小时。旧双窗口布局只显示当前额度；悬浮条主数值仍为未知，展开详情可说明历史。
   历史数据不参与当前额度通知或重置调度。
@@ -150,7 +154,7 @@ Claude 监控每次只显示**一份已接受的报告**：
 
 ## 界面截图
 
-所有截图均采用隔离的合成数据，不包含真实账号或实时用量。以下为历史截图，不代表当前 4.1.4 的界面。
+所有截图均采用隔离的合成数据，不包含真实账号或实时用量。以下为历史截图，不代表当前 4.1.5 的界面。
 以下**柱状图**与**折线图**采集于 `0.3.0 (14)` 候选测试阶段，使用相同的七天日记录。
 原始合成截图保持不变，
 这些英文界面截图来自
@@ -193,8 +197,8 @@ Claude 监控每次只显示**一份已接受的报告**：
 
 ## 安装
 
-已发布稳定版为 [`v4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4)，
-于 **2026-10-07**（Australia/Melbourne）发布，提供 Universal 2 DMG 与同一个 annotated 标签
+已发布稳定版为 [`v4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5)，
+于 **2026-10-18**（Australia/Melbourne）发布，提供 Universal 2 DMG 与同一个 annotated 标签
 的源码。下方下载和 clone 指令指向该版本；后续文档提交不会移动标签或替换已发布资产。
 
 DMG **未签名，也未经过 Apple 公证**。内部 App 只有 ad-hoc Hardened Runtime 签名，
@@ -221,23 +225,23 @@ Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
 
 ### 安装 Universal DMG
 
-请从 [`v4.1.4` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4)
+请从 [`v4.1.5` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5)
 下载以下两个正式资产：
 
-- `Codex94-4.1.4-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.4-SHA256SUMS.txt`
+- `Codex94-4.1.5-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.5-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-4.1.4-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.5-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-4.1.4-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.5-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软件审查或 Gatekeeper 认可。
@@ -257,7 +261,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 仓库公开，无需 GitHub 认证。Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v4.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.5 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：
@@ -319,10 +323,13 @@ sudo xcodebuild -runFirstLaunch
 brew install ripgrep jq
 ```
 
-此开发分支中的 `script/security_check.sh` 要求贡献与发布检查使用完整 Git 历史；浅克隆会
+开始开发任务时运行 `python3 -I script/codex_prepare.py`。完整 checkout 不会改变；
+浅历史会尝试在时限内从 `origin` 补全。准备失败时，先解决问题再依赖历史扫描；本地会话
+hook 和 Cloud Start skill 的配置见 [Codex 设置](docs/CODEX.md)。
+
+从 4.1.5 起，`script/security_check.sh` 要求贡献与发布检查使用完整 Git 历史；浅克隆会
 报错并提示先执行 `git fetch --unshallow`。仅 `install.sh` 为源码安装明确允许浅历史，
-同时提示扫描范围有限，只检查已下载的提交。这项保护与安装提示仍属未发布改动；
-上方稳定版 `v4.1.4` 标签仍保留原扫描脚本。
+同时提示扫描范围有限，只检查已下载的提交。开发和发布检查不得使用此安装专用例外。
 
 构建并运行 Debug App：
 

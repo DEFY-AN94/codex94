@@ -8,8 +8,9 @@ below applies only to its recorded version and does not validate later releases.
 
 ## 4.1.5 - 2026-10-18
 
-Version `4.1.5 (29)` is the release candidate. Publication and final CI asset
-acceptance remain pending; stable downloads stay on 4.1.4 until publication.
+Version `4.1.5 (29)` was published on the date above, following `4.1.4 (28)`.
+Release dates use Australia/Melbourne. Exact source, CI, package and installation
+evidence is recorded in [docs/RELEASING.md](docs/RELEASING.md).
 
 ### Fixed
 
@@ -42,7 +43,7 @@ acceptance remain pending; stable downloads stay on 4.1.4 until publication.
   Add focused synthetic tests to the release gate.
 
 - Reorganize the English and Simplified Chinese READMEs around current product
-  capabilities, setup and installation. Describe the stable 4.1.4 service modes,
+  capabilities, setup and installation. Describe provider service modes,
   Claude source/history behavior and Codex statistics together; keep older
   screenshots explicitly historical. Consolidate version-specific changes and
   validation summaries here instead of stacking them above the product guide.
@@ -56,8 +57,7 @@ acceptance remain pending; stable downloads stay on 4.1.4 until publication.
 
 ## 4.1.4 - 2026-10-07
 
-Version `4.1.4 (28)` is the published stable release. Release dates use
-Australia/Melbourne; `4.1.3 (27)` is the previous release.
+Version `4.1.4 (28)` was published on the date above, following `4.1.3 (27)`.
 
 ### Changed
 

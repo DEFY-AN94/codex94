@@ -126,9 +126,9 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-4.1.4-SHA256SUMS.txt` before opening the DMG. The optional
+Verify `Codex94-4.1.5-SHA256SUMS.txt` before opening the DMG. The optional
 GitHub command
-`gh attestation verify Codex94-4.1.4-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
+`gh attestation verify Codex94-4.1.5-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
 can prove repository/workflow/commit provenance for the exact DMG. A matching
 checksum or attestation is not notarization, malware review, a security audit,
 or Gatekeeper approval. If the exact release is trusted, use only Apple's
@@ -220,6 +220,13 @@ boundaries remain unchanged.
 
 ## Supported versions
 
+Version `4.1.5 (29)` changes Claude quota presentation and bounded popover
+layout without adding an App data source, endpoint, credential reader,
+preference key or cache schema. Its Codex session preparation and shallow-history
+scan guard operate in development/source-install workflows, not inside the App.
+Contributor and release checks require complete Git history; only the source
+installer may explicitly use the documented limited-history scan.
+
 Version `4.1.0 (24)` adds the read-only Claude Code usage-cache
 source, source tiering, the one-time CLI read and per-model weekly buckets
 described above. It adds no quota API, credential access, preference key,
@@ -252,8 +259,8 @@ Version `4.0.1 (22)` uses passive Claude reports by default with explicit
 report-stream adoption and a separate default-off CLI reader. The retained
 `v4.0.0` tag identifies an unpublished candidate, not a supported stable release.
 
-The supported published stable version is [`v4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4),
-released on 2026-10-07 (Australia/Melbourne).
+The supported published stable version is [`v4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5),
+released on 2026-10-18 (Australia/Melbourne).
 Feature branches and `main` may contain development work that has not passed
 release acceptance. Current stable-version links identify the published release.
 Version `3.1.4` adjusts bounded quota deadlines and permits three extra
