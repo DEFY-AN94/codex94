@@ -1,7 +1,7 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4),
-released on 2026-10-07 (Australia/Melbourne). Later docs-only commits do not
+The published stable version is [`v4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5),
+released on 2026-10-18 (Australia/Melbourne). Later docs-only commits do not
 move its tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -33,20 +33,19 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
-The **4.1.5 (29)** candidate targets **2026-10-18** (Australia/Melbourne),
-as confirmed by the maintainer. It includes the changes since 4.1.4 in
-`CHANGELOG.md`, plus model-limit meters and the shrinking provider viewport fix.
-Verify English/Chinese, light/dark, fresh/cached/history and model quota
-extremes with synthetic inputs. Exercise both content growth and shrinkage in
-the same popover, including disappearing five-hour rows. Candidate App,
-PR CI/UI/CodeQL, final-main CI/attestation, exact two-file assets and final
-installation acceptance are separate checks and remain pending until recorded.
-If publication crosses a Melbourne date boundary, update the reviewed date
-before tagging. Public stable links remain on 4.1.4 until 4.1.5 is published.
+The **4.1.5 (29)** release was published on **2026-10-18**
+(Australia/Melbourne). It includes Dashboard history meters, Codex session
+preparation and Git-history scan guards, model-limit meters and the shrinking
+provider viewport fix described in `CHANGELOG.md`. Its synthetic checks cover
+English/Chinese, light/dark, fresh/cached/history and model quota extremes,
+including content growth and shrinkage in the same popover and disappearing
+five-hour rows. Candidate App acceptance, PR CI/UI/CodeQL, final-main
+CI/attestation, exact two-file assets and final installation acceptance remain
+separate evidence; the release record below identifies what was verified.
 
-The latest menu and single-read release is **`4.1.4 (28)`**, published on
-**2026-10-07** (Australia/Melbourne) from PR #55. Stable downloads point to
-`v4.1.4`; the verified package and installation record appears below. The `4.0.2 (23)` candidate
+The preceding menu and single-read release was **`4.1.4 (28)`**, published on
+**2026-10-07** (Australia/Melbourne) from PR #55. Its verified package and
+installation record appears below. The `4.0.2 (23)` candidate
 was merged through PR #43 and carried into 4.1.0 without a separate release.
 Never move or reuse existing tags, including the retained `v4.0.0` candidate.
 
@@ -226,7 +225,8 @@ reports by default and a separate, explicitly enabled CLI option.
 The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
 do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
 records do not establish validation of these source boundaries. Final checks,
-artifacts and installation need separate records. Its release records remain historical; current stable links point to 4.1.4.
+artifacts and installation need separate records. Its release records remain
+historical; current stable links point to 4.1.5.
 
 During the earlier 4.0 release work, the maintainer approved a ten-minute
 live-observation scope.
@@ -457,7 +457,7 @@ states. GitHub's default PR artifact identifies the tested merge SHA, not the
 PR head; record them separately.
 
 Wait for CI, every synthetic UI smoke required by the candidate, and
-Actions/Python/Swift CodeQL on the actual tested revision. The `4.1.4` release gate
+Actions/Python/Swift CodeQL on the actual tested revision. The current release gate
 includes five UI scenarios: Display, Recovery, Token usage, Floating, and
 Providers. Providers uses synthetic data, including a synthetic local usage
 cache under `CLAUDE_CONFIG_DIR`; passing it does not verify real Claude account
@@ -1190,3 +1190,86 @@ Later documentation commits do not move the tag or replace release assets.
   Distribution remains an unsigned, unnotarized DMG with an ad-hoc signed inner App;
   attestation does not establish Apple trust. No automatic installation was added.
   OAuth remains paused and automatic CLI reading remains default-off.
+
+### 4.1.5 final acceptance — 2026-10-18
+
+- [PR #64](https://github.com/DEFY-AN94/codex94/pull/64) fixed the provider
+  popover's shrinking viewport and added current/cached model-limit meters in
+  the popover and Dashboard. The maintainer accepted the installed candidate's
+  appearance and explicitly requested continuation through merge, tag and full
+  GitHub Release publication with a DMG and checksum.
+- The frozen release commit is
+  `fe7f3fde0b50b0129c7774169d41afd8a76f9696`, tree
+  `10271bc4ff561e4a02bfb5f58b1ffa05a3ff8b3b`. Annotated tag `v4.1.5` has object
+  `c98421649f9e173b79bd42ad5154de3256aaa3bd` and peels to that commit. A fresh
+  shallow tag clone confirmed the commit and `4.1.5 (29)` metadata; it was not
+  used to claim a complete-history security scan. Public ZIP and TAR source
+  archives each matched all 186 tracked files in the frozen tree.
+- The release also carries PR #61's Dashboard history meters, PR #60's Codex
+  preparation and product guide, PR #59's complete-history scan guard, and
+  PRs #57/#58's separate Claude Code cloud guidance and SessionStart hook.
+  The Claude hook attempts history completion only with `CLAUDE_CODE_REMOTE=true`;
+  it is independent of Codex session preparation and does not run in the App.
+- Local validation recorded 53 focused provider/layout tests and the full
+  release gate: 597 tests, 1 existing hosted-focus skip, 0 failures, plus the
+  Universal App and DMG checks. The menu-height regression exercised growth
+  and shrinkage in the same popover, and the Claude-only case covered 16 to 1
+  model limits. The model-meter image check covers both languages/themes and
+  terminal/card styles; restoring the old text-only row made all eight variants
+  fail. Its final native-tint adjustment changed tests only.
+- Final PR head `cd59dc429df98b48d8f545f7b7f42c51230d6c0f` was tested as merge
+  `e1cccf105c24391ec877b175e6e15ab2435e0524`, with the same tree as the release.
+  [PR CI](https://github.com/DEFY-AN94/codex94/actions/runs/39053814740)
+  passed the release gate and all five UI scenarios; the main-only attestation
+  job was intentionally skipped on the PR.
+  [PR CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/39053812010)
+  passed Actions, Python, Swift and its aggregate check with no findings.
+- The exact release commit's
+  [main CI](https://github.com/DEFY-AN94/codex94/actions/runs/39055537272)
+  passed the test/package gate, all five UI scenarios and DMG attestation.
+  The Xcode 16.4 suite recorded 597 tests, 1 existing hosted-focus skip and
+  0 failures. [Main CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/39055537245)
+  passed Actions, Python and Swift; their exact-commit main analyses each had
+  zero results and empty error/warning fields, with no open main alerts.
+  Runner-capacity and Ubuntu-image notices were informational.
+- All five final-main UI artifact summaries and 13 representative screenshots
+  were reviewed without blocking layout/privacy findings. The preceding PR
+  review covered 19 representative screenshots. Existing coverage limits
+  remain: recovery diagnostics copy has click-functional evidence but pending
+  keyboard/AXPress/tooltip coverage; native Spaces/fullscreen and some provider
+  keyboard paths are not established. Usage save/copy dialogs were opened and
+  cancelled, without exercising real exports or the general pasteboard.
+- The two release assets came from main CI artifact
+  `codex94-dmg-fe7f3fde0b50b0129c7774169d41afd8a76f9696` (artifact ID
+  `12108334813`), not a local rebuild. The DMG SHA-256 is
+  `9dfbd4582a41ac43d1d3e73fef61bc468439e6b8f982b6bea581b97a6831b92f`;
+  the checksum-file SHA-256 is
+  `d8a1615648545fefbce740a18b876ceb905ac89c762d816611b5b30f06159701`.
+  Strict verification of [attestation 56988695](https://github.com/DEFY-AN94/codex94/attestations/56988695)
+  bound the DMG to this repository's `ci.yml`, `refs/heads/main` and the frozen
+  source commit. This is provenance evidence, not Apple trust approval.
+- The final CI App was copied to `/Applications/Codex94.app` without
+  re-signing, after retaining the previous candidate as a recoverable backup.
+  Recursive content comparison, both architecture signatures, `4.1.5 (29)`
+  metadata and launch at the installed path passed. Its executable SHA-256 is
+  `8ba85eee675b2558bfb6f88497523d0d17d2f2d3eb9dc57e77fa674c006e8d71`.
+  Changed behavior had maintainer acceptance on the candidate; this final
+  installation provides exact-byte and launch evidence. The installed bundle
+  had no quarantine attribute, so first-launch Gatekeeper/Open Anyway acceptance
+  is not proven. No quarantine, Gatekeeper or Login Items setting was changed.
+- [Release v4.1.5](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5)
+  (ID `415984104`) was published from the verified Draft at
+  `2026-10-17T18:20:54Z`, or `2026-10-18 05:20:54` in Australia/Melbourne,
+  and verified as Latest, public and not a prerelease. Exactly two manual
+  assets are present: the
+  [DMG](https://github.com/DEFY-AN94/codex94/releases/download/v4.1.5/Codex94-4.1.5-macos-universal-unnotarized.dmg)
+  (asset `651225058`, 3,803,851 bytes) and
+  [checksum](https://github.com/DEFY-AN94/codex94/releases/download/v4.1.5/Codex94-4.1.5-SHA256SUMS.txt)
+  (asset `651225059`, 112 bytes). Draft and public redownloads matched each
+  GitHub API `sha256:` digest and the final-main bytes. Public package checks
+  reconfirmed the two-item mounted payload, Universal architecture, ad-hoc
+  Hardened Runtime App signature, unsigned/unnotarized DMG and provenance.
+- The later documentation follow-up advances current stable links and records
+  publication only. It does not move `v4.1.5`, change App/build inputs or
+  regenerate release assets. Immutable Releases is not enabled; the existing
+  manual no-replacement policy continues to apply.

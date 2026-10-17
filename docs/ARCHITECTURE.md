@@ -1,13 +1,13 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints for the published
-[`4.1.4 (28)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4),
-published on 2026-10-07 (Australia/Melbourne), including the unpublished
+[`4.1.5 (29)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5),
+published on 2026-10-18 (Australia/Melbourne), including the unpublished
 `4.0.2 (23)` candidate it carries forward.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.1.5 candidate: provider meters and adaptive popover height
+## 4.1.5 release: provider meters and adaptive popover height
 
 Active and cached Claude model limits use `QuotaMeterRow` in the menu popover
 and `QuotaCardMeter` in Dashboard, matching the shared-window geometry. Keep

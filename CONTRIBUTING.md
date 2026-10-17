@@ -109,8 +109,8 @@ before reporting these features as verified. See [architecture rules](docs/ARCHI
 
 ### Version 4.1.0 behavior
 
-Version `4.1.0 (24)` is the published stable release (2026-10-05,
-Australia/Melbourne); `4.0.1 (22)` is the previous release. The App target and the UI test bundle build locally on Xcode 27.0, and the
+Version `4.1.0 (24)` was published on 2026-10-05 (Australia/Melbourne),
+following `4.0.1 (22)`. The App target and the UI test bundle build locally on Xcode 27.0, and the
 hosted unit suite passed there: 544 tests executed, 1 existing hosted-focus
 skip, 0 failures. The metadata, installer and security-scanner script
 self-tests also passed locally, and `script/release_check.sh` passed

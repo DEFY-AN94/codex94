@@ -2,9 +2,16 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4),
-released on 2026-10-07 (Australia/Melbourne). It includes the user-triggered
+stable version is [`v4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5),
+released on 2026-10-18 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
+
+Version `4.1.5 (29)` adds Dashboard history meters, model-limit meters and
+adaptive popover sizing. These are presentation changes: original report times,
+source selection and existing storage remain unchanged, with no additional
+quota request, credential access or persistent history. Codex session preparation
+and Git-history scan guards are development/source-install tools and do not run
+inside the App.
 
 Version `4.1.4 (28)` adds qualified historical menu-bar presentation and
 moves quota selection to Dashboard Display. Its menu single-read action

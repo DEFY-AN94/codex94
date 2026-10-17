@@ -12,7 +12,7 @@ existing local usage reports by default; automatic Claude CLI reads are a
 separate, default-off choice. The app is MIT-licensed, built with SwiftUI/AppKit,
 and bundles no third-party runtime frameworks.
 
-**Latest stable:** [`4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4)
+**Latest stable:** [`4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5)
 · macOS 14+ · Apple Silicon and Intel · English and Simplified Chinese
 
 [Features](#features) · [Screenshots](#screenshots) · [Install](#installation)
@@ -23,8 +23,9 @@ and bundles no third-party runtime frameworks.
 > Anthropic. Codex `app-server` is experimental; upstream CLI and statusline
 > formats may change. Distribution is unsigned/unnotarized as explained below.
 
-The 4.1.5 source candidate adds Dashboard history meters, progress bars for
-Claude model limits and a popover that shrinks with its content; see
+Version 4.1.5 adds Dashboard history meters, progress bars for Claude model
+limits and a popover that shrinks with its content. Contributor setup also adds
+Codex session preparation and explicit Git-history scan boundaries; see
 [4.1.5 changes](CHANGELOG.md#415---2026-10-18).
 
 ## Features
@@ -41,9 +42,11 @@ in the [release records](docs/RELEASING.md).
   its monitoring and reminders; a neutral status item keeps settings reachable
   when both are off.
 - Choose **one service**, **compact dual rings in one menu-bar item**, or **two
-  separate menu-bar items**. Either item opens the same scrollable popover, with
-  a separate section for each enabled service. Dashboard **Overview** shows
-  larger service cards and all displayable quota buckets.
+  separate menu-bar items**. Either item opens the same popover, with
+  a separate section for each enabled service. With Claude enabled, the quota
+  area grows and shrinks with its content, scrolls when needed and keeps command
+  buttons outside the scrolling area. Dashboard **Overview** shows larger
+  service cards and all displayable quota buckets.
 - Choose each service's menu-bar quota in **Dashboard → Display**. Current-quota
   **Auto** selects the lowest remaining percentage among available buckets and
   windows; manual choices pin one bucket/window. Codex's popover bucket browser
@@ -134,7 +137,10 @@ can start; repeated one-time clicks do not queue extra reads.
   explicit adoption. A report-stream fingerprint does not prove account identity.
 - When shared windows expire, accepted data appears as **Last usage record**
   with **Current quota unknown**, original percentages and source time. The
-  popover uses segmented bars; Dashboard retains its historical text view.
+  popover uses segmented bars; Dashboard uses large percentages and horizontal
+  meters, with shared windows side by side and model limits below. Current,
+  cached and historical model limits use the same meter geometry as shared
+  windows, retaining their freshness labels.
 - Compact provider rings and single-window menu-bar layouts can display this
   history with a clock and qualified tooltip. Historical Auto prefers weekly,
   then five-hour. The legacy dual-window layout stays current-only; the floating
@@ -203,7 +209,7 @@ can start; repeated one-time clicks do not queue extra reads.
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.
-These are historical captures, not screenshots of the current 4.1.4 interface.
+These are historical captures, not screenshots of the current 4.1.5 interface.
 The chart previews were captured during `0.3.0 (14)` candidate testing and
 show **Bar chart** and **Line chart** over the same seven reported days. These
 original synthetic captures remain unchanged, from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
@@ -248,8 +254,8 @@ statistics and update UI.
 ## Installation
 
 The published stable release is
-[`v4.1.4 (28)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4),
-released on **2026-10-07** (Australia/Melbourne), with a Universal 2 DMG and source
+[`v4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5),
+released on **2026-10-18** (Australia/Melbourne), with a Universal 2 DMG and source
 from the same annotated tag. The download and clone instructions below use
 that release; later documentation commits do not move its tag or replace assets.
 
@@ -283,23 +289,23 @@ precedence; an invalid manual choice is not silently bypassed.
 ### Install the Universal DMG
 
 Download both stable assets from the
-[`v4.1.4` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.4):
+[`v4.1.5` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5):
 
-- `Codex94-4.1.4-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.4-SHA256SUMS.txt`
+- `Codex94-4.1.5-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.5-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-4.1.4-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.5-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-4.1.4-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.5-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -322,7 +328,7 @@ This public repository needs no GitHub authentication. Clone the published
 stable source tag:
 
 ```bash
-git clone --branch v4.1.4 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.5 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
@@ -398,12 +404,17 @@ Contributor and release checks also require `jq`:
 brew install ripgrep jq
 ```
 
-In this development checkout, `script/security_check.sh` requires complete Git
-history for contributor and release checks. In a shallow clone it stops and
-asks for `git fetch --unshallow`. Only `install.sh` explicitly permits shallow
-history for source installation, prints the limited scan scope and scans the
-fetched commits. This guard and installer warning are unreleased changes; the
-stable `v4.1.4` tag above retains its original scanner.
+Run `python3 -I script/codex_prepare.py` at the start of a development task.
+It leaves complete checkouts unchanged and attempts a bounded fetch from
+`origin` when history is shallow. Resolve any preparation failure before
+relying on a history scan; see [Codex setup](docs/CODEX.md) for local-session
+hooks and Cloud Start skill configuration.
+
+Since 4.1.5, `script/security_check.sh` requires complete Git history for
+contributor and release checks. In a shallow clone it stops and asks for
+`git fetch --unshallow`. Only `install.sh` explicitly permits shallow history
+for source installation, prints the limited scan scope and scans the fetched
+commits. Do not use that installer exception for development or release checks.
 
 Build and run a Debug app:
 
