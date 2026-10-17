@@ -2,11 +2,11 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5),
+stable version is [`v4.1.6 (30)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6),
 released on 2026-10-18 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
-The `4.1.6 (30)` candidate adds one local Boolean preference,
+Version `4.1.6 (30)` adds one local Boolean preference,
 `claude.popoverShowsFable.v1`, defaulting to false. It controls whether the
 reported Fable model limit appears beside the shared five-hour and weekly
 windows in Claude's popover, for current, cached and historical reports.
@@ -332,7 +332,7 @@ browsed in the popover is held only for the current app run and is not written
 to `UserDefaults`. macOS may also store the Dashboard window frame and
 launch-at-login state.
 
-The `4.1.6 (30)` candidate stores the popover's Fable opt-in as the Boolean
+Version `4.1.6 (30)` stores the popover's Fable opt-in as the Boolean
 `claude.popoverShowsFable.v1` in `UserDefaults`. Missing preferences default to
 off for both new and existing installations. The saved value survives app
 restarts and applies to the popover only; it stores no quota values, model

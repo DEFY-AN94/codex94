@@ -1,14 +1,13 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints for the published
-[`4.1.5 (29)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5),
+[`4.1.6 (30)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6),
 published on 2026-10-18 (Australia/Melbourne), including the unpublished
-`4.0.2 (23)` candidate it carries forward. The 4.1.6 candidate's additional
-presentation rules are identified separately below.
+`4.0.2 (23)` candidate it carries forward.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.1.6 candidate: Fable popover visibility
+## 4.1.6 release: Fable popover visibility
 
 `ClaudeModelLimitVisibility` owns presentation filtering for both current and
 historical model rows. Dashboard callers retain its `.all` default. The popover

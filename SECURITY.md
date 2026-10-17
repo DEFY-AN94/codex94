@@ -126,10 +126,19 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-4.1.5-SHA256SUMS.txt` before opening the DMG. The optional
-GitHub command
-`gh attestation verify Codex94-4.1.5-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94`
-can prove repository/workflow/commit provenance for the exact DMG. A matching
+Verify `Codex94-4.1.6-SHA256SUMS.txt` before opening the DMG. The optional
+GitHub command can verify repository/workflow/commit provenance for the exact DMG:
+
+```bash
+gh attestation verify Codex94-4.1.6-macos-universal-unnotarized.dmg \
+  -R DEFY-AN94/codex94 \
+  --signer-workflow DEFY-AN94/codex94/.github/workflows/ci.yml \
+  --source-ref refs/heads/main \
+  --source-digest deddba6242440cd668bf218d8babd0e64dddfdf0 \
+  --deny-self-hosted-runners
+```
+
+A matching
 checksum or attestation is not notarization, malware review, a security audit,
 or Gatekeeper approval. If the exact release is trusted, use only Apple's
 [Privacy & Security → Open Anyway](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/26/mac/26)
@@ -220,14 +229,13 @@ boundaries remain unchanged.
 
 ## Supported versions
 
-The `4.1.6 (30)` candidate adds the local `UserDefaults` Boolean
+Version `4.1.6 (30)` adds the local `UserDefaults` Boolean
 `claude.popoverShowsFable.v1`, default false. Claude popovers show shared
 five-hour/weekly rows by default; opting in adds only the reported Fable model
 row for current, cached and historical reports. Dashboard retains all reported
 model limits. This presentation preference does not change native quota
 selection or add a data source, credential access, endpoint, request, quota-cache
-field, entitlement or persistent usage history. Published support and download
-references remain on 4.1.5 until the candidate is released.
+field, entitlement or persistent usage history.
 
 Version `4.1.5 (29)` changes Claude quota presentation and bounded popover
 layout without adding an App data source, endpoint, credential reader,
@@ -268,7 +276,7 @@ Version `4.0.1 (22)` uses passive Claude reports by default with explicit
 report-stream adoption and a separate default-off CLI reader. The retained
 `v4.0.0` tag identifies an unpublished candidate, not a supported stable release.
 
-The supported published stable version is [`v4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5),
+The supported published stable version is [`v4.1.6 (30)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6),
 released on 2026-10-18 (Australia/Melbourne).
 Feature branches and `main` may contain development work that has not passed
 release acceptance. Current stable-version links identify the published release.

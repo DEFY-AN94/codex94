@@ -1,6 +1,6 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5),
+The published stable version is [`v4.1.6 (30)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6),
 released on 2026-10-18 (Australia/Melbourne). Later docs-only commits do not
 move its tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
@@ -33,16 +33,17 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
-The **4.1.6 (30)** candidate follows published **4.1.5 (29)**. Its changelog
-records the current Melbourne release date, **2026-10-18**; recheck that date
-before tagging. Public stable/download/source-clone references remain
-on 4.1.5 until 4.1.6 publication is confirmed. The new Boolean preference is
+The **4.1.6 (30)** release was published on **2026-10-18**
+(Australia/Melbourne), following **4.1.5 (29)**. The
+[release verification record](#416-release-verification--2026-10-18) below
+identifies the frozen source, checks, artifacts and acceptance limits.
+The new Boolean preference is
 `claude.popoverShowsFable.v1`, default off; it adds only the reported Fable row
 to the popover's shared five-hour/Weekly rows. Dashboard retains every reported
 model limit, and native menu-bar quota selection remains independent.
 
-Candidate validation checklist; all items start **pending** and must be tied to
-the revision and artifacts actually checked:
+The following checklist defines the 4.1.6 validation scope. Actual outcomes and
+limits are recorded below against the revision and artifacts checked:
 
 - Verify fresh and existing preference stores default to off, on/off choices
   survive restart, and unrelated provider/menu-bar preferences remain intact.
@@ -60,7 +61,7 @@ the revision and artifacts actually checked:
 - Record focused tests, the full local release gate, actual visual review, PR
   CI/all five UI smokes/Actions-Python-Swift CodeQL, and final-main
   CI/attestation separately. Earlier release test counts do not validate this
-  candidate.
+  release.
 - Verify the frozen annotated tag and final-main CI DMG/checksum, both public
   API digests and downloads, package version/build, source archives and public
   Latest/non-prerelease status. After publication, audit English/Chinese
@@ -265,7 +266,7 @@ The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
 do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
 records do not establish validation of these source boundaries. Final checks,
 artifacts and installation need separate records. Its release records remain
-historical; current stable links point to 4.1.5.
+historical; current stable links point to 4.1.6.
 
 During the earlier 4.0 release work, the maintainer approved a ten-minute
 live-observation scope.
@@ -1312,3 +1313,94 @@ Later documentation commits do not move the tag or replace release assets.
   publication only. It does not move `v4.1.5`, change App/build inputs or
   regenerate release assets. Immutable Releases is not enabled; the existing
   manual no-replacement policy continues to apply.
+
+### 4.1.6 release verification — 2026-10-18
+
+- [PR #66](https://github.com/DEFY-AN94/codex94/pull/66) adds the persisted,
+  default-off Fable switch in Claude's popover. Dashboard retains all reported
+  model limits; the popover defaults to shared five-hour/Weekly rows for current,
+  cached and historical reports. It changes no quota source, native Auto/manual
+  selection, refresh schedule or quota-cache schema. Work began only after the
+  predecessor task completed and v4.1.5's public release and assets were verified.
+  User authorization for this task covered Ready/merge after green CI and
+  publication of the tag and release; installation and Open Anyway were outside
+  scope.
+- PR #66 merged at `2026-10-17T20:26:04Z`. The frozen release commit is
+  `deddba6242440cd668bf218d8babd0e64dddfdf0`, tree
+  `e5dda76907cc2a0c1357fc1cd9182eb9b7e90fba`. Final PR head
+  `2bf49800509a7f425119ab27df045e5314cd9731` was tested as merge
+  `e46df8ff5f79e1dcc34ca13e167555481a9a4496`; the reviewed head and frozen
+  release have the same tree. Annotated tag `v4.1.6` has object
+  `a06a2967e254212ba933e44b0cb38dbac8a3ea50`; the public annotated tag peels exactly to the frozen commit and tree above.
+- The corrected local release gate passed on Xcode 27.1: 600 tests, 1 existing
+  hosted-focus skip and 0 failures, plus script, Universal App and DMG checks.
+  The UI test bundle passed `build-for-testing`; that is compile-only evidence.
+  The initial Documents-based run encountered Finder metadata that prevented
+  re-signing the isolated bridge fixture. That failed attempt was not counted
+  as a passing gate; validation used a fresh temporary clone and tracked-source
+  patch without copying build products or changing the installed App.
+  The corrected local source tree matched the reviewed head. Its local DMG
+  was 3,731,576 bytes, SHA-256
+  `5c6288679c9cdbdc378e1ff9739ee9fb799bce2a48ac1112880d6d0ee14016cd`;
+  its 112-byte checksum file had SHA-256
+  `353a09be38717e080d1813179cf74070cef2c80c1339bd41e15e8165edef30ec`.
+  These are local validation artifacts, not the public release assets.
+- [Final PR CI](https://github.com/DEFY-AN94/codex94/actions/runs/39064714009)
+  passed the release gate and all five UI scenarios. The Xcode 16.4 suite
+  recorded 600 tests, 1 existing hosted-focus skip and 0 failures; main-only
+  attestation was intentionally skipped on the PR.
+  [Final PR CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/39064710094)
+  passed its applicable Actions, Python, Swift and aggregate checks.
+- PR visual review covered 51 PNGs: Providers 13, Display 14, Usage 9,
+  Floating 6 and Recovery 9. Providers exercised 16 real switch clicks across
+  combined/Claude-only current/history paths in the same open popover, with
+  strict Boolean persistence and unchanged request counts, caches and native
+  identifiers. Clean history and Dashboard captures supplement current views;
+  transient tooltips obscure some metadata/footer content, and the current
+  Claude tooltip is clipped. These visual limits are retained in the evidence.
+  Recovery provides instrumented click-functional evidence only: its seven
+  keyboard-focus captures were identical and `activationVerified=false`, with
+  no AX trust/full keyboard access, so keyboard/AXPress/tooltip acceptance is
+  not established. Usage custom-date editing and actual export save/copy were
+  not tested. Floating Spaces/fullscreen behavior and keyboard focus were not
+  tested. These limitations are not converted into passing native acceptance.
+- The exact frozen release commit's
+  [main CI](https://github.com/DEFY-AN94/codex94/actions/runs/39066691547):
+  passed the test/package gate, all five UI smokes and the DMG attestation job. The suite recorded 600 tests, 1 existing hosted-focus skip and 0 failures on Xcode 16.4.
+  [Main CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/39066691559):
+  Actions, Python and Swift analyses all passed. No separate aggregate CodeQL check is attached to the main commit; all ten attached checks (seven CI and three CodeQL) succeeded.
+  Final-main UI artifact/visual review: all 51 fresh PNGs were reviewed (Providers 13, Display 14, Usage 9, Floating 6, Recovery 9), with no blocking layout/privacy findings. All completion/isolation reports match the frozen commit. Providers again passed 16 real switch clicks and same-window assertions. The specific synthetic/manual acceptance limits above still apply.
+- The release assets use final-main CI artifact
+  `codex94-dmg-deddba6242440cd668bf218d8babd0e64dddfdf0`, artifact ID
+  `12113686753`, run attempt `1`, rather than a local
+  rebuild. DMG SHA-256: `9a55eb0b26840b7fd5b782405d647e5669f5e4f6b07b5236eff63cb09be0b141`; checksum-file SHA-256:
+  `1d116b2129bb7db02d1a8a07955204e3d58d6ddb6b462611a2ec68488bc997ef`. Package verification for `4.1.6 (30)`:
+  passed for the CI, redownloaded draft and anonymous public assets. Read-only verification confirmed exactly Codex94.app plus the /Applications shortcut, arm64/x86_64, macOS 14 minimum, an unsigned/unnotarized DMG, and strict ad-hoc Hardened Runtime App integrity without Team ID or entitlements. The verification mounts and temporary directories were removed.
+- Strict [attestation verification](https://github.com/DEFY-AN94/codex94/attestations/57012295):
+  passed for the exact DMG digest, GitHub-hosted runner and final-main run 39066691547, attempt 1. The expected binding is
+  `DEFY-AN94/codex94/.github/workflows/ci.yml`, `refs/heads/main`, source commit
+  `deddba6242440cd668bf218d8babd0e64dddfdf0`, with
+  `--deny-self-hosted-runners`. Attestation is provenance, not Apple signing,
+  notarization, malware review or Gatekeeper approval.
+- [Release v4.1.6](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6),
+  ID `416053306`, was published at `2026-10-17T20:57:26Z`, or
+  `2026-10-18 07:57:26 AEDT` in Australia/Melbourne.
+  Public status and observation time: anonymous APIs confirmed Latest, public, non-draft and non-prerelease; the complete package/source/provenance audit was verified at 2026-10-17T21:02:34.883364+00:00.
+  Exactly two manual assets were verified:
+  [DMG](https://github.com/DEFY-AN94/codex94/releases/download/v4.1.6/Codex94-4.1.6-macos-universal-unnotarized.dmg)
+  (asset `651575712`, `3815134` bytes) and
+  [checksum](https://github.com/DEFY-AN94/codex94/releases/download/v4.1.6/Codex94-4.1.6-SHA256SUMS.txt)
+  (asset `651575713`, `112` bytes).
+  Public downloads, API digests, checksum and final-main byte comparison:
+  all passed. Both uploaded-state assets match their API SHA-256 digests and sizes, the one-line checksum, and the exact final-main CI bytes. The checksum file is not a separately attested subject.
+- Public source ZIP SHA-256: `e36652f92bed8192d811acd63ed9436bacf4fb05568341de4df848a29e4202c3`; TAR.GZ SHA-256:
+  `ef27de723b5465dc22d3eaa9e3ad48003049b83a8fcd5ca2fb5039a42c4612e2`. Exact frozen-tree file/content/mode verification:
+  both passed without extraction: 186 tracked files, 6 executables and 0 symlinks, with exact paths, contents and executable modes. Tree-manifest SHA-256: `c355cfa2b11616003c447ce4706f54f31e01219790ec28bcbe13b7a0005fdc5b`.
+- Manual installation, installed-App replacement, Gatekeeper/Open Anyway,
+  real Login Items and real-account acceptance were not performed for this
+  release. Package/provenance checks and synthetic CI evidence do not establish
+  those outcomes. No quarantine, Gatekeeper or Login Items settings were changed.
+- This documentation follow-up advances stable download/source links and
+  records verification only. It does not move `v4.1.6`, alter App/build inputs
+  or regenerate the release assets. Previous release records and historical
+  screenshots retain their original provenance.
