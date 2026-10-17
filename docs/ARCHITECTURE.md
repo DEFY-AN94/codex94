@@ -7,7 +7,17 @@ published on 2026-10-07 (Australia/Melbourne), including the unpublished
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## Unreleased: Dashboard history meters
+## 4.1.5 candidate: provider meters and adaptive popover height
+
+Active and cached Claude model limits use `QuotaMeterRow` in the menu popover
+and `QuotaCardMeter` in Dashboard, matching the shared-window geometry. Keep
+their original model identifiers, precise percentages, reset information and
+freshness semantics. These views do not read quota or alter source selection.
+The provider viewport must follow both growth and shrinkage of its complete
+content, with scrolling only above its maximum height; the command footer must
+not reserve space for quota rows that are no longer present.
+
+### Dashboard history meters
 
 `QuotaCardMeter` shares large percentage and continuous progress-bar geometry
 between current Dashboard quotas and Claude history. It accepts only presentation

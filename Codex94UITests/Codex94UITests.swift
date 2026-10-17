@@ -610,6 +610,11 @@ final class Codex94UITests: XCTestCase {
         try assertProviderMetric("claude-quota-weekly", percent: "75%", in: popover)
         try require(identified("claude-model-limit-claude.model.fable", in: popover).exists,
                     "The cached per-model weekly limit must be listed")
+        try assertProviderMetric("claude-model-limit-claude.model.fable", percent: "70%", in: popover)
+        // A percentage alone contains too few accent pixels to satisfy this.
+        // The synthetic 70% model meter must paint its segmented fill as well.
+        try assertColor("27C8FF", in: identified("claude-model-limit-claude.model.fable", in: popover),
+                        minimumPixels: 200)
         XCTAssertEqual(try fixture.claudeUsageRequestCount(), cliReadsBeforeOff,
                        "Reading the local usage cache must never launch the CLI")
         try captureProviderPopover(popover, marker: "claude-quota-section", named: "providers-local-cache-en.png")

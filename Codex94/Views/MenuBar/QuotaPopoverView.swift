@@ -26,7 +26,8 @@ enum QuotaPopoverLayout {
 
 /// A single scroll tree whose viewport follows its actual content up to the
 /// popover limit. Measuring inside the scroll view keeps overflowing content
-/// unconstrained; status/source changes invalidate the same measurement.
+/// unconstrained. Observe geometry directly so updating the viewport does not
+/// feed its height back through a preference during provider layout updates.
 struct QuotaPopoverScrollViewport<Content: View>: View {
     let content: Content
     @State private var contentHeight = QuotaPopoverLayout.maximumProviderViewportHeight
@@ -40,29 +41,14 @@ struct QuotaPopoverScrollViewport<Content: View>: View {
             content
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .top)
-                .background {
-                    GeometryReader { geometry in
-                        Color.clear.preference(key: QuotaPopoverContentHeightKey.self,
-                                               value: geometry.size.height)
-                            .allowsHitTesting(false)
-                    }
+                .onGeometryChange(for: CGFloat.self) { geometry in
+                    ceil(geometry.size.height)
+                } action: { height in
+                    guard height.isFinite, height > 0, height != contentHeight else { return }
+                    contentHeight = height
                 }
         }
         .frame(height: min(contentHeight, QuotaPopoverLayout.maximumProviderViewportHeight), alignment: .top)
-        .onPreferenceChange(QuotaPopoverContentHeightKey.self) { height in
-            guard height.isFinite, height > 0 else { return }
-            let roundedHeight = ceil(height)
-            guard roundedHeight != contentHeight else { return }
-            contentHeight = roundedHeight
-        }
-    }
-}
-
-private struct QuotaPopoverContentHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
     }
 }
 

@@ -6,7 +6,19 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
-## Unreleased
+## 4.1.5 - 2026-10-18
+
+Version `4.1.5 (29)` is the release candidate. Publication and final CI asset
+acceptance remain pending; stable downloads stay on 4.1.4 until publication.
+
+### Fixed
+
+- Let the multi-provider popover shrink when quota content becomes shorter,
+  keeping its commands next to the visible content instead of leaving a blank
+  viewport after a quota window disappears. Longer content remains scrollable.
+- Give active and cached Claude model limits, including Fable, the same quota
+  progress meters as shared windows in both the popover and Dashboard. Preserve
+  precise percentages, reset information and source freshness labels.
 
 ### Changed
 
@@ -15,7 +27,7 @@ below applies only to its recorded version and does not validate later releases.
   weekly windows side by side, with model limits below. Keep last-remaining and
   previously-used labels, the current-quota-unknown notice and original source
   time. Historical values remain separate from current snapshots, selection,
-  notifications and refresh work; the menu popover keeps its existing layout.
+  notifications and refresh work.
 
 - Add Codex-only session preparation: a project SessionStart hook for supported
   local sessions, a repository Start skill for Codex Cloud, and a shared bounded
