@@ -373,7 +373,7 @@ final class ProviderViewTests: XCTestCase {
     }
 
     private func writeAutoCaptionCache(in directory: URL, includeModel: Bool,
-                                       includeFiveHour: Bool) throws -> URL {
+                                       includeFiveHour: Bool, modelCount: Int = 1) throws -> URL {
         let cacheDirectory = directory.appendingPathComponent("claude-state")
         try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true,
                                                attributes: [.posixPermissions: 0o700])
@@ -382,8 +382,10 @@ final class ProviderViewTests: XCTestCase {
         var utilization: [String: Any] = ["seven_day": ["utilization": 40, "resets_at": reset]]
         if includeFiveHour { utilization["five_hour"] = ["utilization": 20, "resets_at": reset] }
         if includeModel {
-            utilization["limits"] = [["kind": "weekly_scoped", "percent": 90, "resets_at": reset,
-                                      "scope": ["model": ["display_name": "Fable"]]]]
+            utilization["limits"] = (0..<modelCount).map { index in
+                ["kind": "weekly_scoped", "percent": 90, "resets_at": reset,
+                 "scope": ["model": ["display_name": index == 0 ? "Fable" : "Synthetic model \(index)"]]] as [String: Any]
+            }
         }
         let bytes = try JSONSerialization.data(withJSONObject: ["cachedUsageUtilization": [
             "fetchedAtMs": Int(reportedAt.timeIntervalSince1970 * 1_000),
@@ -1044,6 +1046,54 @@ final class ProviderViewTests: XCTestCase {
         XCTAssertEqual(codexCalls, 4, "Only the four explicit synthetic state updates may read Codex")
         XCTAssertEqual(fixture.notificationService.permissionRequests, 0)
         XCTAssertEqual(fixture.notificationService.deliveries, 0)
+    }
+
+    func testClaudeOnlyPopoverCapsManyModelMetersAndShrinksWhenTheyDisappear() async throws {
+        let directory = try temporaryDirectory()
+        print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
+        let state = directory.appendingPathComponent("claude-only-models")
+        try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        let fixture = try makeFixture(directory: state)
+        defer { fixture.cleanUp() }
+        fixture.preferences.codexMonitoringEnabled = false
+        fixture.preferences.claudeCLIUsageEnabled = false
+        fixture.preferences.claudeMonitoringEnabled = true
+        _ = try writeAutoCaptionCache(in: state, includeModel: true, includeFiveHour: false, modelCount: 16)
+        fixture.claude.start()
+        let view = QuotaPopoverView(store: fixture.store, openDashboard: { _ in }, quit: {},
+                                   referenceDate: reportedAt, showFloatingWindow: {})
+        let controller = QuotaPopoverHostingController(rootView: view)
+        let footer = NSHostingController(rootView:
+            VStack(spacing: 0) { Divider(); view.commandRows }.codex94Environment(fixture.preferences))
+        let popover = NSPopover()
+        controller.install(in: popover)
+        let proposal = NSSize(width: 500, height: CGFloat.greatestFiniteMagnitude)
+        let maximumHeight = ceil(QuotaPopoverLayout.maximumProviderViewportHeight
+                                 + footer.sizeThatFits(in: proposal).height)
+        try await waitForProviderLayout(controller, matching: { maximumHeight })
+        XCTAssertEqual(ProviderScopedLimit.limits(in: fixture.claude.snapshot).count, 16)
+        XCTAssertEqual(popover.contentSize.height, maximumHeight, accuracy: 1,
+                       "All accepted model limits must remain scrollable with commands outside the viewport")
+        _ = try render(view, width: 500, dark: true, language: .english,
+                       name: "claude-only-sixteen-models", output: directory)
+        _ = try writeAutoCaptionCache(in: state, includeModel: true, includeFiveHour: false)
+        fixture.claude.refresh(trigger: .manual)
+        let natural = NSHostingController(rootView:
+            ClaudeQuotaCard(store: fixture.claude, language: .english, openSetup: {},
+                            referenceDate: reportedAt, compact: true, style: .terminal)
+                .padding(14).codex94Environment(fixture.preferences))
+        let shortHeight = ceil(natural.sizeThatFits(in: proposal).height + footer.sizeThatFits(in: proposal).height)
+        try await waitForProviderLayout(controller, matching: { shortHeight })
+        XCTAssertEqual(ProviderScopedLimit.limits(in: fixture.claude.snapshot).count, 1)
+        XCTAssertLessThan(popover.contentSize.height, maximumHeight)
+        XCTAssertIdentical(popover.contentViewController, controller)
+        let cliReads = await fixture.claudeFetcher.calls
+        let codexReads = await fixture.codexFetcher.calls
+        XCTAssertEqual(cliReads, 0)
+        XCTAssertEqual(codexReads, 0)
+        _ = try render(view, width: 500, dark: true, language: .english,
+                       name: "claude-only-one-model", output: directory)
     }
 
     private func waitForProviderLayout<Content: View>(

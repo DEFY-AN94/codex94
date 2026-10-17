@@ -162,7 +162,9 @@ struct QuotaPopoverView: View {
                 }
                 .accessibilityIdentifier("provider-quota-sections")
             } else {
-                claudeSection
+                QuotaPopoverScrollViewport {
+                    claudeSection
+                }
             }
             Divider()
             commandRows

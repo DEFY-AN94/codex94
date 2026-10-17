@@ -16,6 +16,8 @@ freshness semantics. These views do not read quota or alter source selection.
 The provider viewport must follow both growth and shrinkage of its complete
 content, with scrolling only above its maximum height; the command footer must
 not reserve space for quota rows that are no longer present.
+Claude-only content uses the same viewport so model-heavy reports stay bounded
+and shrink when limits disappear; commands remain outside the scroll area.
 
 ### Dashboard history meters
 

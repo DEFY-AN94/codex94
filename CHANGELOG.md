@@ -16,6 +16,9 @@ acceptance remain pending; stable downloads stay on 4.1.4 until publication.
 - Let the multi-provider popover shrink when quota content becomes shorter,
   keeping its commands next to the visible content instead of leaving a blank
   viewport after a quota window disappears. Longer content remains scrollable.
+- Apply the same bounded scrolling to Claude-only popovers, including reports
+  containing up to sixteen model limits, while keeping command buttons outside
+  the scrolling content.
 - Give active and cached Claude model limits, including Fable, the same quota
   progress meters as shared windows in both the popover and Dashboard. Preserve
   precise percentages, reset information and source freshness labels.
