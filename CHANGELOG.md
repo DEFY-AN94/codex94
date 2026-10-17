@@ -8,9 +8,9 @@ below applies only to its recorded version and does not validate later releases.
 
 ## 4.1.6 - 2026-10-18
 
-Candidate version: `4.1.6 (30)`, following published `4.1.5 (29)`. Release dates
-use Australia/Melbourne. Publication and validation evidence remain pending
-until the release checks complete; the date is rechecked before tagging.
+Version `4.1.6 (30)` was published on the date above, following `4.1.5 (29)`.
+Release dates use Australia/Melbourne. Exact source, CI and package evidence
+is recorded in [docs/RELEASING.md](docs/RELEASING.md).
 
 ### Changed
 

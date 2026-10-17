@@ -12,7 +12,7 @@ existing local usage reports by default; automatic Claude CLI reads are a
 separate, default-off choice. The app is MIT-licensed, built with SwiftUI/AppKit,
 and bundles no third-party runtime frameworks.
 
-**Latest stable:** [`4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5)
+**Latest stable:** [`4.1.6 (30)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6)
 · macOS 14+ · Apple Silicon and Intel · English and Simplified Chinese
 
 [Features](#features) · [Screenshots](#screenshots) · [Install](#installation)
@@ -23,22 +23,16 @@ and bundles no third-party runtime frameworks.
 > Anthropic. Codex `app-server` is experimental; upstream CLI and statusline
 > formats may change. Distribution is unsigned/unnotarized as explained below.
 
-Version 4.1.5 adds Dashboard history meters, progress bars for Claude model
-limits and a popover that shrinks with its content. Contributor setup also adds
-Codex session preparation and explicit Git-history scan boundaries; see
-[4.1.5 changes](CHANGELOG.md#415---2026-10-18).
-
-**Next candidate: 4.1.6 (30), not yet released.** Claude's popover shows shared
-5-hour and Weekly quotas by default. Its optional Fable switch starts off and
-remembers your choice; Dashboard keeps all reported model limits. See the
-[candidate changes](CHANGELOG.md#416---2026-10-18).
+Version 4.1.6 keeps Claude's reported model limits in Dashboard. Its popover
+shows shared 5-hour and Weekly quotas by default, with a default-off Fable
+switch that remembers your choice for current, cached and historical reports.
+See [4.1.6 changes](CHANGELOG.md#416---2026-10-18).
 
 ## Features
 
-The following describes this source checkout; the Fable visibility option is
-part of the 4.1.6 candidate, not the stable download above. Release-by-release
-changes live in [CHANGELOG.md](CHANGELOG.md); candidate checks and installation
-evidence live in the [release records](docs/RELEASING.md).
+The following describes the published release. Release-by-release changes live
+in [CHANGELOG.md](CHANGELOG.md); validation outcomes and acceptance limits live
+in the [release records](docs/RELEASING.md).
 
 ### Two services, one place to check quota
 
@@ -58,7 +52,7 @@ evidence live in the [release records](docs/RELEASING.md).
   windows; manual choices pin one bucket/window. Codex's popover bucket browser
   is independent of that menu-bar choice.
 - Show only returned **5-hour and Weekly** windows, plus Claude per-model weekly
-  limits in Dashboard when reported. In the **4.1.6 candidate**, Claude's popover
+  limits in Dashboard when reported. Claude's popover
   shows only the shared 5-hour and Weekly rows by default. Turn on its Fable
   switch to add the reported Fable row; the choice persists across restarts and
   applies to current, cached and historical reports. Other model limits remain
@@ -151,7 +145,7 @@ can start; repeated one-time clicks do not queue extra reads.
   popover uses segmented bars; Dashboard uses large percentages and horizontal
   meters, with shared windows side by side and model limits below. Current,
   cached and historical model limits use the same meter geometry as shared
-  windows, retaining their freshness labels. The candidate's popover Fable
+  windows, retaining their freshness labels. The popover's Fable
   switch also applies to the last usage record; Dashboard retains every reported
   model limit and the original source time.
 - Compact provider rings and single-window menu-bar layouts can display this
@@ -222,7 +216,7 @@ can start; repeated one-time clicks do not queue extra reads.
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.
-These are historical captures, not screenshots of the current 4.1.5 interface.
+These are historical captures, not screenshots of the current 4.1.6 interface.
 The chart previews were captured during `0.3.0 (14)` candidate testing and
 show **Bar chart** and **Line chart** over the same seven reported days. These
 original synthetic captures remain unchanged, from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
@@ -267,7 +261,7 @@ statistics and update UI.
 ## Installation
 
 The published stable release is
-[`v4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5),
+[`v4.1.6 (30)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6),
 released on **2026-10-18** (Australia/Melbourne), with a Universal 2 DMG and source
 from the same annotated tag. The download and clone instructions below use
 that release; later documentation commits do not move its tag or replace assets.
@@ -302,23 +296,28 @@ precedence; an invalid manual choice is not silently bypassed.
 ### Install the Universal DMG
 
 Download both stable assets from the
-[`v4.1.5` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5):
+[`v4.1.6` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6):
 
-- `Codex94-4.1.5-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.5-SHA256SUMS.txt`
+- `Codex94-4.1.6-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.6-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-4.1.5-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.6-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-4.1.5-macos-universal-unnotarized.dmg -R DEFY-AN94/codex94
+gh attestation verify Codex94-4.1.6-macos-universal-unnotarized.dmg \
+  -R DEFY-AN94/codex94 \
+  --signer-workflow DEFY-AN94/codex94/.github/workflows/ci.yml \
+  --source-ref refs/heads/main \
+  --source-digest deddba6242440cd668bf218d8babd0e64dddfdf0 \
+  --deny-self-hosted-runners
 ```
 
 Attestation is build provenance, not an Apple signature, notarization, malware
@@ -341,7 +340,7 @@ This public repository needs no GitHub authentication. Clone the published
 stable source tag:
 
 ```bash
-git clone --branch v4.1.5 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.6 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
