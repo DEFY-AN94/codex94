@@ -490,6 +490,8 @@ struct ProviderQuotaSummaries: View {
                 store: store, openSetup: { openDashboard(.providers) }, referenceDate: referenceDate
             )
         }
+        // Keep the group's identifier from replacing native child controls' identifiers.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("provider-quota-summaries")
     }
 
