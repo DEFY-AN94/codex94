@@ -220,6 +220,15 @@ boundaries remain unchanged.
 
 ## Supported versions
 
+The `4.1.6 (30)` candidate adds the local `UserDefaults` Boolean
+`claude.popoverShowsFable.v1`, default false. Claude popovers show shared
+five-hour/weekly rows by default; opting in adds only the reported Fable model
+row for current, cached and historical reports. Dashboard retains all reported
+model limits. This presentation preference does not change native quota
+selection or add a data source, credential access, endpoint, request, quota-cache
+field, entitlement or persistent usage history. Published support and download
+references remain on 4.1.5 until the candidate is released.
+
 Version `4.1.5 (29)` changes Claude quota presentation and bounded popover
 layout without adding an App data source, endpoint, credential reader,
 preference key or cache schema. Its Codex session preparation and shallow-history

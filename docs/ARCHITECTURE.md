@@ -3,9 +3,27 @@
 This describes ownership and reuse constraints for the published
 [`4.1.5 (29)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.5),
 published on 2026-10-18 (Australia/Melbourne), including the unpublished
-`4.0.2 (23)` candidate it carries forward.
+`4.0.2 (23)` candidate it carries forward. The 4.1.6 candidate's additional
+presentation rules are identified separately below.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
+
+## 4.1.6 candidate: Fable popover visibility
+
+`ClaudeModelLimitVisibility` owns presentation filtering for both current and
+historical model rows. Dashboard callers retain its `.all` default. The popover
+passes `.popover(showFable:)`: false hides every per-model row while preserving
+the shared five-hour/weekly windows; true includes only the exact
+`claude.model.fable` bucket. Other model rows remain available in Dashboard.
+
+The popover's switch binds to the local Boolean preference
+`claude.popoverShowsFable.v1`, default false, and applies without closing the
+popover. Existing viewport sizing handles growth and shrinkage. This policy
+does not filter provider snapshots or modify source selection, report age,
+native quota pickers, Auto selection, notifications or refresh scheduling.
+Toggling performs no provider read or quota-cache write. Keep the same policy
+at both current and history call sites so expired reports cannot bypass the
+saved visibility choice.
 
 ## 4.1.5 release: provider meters and adaptive popover height
 

@@ -1,3 +1,4 @@
+import CoreFoundation
 import XCTest
 @testable import Codex94
 
@@ -55,13 +56,15 @@ final class ProviderPreferencesTests: XCTestCase {
         XCTAssertEqual(preferences.language, .simplifiedChinese)
         XCTAssertFalse(preferences.claudeMonitoringEnabled)
         XCTAssertFalse(preferences.claudeCLIUsageEnabled)
+        XCTAssertFalse(preferences.claudePopoverShowsFable)
         XCTAssertFalse(preferences.claudeNotifications.isEnabled)
         XCTAssertEqual(preferences.claudeRefreshInterval, .fiveMinutes)
         XCTAssertEqual(preferences.claudeMenuBarQuotaSelection, .automatic)
         XCTAssertEqual(preferences.claudeDualWindowBucketSelection, .automatic)
         XCTAssertEqual(defaults.string(forKey: "displayMode"), "weekly")
         for key in ["codexMonitoringEnabled.v1", "claudeMonitoringEnabled.v1", "claude.cliUsageEnabled.v1", "claude.refreshInterval.v1",
-                    "claude.notifications.v1", "claude.menuBarQuotaSelection.v1", "claude.dualWindowBucketSelection.v1"] {
+                    "claude.notifications.v1", "claude.menuBarQuotaSelection.v1", "claude.dualWindowBucketSelection.v1",
+                    "claude.popoverShowsFable.v1"] {
             XCTAssertNil(defaults.object(forKey: key), "Loading old preferences must not silently enable or configure Claude")
         }
     }
@@ -97,6 +100,56 @@ final class ProviderPreferencesTests: XCTestCase {
         }
         preferences.setClaudePassiveProducerID(nil)
         XCTAssertNil(defaults.object(forKey: "claude.passiveProducerID.v1"))
+    }
+
+    func testFablePopoverOptInDefaultsOffPersistsAndPreservesOtherPreferences() throws {
+        let defaults = try isolatedDefaults()
+        defaults.set(true, forKey: "claudeMonitoringEnabled.v1")
+        let preferences = PreferencesStore(defaults: defaults)
+        preferences.claudeMenuBarQuotaSelection = .bucket(limitID: "claude.model.fable", kind: .weekly)
+        preferences.claudeDualWindowBucketSelection = .bucket(limitID: "claude.model.fable")
+        preferences.menuBarQuotaSelection = .defaultBucket(.weekly)
+        let key = "claude.popoverShowsFable.v1"
+        XCTAssertFalse(preferences.claudePopoverShowsFable,
+                       "Existing Claude monitoring and a pinned Fable quota must not opt into popover rows")
+        XCTAssertNil(defaults.object(forKey: key), "Loading the default must not write a preference")
+        let preservedKeys = ["codexMonitoringEnabled.v1", "claudeMonitoringEnabled.v1", "claude.cliUsageEnabled.v1",
+                             "claude.menuBarQuotaSelection.v1", "claude.dualWindowBucketSelection.v1",
+                             "menuBarQuotaSelection.v2", "dualWindowBucketSelection.v1", "menuBarServiceMode.v1"]
+        func unaffectedValues() -> NSDictionary {
+            NSDictionary(dictionary: Dictionary(uniqueKeysWithValues: preservedKeys.map {
+                ($0, defaults.object(forKey: $0) ?? NSNull())
+            }))
+        }
+        for enabled in [true, false, true, false] {
+            let preserved = unaffectedValues()
+            preferences.claudePopoverShowsFable = enabled
+            XCTAssertEqual(unaffectedValues(), preserved,
+                           "The toggle write must not change any native selection, monitoring or CLI preference bytes")
+            let reloaded = PreferencesStore(defaults: defaults)
+            XCTAssertEqual(reloaded.claudePopoverShowsFable, enabled)
+            let stored = try XCTUnwrap(defaults.object(forKey: key) as? NSNumber)
+            XCTAssertEqual(CFGetTypeID(stored), CFBooleanGetTypeID())
+            XCTAssertEqual(stored.boolValue, enabled)
+            // Reloading normalizes the existing Codex selection JSON, whose
+            // dictionary key order is not stable. Compare its decoded value.
+            XCTAssertEqual(reloaded.menuBarQuotaSelection, preferences.menuBarQuotaSelection)
+            XCTAssertEqual(reloaded.dualWindowBucketSelection, preferences.dualWindowBucketSelection)
+            XCTAssertEqual(reloaded.claudeMenuBarQuotaSelection, preferences.claudeMenuBarQuotaSelection)
+            XCTAssertEqual(reloaded.claudeDualWindowBucketSelection, preferences.claudeDualWindowBucketSelection)
+            XCTAssertEqual(reloaded.menuBarServiceMode, preferences.menuBarServiceMode)
+            XCTAssertEqual(reloaded.codexMonitoringEnabled, preferences.codexMonitoringEnabled)
+            XCTAssertEqual(reloaded.claudeMonitoringEnabled, preferences.claudeMonitoringEnabled)
+            XCTAssertEqual(reloaded.claudeCLIUsageEnabled, preferences.claudeCLIUsageEnabled)
+        }
+
+        for malformed in [1, 0, "true", "false", Data("true".utf8), ["enabled": true]] as [Any] {
+            defaults.set(malformed, forKey: key)
+            XCTAssertFalse(PreferencesStore(defaults: defaults).claudePopoverShowsFable,
+                           "Only an actual stored Boolean can enable the popover row")
+        }
+        defaults.removeObject(forKey: key)
+        XCTAssertFalse(PreferencesStore(defaults: defaults).claudePopoverShowsFable)
     }
 
     func testClaudeSettingsRoundTripWithoutChangingCodexKeys() throws {

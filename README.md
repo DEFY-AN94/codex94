@@ -28,11 +28,17 @@ limits and a popover that shrinks with its content. Contributor setup also adds
 Codex session preparation and explicit Git-history scan boundaries; see
 [4.1.5 changes](CHANGELOG.md#415---2026-10-18).
 
+**Next candidate: 4.1.6 (30), not yet released.** Claude's popover shows shared
+5-hour and Weekly quotas by default. Its optional Fable switch starts off and
+remembers your choice; Dashboard keeps all reported model limits. See the
+[candidate changes](CHANGELOG.md#416---2026-10-18).
+
 ## Features
 
-The following describes the current stable app. Release-by-release changes live
-in [CHANGELOG.md](CHANGELOG.md); candidate checks and installation evidence live
-in the [release records](docs/RELEASING.md).
+The following describes this source checkout; the Fable visibility option is
+part of the 4.1.6 candidate, not the stable download above. Release-by-release
+changes live in [CHANGELOG.md](CHANGELOG.md); candidate checks and installation
+evidence live in the [release records](docs/RELEASING.md).
 
 ### Two services, one place to check quota
 
@@ -52,9 +58,14 @@ in the [release records](docs/RELEASING.md).
   windows; manual choices pin one bucket/window. Codex's popover bucket browser
   is independent of that menu-bar choice.
 - Show only returned **5-hour and Weekly** windows, plus Claude per-model weekly
-  limits when reported. Weekly-only data is valid; missing values stay unknown
-  rather than becoming `0%` or an invented quota. Default Codex quota and named
-  model buckets remain separate.
+  limits in Dashboard when reported. In the **4.1.6 candidate**, Claude's popover
+  shows only the shared 5-hour and Weekly rows by default. Turn on its Fable
+  switch to add the reported Fable row; the choice persists across restarts and
+  applies to current, cached and historical reports. Other model limits remain
+  in Dashboard. This display choice does not change the native menu-bar quota
+  selection or fetch data. Weekly-only data is valid; missing values stay
+  unknown rather than becoming `0%` or an invented quota. Default Codex quota
+  and named model buckets remain separate.
 - Codex's read-only **Manual quota resets** display shows the reported available
   count, including a real zero. Missing counts stay unavailable and retained
   counts are marked cached. The app has no reset-redemption action.
@@ -140,7 +151,9 @@ can start; repeated one-time clicks do not queue extra reads.
   popover uses segmented bars; Dashboard uses large percentages and horizontal
   meters, with shared windows side by side and model limits below. Current,
   cached and historical model limits use the same meter geometry as shared
-  windows, retaining their freshness labels.
+  windows, retaining their freshness labels. The candidate's popover Fable
+  switch also applies to the last usage record; Dashboard retains every reported
+  model limit and the original source time.
 - Compact provider rings and single-window menu-bar layouts can display this
   history with a clock and qualified tooltip. Historical Auto prefers weekly,
   then five-hour. The legacy dual-window layout stays current-only; the floating

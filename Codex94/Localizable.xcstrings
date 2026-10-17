@@ -766,6 +766,40 @@
         }
       }
     },
+    "claude.popoverShowsFable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Fable in popover"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在弹窗中显示 Fable"
+          }
+        }
+      }
+    },
+    "claude.popoverShowsFable.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Fable's weekly limit here when available. Dashboard always includes reported model limits."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有数据时，在此显示 Fable 的每周额度。仪表盘始终显示已上报的模型额度。"
+          }
+        }
+      }
+    },
     "claude.passive.waitingShort": {
       "extractionState": "manual",
       "localizations": {

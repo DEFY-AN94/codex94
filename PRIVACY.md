@@ -6,6 +6,15 @@ stable version is [`v4.1.5 (29)`](https://github.com/DEFY-AN94/codex94/releases/
 released on 2026-10-18 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
+The `4.1.6 (30)` candidate adds one local Boolean preference,
+`claude.popoverShowsFable.v1`, defaulting to false. It controls whether the
+reported Fable model limit appears beside the shared five-hour and weekly
+windows in Claude's popover, for current, cached and historical reports.
+Dashboard retains all reported model limits. The switch changes presentation
+only: it does not alter source selection, report timestamps, native menu-bar
+quota selection, notifications, refresh scheduling or quota cache v2. It adds no
+data fetch, credential access, endpoint, entitlement or persistent usage record.
+
 Version `4.1.5 (29)` adds Dashboard history meters, model-limit meters and
 adaptive popover sizing. These are presentation changes: original report times,
 source selection and existing storage remain unchanged, with no additional
@@ -322,6 +331,13 @@ optional Codex executable path chosen by the user. The model bucket being
 browsed in the popover is held only for the current app run and is not written
 to `UserDefaults`. macOS may also store the Dashboard window frame and
 launch-at-login state.
+
+The `4.1.6 (30)` candidate stores the popover's Fable opt-in as the Boolean
+`claude.popoverShowsFable.v1` in `UserDefaults`. Missing preferences default to
+off for both new and existing installations. The saved value survives app
+restarts and applies to the popover only; it stores no quota values, model
+report, account identity or history. Dashboard model visibility and the
+existing menu-bar quota preferences remain independent.
 
 Version `0.1.8` introduced two UI preference keys; `0.1.9` reuses both keys and
 their migration without adding another preference:

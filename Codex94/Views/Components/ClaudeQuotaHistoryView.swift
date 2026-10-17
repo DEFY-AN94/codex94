@@ -8,6 +8,11 @@ struct ClaudeQuotaHistoryView: View {
     let language: LanguagePreference
     let palette: Codex94Palette
     var style: ProviderQuotaDisplayStyle = .card
+    var modelLimitVisibility: ClaudeModelLimitVisibility = .all
+
+    var displayedModelLimits: [ClaudeQuotaModelLimit] {
+        report.modelLimits.filter { modelLimitVisibility.includes($0.limitID) }
+    }
 
     private var isTerminal: Bool { style == .terminal }
 
@@ -35,11 +40,11 @@ struct ClaudeQuotaHistoryView: View {
                     )
                 }
             }
-            if !report.modelLimits.isEmpty {
+            if !displayedModelLimits.isEmpty {
                 Text("claude.modelLimits.title")
                     .font(.caption).foregroundStyle(.secondary)
                     .padding(.top, 2)
-                ForEach(report.modelLimits, id: \.limitID) { limit in
+                ForEach(displayedModelLimits, id: \.limitID) { limit in
                     historyRow(
                         title: limit.modelName + " · " + StatusAccessibilityString.localized(
                             "quota.weeklyShort", language: language, bundle: .main),
