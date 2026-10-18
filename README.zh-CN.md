@@ -24,6 +24,13 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 5 小时和每周额度；Fable 开关默认关闭，选择会保留，并适用于当前、缓存和历史报告。
 详见 [4.1.6 更新记录](CHANGELOG.md#416---2026-10-18)。
 
+**发布候选版：4.1.7 (31)，2026-10-18（Australia/Melbourne）。** Claude CLI 终端持续重绘时仍会继续解析用量；保留
+默认 20 秒期限、1 MiB 输出上限和报告稳定 1 秒的要求，`/usage` 显示 `refreshing` 时
+不接受其中的缓存数值。新增本地探测诊断仅含固定枚举 `phase`、`result`、`issue`，
+布尔值 `usage_sent`、`terminal_received` 和 `duration_ms`，不含终端正文、路径、
+账号信息或用量数值。本地手动 CLI 重试已由维护者验收，正式发布仍需通过发布检查；
+详见[4.1.7 更新记录](CHANGELOG.md#417---2026-10-18)。
+
 ## 功能详情
 
 以下介绍已发布版本的功能。逐版变更集中在 [CHANGELOG.md](CHANGELOG.md)，

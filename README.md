@@ -28,6 +28,16 @@ shows shared 5-hour and Weekly quotas by default, with a default-off Fable
 switch that remembers your choice for current, cached and historical reports.
 See [4.1.6 changes](CHANGELOG.md#416---2026-10-18).
 
+**Release candidate: 4.1.7 (31), 2026-10-18 (Australia/Melbourne).** Claude CLI usage parsing continues
+during terminal redraws. The probe keeps its 20-second default deadline, 1 MiB
+output cap and one-second report stability requirement; cached values are not
+accepted while `/usage` shows `refreshing`. New local probe diagnostics contain
+only fixed-enum `phase`, `result` and `issue` values, `usage_sent` and
+`terminal_received` booleans, and `duration_ms`, without terminal text, paths,
+account details or quota values. The maintainer accepted the local manual CLI
+retry; publication still awaits its release checks. See
+[4.1.7 changes](CHANGELOG.md#417---2026-10-18).
+
 ## Features
 
 The following describes the published release. Release-by-release changes live

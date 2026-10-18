@@ -493,6 +493,51 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         XCTAssertThrowsError(try ClaudeUsageScreen.report(from: cleared, at: first))
     }
 
+    func testScreenSnapshotRejectsTruncatedUTF8AndTerminalSequencesUntilCompleted() {
+        let base = Data("Current week (all models)\r\n62.5% used\r\n".utf8)
+        XCTAssertTrue(ClaudeUsageScreen.snapshot(from: base).isComplete)
+        let character = Data("界".utf8)
+        for byteCount in 1..<character.count {
+            var bytes = base
+            bytes.append(character.prefix(byteCount))
+            XCTAssertFalse(ClaudeUsageScreen.snapshot(from: bytes).isComplete,
+                           "A readable quota must not bypass an unfinished UTF-8 character")
+            bytes.append(character.dropFirst(byteCount))
+            let completed = ClaudeUsageScreen.snapshot(from: bytes)
+            XCTAssertTrue(completed.isComplete)
+            XCTAssertTrue(completed.text.contains("界"))
+        }
+        for (prefix, suffix) in [
+            ("\u{1b}", "[0m"),
+            ("\u{1b}[31", "m"),
+            ("\u{1b}]0;synthetic-title", "\u{7}"),
+            ("\u{1b}]0;synthetic-title\u{1b}", "\\"),
+            ("\u{1b}Psynthetic-control-payload", "\u{1b}\\"),
+            ("\u{1b}Psynthetic-control-payload\u{1b}", "\\")
+        ] {
+            var bytes = base
+            bytes.append(Data(prefix.utf8))
+            XCTAssertFalse(ClaudeUsageScreen.snapshot(from: bytes).isComplete,
+                           "An unfinished control sequence must suspend interpretation of the screen")
+            bytes.append(Data(suffix.utf8))
+            let completed = ClaudeUsageScreen.snapshot(from: bytes)
+            XCTAssertTrue(completed.isComplete)
+            XCTAssertTrue(completed.text.contains("62.5% used"))
+            XCTAssertFalse(completed.text.contains("synthetic-title"))
+            XCTAssertFalse(completed.text.contains("synthetic-control-payload"))
+        }
+    }
+
+    func testScreenSnapshotWaitsForSynchronizedUpdateToClose() {
+        let frame = "\u{1b}[?2026h\u{1b}[2J\u{1b}[HCurrent week (all models)\r\n62.5% used"
+        XCTAssertFalse(ClaudeUsageScreen.snapshot(from: Data(frame.utf8)).isComplete)
+        let completed = ClaudeUsageScreen.snapshot(from: Data((frame + "\u{1b}[?2026l").utf8))
+        XCTAssertTrue(completed.isComplete)
+        XCTAssertTrue(completed.text.contains("62.5% used"))
+        XCTAssertFalse(ClaudeUsageScreen.snapshot(from: Data((frame + "\u{1b}[?2026l\u{1b}[?2026h").utf8)).isComplete,
+                       "A later open update cannot reuse an earlier frame's completion")
+    }
+
     func testFakeCLIUsesOnlyUsageAndCleansItsProcessGroup() async throws {
         let root = try fixtureDirectory()
         let executable = root.appendingPathComponent("claude")
@@ -586,6 +631,131 @@ final class ClaudeQuotaBackendTests: XCTestCase {
             let child = try XCTUnwrap(Int32(try String(contentsOf: fixture.childPIDFile, encoding: .utf8)))
             XCTAssertEqual(kill(child, 0), -1)
         }
+    }
+
+    func testContinuousReadyAndUsageRedrawsReturnSingleWeeklyWindow() async throws {
+        let fixture = try redrawingCLI(redrawReady: true)
+        defer { fixture.client.shutdown() }
+        let report = try await fixture.client.fetch()
+        XCTAssertEqual(report.windows.map(\.kind), [.weekly])
+        XCTAssertEqual(report.windows.map(\.usedPercentage), [62.5])
+        XCTAssertNil(report.snapshot(at: report.reportedAt)?.defaultBucket?.window(.fiveHour))
+        try await assertRedrawingCLICleanedUp(fixture)
+        XCTAssertEqual(try Data(contentsOf: fixture.inputFile), Data("/usage\r".utf8),
+                       "Continuous ready and usage paints must receive the built-in command exactly once")
+        let frames = try String(contentsOf: fixture.framesFile, encoding: .utf8).components(separatedBy: "\n")
+        XCTAssertTrue(frames.contains("ready"))
+        XCTAssertGreaterThan(frames.filter { $0 == "usage" }.count, 5,
+                             "A successful read must settle its values while the panel is still repainting")
+        try assertCLIDiagnostic(fixture.diagnostics, phase: .completed, issue: nil, usageSent: true)
+    }
+
+    func testContinuousUsageRedrawsReturnStableWeeklyWindow() async throws {
+        let fixture = try redrawingCLI(redrawReady: false)
+        defer { fixture.client.shutdown() }
+        let report = try await fixture.client.fetch()
+        XCTAssertEqual(report.windows.map(\.kind), [.weekly])
+        XCTAssertEqual(report.windows.map(\.usedPercentage), [62.5])
+        try await assertRedrawingCLICleanedUp(fixture)
+        XCTAssertEqual(try Data(contentsOf: fixture.inputFile), Data("/usage\r".utf8))
+        let frames = try String(contentsOf: fixture.framesFile, encoding: .utf8).components(separatedBy: "\n")
+        XCTAssertEqual(frames.filter { $0 == "ready" }.count, 1,
+                       "This fixture isolates repainting after a quiet, recognized startup")
+        XCTAssertGreaterThan(frames.filter { $0 == "usage" }.count, 5)
+        try assertCLIDiagnostic(fixture.diagnostics, phase: .completed, issue: nil, usageSent: true)
+    }
+
+    func testContinuouslyRedrawnRefreshingPanelKeepsOriginalDeadline() async throws {
+        for marker in ["Refreshing…", "Refreshing..."] {
+            let fixture = try redrawingCLI(redrawReady: false, refreshingMarker: marker, timeout: 2)
+            defer { fixture.client.shutdown() }
+            let clock = ContinuousClock()
+            let started = clock.now
+            do { _ = try await fixture.client.fetch(); XCTFail("Repainted cached windows cannot finish a refreshing read") }
+            catch { XCTAssertEqual(error as? ClaudeQuotaIssue, .timedOut) }
+            XCTAssertGreaterThanOrEqual(clock.now - started, .seconds(2))
+            XCTAssertLessThan(clock.now - started, .seconds(5), "Every paint must preserve the original transaction deadline")
+            try await assertRedrawingCLICleanedUp(fixture)
+            XCTAssertEqual(try Data(contentsOf: fixture.inputFile), Data("/usage\r".utf8))
+            let frames = try String(contentsOf: fixture.framesFile, encoding: .utf8).components(separatedBy: "\n")
+            XCTAssertGreaterThan(frames.filter { $0 == "usage" }.count, 5)
+            try assertCLIDiagnostic(fixture.diagnostics, phase: .refreshingUsage, issue: .timedOut, usageSent: true)
+        }
+    }
+
+    func testContinuouslyRedrawnUnknownStartupNeverReceivesInput() async throws {
+        let fixture = try redrawingCLI(redrawReady: true, unknownStartup: true, timeout: 2)
+        defer { fixture.client.shutdown() }
+        let clock = ContinuousClock()
+        let started = clock.now
+        do { _ = try await fixture.client.fetch(); XCTFail("Unrecognized startup must not authorize command input") }
+        catch { XCTAssertEqual(error as? ClaudeQuotaIssue, .timedOut) }
+        XCTAssertGreaterThanOrEqual(clock.now - started, .seconds(2))
+        XCTAssertLessThan(clock.now - started, .seconds(5))
+        try await assertRedrawingCLICleanedUp(fixture)
+        XCTAssertTrue(try Data(contentsOf: fixture.inputFile).isEmpty)
+        let frames = try String(contentsOf: fixture.framesFile, encoding: .utf8).components(separatedBy: "\n")
+        XCTAssertGreaterThan(frames.filter { $0 == "ready" }.count, 5)
+        XCTAssertFalse(frames.contains("usage"))
+        try assertCLIDiagnostic(fixture.diagnostics, phase: .waitingForPrompt, issue: .timedOut, usageSent: false)
+    }
+
+    func testIncompleteSynchronizedFramesNeitherSendUsageNorReturnInterimQuota() async throws {
+        let root = try fixtureDirectory()
+        let executable = root.appendingPathComponent("claude")
+        let input = root.appendingPathComponent("input")
+        let frames = root.appendingPathComponent("frames")
+        let parentPID = root.appendingPathComponent("parent-pid")
+        let readerPID = root.appendingPathComponent("reader-pid")
+        let childPID = root.appendingPathComponent("child-pid")
+        let prematureInput = root.appendingPathComponent("input-before-complete")
+        let completedFrame = root.appendingPathComponent("completed-frame")
+        let rule = String(repeating: "─", count: 80)
+        let script = """
+        #!/bin/sh
+        if [ "$1" = "--version" ]; then printf '2.1.286 (Claude Code)\\n'; exit 0; fi
+        /bin/stty raw -echo
+        printf '%s' $$ > '\(parentPID.path)'
+        : > '\(input.path)'
+        : > '\(frames.path)'
+        exec 3<&0
+        /bin/cat <&3 > '\(input.path)' &
+        printf '%s' $! > '\(readerPID.path)'
+        /bin/sleep 30 &
+        printf '%s' $! > '\(childPID.path)'
+        printf '\\033[?2026h\\033[2J\\033[HClaude Code v2.1.286\\r\\n\(rule)\\r\\n❯\\r\\n\(rule)\\r\\n⏸ plan mode on (shift+tab to cycle)\\r\\n'
+        /bin/sleep 0.6
+        if [ -s '\(input.path)' ]; then printf 'premature' > '\(prematureInput.path)'; fi
+        printf '\\033[?2026l'
+        while [ ! -s '\(input.path)' ]; do /bin/sleep 0.05; done
+        printf '\\033[?2026h\\033[2J\\033[HCurrent week (all models)\\r\\n10%% used\\r\\n'
+        /bin/sleep 1.4
+        printf '\\033[2J\\033[HCurrent week (all models)\\r\\n62.5%% used\\r\\n\\033[?2026l'
+        printf 'complete' > '\(completedFrame.path)'
+        wait
+        """
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let diagnostics = CLIDiagnosticRecorder()
+        let fixture = RedrawingCLIFixture(
+            client: ClaudeCLIUsageClient(
+                executableURL: executable, runtimeDirectory: root.appendingPathComponent("runtime"), timeout: 6,
+                diagnosticHandler: { diagnostics.append($0) }
+            ),
+            inputFile: input, framesFile: frames, parentPIDFile: parentPID, readerPIDFile: readerPID,
+            childPIDFile: childPID, diagnostics: diagnostics
+        )
+        defer { fixture.client.shutdown() }
+        let report = try await fixture.client.fetch()
+        XCTAssertEqual(report.windows.map(\.kind), [.weekly])
+        XCTAssertEqual(report.windows.map(\.usedPercentage), [62.5],
+                       "The provisional 10% frame remains unusable even after the normal one-second settling interval")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: completedFrame.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: prematureInput.path),
+                       "A ready-looking prompt inside an unfinished synchronized update must not receive input")
+        try await assertRedrawingCLICleanedUp(fixture)
+        XCTAssertEqual(try Data(contentsOf: input), Data("/usage\r".utf8))
+        try assertCLIDiagnostic(diagnostics, phase: .completed, issue: nil, usageSent: true)
     }
 
     func testProbeSuppressesUpdatesAndHistoryOnlyInItsChildEnvironment() async throws {
@@ -899,6 +1069,109 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         return (ClaudeCLIUsageClient(executableURL: executable, runtimeDirectory: root.appendingPathComponent("runtime"),
                                      environment: environment ?? ProcessInfo.processInfo.environment, timeout: timeout),
                 request, childPID, marker)
+    }
+
+    private struct RedrawingCLIFixture {
+        let client: ClaudeCLIUsageClient
+        let inputFile: URL
+        let framesFile: URL
+        let parentPIDFile: URL
+        let readerPIDFile: URL
+        let childPIDFile: URL
+        let diagnostics: CLIDiagnosticRecorder
+    }
+
+    private final class CLIDiagnosticRecorder: @unchecked Sendable {
+        private let lock = NSLock()
+        private var values: [ClaudeCLIUsageDiagnostic] = []
+        func append(_ value: ClaudeCLIUsageDiagnostic) { lock.withLock { values.append(value) } }
+        func read() -> [ClaudeCLIUsageDiagnostic] { lock.withLock { values } }
+    }
+
+    private func assertCLIDiagnostic(_ recorder: CLIDiagnosticRecorder, phase: ClaudeCLIUsageDiagnostic.Phase,
+                                     issue: ClaudeQuotaIssue?, usageSent: Bool,
+                                     file: StaticString = #filePath, line: UInt = #line) throws {
+        let values = recorder.read()
+        XCTAssertEqual(values.count, 1, "Each fetch must report exactly one final diagnostic", file: file, line: line)
+        let diagnostic = try XCTUnwrap(values.first, file: file, line: line)
+        XCTAssertEqual(diagnostic.phase, phase, file: file, line: line)
+        XCTAssertEqual(diagnostic.result, issue == nil ? .success : .failure, file: file, line: line)
+        XCTAssertEqual(diagnostic.issue, issue, file: file, line: line)
+        XCTAssertEqual(diagnostic.usageSent, usageSent, file: file, line: line)
+        XCTAssertTrue(diagnostic.terminalReceived, file: file, line: line)
+        XCTAssertGreaterThan(diagnostic.durationMilliseconds, 0, file: file, line: line)
+        XCTAssertLessThan(diagnostic.durationMilliseconds, 6_000, file: file, line: line)
+    }
+
+    /// The fixture continuously changes only an unrelated animation counter.
+    /// Raw input is recorded independently, including any accidental duplicate
+    /// command or confirmation. All processes belong to the client's fake group.
+    private func redrawingCLI(redrawReady: Bool, unknownStartup: Bool = false,
+                               refreshingMarker: String? = nil, timeout: TimeInterval = 4) throws -> RedrawingCLIFixture {
+        let root = try fixtureDirectory()
+        let executable = root.appendingPathComponent("claude")
+        let input = root.appendingPathComponent("input")
+        let frames = root.appendingPathComponent("frames")
+        let parentPID = root.appendingPathComponent("parent-pid")
+        let readerPID = root.appendingPathComponent("reader-pid")
+        let childPID = root.appendingPathComponent("child-pid")
+        let rule = String(repeating: "─", count: 80)
+        let startup = unknownStartup ? "Unrecognized synthetic startup panel" :
+            "Claude Code v2.1.286\\r\\n\(rule)\\r\\n❯\\r\\n\(rule)\\r\\n⏸ plan mode on (shift+tab to cycle)"
+        let marker = refreshingMarker.map { "\\r\\n" + $0 } ?? ""
+        let script = """
+        #!/bin/sh
+        if [ "$1" = "--version" ]; then printf '2.1.286 (Claude Code)\\n'; exit 0; fi
+        /bin/stty raw -echo
+        printf '%s' $$ > '\(parentPID.path)'
+        : > '\(input.path)'
+        : > '\(frames.path)'
+        exec 3<&0
+        /bin/cat <&3 > '\(input.path)' &
+        printf '%s' $! > '\(readerPID.path)'
+        /bin/sleep 30 &
+        printf '%s' $! > '\(childPID.path)'
+        painted=0
+        tick=0
+        while :; do
+            if [ -s '\(input.path)' ]; then
+                printf '\\033[2J\\033[HCurrent week (all models)\\r\\n62.5%% used\(marker)\\r\\nAnimation %s\\r\\n' "$tick"
+                printf 'usage\\n' >> '\(frames.path)'
+            elif [ '\(redrawReady ? "1" : "0")' = 1 ] || [ "$painted" = 0 ]; then
+                printf '\\033[2J\\033[H\(startup)\\r\\nAnimation %s\\r\\n' "$tick"
+                printf 'ready\\n' >> '\(frames.path)'
+                painted=1
+            fi
+            tick=$((tick + 1))
+            /bin/sleep 0.05
+        done
+        """
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let diagnostics = CLIDiagnosticRecorder()
+        return RedrawingCLIFixture(
+            client: ClaudeCLIUsageClient(
+                executableURL: executable, runtimeDirectory: root.appendingPathComponent("runtime"), timeout: timeout,
+                diagnosticHandler: { diagnostics.append($0) }
+            ),
+            inputFile: input, framesFile: frames, parentPIDFile: parentPID, readerPIDFile: readerPID,
+            childPIDFile: childPID, diagnostics: diagnostics
+        )
+    }
+
+    private func assertRedrawingCLICleanedUp(_ fixture: RedrawingCLIFixture,
+                                           file: StaticString = #filePath, line: UInt = #line) async throws {
+        let processes = try [fixture.parentPIDFile, fixture.readerPIDFile, fixture.childPIDFile].map {
+            try XCTUnwrap(Int32(String(contentsOf: $0, encoding: .utf8)), file: file, line: line)
+        }
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(2))
+        while processes.contains(where: { kill($0, 0) == 0 }), clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        for process in processes {
+            XCTAssertEqual(kill(process, 0), -1, "The client must stop its entire synthetic process group", file: file, line: line)
+        }
     }
 
     private func fixtureDirectory() throws -> URL {

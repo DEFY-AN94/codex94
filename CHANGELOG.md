@@ -6,6 +6,28 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
+## 4.1.7 - 2026-10-18
+
+Version `4.1.7 (31)` is the release candidate for the date above
+(Australia/Melbourne). The maintainer accepted the local manual CLI retry;
+PR/final-main checks and release-asset verification remain separate gates.
+Stable downloads continue to identify `4.1.6 (30)` until publication.
+
+### Fixed
+
+- Continue evaluating Claude CLI usage output during continuous terminal
+  redraws, so incoming bytes do not indefinitely postpone parsing.
+- Retain the probe's 20-second default deadline, 1 MiB output cap and one-second
+  report stability requirement. Do not accept cached values while the usage
+  panel shows `refreshing`.
+
+### Changed
+
+- Add local probe diagnostics containing only fixed-enum `phase`, `result`
+  and `issue` values, `usage_sent` and `terminal_received` booleans, and
+  `duration_ms`. Do not record terminal text, paths, account details or quota
+  values.
+
 ## 4.1.6 - 2026-10-18
 
 Version `4.1.6 (30)` was published on the date above, following `4.1.5 (29)`.

@@ -1,5 +1,41 @@
 import Darwin
 import Foundation
+import OSLog
+
+/// One bounded, payload-free event per CLI read. Terminal text never leaves the reader.
+struct ClaudeCLIUsageDiagnostic: Equatable, Sendable {
+    enum Phase: String, Sendable {
+        case locatingExecutable = "locating_executable"
+        case validatingVersion = "validating_version"
+        case preparingSession = "preparing_session"
+        case waitingForPrompt = "waiting_for_prompt"
+        case confirmingTrust = "confirming_trust"
+        case waitingForUsage = "waiting_for_usage"
+        case refreshingUsage = "refreshing_usage"
+        case settlingUsage = "settling_usage"
+        case readingTerminal = "reading_terminal"
+        case completed
+    }
+    enum Result: String, Sendable { case success, failure, cancelled }
+
+    let phase: Phase
+    let result: Result
+    let issue: ClaudeQuotaIssue?
+    let usageSent: Bool
+    let terminalReceived: Bool
+    let durationMilliseconds: Int
+
+    private static let logger = Logger(subsystem: "com.defyan94.codex94", category: "claude-cli")
+
+    func log() {
+        let issueName = issue?.rawValue ?? "none"
+        if result == .failure {
+            Self.logger.error("read=finished phase=\(phase.rawValue, privacy: .public) result=\(result.rawValue, privacy: .public) issue=\(issueName, privacy: .public) usage_sent=\(usageSent, privacy: .public) terminal_received=\(terminalReceived, privacy: .public) duration_ms=\(durationMilliseconds, privacy: .public)")
+        } else {
+            Self.logger.info("read=finished phase=\(phase.rawValue, privacy: .public) result=\(result.rawValue, privacy: .public) issue=\(issueName, privacy: .public) usage_sent=\(usageSent, privacy: .public) terminal_received=\(terminalReceived, privacy: .public) duration_ms=\(durationMilliseconds, privacy: .public)")
+        }
+    }
+}
 
 /// A short-lived official CLI session. It only submits the built-in /usage command.
 final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
@@ -8,19 +44,22 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
     private let environment: [String: String]
     private let locator: ClaudeExecutableLocator
     private let timeout: TimeInterval
+    private let diagnosticHandler: @Sendable (ClaudeCLIUsageDiagnostic) -> Void
     private let lifecycle = ManagedSubprocessLifecycle()
     private let queue = DispatchQueue(label: "com.defyan94.codex94.claude-usage", qos: .utility)
     private let cancellationQueue = DispatchQueue(label: "com.defyan94.codex94.claude-cancellation", qos: .utility)
 
     init(executableURL: URL? = nil, runtimeDirectory: URL? = nil,
          environment: [String: String] = ProcessInfo.processInfo.environment, timeout: TimeInterval = 20,
-         locator: ClaudeExecutableLocator? = nil) {
+         locator: ClaudeExecutableLocator? = nil,
+         diagnosticHandler: @escaping @Sendable (ClaudeCLIUsageDiagnostic) -> Void = { $0.log() }) {
         self.executableURL = executableURL
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         self.runtimeDirectory = runtimeDirectory ?? support.appendingPathComponent("Codex94/Claude/UsageProbe")
         self.environment = environment
         self.locator = locator ?? ClaudeExecutableLocator(environment: environment)
         self.timeout = max(1, min(timeout, 60))
+        self.diagnosticHandler = diagnosticHandler
     }
 
     func fetch() async throws -> ClaudeQuotaReport {
@@ -45,8 +84,44 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
     func shutdown() { lifecycle.shutdown(gracePeriod: 0.3) }
 
     private func fetchSynchronously() throws -> ClaudeQuotaReport {
+        let started = ProcessInfo.processInfo.systemUptime
+        var trace = ReadTrace()
+        do {
+            let report = try readUsage(trace: &trace)
+            trace.phase = .completed
+            record(trace, result: .success, issue: nil, started: started)
+            return report
+        } catch {
+            let cancelled = error is CancellationError || lifecycle.hasShutDown
+            record(trace, result: cancelled ? .cancelled : .failure,
+                   issue: cancelled ? nil : ((error as? ClaudeQuotaIssue) ?? .unavailable), started: started)
+            throw error
+        }
+    }
+
+    private struct ReadTrace {
+        var phase: ClaudeCLIUsageDiagnostic.Phase = .locatingExecutable
+        var usageSent = false
+        var terminalReceived = false
+    }
+
+    private enum InputAction: Equatable {
+        case usage, trust(String), unsupportedTrust, confirmUsage
+    }
+
+    private func record(_ trace: ReadTrace, result: ClaudeCLIUsageDiagnostic.Result,
+                        issue: ClaudeQuotaIssue?, started: TimeInterval) {
+        diagnosticHandler(ClaudeCLIUsageDiagnostic(
+            phase: trace.phase, result: result, issue: issue,
+            usageSent: trace.usageSent, terminalReceived: trace.terminalReceived,
+            durationMilliseconds: Int(max(0, ProcessInfo.processInfo.systemUptime - started) * 1_000)))
+    }
+
+    private func readUsage(trace: inout ReadTrace) throws -> ClaudeQuotaReport {
         let executable = try locator.locate(manualURL: executableURL)
+        trace.phase = .validatingVersion
         try validateVersion(of: executable)
+        trace.phase = .preparingSession
         try ClaudeLocalFile.createPrivateDirectory(runtimeDirectory)
         let marker = runtimeDirectory.appendingPathComponent(".codex94-usage-probe")
         let contents = try FileManager.default.contentsOfDirectory(atPath: runtimeDirectory.path)
@@ -80,13 +155,16 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
         }
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: .seconds(timeout))
+        trace.phase = .waitingForPrompt
         var output = Data()
         var terminalQueries = ClaudeTerminalQueries()
         var sentUsage = false
         var confirmedUsageAction = false
         var trustSteps = 0
         var lastTrustInput: String?
-        var lastOutput = clock.now
+        var nextEvaluation = clock.now
+        var pendingAction: InputAction?
+        var actionSince: ContinuousClock.Instant?
         var candidateWindows: [ClaudeQuotaWindow]?
         var candidateSince: ContinuousClock.Instant?
         while clock.now < deadline {
@@ -105,10 +183,21 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
                 output.append(data)
                 guard output.count <= 1_048_576 else { throw ClaudeQuotaIssue.invalidData }
                 for reply in terminalQueries.responses(to: data) { try primary.write(contentsOf: reply) }
-                lastOutput = clock.now
+                trace.terminalReceived = true
             }
-            guard clock.now - lastOutput >= .milliseconds(200) else { continue }
-            let screen = ClaudeUsageScreen.text(from: output)
+            // A busy terminal must not postpone parsing indefinitely. Limit work
+            // by time, independently of byte arrival or animation frequency.
+            guard clock.now >= nextEvaluation else { continue }
+            nextEvaluation = clock.now.advanced(by: .milliseconds(100))
+            let frame = ClaudeUsageScreen.snapshot(from: output)
+            guard clock.now < deadline else { break }
+            guard frame.isComplete else {
+                trace.phase = .readingTerminal
+                pendingAction = nil; actionSince = nil
+                candidateWindows = nil; candidateSince = nil
+                continue
+            }
+            let screen = frame.text
             let normalized = screen.lowercased().filter { !$0.isWhitespace }
             if normalized.contains("selecttheme") || normalized.contains("textstyle")
                 || (normalized.contains("let’sgetstarted") && normalized.contains("darkmode")) {
@@ -118,25 +207,25 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
                 || normalized.contains("logintoclaude") || normalized.contains("choosehowtologin") {
                 throw ClaudeQuotaIssue.loginRequired
             }
+            var action: InputAction?
             if normalized.contains("quicksafetycheck") || normalized.contains("trustthisfolder")
                 || normalized.contains("doyoutrustthefiles") {
-                let key = try trustInput(on: screen)
-                // Wait for a changed selection, not merely more terminal bytes,
-                // before sending another key to the same trust dialog.
-                guard key != lastTrustInput else { continue }
-                guard trustSteps < 3 else { throw ClaudeQuotaIssue.setupRequired }
-                lastTrustInput = key
-                try primary.write(contentsOf: Data(key.utf8)); trustSteps += 1; lastOutput = clock.now; continue
-            }
-            if !sentUsage, ClaudeUsageScreen.isReadyForUsage(screen) {
-                try primary.write(contentsOf: Data("/usage\r".utf8))
-                sentUsage = true; output.removeAll(keepingCapacity: true); lastOutput = clock.now; continue
-            }
-            if sentUsage {
+                trace.phase = .confirmingTrust
+                // Revalidate the complete owned path and selection on every
+                // sample. Partially painted menus never authorize a key.
+                action = (try? trustInput(on: screen)).map(InputAction.trust) ?? .unsupportedTrust
+                candidateWindows = nil; candidateSince = nil
+            } else if !sentUsage {
+                trace.phase = .waitingForPrompt
+                if ClaudeUsageScreen.isReadyForUsage(screen) { action = .usage }
+            } else {
                 // The usage panel can show cached windows while its own
                 // network refresh is still pending. Those are not fresh data.
-                if !ClaudeUsageScreen.isRefreshing(screen),
-                   let report = try? ClaudeUsageScreen.report(from: screen, at: Date()) {
+                if ClaudeUsageScreen.isRefreshing(screen) {
+                    trace.phase = .refreshingUsage
+                    candidateWindows = nil; candidateSince = nil
+                } else if let report = try? ClaudeUsageScreen.report(from: screen, at: Date()) {
+                    trace.phase = .settlingUsage
                     if candidateWindows != report.windows {
                         candidateWindows = report.windows
                         candidateSince = clock.now
@@ -147,16 +236,44 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
                     // This never moves the transaction's original deadline.
                     if let candidateSince, clock.now - candidateSince >= .seconds(1) {
                         if lifecycle.hasShutDown { throw CancellationError() }
+                        guard clock.now < deadline else { break }
                         return report
                     }
                 } else {
+                    trace.phase = .waitingForUsage
                     candidateWindows = nil
                     candidateSince = nil
                 }
                 if !confirmedUsageAction, normalized.contains("showplan") {
-                    try primary.write(contentsOf: Data("\r".utf8))
-                    confirmedUsageAction = true; lastOutput = clock.now
+                    action = .confirmUsage
                 }
+            }
+            // Keep the input guard, but settle recognized actions rather than
+            // waiting for every unrelated animation byte to become quiet.
+            if action != pendingAction {
+                pendingAction = action
+                actionSince = action == nil ? nil : clock.now
+            }
+            if let action, let since = actionSince, clock.now - since >= .milliseconds(200) {
+                if lifecycle.hasShutDown { throw CancellationError() }
+                guard clock.now < deadline else { break }
+                switch action {
+                case .usage:
+                    try primary.write(contentsOf: Data("/usage\r".utf8))
+                    sentUsage = true; trace.usageSent = true; trace.phase = .waitingForUsage
+                    output.removeAll(keepingCapacity: true)
+                case .trust(let key):
+                    if key != lastTrustInput {
+                        guard trustSteps < 3 else { throw ClaudeQuotaIssue.setupRequired }
+                        try primary.write(contentsOf: Data(key.utf8))
+                        lastTrustInput = key; trustSteps += 1
+                    }
+                case .unsupportedTrust: throw ClaudeQuotaIssue.setupRequired
+                case .confirmUsage:
+                    try primary.write(contentsOf: Data("\r".utf8))
+                    confirmedUsageAction = true
+                }
+                pendingAction = nil; actionSince = nil
             }
             if process.pollForExit() { throw ClaudeQuotaIssue.unavailable }
         }
@@ -341,24 +458,42 @@ enum ClaudeUsageScreen {
         return ClaudeQuotaReport(source: .cliUsage, reportedAt: date, receivedAt: date, windows: windows)
     }
 
+    struct Snapshot {
+        let text: String
+        let isComplete: Bool
+    }
+
+    static func text(from data: Data) -> String { snapshot(from: data).text }
+
     /// Small VT screen replay: stale panels erased by the CLI never remain parseable.
-    static func text(from data: Data) -> String {
-        let scalars = Array(String(decoding: data, as: UTF8.self).unicodeScalars)
+    /// Partial encodings/control strings and open synchronized updates cannot
+    /// authorize input or make the preceding screen count as a stable report.
+    static func snapshot(from data: Data) -> Snapshot {
+        guard let decoded = String(data: data, encoding: .utf8) else {
+            return Snapshot(text: "", isComplete: false)
+        }
+        let scalars = Array(decoded.unicodeScalars)
         let rows = 50, columns = 180
         var cells = Array(repeating: Array(repeating: " ", count: columns), count: rows)
         var row = 0, column = 0, index = 0
+        var complete = true
+        var synchronizedUpdate = false
         while index < scalars.count {
             let scalar = scalars[index]; index += 1
             if scalar.value == 27 {
-                guard index < scalars.count else { break }
+                guard index < scalars.count else { complete = false; break }
                 let next = scalars[index]; index += 1
                 if next == "[" {
                     var parameters = ""
                     while index < scalars.count, !(64...126).contains(scalars[index].value) {
                         parameters.unicodeScalars.append(scalars[index]); index += 1
                     }
-                    guard index < scalars.count else { break }
+                    guard index < scalars.count else { complete = false; break }
                     let command = scalars[index]; index += 1
+                    if parameters.hasPrefix("?"), parameters.dropFirst().split(separator: ";").contains("2026") {
+                        if command == "h" { synchronizedUpdate = true }
+                        if command == "l" { synchronizedUpdate = false }
+                    }
                     let values = parameters.split(separator: ";", omittingEmptySubsequences: false).map { Int($0) ?? 0 }
                     let value = values.first ?? 0, amount = max(1, value)
                     switch command {
@@ -377,12 +512,21 @@ enum ClaudeUsageScreen {
                         }
                     default: break
                     }
-                } else if next == "]" {
+                } else if next == "]" || next == "P" || next == "X" || next == "^" || next == "_" {
+                    var terminated = false
                     while index < scalars.count {
-                        if scalars[index].value == 7 { index += 1; break }
-                        if scalars[index].value == 27, index + 1 < scalars.count, scalars[index + 1] == "\\" { index += 2; break }
+                        if next == "]", scalars[index].value == 7 { index += 1; terminated = true; break }
+                        if scalars[index].value == 27, index + 1 < scalars.count, scalars[index + 1] == "\\" {
+                            index += 2; terminated = true; break
+                        }
                         index += 1
                     }
+                    if !terminated { complete = false; break }
+                } else if (32...47).contains(next.value) {
+                    // ESC intermediate sequences, such as character-set selection.
+                    while index < scalars.count, (32...47).contains(scalars[index].value) { index += 1 }
+                    guard index < scalars.count else { complete = false; break }
+                    index += 1
                 }
             } else if scalar == "\r" { column = 0 }
             else if scalar == "\n" {
@@ -394,6 +538,7 @@ enum ClaudeUsageScreen {
                 column = min(columns - 1, column + 1)
             }
         }
-        return cells.map { $0.joined().trimmingCharacters(in: .whitespaces) }.joined(separator: "\n")
+        return Snapshot(text: cells.map { $0.joined().trimmingCharacters(in: .whitespaces) }.joined(separator: "\n"),
+                        isComplete: complete && !synchronizedUpdate)
     }
 }
