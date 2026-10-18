@@ -10,7 +10,7 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 自动调用 Claude CLI 是独立且默认关闭的选项。项目采用 MIT 许可，以 SwiftUI/AppKit 构建，
 不捆绑第三方运行时框架。
 
-**最新稳定版：**[`4.1.6 (30)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6)
+**最新稳定版：**[`4.1.7 (31)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7)
 · macOS 14+ · Apple Silicon 与 Intel · English 与简体中文
 
 [功能详情](#功能详情) · [界面截图](#界面截图) · [安装](#安装)
@@ -20,15 +20,11 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 > Codex `app-server` 为实验性接口，上游 CLI 与状态栏数据格式可能变化。
 > 分发包未签名／未公证，具体信任边界见下方安装说明。
 
-4.1.6 继续在 Dashboard 中显示 Claude 报告的全部模型限额。弹窗默认只显示共享的
-5 小时和每周额度；Fable 开关默认关闭，选择会保留，并适用于当前、缓存和历史报告。
-详见 [4.1.6 更新记录](CHANGELOG.md#416---2026-10-18)。
-
-**发布候选版：4.1.7 (31)，2026-10-18（Australia/Melbourne）。** Claude CLI 终端持续重绘时仍会继续解析用量；保留
+4.1.7 修复 Claude CLI 解析停滞问题：终端持续重绘时仍会继续解析用量；保留
 默认 20 秒期限、1 MiB 输出上限和报告稳定 1 秒的要求，`/usage` 显示 `refreshing` 时
 不接受其中的缓存数值。新增本地探测诊断仅含固定枚举 `phase`、`result`、`issue`，
 布尔值 `usage_sent`、`terminal_received` 和 `duration_ms`，不含终端正文、路径、
-账号信息或用量数值。本地手动 CLI 重试已由维护者验收，正式发布仍需通过发布检查；
+账号信息或用量数值；
 详见[4.1.7 更新记录](CHANGELOG.md#417---2026-10-18)。
 
 ## 功能详情
@@ -165,7 +161,7 @@ Claude 监控每次只显示**一份已接受的报告**：
 
 ## 界面截图
 
-所有截图均采用隔离的合成数据，不包含真实账号或实时用量。以下为历史截图，不代表当前 4.1.6 的界面。
+所有截图均采用隔离的合成数据，不包含真实账号或实时用量。以下为历史截图，不代表当前 4.1.7 的界面。
 以下**柱状图**与**折线图**采集于 `0.3.0 (14)` 候选测试阶段，使用相同的七天日记录。
 原始合成截图保持不变，
 这些英文界面截图来自
@@ -208,7 +204,7 @@ Claude 监控每次只显示**一份已接受的报告**：
 
 ## 安装
 
-已发布稳定版为 [`v4.1.6 (30)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6)，
+已发布稳定版为 [`v4.1.7 (31)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7)，
 于 **2026-10-18**（Australia/Melbourne）发布，提供 Universal 2 DMG 与同一个 annotated 标签
 的源码。下方下载和 clone 指令指向该版本；后续文档提交不会移动标签或替换已发布资产。
 
@@ -236,27 +232,27 @@ Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
 
 ### 安装 Universal DMG
 
-请从 [`v4.1.6` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6)
+请从 [`v4.1.7` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7)
 下载以下两个正式资产：
 
-- `Codex94-4.1.6-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.6-SHA256SUMS.txt`
+- `Codex94-4.1.7-macos-universal-unnotarized.dmg`
+- `Codex94-4.1.7-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-4.1.6-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.1.7-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-4.1.6-macos-universal-unnotarized.dmg \
+gh attestation verify Codex94-4.1.7-macos-universal-unnotarized.dmg \
   -R DEFY-AN94/codex94 \
   --signer-workflow DEFY-AN94/codex94/.github/workflows/ci.yml \
   --source-ref refs/heads/main \
-  --source-digest deddba6242440cd668bf218d8babd0e64dddfdf0 \
+  --source-digest 0ec67e917ea9a96ddee993d280fcc377a93bdc0c \
   --deny-self-hosted-runners
 ```
 
@@ -277,7 +273,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 仓库公开，无需 GitHub 认证。Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v4.1.6 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.1.7 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：

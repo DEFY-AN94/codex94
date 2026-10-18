@@ -8,10 +8,9 @@ below applies only to its recorded version and does not validate later releases.
 
 ## 4.1.7 - 2026-10-18
 
-Version `4.1.7 (31)` is the release candidate for the date above
-(Australia/Melbourne). The maintainer accepted the local manual CLI retry;
-PR/final-main checks and release-asset verification remain separate gates.
-Stable downloads continue to identify `4.1.6 (30)` until publication.
+Version `4.1.7 (31)` was published on the date above, following `4.1.6 (30)`.
+Release dates use Australia/Melbourne. Exact source, CI, package and acceptance
+evidence is recorded in [docs/RELEASING.md](docs/RELEASING.md).
 
 ### Fixed
 
