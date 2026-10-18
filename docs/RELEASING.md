@@ -1,6 +1,6 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v4.1.6 (30)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.6),
+The published stable version is [`v4.1.7 (31)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7),
 released on 2026-10-18 (Australia/Melbourne). Later docs-only commits do not
 move its tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
@@ -33,7 +33,7 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
-The **4.1.7 (31)** release candidate targets **2026-10-18**
+The **4.1.7 (31)** release was published on **2026-10-18**
 (Australia/Melbourne). It fixes CLI screen evaluation being indefinitely
 postponed by continuous redraws and adds one payload-free final diagnostic per
 read. Fixed phase/result/issue enums, `usage_sent`, `terminal_received` and
@@ -54,9 +54,8 @@ SHA-256 is
 The maintainer confirmed the manual retry works and requested Issue #68,
 a PR, green checks, merge and full tag/Release publication. No extra real CLI
 read was run by the agent. PR checks, final-main attestation, exact CI assets
-and final distribution verification remain pending until separately recorded.
-Public stable links stay on 4.1.6 until publication. Reconfirm the Melbourne
-date before tagging if this work crosses a date boundary.
+and final distribution verification are separate evidence recorded in the
+final 4.1.7 release record below. Public stable links now point to 4.1.7.
 
 The **4.1.6 (30)** release was published on **2026-10-18**
 (Australia/Melbourne), following **4.1.5 (29)**. The
@@ -291,7 +290,7 @@ The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
 do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
 records do not establish validation of these source boundaries. Final checks,
 artifacts and installation need separate records. Its release records remain
-historical; current stable links point to 4.1.6.
+historical; current stable links point to 4.1.7.
 
 During the earlier 4.0 release work, the maintainer approved a ten-minute
 live-observation scope.
@@ -1429,3 +1428,97 @@ Later documentation commits do not move the tag or replace release assets.
   records verification only. It does not move `v4.1.6`, alter App/build inputs
   or regenerate the release assets. Previous release records and historical
   screenshots retain their original provenance.
+
+### 4.1.7 final acceptance — 2026-10-18
+
+- [Issue #68](https://github.com/DEFY-AN94/codex94/issues/68) records the Claude
+  CLI timeout and the synthetic continuous-redraw reproduction.
+  [PR #69](https://github.com/DEFY-AN94/codex94/pull/69) was marked Ready after
+  its checks passed and merged at `2026-10-18T07:27:33Z`, closing the issue.
+  The maintainer requested the Issue, PR, green checks, merge, tag and full
+  GitHub Release publication with updated release notes.
+- The frozen release commit is
+  `0ec67e917ea9a96ddee993d280fcc377a93bdc0c`, tree
+  `9ddf23b13493b3299dcbb937595c91da26e85c4e`. PR head
+  `779b86273d761efe8ee9c9f9099838ef0a2286d1` was tested as merge
+  `0c62c7e3d0e7838c6fa48c8844e05e8ca9a01dd6`; all three trees match.
+  Annotated tag `v4.1.7` has object
+  `06f7c3959c2a2e4b3d85308e4c2b744320d29ba2` and peels to the frozen commit.
+  A fresh shallow tag clone confirmed source, tree and `4.1.7 (31)` metadata;
+  it was not used to claim a complete-history security scan.
+- The old reader failed both valid continuous-redraw regressions while the
+  refreshing-panel and unknown-startup protections passed. The corrected
+  reader passed 44 focused backend tests and the full local gate on Xcode
+  27.1: 607 tests, 1 existing hosted-focus skip, 0 failures, plus script,
+  security, Universal App and DMG checks. New tests also cover incomplete
+  UTF-8/control sequences, synchronized redraws, exact single-command input,
+  bounded final diagnostics and complete process-group cleanup.
+- The maintainer accepted the installed local candidate after a successful
+  manual CLI retry. Its executable SHA-256 is
+  `4106daf189f26ed9ad50281d6b8ee321f5a958505f8af33e0f3f2732c170ed4b`.
+  At `2026-10-18 17:58:08` Australia/Melbourne, the payload-free diagnostic
+  recorded `completed/success`, `usage_sent=true`, `terminal_received=true`
+  and 3357 ms; the Store completion was 3379 ms. The agent did not initiate
+  another real Claude CLI read. This acceptance is specific to that candidate;
+  it does not guarantee future network availability or zero quota consumption.
+- [PR CI](https://github.com/DEFY-AN94/codex94/actions/runs/39106250759)
+  passed the release gate and all five UI smokes on Xcode 16.4 with
+  607 tests, 1 existing hosted-focus skip and 0 failures. Ten actual screenshots
+  covering all scenarios were reviewed without blocking findings. The main-only
+  attestation job was intentionally skipped on the PR.
+  [PR CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/39106249558)
+  passed Actions, Python, Swift and its aggregate check. The three exact-head
+  analyses had zero results and empty error/warning fields, with no open alerts.
+- The frozen commit's
+  [main CI](https://github.com/DEFY-AN94/codex94/actions/runs/39107733851)
+  passed test/package, all five UI smokes and Attest DMG. The suite recorded
+  607 tests, 1 existing hosted-focus skip and 0 failures. All five UI completion
+  and isolation records match the frozen source and `4.1.7 (31)`; twelve fresh
+  screenshots were reviewed without blocking visual/privacy findings.
+  [Main CodeQL](https://github.com/DEFY-AN94/codex94/actions/runs/39107733885)
+  passed Actions, Python and Swift; all three exact-commit analyses had zero
+  results, empty error/warning fields and no open main alerts. All ten attached
+  main checks succeeded. CodeQL job annotations were only runner notices.
+- Existing acceptance limits remain: Recovery provides diagnostic-copy click
+  evidence while keyboard/AXPress/tooltip coverage is pending; some provider
+  and floating keyboard/Spaces/fullscreen paths are not established. Usage
+  actual save/copy and date-field editing were not exercised. These synthetic
+  UI checks do not establish live provider-account quota correctness.
+- The final assets came from main CI artifact
+  `codex94-dmg-0ec67e917ea9a96ddee993d280fcc377a93bdc0c` (ID `12129775443`).
+  DMG SHA-256:
+  `15c18ed74015c8697e058a4b279ceeebb03c11540709dd617a5bbebcc7278884`;
+  checksum-file SHA-256:
+  `6830b0e5736f4ca65c17d9425fc9db3bc43bcab35ece63935fb39aeec7e862e0`.
+  CI, Draft and public copies passed package verification: exactly the App and
+  literal Applications shortcut, arm64/x86_64, `4.1.7 (31)`, macOS 14 minimum,
+  strict ad-hoc Hardened Runtime App signature with no Team ID or entitlements,
+  and an unsigned/unnotarized DMG. No locally rebuilt package replaced CI bytes.
+- Strict [attestation verification](https://github.com/DEFY-AN94/codex94/attestations/57092052)
+  passed for the exact DMG digest, this repository's `ci.yml`, `refs/heads/main`,
+  the frozen source commit and a GitHub-hosted runner, with self-hosted runners
+  denied. This proves provenance, not Apple trust, notarization or a malware
+  review. The checksum file is not a separately attested subject.
+- The exact App from the verified Draft DMG was installed at
+  `/Applications/Codex94.app` without re-signing, after retaining the accepted
+  local candidate as a recoverable backup. Its executable SHA-256 is
+  `fb1afeb2dc615d704870d118ebb5d4071294a1c1cc1fc760bfcd4e001f34fab1`.
+  Content comparison before/after launch, version/build, signatures and running
+  executable path passed. Automatic Claude CLI remained off. Mounted and
+  installed bundle quarantine attributes were absent, so first-launch
+  Gatekeeper/Open Anyway acceptance is not proven. No quarantine, Gatekeeper
+  or Login Items settings were changed and no extra real CLI read was invoked.
+- [Release v4.1.7](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7)
+  (ID `416313944`) was published from the verified Draft at
+  `2026-10-18T08:00:16Z`, or `2026-10-18 19:00:16` Australia/Melbourne.
+  It is public, Latest and not a prerelease, with exactly two manual assets:
+  the [DMG](https://github.com/DEFY-AN94/codex94/releases/download/v4.1.7/Codex94-4.1.7-macos-universal-unnotarized.dmg)
+  (asset `652867676`, 3,823,028 bytes) and the
+  [checksum](https://github.com/DEFY-AN94/codex94/releases/download/v4.1.7/Codex94-4.1.7-SHA256SUMS.txt)
+  (asset `652867673`, 112 bytes). Draft/public re-downloads matched both API
+  digests and the verified final-main hashes. Public ZIP/TAR source downloads
+  each matched all 186 tracked files, contents and executable modes in the
+  frozen tree; the remote annotated tag remained unchanged.
+- Subsequent publication documentation updates stable links and records only.
+  They do not move `v4.1.7`, change App/build inputs or regenerate assets.
+  Immutable Releases is not enabled; the manual no-replacement policy remains.
