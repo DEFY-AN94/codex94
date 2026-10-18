@@ -6,6 +6,14 @@ stable version is [`v4.1.6 (30)`](https://github.com/DEFY-AN94/codex94/releases/
 released on 2026-10-18 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
+The `4.1.7 (31)` release candidate evaluates Claude CLI usage output
+even while the terminal continues redrawing. It retains the probe's 20-second
+default deadline, 1 MiB output cap and one-second report stability requirement,
+and does not accept cached values while `/usage` shows `refreshing`. New local
+probe diagnostics are limited to fixed-enum `phase`, `result` and `issue`
+values, `usage_sent` and `terminal_received` booleans, and `duration_ms`. They
+exclude terminal text, filesystem paths, account information and quota values.
+
 Version `4.1.6 (30)` adds one local Boolean preference,
 `claude.popoverShowsFable.v1`, defaulting to false. It controls whether the
 reported Fable model limit appears beside the shared five-hour and weekly

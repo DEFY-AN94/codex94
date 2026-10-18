@@ -33,6 +33,31 @@ acceptance visible in the PR. Never mark Ready merely because CI is green.
 
 ## 2. Local candidate and shared metadata
 
+The **4.1.7 (31)** release candidate targets **2026-10-18**
+(Australia/Melbourne). It fixes CLI screen evaluation being indefinitely
+postponed by continuous redraws and adds one payload-free final diagnostic per
+read. Fixed phase/result/issue enums, `usage_sent`, `terminal_received` and
+integer elapsed milliseconds exclude terminal text, paths, identity and quota
+values. Keep the default 20-second session deadline, 1 MiB output cap,
+one-second stable-report guard and rejection of refreshing cached panels.
+Incomplete UTF-8/control sequences and open synchronized redraws must neither
+authorize input nor reuse old report candidates. Actions retain a 200 ms
+semantic stability guard and the existing trust/single-command limits.
+
+Local synthetic validation: the old implementation failed both valid continuous
+redraw regressions; unknown startup and refreshing-panel protections passed.
+The corrected reader passed 44 focused backend tests and the full local gate
+on Xcode 27.1: 607 tests, 1 existing hosted-focus skip, 0 failures, plus script,
+security, Universal App and DMG checks. The installed candidate executable
+SHA-256 is
+`4106daf189f26ed9ad50281d6b8ee321f5a958505f8af33e0f3f2732c170ed4b`.
+The maintainer confirmed the manual retry works and requested Issue #68,
+a PR, green checks, merge and full tag/Release publication. No extra real CLI
+read was run by the agent. PR checks, final-main attestation, exact CI assets
+and final distribution verification remain pending until separately recorded.
+Public stable links stay on 4.1.6 until publication. Reconfirm the Melbourne
+date before tagging if this work crosses a date boundary.
+
 The **4.1.6 (30)** release was published on **2026-10-18**
 (Australia/Melbourne), following **4.1.5 (29)**. The
 [release verification record](#416-release-verification--2026-10-18) below
