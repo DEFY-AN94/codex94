@@ -1029,8 +1029,15 @@ final class ProviderViewTests: XCTestCase {
             ]
             try cache.capture(JSONSerialization.data(withJSONObject: payload), at: reportedAt)
             fixture.claude.refresh(trigger: .manual)
+            XCTAssertNil(fixture.claude.source, "This uninstalled synthetic stream is not automatically trusted")
+            XCTAssertNil(fixture.claude.snapshot)
+            let confirmationID = try XCTUnwrap(fixture.claude.pendingPassiveConfirmationID)
+            // Exercise the store's explicit adoption before measuring accepted
+            // content; native confirmation-dialog interaction is a separate test.
+            fixture.claude.adoptPendingPassiveReport(expectedConfirmationID: confirmationID)
+            XCTAssertFalse(fixture.claude.passiveReportNeedsConfirmation)
             XCTAssertEqual(fixture.claude.source, .statusline,
-                           "The first stream is accepted by the passive store; this test does not assume a confirmation flow")
+                           "The captured synthetic stream is displayed after explicit adoption")
             XCTAssertEqual(fixture.claude.snapshot?.defaultBucket?.windows.count, 2)
             try await waitForProviderLayout(controller, matching: { expectedHeight() })
             XCTAssertEqual(popover.contentSize.height, expectedHeight(), accuracy: 1)
