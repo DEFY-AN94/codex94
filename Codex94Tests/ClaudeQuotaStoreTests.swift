@@ -1789,7 +1789,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let current = try JSONDecoder().decode(ClaudeStatuslineInstaller.Manifest.self,
                                               from: Data(contentsOf: installer.manifestURL))
         let command = String(preview.bridgeCommand.dropLast(preview.installationID.count + 3))
-        let line = try JSONSerialization.data(withJSONObject: ["type": "command", "command": command], options: [.sortedKeys])
+        let line = try JSONSerialization.data(withJSONObject: ["type": "command", "command": command], options: [.sortedKeys, .prettyPrinted])
         let legacy = ClaudeStatuslineInstaller.Manifest(version: current.version, settingsPath: current.settingsPath,
             cachePath: current.cachePath, installedCommand: command, installedStatusline: line,
             previousStatusline: current.previousStatusline, originalCommand: current.originalCommand,

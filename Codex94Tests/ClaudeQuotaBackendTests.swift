@@ -1252,6 +1252,82 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.cache.fileURL.path))
     }
 
+    func testLegacyBridgeCaptureUsesOnlyTheInjectedDefaultConfiguration() throws {
+        let home = try fixtureDirectory()
+        let support = home.appendingPathComponent("support")
+        let cache = ClaudeStatuslineCache(fileURL: support.appendingPathComponent("quota.json"))
+        let settings = home.appendingPathComponent(".claude/settings.json")
+        let manifestURL = support.appendingPathComponent("installation.json")
+        let command = "synthetic-legacy-bridge"
+        let line = try JSONSerialization.data(withJSONObject: ["type": "command", "command": command])
+        let manifest = ClaudeStatuslineInstaller.Manifest(
+            version: 1, settingsPath: settings.path, cachePath: cache.fileURL.path,
+            installedCommand: command, installedStatusline: line,
+            previousStatusline: nil, originalCommand: nil,
+            backupPath: support.appendingPathComponent("synthetic-backup.json").path
+        )
+        let bytes = try JSONEncoder().encode(manifest)
+        try ClaudeLocalFile.write(bytes, to: manifestURL)
+        XCTAssertNil(try json(manifestURL)["installationID"], "This fixture uses the actual pre-binding format")
+
+        try ClaudeStatuslineBridge.capture(payload(), manifestURL: manifestURL,
+            enabled: true, now: first, environment: [:], homeDirectory: home)
+        let accepted = try XCTUnwrap(cache.loadEntry())
+        XCTAssertNil(accepted.installationID)
+        XCTAssertEqual(accepted.report.reportedAt, first)
+        XCTAssertEqual(accepted.report.windows.first?.usedPercentage, 23.5)
+        // Even an override that resolves to the same settings path must not
+        // turn an unbound legacy command into a custom-profile connection.
+        for override in [settings.deletingLastPathComponent(), home.appendingPathComponent("other-profile")] {
+            XCTAssertThrowsError(try ClaudeStatuslineBridge.capture(payload(used: "90"), manifestURL: manifestURL,
+                enabled: true, now: first.addingTimeInterval(1),
+                environment: ["CLAUDE_CONFIG_DIR": override.path], homeDirectory: home))
+            XCTAssertEqual(try cache.loadEntry(), accepted)
+        }
+        XCTAssertEqual(try Data(contentsOf: manifestURL), bytes)
+    }
+
+    func testOldExecutableInvocationCannotRunReinstalledOriginalCommand() throws {
+        let executable = try helperExecutable()
+        let fixture = try installerFixture(executable: executable)
+        let old = try fixture.installer.previewInstall()
+        try fixture.installer.install(old)
+        let retiredInvocation = try bridgeInvocation(fixture.installer.manifestURL)
+        try fixture.installer.remove()
+        let marker = fixture.support.appendingPathComponent("new-original-command-ran")
+        let markerPath = "'" + marker.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        try JSONSerialization.data(withJSONObject: ["statusLine": ["type": "command",
+            "command": "printf ran > " + markerPath]]).write(to: fixture.installer.settingsURL)
+        let current = try fixture.installer.previewInstall()
+        try fixture.installer.install(current)
+        XCTAssertNotEqual(current.installationID, old.installationID)
+
+        func invoke(_ arguments: [String]) throws -> Int32 {
+            let process = Process()
+            process.executableURL = executable
+            process.arguments = arguments
+            process.environment = retiredInvocation.environment
+            process.standardInput = FileHandle.nullDevice
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            defer { if process.isRunning { process.terminate(); try? waitForExit(process) } }
+            try waitForExit(process)
+            return process.terminationStatus
+        }
+
+        for arguments in [retiredInvocation.arguments,
+                          [ClaudeStatuslineBridge.argument, fixture.installer.manifestURL.path]] {
+            XCTAssertEqual(try invoke(arguments), 2)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path),
+                           "Old commands cannot borrow the new manifest's original command")
+        }
+        let currentInvocation = try bridgeInvocation(fixture.installer.manifestURL)
+        XCTAssertEqual(try invoke(currentInvocation.arguments), 0)
+        XCTAssertEqual(try String(contentsOf: marker, encoding: .utf8), "ran",
+                       "The positive control proves the new original command is executable")
+    }
+
     func testInstallationMutationAndCaptureUseOneNonblockingLock() throws {
         let fixture = try installerFixture()
         let preview = try fixture.installer.previewInstall()
