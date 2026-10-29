@@ -130,6 +130,32 @@ confirmation is unchanged. Codex94 still does not read `.credentials.json`, the
 Keychain, browser cookies, tokens or conversation transcripts, and the
 repository security scanner forbids those identifiers in production sources.
 
+## 4.1.8 candidate: consistent configuration and installation records
+
+A valid `CLAUDE_CONFIG_DIR` in Codex94's own environment selects the same Claude
+configuration for the read-only local cache, optional CLI child and new
+statusline connection. With no override, the existing distinct default global
+state and settings locations are preserved. The resolver performs no file read,
+and no additional authentication variable is forwarded to the child.
+
+New connections add a random installation identifier to the existing manifest,
+wrapper invocation and statusline-cache metadata. It binds reports to that
+installation and keeps deduplication separate from retired installations. It is
+not an account/session identifier, secret, path or telemetry field and is not
+included in logs or redacted diagnostics. No additional cache file, network
+endpoint or account-history collection is introduced. The Codex quota cache v2
+and in-memory-only CLI quota storage remain unchanged.
+
+Changing configuration directories does not move, overwrite or automatically
+forget an existing connection. Use the original configuration to remove it in
+Services, then install for the new configuration. Original settings and backups
+remain protected by the existing conflict checks. Known mismatched or retired
+reports cannot enter current quota, history or notifications. Unbound streams
+still require source confirmation and do not establish account identity.
+Before downgrading to 4.1.7 or earlier, use this candidate's Services page to
+remove any connection it installed. The older bridge entrypoint does not
+understand the installation identifier in a new wrapper invocation.
+
 ## Optional Claude monitoring (4.0.1)
 
 Version 4.0.1 uses passive local reports by default and keeps the optional CLI

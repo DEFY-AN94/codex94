@@ -248,6 +248,23 @@ final class ManagedSubprocessLifecycle: @unchecked Sendable {
         return LaunchTicket(owner: ticketOwner, generation: launchGeneration)
     }
 
+    /// Check between steps of a transaction as well as at the atomic launch.
+    /// A terminated probe must not turn cancellation into a fallback attempt.
+    func checkLaunchTicket(_ ticket: LaunchTicket) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        try checkLaunchTicketWhileLocked(ticket)
+    }
+
+    private func checkLaunchTicketWhileLocked(_ ticket: LaunchTicket?) throws {
+        guard !isShutDown else {
+            throw ManagedSubprocessLifecycleError.shutDown
+        }
+        if let ticket, ticket.owner != ticketOwner || ticket.generation != launchGeneration {
+            throw ManagedSubprocessLifecycleError.cancelled
+        }
+    }
+
     func launch(
         ticket: LaunchTicket? = nil,
         _ operation: () throws -> ManagedSubprocess
@@ -255,12 +272,7 @@ final class ManagedSubprocessLifecycle: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        guard !isShutDown else {
-            throw ManagedSubprocessLifecycleError.shutDown
-        }
-        if let ticket, ticket.owner != ticketOwner || ticket.generation != launchGeneration {
-            throw ManagedSubprocessLifecycleError.cancelled
-        }
+        try checkLaunchTicketWhileLocked(ticket)
         guard activeProcess == nil else {
             throw ManagedSubprocessLifecycleError.processAlreadyActive
         }

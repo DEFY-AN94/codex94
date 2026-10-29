@@ -381,6 +381,49 @@ final class MultiProviderStoreTests: XCTestCase {
         XCTAssertFalse(fixture.codex.cancelWaitTimedOut)
     }
 
+    func testDisableDuringAutomaticDiscoveryCancelsFallbackBeforeReenable() async throws {
+        let baseline = codexSnapshot(used: 40)
+        let fixture = try makeFixture(cached: baseline, automaticDiscovery: true)
+        let first = fixture.directory.appendingPathComponent("First.app/Contents/Resources/codex")
+        let second = fixture.directory.appendingPathComponent("Second.app/Contents/Resources/codex")
+        let pidFile = first.appendingPathExtension("pid")
+        let cacheBefore = try Data(contentsOf: fixture.cacheURL)
+        fixture.store.start()
+        try await waitFor("The first synthetic version probe must reach its barrier") {
+            guard let text = try? String(contentsOf: pidFile, encoding: .utf8) else { return false }
+            return Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
+        }
+        let pid = try XCTUnwrap(Int32(String(contentsOf: pidFile, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)))
+        defer { _ = kill(-pid, SIGKILL) }
+
+        fixture.store.setMonitoringEnabled(false, for: .codex)
+        // The next generation can use the first candidate immediately. The
+        // already-running shell remains the old, blocked fixture process.
+        try #"""
+        #!/bin/sh
+        printf '%s\n' 'codex-cli 9.4.0-reenabled'
+        """#.write(to: first, atomically: true, encoding: .utf8)
+        XCTAssertEqual(chmod(first.path, 0o700), 0)
+        fixture.store.setMonitoringEnabled(true, for: .codex)
+        try await waitFor("The new generation must proceed after the old discovery retires") {
+            fixture.codex.requestCount == 1
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: second.appendingPathExtension("invocations").path),
+                       "The cancelled transaction must not probe its next candidate")
+        XCTAssertEqual(try Data(contentsOf: fixture.cacheURL), cacheBefore)
+        XCTAssertEqual(fixture.store.snapshot, baseline)
+        XCTAssertEqual(fixture.notifications.deliveries, 0)
+        XCTAssertEqual(kill(pid, 0), -1)
+
+        let accepted = codexSnapshot(used: 25)
+        fixture.codex.completeNext(.success(accepted))
+        try await waitFor("Only the reenabled generation may publish quota") { !fixture.store.isRefreshing }
+        XCTAssertEqual(fixture.store.snapshot, accepted)
+        XCTAssertEqual(fixture.store.connectionState, .connected)
+        XCTAssertEqual(fixture.codex.requestCount, 1)
+    }
+
     func testProviderSingleFlightsAndStatusProjectionsRemainIndependent() async throws {
         let fixture = try makeFixture(claudeEnabled: true, cached: codexSnapshot(used: 35))
         fixture.store.start()
@@ -488,7 +531,8 @@ final class MultiProviderStoreTests: XCTestCase {
 
     private func makeFixture(
         codexEnabled: Bool = true, claudeEnabled: Bool = false, claudeCLIEnabled: Bool = true,
-        cached: QuotaSnapshot? = nil, holdCodexCancellation: Bool = false
+        cached: QuotaSnapshot? = nil, holdCodexCancellation: Bool = false,
+        automaticDiscovery: Bool = false
     ) throws -> Fixture {
         let directory = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
             .appendingPathComponent("Codex94MultiProviderTests-\(UUID().uuidString)", isDirectory: true)
@@ -500,6 +544,26 @@ final class MultiProviderStoreTests: XCTestCase {
         printf '%s\n' 'codex-cli 9.4.0-fixture'
         """#.write(to: executable, atomically: true, encoding: .utf8)
         XCTAssertEqual(chmod(executable.path, 0o700), 0)
+        var bundledAppRoots: [URL] = []
+        if automaticDiscovery {
+            bundledAppRoots = ["First.app", "Second.app"].map { directory.appendingPathComponent($0) }
+            for (index, app) in bundledAppRoots.enumerated() {
+                let probe = app.appendingPathComponent("Contents/Resources/codex")
+                try FileManager.default.createDirectory(at: probe.deletingLastPathComponent(), withIntermediateDirectories: true)
+                let script = index == 0 ? #"""
+                #!/bin/sh
+                printf '%s\n' "$$" > "$0.pid"
+                sleep 30 &
+                wait
+                """# : #"""
+                #!/bin/sh
+                printf '%s\n' probe >> "$0.invocations"
+                printf '%s\n' 'codex-cli 9.4.0-fallback'
+                """#
+                try script.write(to: probe, atomically: true, encoding: .utf8)
+                XCTAssertEqual(chmod(probe.path, 0o700), 0)
+            }
+        }
         let suite = "Codex94MultiProviderPreferences-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         let preferences = PreferencesStore(defaults: defaults)
@@ -508,7 +572,7 @@ final class MultiProviderStoreTests: XCTestCase {
         preferences.claudeCLIUsageEnabled = claudeCLIEnabled
         preferences.hasChosenIdentityMode = true
         preferences.identityMode = .quotaOnly
-        preferences.manualCodexPath = executable.path
+        preferences.manualCodexPath = automaticDiscovery ? nil : executable.path
         let cacheURL = directory.appendingPathComponent("codex-quota.json")
         let cache = SnapshotCache(fileURL: cacheURL)
         if let cached { try cache.save(cached) }
@@ -542,7 +606,7 @@ final class MultiProviderStoreTests: XCTestCase {
                 unregister: { XCTFail("No real login-item action in provider tests") }, stableInstall: { false }
             ),
             locator: CodexExecutableLocator(environment: ["HOME": directory.path, "PATH": "/usr/bin:/bin"],
-                                             homeDirectory: directory, bundledAppRoots: []),
+                                             homeDirectory: directory, bundledAppRoots: bundledAppRoots),
             fetcher: codex, cache: cache, notificationController: NotificationController(service: notifications),
             usageStore: usage, claudeStore: claudeStore,
             retrySleep: { try await retry.sleep($0) }, backgroundSleep: { try await background.sleep($0) }

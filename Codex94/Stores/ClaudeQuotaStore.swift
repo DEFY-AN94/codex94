@@ -48,11 +48,14 @@ final class ClaudeQuotaStore: ObservableObject {
     private var passiveRequiresReconfirmation = false
     private var localIdentityInterrupted = false
     private var passiveReport: ClaudeQuotaReport?
+    private var passiveInstallationID: String?
+    private var passiveWasExplicitlyConfirmed = false
     private var passiveIssue: ClaudeQuotaIssue?
     private var cliReport: ClaudeQuotaReport?
     private var report: ClaudeQuotaReport?
     private var lastNotifiedReport: ClaudeQuotaReport?
     private var pendingPassiveReport: ClaudeQuotaReport?
+    private var pendingPassiveInstallationID: String?
     private var policy = QuotaNotificationPolicy()
     private var requestTask: Task<Void, Never>?
     private var retirementTask: Task<Void, Never>?
@@ -288,7 +291,8 @@ final class ClaudeQuotaStore: ObservableObject {
         nextBackgroundRefreshAt = nil
         clearResetSchedule()
         cliReport = nil
-        resetNotificationBaseline()
+        // The source option is not an account boundary. Keep the notification
+        // watermark and cycle deduplication when falling back to an older report.
         guard isEnabled else { updateNextAutomaticRefresh(); return }
         armPolling()
         projectReport(at: now())
@@ -343,6 +347,13 @@ final class ClaudeQuotaStore: ObservableObject {
               let confirmationID = pendingPassiveConfirmationID,
               confirmationID == expectedConfirmationID,
               let pending = pendingPassiveReport else { return }
+        let installationID = pendingPassiveInstallationID
+        guard installer.reportEligibility(installationID: installationID) != .blocked else {
+            clearPendingPassiveReport()
+            passiveIssue = .configurationConflict
+            projectReport(at: now())
+            return
+        }
         // Adopt the frozen report shown by the confirmation UI, never a newer
         // cache value that may have arrived while the dialog was open.
         clearPendingPassiveReport()
@@ -361,20 +372,22 @@ final class ClaudeQuotaStore: ObservableObject {
         passiveRequiresReconfirmation = false
         passiveReport = nil
         resetNotificationBaseline()
-        acceptPassive(pending)
+        acceptPassive(pending, installationID: installationID, explicitlyConfirmed: true)
         projectReport(at: date)
     }
 
     private func clearPendingPassiveReport() {
         pendingPassiveReport = nil
+        pendingPassiveInstallationID = nil
         assign(\.pendingPassiveConfirmationID, nil)
         assign(\.pendingPassiveReportedAt, nil)
         assign(\.passiveReportNeedsConfirmation, false)
     }
 
-    private func requireConfirmation(for value: ClaudeQuotaReport) {
+    private func requireConfirmation(for value: ClaudeQuotaReport, installationID: String?) {
         guard pendingPassiveReport == nil else { return }
         pendingPassiveReport = value
+        pendingPassiveInstallationID = installationID
         pendingPassiveReportedAt = value.reportedAt
         pendingPassiveConfirmationID = UUID()
         passiveReportNeedsConfirmation = true
@@ -395,7 +408,10 @@ final class ClaudeQuotaStore: ObservableObject {
 
     func refreshNotificationAuthorization() { notificationController.refreshAuthorization() }
 
-    func refreshSetupState() { statuslineSetupState = installer.setupState }
+    func refreshSetupState() {
+        statuslineSetupState = installer.setupState
+        if isEnabled { projectReport(at: now()) }
+    }
 
     func previewStatuslineInstall() throws -> ClaudeStatuslineInstallPreview {
         defer { refreshSetupState() }
@@ -557,12 +573,25 @@ final class ClaudeQuotaStore: ObservableObject {
     // MARK: Backup source: statusline bridge reports
 
     private func loadBridgeReport() {
+        statuslineSetupState = installer.setupState
+        reconcilePassiveEligibility()
         // The pending candidate stays frozen, but the selected producer can
         // still publish newer values while another report awaits confirmation.
-        guard let value = try? cache.load() else { return }
+        guard let entry = try? cache.loadEntry() else { return }
+        let value = entry.report
+        let eligibility = installer.reportEligibility(installationID: entry.installationID)
+        guard eligibility != .blocked else {
+            passiveIssue = .configurationConflict
+            return
+        }
         guard value.snapshot(at: now()) != nil else { return }
         guard value.reportedAt <= now().addingTimeInterval(5) else { passiveIssue = .invalidData; return }
-        if passiveRequiresReconfirmation { requireConfirmation(for: value); return }
+        let confirmedStream = passiveReport != nil && passiveWasExplicitlyConfirmed
+            && passiveInstallationID == entry.installationID && passiveReport?.producerID == value.producerID
+        if passiveRequiresReconfirmation || (eligibility == .confirmationRequired && !confirmedStream) {
+            requireConfirmation(for: value, installationID: entry.installationID)
+            return
+        }
         let producer = ClaudeStatuslineParser.identifiableProducerID(value.producerID)
         let selected = ClaudeStatuslineParser.identifiableProducerID(preferences.claudePassiveProducerID)
         if producer == nil {
@@ -570,19 +599,41 @@ final class ClaudeQuotaStore: ObservableObject {
             // but its shared placeholder never authorizes a different report.
             if let passiveReport, passiveReport.producerID == value.producerID,
                passiveReport.reportedAt == value.reportedAt, passiveReport.windows == value.windows { return }
-            requireConfirmation(for: value)
+            requireConfirmation(for: value, installationID: entry.installationID)
             return
         }
         if let selected {
-            guard producer == selected else { requireConfirmation(for: value); return }
+            guard producer == selected else { requireConfirmation(for: value, installationID: entry.installationID); return }
         } else {
-            guard passiveReport == nil else { requireConfirmation(for: value); return }
+            guard passiveReport == nil else { requireConfirmation(for: value, installationID: entry.installationID); return }
             preferences.setClaudePassiveProducerID(producer)
         }
-        if passiveReport == nil || value.reportedAt > passiveReport!.reportedAt { acceptPassive(value) }
+        if passiveReport == nil || value.reportedAt > passiveReport!.reportedAt {
+            acceptPassive(value, installationID: entry.installationID, explicitlyConfirmed: confirmedStream)
+        }
     }
 
-    private func acceptPassive(_ value: ClaudeQuotaReport) {
+    /// Revalidate retained reports too: a missing/new installation must not let
+    /// an already accepted old report survive through the history projection.
+    private func reconcilePassiveEligibility() {
+        if passiveReport != nil {
+            let eligibility = installer.reportEligibility(installationID: passiveInstallationID)
+            if eligibility == .blocked || (eligibility == .confirmationRequired && !passiveWasExplicitlyConfirmed) {
+                passiveReport = nil
+                passiveInstallationID = nil
+                passiveWasExplicitlyConfirmed = false
+                passiveIssue = .configurationConflict
+                resetNotificationBaseline()
+            }
+        }
+        if pendingPassiveReport != nil,
+           installer.reportEligibility(installationID: pendingPassiveInstallationID) == .blocked {
+            clearPendingPassiveReport()
+            passiveIssue = .configurationConflict
+        }
+    }
+
+    private func acceptPassive(_ value: ClaudeQuotaReport, installationID: String?, explicitlyConfirmed: Bool) {
         guard value.source == .statusline,
               value.reportedAt <= now().addingTimeInterval(5),
               value.receivedAt >= value.reportedAt else { passiveIssue = .invalidData; return }
@@ -592,6 +643,8 @@ final class ClaudeQuotaStore: ObservableObject {
         passiveIssue = nil
         if passiveReport != value { logger.info("source=statusline result=reported") }
         passiveReport = value
+        passiveInstallationID = installationID
+        passiveWasExplicitlyConfirmed = explicitlyConfirmed
     }
 
     // MARK: Last option: the CLI reader
@@ -640,6 +693,7 @@ final class ClaudeQuotaStore: ObservableObject {
     /// cannot prove account identity. Falling back to older data never rewinds
     /// the notification observation watermark.
     private func projectReport(at date: Date) {
+        reconcilePassiveEligibility()
         let usable = ClaudeQuotaFreshnessPolicy.select(localCache: localReport, statusline: passiveReport, cli: cliReport, at: date)
         // If every window expired, keep only its source/time diagnostic; never
         // create quota from that report. Eligible old reports may be displayed

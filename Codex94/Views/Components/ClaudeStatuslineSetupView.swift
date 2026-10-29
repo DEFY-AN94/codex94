@@ -29,11 +29,14 @@ struct ClaudeStatuslineSetupView: View {
                     }
                 )
             }
-            if store.statuslineSetupState == .conflict {
+            if store.statuslineSetupState == .conflict || store.statuslineSetupState == .differentConfiguration {
                 VStack(alignment: .leading, spacing: 5) {
-                    Label("claude.setup.conflict", systemImage: "exclamationmark.triangle")
+                    Label(LocalizedStringKey(store.statuslineSetupState == .differentConfiguration
+                          ? "claude.setup.differentConfiguration" : "claude.setup.conflict"),
+                          systemImage: "exclamationmark.triangle")
                         .font(.callout.weight(.medium)).foregroundStyle(.orange)
-                    Text("claude.setup.conflictHelp")
+                    Text(LocalizedStringKey(store.statuslineSetupState == .differentConfiguration
+                         ? "claude.setup.differentConfigurationHelp" : "claude.setup.conflictHelp"))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

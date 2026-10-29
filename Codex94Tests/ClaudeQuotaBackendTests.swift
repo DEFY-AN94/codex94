@@ -237,10 +237,13 @@ final class ClaudeQuotaBackendTests: XCTestCase {
 
     func testDisabledBridgeDoesNotWriteQuotaCache() throws {
         let fixture = try installerFixture()
-        try fixture.installer.install(fixture.installer.previewInstall())
+        let preview = try fixture.installer.previewInstall()
+        try fixture.installer.install(preview)
+        let environment = ["CLAUDE_CONFIG_DIR": fixture.installer.settingsURL.deletingLastPathComponent().path]
         try ClaudeStatuslineBridge.capture(payload(), manifestURL: fixture.installer.manifestURL, enabled: false, now: first)
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.cache.fileURL.path))
-        try ClaudeStatuslineBridge.capture(payload(), manifestURL: fixture.installer.manifestURL, enabled: true, now: first)
+        try ClaudeStatuslineBridge.capture(payload(), manifestURL: fixture.installer.manifestURL, enabled: true, now: first,
+            installationID: preview.installationID, environment: environment)
         XCTAssertEqual(try fixture.cache.load()?.reportedAt, first)
     }
 
@@ -308,8 +311,9 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         let process = Process()
         let input = Pipe(), output = Pipe()
         process.executableURL = executable
-        process.arguments = [ClaudeStatuslineBridge.argument, fixture.installer.manifestURL.path]
-        process.environment = CodexExecutableLocator.sanitizedEnvironment(from: ProcessInfo.processInfo.environment)
+        let invocation = try bridgeInvocation(fixture.installer.manifestURL)
+        process.arguments = invocation.arguments
+        process.environment = invocation.environment
         process.standardInput = input
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
@@ -336,8 +340,9 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         let process = Process()
         let input = Pipe()
         process.executableURL = executable
-        process.arguments = [ClaudeStatuslineBridge.argument, fixture.installer.manifestURL.path]
-        process.environment = CodexExecutableLocator.sanitizedEnvironment(from: ProcessInfo.processInfo.environment)
+        let invocation = try bridgeInvocation(fixture.installer.manifestURL)
+        process.arguments = invocation.arguments
+        process.environment = invocation.environment
         process.standardInput = input
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
@@ -372,8 +377,9 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         let process = Process()
         let input = Pipe()
         process.executableURL = executable
-        process.arguments = [ClaudeStatuslineBridge.argument, fixture.installer.manifestURL.path]
-        process.environment = CodexExecutableLocator.sanitizedEnvironment(from: ProcessInfo.processInfo.environment)
+        let invocation = try bridgeInvocation(fixture.installer.manifestURL)
+        process.arguments = invocation.arguments
+        process.environment = invocation.environment
         process.standardInput = input
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
@@ -1034,7 +1040,8 @@ final class ClaudeQuotaBackendTests: XCTestCase {
     }
 
     private func stagedCLI(firstFrame: String, delayedFrame: String?, environment: [String: String]? = nil,
-                           requireProbeEnvironment: Bool = false, delay: TimeInterval = 0.4,
+                           requireProbeEnvironment: Bool = false, expectedConfigDirectory: String? = nil,
+                           delay: TimeInterval = 0.4,
                            timeout: TimeInterval = 5) throws -> (
         client: ClaudeCLIUsageClient, requestFile: URL, childPIDFile: URL, secondFrameMarker: URL
     ) {
@@ -1051,9 +1058,14 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         [ "$CLAUDE_CODE_SKIP_PROMPT_HISTORY" = "1" ] || exit 71
         [ -n "$USER" ] && [ "$USER" = "$(/usr/bin/id -un)" ] || exit 72
         """# : ""
+        let configChecks = expectedConfigDirectory.map { directory in
+            let quoted = "'" + directory.replacingOccurrences(of: "'", with: "'\\''") + "'"
+            return "[ \"$CLAUDE_CONFIG_DIR\" = \(quoted) ] || exit 73\n[ -z \"$CODEX94_TEST_UNRELATED_AUTH\" ] || exit 74"
+        } ?? ""
         let script = """
         #!/bin/sh
         \(environmentChecks)
+        \(configChecks)
         if [ "$1" = "--version" ]; then printf '2.1.165 (Claude Code)\\n'; exit 0; fi
         printf '\\033[2J\\033[H? for shortcuts\\n'
         IFS= read -r request
@@ -1174,6 +1186,86 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         }
     }
 
+    func testProbeUsesOneCustomConfigurationForVersionAndUsage() async throws {
+        let root = try fixtureDirectory().appendingPathComponent("custom profile")
+        let injected = ["PATH": "/usr/bin:/bin", "CLAUDE_CONFIG_DIR": root.path,
+                        "CODEX94_TEST_UNRELATED_AUTH": "must-not-be-forwarded"]
+        let fixture = try stagedCLI(firstFrame: "Current session\\r\\n23.5%% used\\r\\n", delayedFrame: nil,
+                                    environment: injected, expectedConfigDirectory: root.path)
+        defer { fixture.client.shutdown() }
+        let report = try await fixture.client.fetch()
+        XCTAssertEqual(report.windows.first?.usedPercentage, 23.5,
+                       "Both version and usage must use the same configured profile")
+    }
+
+    func testCacheInstallationGenerationDoesNotReusePriorReportOrDeduplicationClock() throws {
+        let cache = ClaudeStatuslineCache(fileURL: try fixtureDirectory().appendingPathComponent("cache.json"))
+        let old = UUID().uuidString, current = UUID().uuidString
+        try cache.capture(payload(), at: first.addingTimeInterval(100), installationID: old)
+        try cache.capture(payload(), at: first, installationID: current)
+        let entry = try XCTUnwrap(cache.loadEntry())
+        XCTAssertEqual(entry.installationID, current)
+        XCTAssertEqual(entry.report.reportedAt, first,
+                       "Same producer/values must not inherit another installation's later observation")
+        try cache.capture(payload(), at: first.addingTimeInterval(10), installationID: current)
+        XCTAssertEqual(try cache.loadEntry()?.report.reportedAt, first)
+        XCTAssertThrowsError(try cache.capture(payload(), installationID: "invalid"))
+    }
+
+    func testReinstalledBridgeRejectsOldInvocationAndRetiredCapture() throws {
+        let fixture = try installerFixture()
+        let environment = ["CLAUDE_CONFIG_DIR": fixture.installer.settingsURL.deletingLastPathComponent().path]
+        let directories = ClaudeConfigurationDirectories(environment: environment)
+        let old = try fixture.installer.previewInstall()
+        try fixture.installer.install(old)
+        let retired = try JSONDecoder().decode(ClaudeStatuslineInstaller.Manifest.self,
+            from: Data(contentsOf: fixture.installer.manifestURL))
+        try ClaudeStatuslineBridge.capture(payload(), manifestURL: fixture.installer.manifestURL,
+            enabled: true, now: first.addingTimeInterval(100), installationID: old.installationID, environment: environment)
+        try fixture.installer.remove()
+        let current = try fixture.installer.previewInstall()
+        try fixture.installer.install(current)
+        XCTAssertNotEqual(old.installationID, current.installationID)
+        XCTAssertTrue(current.bridgeCommand.contains(current.installationID))
+        XCTAssertEqual(fixture.installer.reportEligibility(installationID: old.installationID), .blocked)
+        XCTAssertThrowsError(try ClaudeStatuslineBridge.capture(payload(), manifestURL: fixture.installer.manifestURL,
+            enabled: true, now: first, installationID: old.installationID, environment: environment))
+        XCTAssertThrowsError(try ClaudeStatuslineBridge.capture(payload(), manifestURL: fixture.installer.manifestURL,
+            enabled: true, now: first, environment: environment), "Old argument format cannot acquire the new installation ID")
+        try ClaudeStatuslineBridge.capture(payload(), manifestURL: fixture.installer.manifestURL,
+            enabled: true, now: first, installationID: current.installationID, environment: environment)
+        let accepted = try XCTUnwrap(fixture.cache.loadEntry())
+        XCTAssertEqual(accepted.installationID, current.installationID)
+        XCTAssertEqual(accepted.report.reportedAt, first)
+        XCTAssertThrowsError(try ClaudeStatuslineBridge.capture(payload(used: "90"), manifest: retired,
+            manifestURL: fixture.installer.manifestURL, directories: directories, now: first.addingTimeInterval(200)))
+        XCTAssertEqual(try fixture.cache.loadEntry(), accepted, "An already running old bridge cannot overwrite the new cache")
+    }
+
+    func testBridgeRefusesAnotherConfigurationEvenWithCurrentInstallationID() throws {
+        let fixture = try installerFixture()
+        let preview = try fixture.installer.previewInstall()
+        try fixture.installer.install(preview)
+        XCTAssertThrowsError(try ClaudeStatuslineBridge.capture(payload(), manifestURL: fixture.installer.manifestURL,
+            enabled: true, now: first, installationID: preview.installationID,
+            environment: ["CLAUDE_CONFIG_DIR": fixture.support.appendingPathComponent("other").path]))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.cache.fileURL.path))
+    }
+
+    func testInstallationMutationAndCaptureUseOneNonblockingLock() throws {
+        let fixture = try installerFixture()
+        let preview = try fixture.installer.previewInstall()
+        try fixture.installer.install(preview)
+        let original = try Data(contentsOf: fixture.installer.manifestURL)
+        try fixture.cache.withExclusiveAccess {
+            XCTAssertThrowsError(try fixture.installer.remove())
+            XCTAssertThrowsError(try fixture.cache.capture(payload(), at: first, installationID: preview.installationID))
+            XCTAssertEqual(try Data(contentsOf: fixture.installer.manifestURL), original)
+        }
+        try fixture.installer.remove()
+        XCTAssertEqual(fixture.installer.setupState, .notInstalled)
+    }
+
     private func fixtureDirectory() throws -> URL {
         let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
             .appendingPathComponent("Codex94ClaudeTests-\(UUID().uuidString)")
@@ -1203,12 +1295,22 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         return executable
     }
 
+    private func bridgeInvocation(_ url: URL) throws -> (arguments: [String], environment: [String: String]) {
+        let manifest = try JSONDecoder().decode(ClaudeStatuslineInstaller.Manifest.self, from: Data(contentsOf: url))
+        var arguments = [ClaudeStatuslineBridge.argument, url.path]
+        if let id = manifest.installationID { arguments.append(id) }
+        var environment = CodexExecutableLocator.sanitizedEnvironment(from: ProcessInfo.processInfo.environment)
+        environment["CLAUDE_CONFIG_DIR"] = URL(fileURLWithPath: manifest.settingsPath).deletingLastPathComponent().path
+        return (arguments, environment)
+    }
+
     private func runIsolatedBridge(_ executable: URL, manifest: URL, input data: Data) throws {
         let process = Process()
         let input = Pipe(), output = Pipe()
         process.executableURL = executable
-        process.arguments = [ClaudeStatuslineBridge.argument, manifest.path]
-        process.environment = CodexExecutableLocator.sanitizedEnvironment(from: ProcessInfo.processInfo.environment)
+        let invocation = try bridgeInvocation(manifest)
+        process.arguments = invocation.arguments
+        process.environment = invocation.environment
         process.standardInput = input
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice

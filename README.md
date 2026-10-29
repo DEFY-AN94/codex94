@@ -32,6 +32,22 @@ only fixed-enum `phase`, `result` and `issue` values, `usage_sent` and
 account details or quota values. See
 [4.1.7 changes](CHANGELOG.md#417---2026-10-18).
 
+### Development candidate: 4.1.8 (32)
+
+The current source candidate aligns Claude's local cache, optional CLI and new
+statusline connections with the same validated `CLAUDE_CONFIG_DIR`. When changing
+that directory with an existing connection, start Codex94 with the original
+configuration and remove the connection in Services before installing it for
+the new directory. Reports from a mismatched or retired installation are not
+adopted automatically; an installation identifier is not account verification.
+Before downgrading to 4.1.7 or earlier, remove a connection installed by this
+candidate using its Services page; older Apps do not understand the new wrapper.
+
+The candidate also fixes repeated notifications after toggling Claude CLI reads,
+Codex discovery cancellation, Xcode selection and the old-data indicator during
+Token statistics retries. See [Unreleased changes](CHANGELOG.md#unreleased--418-32).
+It is not yet a published release; the stable downloads above remain 4.1.7.
+
 ## Features
 
 The following describes the published release. Release-by-release changes live

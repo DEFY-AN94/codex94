@@ -1208,6 +1208,38 @@
         }
       }
     },
+    "claude.setup.differentConfiguration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The connection belongs to another Claude configuration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接属于另一个 Claude 配置目录"
+          }
+        }
+      }
+    },
+    "claude.setup.differentConfigurationHelp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restart Codex94 with the original configuration directory and remove its connection there. Then switch to the new directory and preview installation again. Reports from the other configuration are excluded until this conflict is resolved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请使用原配置目录重新启动 Codex94，并在那里移除原连接。然后切换到新目录，重新预览安装。解决冲突前，其他配置的状态栏报告不会参与当前额度显示。"
+          }
+        }
+      }
+    },
     "claude.setup.conflict": {
       "localizations": {
         "en": {

@@ -7,6 +7,26 @@ published on 2026-10-18 (Australia/Melbourne), including the unpublished
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
+## 4.1.8 candidate: configuration, cancellation and retry continuity
+
+The Claude configuration resolver owns only path/environment selection. The
+local usage reader remains the sole global-state reader. The statusline
+installer owns immutable installation identity in its wrapper and manifest;
+the bridge validates that identity and configuration before forwarding or
+capturing; the cache scopes report deduplication to that installation. The
+store validates source eligibility before selecting current/history data or
+evaluating notifications. A directory conflict is not only a setup label.
+
+CLI option changes retire the client and remove its report without resetting
+same-account notification history. Actual identity/context changes retain
+their existing invalidation responsibilities.
+
+Codex discovery uses one subprocess-lifecycle ticket for its entire candidate
+search. AppStore captures it after retirement settles and before queueing
+detached work. A cancellation stops candidate traversal; ordinary incompatible
+versions retain fallback behavior. Token usage keeps its existing generation
+invalidation and preserves stale/error presentation until a retry succeeds.
+
 ## 4.1.6 release: Fable popover visibility
 
 `ClaudeModelLimitVisibility` owns presentation filtering for both current and
