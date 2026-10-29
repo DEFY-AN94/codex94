@@ -25,6 +25,7 @@ METADATA_HELPER = "script/release_metadata.py"
 # Only these tracked build inputs may enter the disposable recovery source copy.
 # No repository metadata, documentation, scripts, local state or directory copy.
 BUILD_INPUTS = (
+    "Codex94/Services/ClaudeConfigurationDirectories.swift",
     "Codex94/Services/ClaudeLocalUsageCacheReader.swift",
     "Codex94/Support/ClaudeQuotaFreshnessPolicy.swift",
     "Codex94/Support/ClaudeQuotaHistoryFormatting.swift",

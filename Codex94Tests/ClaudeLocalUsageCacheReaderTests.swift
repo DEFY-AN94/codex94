@@ -265,6 +265,26 @@ final class ClaudeLocalUsageCacheReaderTests: XCTestCase {
         XCTAssertFalse(defaultURL.path.contains("/Users/"), "Paths are derived, never literal")
     }
 
+    func testConfigurationDirectoryResolutionKeepsDefaultLayoutAndSharesOverrides() {
+        let home = URL(fileURLWithPath: "/private/tmp/synthetic-home", isDirectory: true)
+        for value in [nil, "", "relative", "/tmp/../other", "/tmp/with\u{0007}bell"] as [String?] {
+            let environment = value.map { ["CLAUDE_CONFIG_DIR": $0] } ?? [:]
+            let paths = ClaudeConfigurationDirectories(environment: environment, homeDirectory: home)
+            XCTAssertNil(paths.overrideDirectory)
+            XCTAssertEqual(paths.usageDirectory, home)
+            XCTAssertEqual(paths.settingsURL.path, home.appendingPathComponent(".claude/settings.json").path)
+            XCTAssertEqual(ClaudeStatuslineInstaller(environment: environment, homeDirectory: home).settingsURL, paths.settingsURL)
+        }
+        let custom = home.appendingPathComponent("custom profile", isDirectory: true)
+        let environment = ["CLAUDE_CONFIG_DIR": custom.path]
+        let paths = ClaudeConfigurationDirectories(environment: environment, homeDirectory: home)
+        XCTAssertEqual(paths.usageDirectory, custom)
+        XCTAssertEqual(paths.settingsURL.path, custom.appendingPathComponent("settings.json").path)
+        XCTAssertEqual(ClaudeStatuslineInstaller(environment: environment, homeDirectory: home).settingsURL, paths.settingsURL)
+        XCTAssertEqual(ClaudeLocalUsageCacheReader.defaultFileURL(environment: environment, homeDirectory: home)
+            .deletingLastPathComponent(), paths.usageDirectory)
+    }
+
     func testModelLimitsFallBackToLegacyKeysDeduplicateAndSkipMalformedRows() throws {
         let limits = """
         [

@@ -324,11 +324,98 @@ final class ExecutableLocatorTests: XCTestCase {
         assertProcessGroupIsGone(parentPID)
 
         XCTAssertThrowsError(try locator.locate(manualPath: executable.path)) { error in
-            XCTAssertEqual(error as? ConnectionIssue, .invalidCodexVersion)
+            XCTAssertTrue(error is CancellationError)
         }
         let launches = try String(contentsOf: invocationFile, encoding: .utf8)
             .split(whereSeparator: \.isNewline)
         XCTAssertEqual(launches.count, 1)
+    }
+
+    func testCancellationRejectsQueuedAutomaticAndManualDiscoveryWithoutLaunching() async throws {
+        let directory = try makeTemporaryDirectory()
+        let app = directory.appendingPathComponent("Synthetic.app")
+        let executable = app.appendingPathComponent(nestedCLIPath)
+        try writeVersionExecutable(at: executable, output: "codex-cli 9.4.0")
+        let locator = bundledLocator(roots: [app], home: directory)
+        defer { locator.shutdown() }
+
+        let manualPaths: [String?] = [nil, executable.path]
+        for manualPath in manualPaths {
+            // Hold the queued transaction before discovery can begin. Its
+            // ticket belongs to the accepted request, not the worker's start.
+            let gate = AsyncStream<Void>.makeStream()
+            let ticket = locator.captureLaunchTicket()
+            let task = Task.detached {
+                for await _ in gate.stream { break }
+                do {
+                    _ = try locator.locate(manualPath: manualPath, ticket: ticket)
+                    return false
+                } catch {
+                    return error is CancellationError
+                }
+            }
+            locator.cancelCurrentRequest()
+            gate.continuation.finish()
+            let cancelled = await task.value
+            XCTAssertTrue(cancelled, "Cancellation must survive the queue boundary")
+            XCTAssertEqual(try probeCount(executable), 0)
+        }
+
+        let newResult = try locator.locate(manualPath: executable.path)
+        XCTAssertEqual(newResult.version, "codex-cli 9.4.0")
+        XCTAssertEqual(try probeCount(executable), 1, "A fresh transaction may reuse the cancelled locator")
+    }
+
+    func testCancellingAutomaticDiscoveryStopsBeforeTheNextCandidate() async throws {
+        let directory = try makeTemporaryDirectory()
+        let firstApp = directory.appendingPathComponent("First.app")
+        let secondApp = directory.appendingPathComponent("Second.app")
+        let first = firstApp.appendingPathComponent(nestedCLIPath)
+        let second = secondApp.appendingPathComponent(nestedCLIPath)
+        try writeVersionExecutable(at: first, output: "codex-cli 9.4.0")
+        try writeVersionExecutable(at: second, output: "codex-cli 9.5.0")
+        let script = """
+        #!/bin/sh
+        [ "$#" -eq 1 ] && [ "$1" = "--version" ] || exit 91
+        printf 'probe\\n' >> "$0.invocations"
+        printf '%s\\n' "$$" > "$0.pid"
+        sleep 30 &
+        printf '%s\\n' "$!" > "$0.child-pid"
+        wait
+        """
+        try script.write(to: first, atomically: true, encoding: .utf8)
+        XCTAssertEqual(chmod(first.path, 0o700), 0)
+        let locator = bundledLocator(roots: [firstApp, secondApp], home: directory)
+        defer { locator.shutdown() }
+        let ticket = locator.captureLaunchTicket()
+        let task = Task.detached {
+            do {
+                _ = try locator.locate(manualPath: nil, ticket: ticket)
+                return false
+            } catch {
+                return error is CancellationError
+            }
+        }
+        let parentPID = try await waitForPID(at: first.appendingPathExtension("pid"))
+        let childPID = try await waitForPID(at: first.appendingPathExtension("child-pid"))
+        defer {
+            _ = kill(-parentPID, SIGKILL)
+            _ = kill(parentPID, SIGKILL)
+            _ = kill(childPID, SIGKILL)
+        }
+
+        locator.cancelCurrentRequest()
+        let cancelled = await task.value
+        XCTAssertTrue(cancelled, "A killed version probe is cancellation, not an incompatible candidate")
+        XCTAssertEqual(try probeCount(first), 1)
+        XCTAssertEqual(try probeCount(second), 0, "Disabling must not launch another candidate")
+        assertProcessIsGone(parentPID)
+        assertProcessIsGone(childPID)
+
+        try FileManager.default.removeItem(at: first)
+        let newResult = try locator.locate(manualPath: nil)
+        XCTAssertEqual(newResult.executableURL, second.resolvingSymlinksInPath())
+        XCTAssertEqual(try probeCount(second), 1)
     }
 
     private var nestedCLIPath: String {

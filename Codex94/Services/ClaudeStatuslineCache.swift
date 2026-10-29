@@ -68,6 +68,7 @@ struct ClaudeStatuslineCache: Sendable {
         let version: Int
         let report: ClaudeQuotaReport
         let producers: [String: Producer]
+        var installationID: String? = nil
     }
 
     private struct Producer: Codable {
@@ -84,14 +85,22 @@ struct ClaudeStatuslineCache: Sendable {
         self.fileURL = fileURL ?? support.appendingPathComponent("Codex94/Claude/statusline-quota.json")
     }
 
-    func load() throws -> ClaudeQuotaReport? {
-        try loadRecord()?.report
+    struct Entry: Equatable, Sendable {
+        let report: ClaudeQuotaReport
+        let installationID: String?
+    }
+
+    func load() throws -> ClaudeQuotaReport? { try loadEntry()?.report }
+
+    func loadEntry() throws -> Entry? {
+        try loadRecord().map { Entry(report: $0.report, installationID: $0.installationID) }
     }
 
     private func loadRecord() throws -> Record? {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
         let data = try ClaudeLocalFile.read(fileURL, maximumBytes: Self.maximumCacheBytes)
         guard let record = try? JSONDecoder().decode(Record.self, from: data), record.version == 1,
+              ClaudeStatuslineInstaller.validInstallationID(record.installationID),
               record.report.source == .statusline,
               record.report.modelLimits.isEmpty,
               Self.isSupportedTimestamp(record.report.reportedAt),
@@ -118,22 +127,38 @@ struct ClaudeStatuslineCache: Sendable {
         return seconds.isFinite && (0...253_402_300_799).contains(seconds)
     }
 
-    func capture(_ data: Data, at now: Date = Date()) throws {
-        let parsed = try ClaudeStatuslineParser.parse(data)
-        let windows = parsed.windows
-        // Startup/expired statusline payloads are not new quota evidence. They
-        // must not overwrite a useful report or advance its observation clock.
-        guard windows.contains(where: { $0.resetsAt.map { $0 > now } ?? false }) else { return }
-        let producerID = parsed.producerID
+    /// Installation mutations and captures share the same nonblocking lock.
+    /// Ownership is rechecked inside this lock, after any waiting/reinstallation.
+    func withExclusiveAccess<T>(_ operation: () throws -> T) throws -> T {
         try ClaudeLocalFile.createPrivateDirectory(fileURL.deletingLastPathComponent())
         let lockURL = fileURL.appendingPathExtension("lock")
         let descriptor = Darwin.open(lockURL.path, O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0o600)
         guard descriptor >= 0 else { throw ClaudeQuotaIssue.unavailable }
         defer { Darwin.close(descriptor) }
-        // Statusline producers must never stall another terminal's status line.
-        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else { return }
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else { throw ClaudeQuotaIssue.unavailable }
         defer { flock(descriptor, LOCK_UN) }
-        let previous = try loadRecord()
+        return try operation()
+    }
+
+    func capture(_ data: Data, at now: Date = Date(), installationID: String? = nil,
+                 validateInstallation: () throws -> Void = {}) throws {
+        guard ClaudeStatuslineInstaller.validInstallationID(installationID) else { throw ClaudeQuotaIssue.invalidData }
+        let parsed = try ClaudeStatuslineParser.parse(data)
+        let windows = parsed.windows
+        guard windows.contains(where: { $0.resetsAt.map { $0 > now } ?? false }) else { return }
+        try withExclusiveAccess {
+            try validateInstallation()
+            try captureLocked(parsed, at: now, installationID: installationID)
+        }
+    }
+
+    private func captureLocked(_ parsed: ClaudeStatuslineParser.ParsedInput, at now: Date,
+                               installationID: String?) throws {
+        let windows = parsed.windows
+        let producerID = parsed.producerID
+        // Reports and duplicate timestamps never cross installation generations.
+        let stored = try loadRecord()
+        let previous = stored?.installationID == installationID ? stored : nil
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let fingerprint = ClaudeLocalFile.digest(try encoder.encode(windows))
@@ -149,7 +174,7 @@ struct ClaudeStatuslineCache: Sendable {
                                        receivedAt: max(now, reportedAt), windows: windows, producerID: producerID)
         // An older cached producer cannot displace a more recent observed report.
         let selected = previous.map { $0.report.reportedAt > reportedAt ? $0.report : report } ?? report
-        let encoded = try encoder.encode(Record(version: 1, report: selected, producers: producers))
+        let encoded = try encoder.encode(Record(version: 1, report: selected, producers: producers, installationID: installationID))
         guard encoded.count <= Self.maximumCacheBytes else { throw ClaudeQuotaIssue.invalidData }
         try ClaudeLocalFile.write(encoded, to: fileURL)
     }

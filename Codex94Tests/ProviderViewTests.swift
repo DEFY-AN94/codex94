@@ -1029,8 +1029,15 @@ final class ProviderViewTests: XCTestCase {
             ]
             try cache.capture(JSONSerialization.data(withJSONObject: payload), at: reportedAt)
             fixture.claude.refresh(trigger: .manual)
+            XCTAssertNil(fixture.claude.source, "This uninstalled synthetic stream is not automatically trusted")
+            XCTAssertNil(fixture.claude.snapshot)
+            let confirmationID = try XCTUnwrap(fixture.claude.pendingPassiveConfirmationID)
+            // Exercise the store's explicit adoption before measuring accepted
+            // content; native confirmation-dialog interaction is a separate test.
+            fixture.claude.adoptPendingPassiveReport(expectedConfirmationID: confirmationID)
+            XCTAssertFalse(fixture.claude.passiveReportNeedsConfirmation)
             XCTAssertEqual(fixture.claude.source, .statusline,
-                           "The first stream is accepted by the passive store; this test does not assume a confirmation flow")
+                           "The captured synthetic stream is displayed after explicit adoption")
             XCTAssertEqual(fixture.claude.snapshot?.defaultBucket?.windows.count, 2)
             try await waitForProviderLayout(controller, matching: { expectedHeight() })
             XCTAssertEqual(popover.contentSize.height, expectedHeight(), accuracy: 1)
@@ -1386,6 +1393,30 @@ final class ProviderViewTests: XCTestCase {
         }
         _ = try render(ClaudeStatuslineSetupView(store: fixture.claude), width: 360, dark: false,
                        language: .english, name: "setup-after-forgetting-record", output: directory)
+    }
+
+    func testDifferentConfigurationSetupExplainsRecoveryWithoutChangingFiles() throws {
+        let directory = try temporaryDirectory()
+        let fixture = try makeFixture(directory: directory)
+        defer { fixture.cleanUp() }
+        let executable = directory.appendingPathComponent("SyntheticCodex94")
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        try fixture.claude.installStatusline(fixture.claude.previewStatuslineInstall())
+        let manifestURL = directory.appendingPathComponent("bridge/statusline-installation.json")
+        var manifest = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any])
+        manifest["settingsPath"] = directory.appendingPathComponent("other-profile/settings.json").path
+        let bytes = try JSONSerialization.data(withJSONObject: manifest)
+        try bytes.write(to: manifestURL)
+        fixture.claude.refreshSetupState()
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .differentConfiguration)
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let size = try render(ClaudeStatuslineSetupView(store: fixture.claude), width: 360, dark: false,
+                language: language, name: "setup-different-configuration-\(language.rawValue)", output: directory)
+            XCTAssertLessThan(size.height, 460)
+            XCTAssertEqual(try Data(contentsOf: manifestURL), bytes,
+                           "Showing recovery instructions must not rewrite a different configuration's manifest")
+        }
     }
 
     private func card(snapshot: QuotaSnapshot?, source: ClaudeQuotaSource?, now: Date,

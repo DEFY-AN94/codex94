@@ -359,6 +359,9 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
 
     private var probeEnvironment: [String: String] {
         var child = CodexExecutableLocator.sanitizedEnvironment(from: environment)
+        if let directory = ClaudeConfigurationDirectories(environment: environment).overrideDirectory {
+            child[ClaudeConfigurationDirectories.environmentKey] = directory.path
+        }
         child["TERM"] = "xterm-256color"
         child["LANG"] = "en_US.UTF-8"
         child["LC_ALL"] = "en_US.UTF-8"

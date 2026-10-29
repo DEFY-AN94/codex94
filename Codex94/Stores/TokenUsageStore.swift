@@ -51,7 +51,9 @@ final class TokenUsageStore: ObservableObject {
         let requestFetcher = fetcher
         let requestLocator = locator
         isRefreshing = true
-        issue = nil
+        // Retrying has not made the retained snapshot current. Keep its failure
+        // marker until a successful response replaces it.
+        if snapshot == nil { issue = nil }
         task = Task { [weak self] in
             guard let self else { return }
             do {
@@ -68,6 +70,7 @@ final class TokenUsageStore: ObservableObject {
                 guard !Task.isCancelled, generation == requestGeneration, !stopped else { return }
                 // Each response replaces the prior snapshot, including same-date corrections.
                 snapshot = result
+                issue = nil
             } catch {
                 guard !Task.isCancelled, generation == requestGeneration, !stopped else { return }
                 let mapped = Self.map(error)

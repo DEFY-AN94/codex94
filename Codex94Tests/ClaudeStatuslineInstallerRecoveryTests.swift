@@ -135,6 +135,62 @@ final class ClaudeStatuslineInstallerRecoveryTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: backupURL), backupBytes)
     }
 
+    func testChangingConfigurationDoesNotRedirectRemovalOrAcceptTheOldReport() throws {
+        let fixture = try fixture()
+        let preview = try fixture.installer.previewInstall()
+        try fixture.installer.install(preview)
+        let oldSettings = try Data(contentsOf: fixture.installer.settingsURL)
+        let manifest = try Data(contentsOf: fixture.installer.manifestURL)
+        let oldBackups = try backups(in: fixture)
+        let newDirectory = fixture.root.appendingPathComponent("other profile")
+        let other = ClaudeStatuslineInstaller(cache: fixture.installer.cache,
+            executableURL: fixture.installer.executableURL, supportDirectory: fixture.installer.supportDirectory,
+            environment: ["CLAUDE_CONFIG_DIR": newDirectory.path], homeDirectory: fixture.root)
+        XCTAssertEqual(other.setupState, .differentConfiguration)
+        XCTAssertEqual(other.reportEligibility(installationID: preview.installationID), .blocked)
+        XCTAssertEqual(other.reportEligibility(installationID: nil), .blocked)
+        XCTAssertThrowsError(try other.remove())
+        XCTAssertThrowsError(try other.forgetConflictingInstallation())
+        XCTAssertThrowsError(try other.previewInstall())
+        XCTAssertEqual(try Data(contentsOf: fixture.installer.settingsURL), oldSettings)
+        XCTAssertEqual(try Data(contentsOf: fixture.installer.manifestURL), manifest)
+        XCTAssertEqual(try backups(in: fixture), oldBackups)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: other.settingsURL.path))
+        // The recovery instruction remains actionable in the original configuration.
+        try fixture.installer.remove()
+        let newPreview = try other.previewInstall()
+        try other.install(newPreview)
+        XCTAssertEqual(other.setupState, .installed)
+        XCTAssertEqual(other.reportEligibility(installationID: newPreview.installationID), .allowed)
+        XCTAssertEqual(other.reportEligibility(installationID: preview.installationID), .blocked)
+        XCTAssertEqual(other.reportEligibility(installationID: nil), .blocked)
+    }
+
+    func testLegacyDefaultInstallationRemainsRemovableAndAutomaticallyEligible() throws {
+        let fixture = try fixture()
+        let installer = ClaudeStatuslineInstaller(cache: fixture.installer.cache,
+            executableURL: fixture.installer.executableURL, supportDirectory: fixture.installer.supportDirectory,
+            environment: [:], homeDirectory: fixture.root)
+        let preview = try installer.previewInstall()
+        try installer.install(preview)
+        var manifest = try json(installer.manifestURL)
+        let legacyCommand = String(preview.bridgeCommand.dropLast(preview.installationID.count + 3))
+        let line = try JSONSerialization.data(withJSONObject: ["type": "command", "command": legacyCommand], options: [.sortedKeys, .prettyPrinted])
+        manifest.removeValue(forKey: "installationID")
+        manifest["installedCommand"] = legacyCommand
+        manifest["installedStatusline"] = line.base64EncodedString()
+        try JSONSerialization.data(withJSONObject: manifest).write(to: installer.manifestURL)
+        try JSONSerialization.data(withJSONObject: ["statusLine": ["type": "command", "command": legacyCommand]])
+            .write(to: installer.settingsURL)
+        XCTAssertEqual(installer.setupState, .installed)
+        XCTAssertEqual(installer.reportEligibility(installationID: nil), .allowed)
+        XCTAssertEqual(installer.reportEligibility(installationID: UUID().uuidString), .blocked)
+        try installer.remove()
+        XCTAssertEqual(installer.setupState, .notInstalled)
+        XCTAssertEqual(installer.reportEligibility(installationID: nil), .confirmationRequired)
+        XCTAssertEqual(installer.reportEligibility(installationID: preview.installationID), .blocked)
+    }
+
     private struct Fixture {
         let root: URL
         let installer: ClaudeStatuslineInstaller

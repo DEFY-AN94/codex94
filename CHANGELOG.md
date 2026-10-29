@@ -6,6 +6,38 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
+## Unreleased — 4.1.8 (32)
+
+### Fixed
+
+- Use the same validated `CLAUDE_CONFIG_DIR` for the local usage reader,
+  optional Claude CLI and new statusline installations, while preserving the
+  different default locations of Claude's global state and settings files.
+- Isolate statusline reports belonging to another configuration or retired
+  installation. Bind new wrapper calls and cached reports to their installation,
+  and keep duplicate-report timestamps within that installation. Existing
+  connections in another directory require removal from their original
+  configuration before installing a replacement; they are never moved silently.
+- Preserve same-account notification thresholds and observation watermarks when
+  toggling automatic Claude CLI reads or replacing a statusline connection,
+  avoiding duplicate low-quota alerts after falling back to an older report.
+  Successful statusline removal no longer appears as a configuration conflict.
+- Cancel the complete Codex executable-discovery transaction, including queued
+  work and remaining version candidates, while allowing a later fresh lookup.
+- Respect an explicit `DEVELOPER_DIR` or the system-selected Xcode in the
+  development build/run script instead of forcing `/Applications/Xcode.app`.
+- Keep the previous Token statistics failure/stale marker visible while retrying
+  with an existing snapshot, clearing it only after a successful response.
+
+### Changed
+
+- Remove the duplicate custom-date-range change handler in the Token chart.
+- Add synthetic regression coverage for configuration/installation boundaries,
+  notification continuity, cancellation, retry presentation and Xcode selection.
+
+This is an unpublished candidate. Its validation and acceptance are tracked
+separately from the published 4.1.7 release; stable download links remain there.
+
 ## 4.1.7 - 2026-10-18
 
 Version `4.1.7 (31)` was published on the date above, following `4.1.6 (30)`.

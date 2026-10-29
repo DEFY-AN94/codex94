@@ -31,6 +31,35 @@ Launching an explicitly approved candidate does not authorize replacing an
 installed App or operating real Login Items/System Settings. Keep pending
 acceptance visible in the PR. Never mark Ready merely because CI is green.
 
+## Unreleased candidate: 4.1.8 (32)
+
+Baseline main is `08dee47aa935856234aa3a80c06908e298d88cf7`. This candidate
+addresses Claude configuration/installation consistency and notification
+continuity, Codex discovery cancellation, development Xcode selection, and Token
+statistics retry presentation. The implementation and regression scope is
+recorded in the Unreleased changelog; earlier release test counts do not
+validate this candidate.
+
+Record the PR head and tested merge SHA/tree, script and hosted tests, all five
+external UI smokes, actual screenshot review and CodeQL results in its Draft PR.
+The current preparation host is Linux: local native build/launch, hosted tests,
+DMG/install transactions and candidate App acceptance are pending macOS evidence.
+GitHub-hosted UI smokes launch isolated synthetic Apps and do not establish
+maintainer acceptance of the installed production App or real CLI compatibility.
+
+Configuration migration must cover default/custom directories, old manifests,
+old commands invoked after reinstall, cache-write/reinstall interleavings and
+per-installation duplicate-report timestamps. Verify original statusline stdout
+and cancellation as well as new report isolation. Cancellation checks use
+controlled queued and running fake probes; notifications use injected services.
+Rollback: remove a newly installed statusline connection with this candidate
+before replacing it with 4.1.7 or earlier; those bridge entrypoints do not
+understand the new wrapper argument. Preserve user settings and backups.
+
+Candidate App acceptance before Ready, final-main DMG/install acceptance, a
+release date, tagging and publication remain separate gates. Keep public stable
+links and published artifacts on 4.1.7 until a later publication is confirmed.
+
 ## 2. Local candidate and shared metadata
 
 The **4.1.7 (31)** release was published on **2026-10-18**
