@@ -19,8 +19,9 @@ below applies only to its recorded version and does not validate later releases.
   connections in another directory require removal from their original
   configuration before installing a replacement; they are never moved silently.
 - Preserve same-account notification thresholds and observation watermarks when
-  toggling automatic Claude CLI reads, avoiding duplicate low-quota alerts after
-  falling back to an older passive report.
+  toggling automatic Claude CLI reads or replacing a statusline connection,
+  avoiding duplicate low-quota alerts after falling back to an older report.
+  Successful statusline removal no longer appears as a configuration conflict.
 - Cancel the complete Codex executable-discovery transaction, including queued
   work and remaining version candidates, while allowing a later fresh lookup.
 - Respect an explicit `DEVELOPER_DIR` or the system-selected Xcode in the

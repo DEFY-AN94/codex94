@@ -83,6 +83,11 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try await wait { !f.store.isRefreshing }
         XCTAssertEqual(f.store.source, .localCache, "A failed one-time read cannot admit the other configuration")
         XCTAssertTrue(f.notifications.deliveries.isEmpty)
+        try FileManager.default.removeItem(at: f.localCacheURL)
+        f.store.refresh()
+        XCTAssertNil(f.store.snapshot)
+        XCTAssertEqual(f.store.lastIssue, .configurationConflict,
+                       "An actual cross-directory installation remains a visible conflict")
     }
 
     func testReinstallationInvalidatesRetainedHistoryAndRejectsAnOldCacheGeneration() throws {
@@ -99,11 +104,16 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try f.store.removeStatusline()
         XCTAssertNil(f.store.snapshot)
         XCTAssertNil(f.store.historicalReport, "Retained history cannot outlive the installation that qualified it")
+        XCTAssertEqual(f.store.statuslineSetupState, .notInstalled)
+        XCTAssertNil(f.store.lastIssue, "Successful removal is not a configuration conflict")
+        f.store.refresh()
+        XCTAssertNil(f.store.lastIssue, "An intentionally retained retired cache is simply ignored")
         let second = try f.store.previewStatuslineInstall()
         try f.store.installStatusline(second)
         f.store.refresh()
         XCTAssertNil(f.store.source, "Reinstalling does not reinterpret an old cache as new evidence")
         XCTAssertFalse(f.store.passiveReportNeedsConfirmation)
+        XCTAssertNil(f.store.lastIssue, "A valid new installation may be waiting for its first report")
         try f.cache.capture(passivePayload(session: 1, used: 30), at: f.clock.read(),
                             installationID: second.installationID)
         f.store.refresh()
@@ -122,6 +132,74 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertNil(f.store.snapshot)
         XCTAssertNil(f.store.historicalReport)
         XCTAssertFalse(f.store.passiveReportNeedsConfirmation)
+    }
+
+    func testRemovingAndReinstallingBridgeKeepsSameAccountNotificationBaseline() async throws {
+        let f = try fixture(cliEnabled: false, legacyInstallation: false)
+        var alerts = NotificationPreferences()
+        alerts.isEnabled = true
+        alerts.recoveryEnabled = true
+        f.preferences.claudeNotifications = alerts
+        let began = f.clock.read()
+        let reset = began.addingTimeInterval(20_000)
+        let first = try f.store.previewStatuslineInstall()
+        try f.store.installStatusline(first)
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: reset)
+        f.store.start()
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 1, used: 95, reset: Int(reset.timeIntervalSince1970)),
+                            at: f.clock.read(), installationID: first.installationID)
+        f.store.refresh()
+        try await wait { f.notifications.deliveries.count == 1 }
+
+        try f.store.removeStatusline()
+        XCTAssertEqual(f.store.source, .localCache)
+        XCTAssertEqual(f.store.reportedAt, began, "Removal falls back to the old source observation")
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 96, fetchedAt: f.clock.read(), resetAt: reset)
+        try await poll(f)
+        XCTAssertEqual(f.notifications.deliveries.count, 1,
+                       "An installation retirement cannot rearm the same account's low-quota alert")
+
+        let second = try f.store.previewStatuslineInstall()
+        try f.store.installStatusline(second)
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 1, used: 97, reset: Int(reset.timeIntervalSince1970)),
+                            at: f.clock.read(), installationID: second.installationID)
+        try await poll(f)
+        XCTAssertEqual(f.store.source, .statusline)
+        XCTAssertFalse(f.store.passiveReportNeedsConfirmation)
+        XCTAssertEqual(f.notifications.deliveries.count, 1, "The same producer in a new installation retains cycle deduplication")
+
+        // A genuine refill/new cycle must still recover and permit a later alert.
+        let nextReset = reset.addingTimeInterval(20_000)
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: f.clock.read(), resetAt: nextReset)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 2 }
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 95, fetchedAt: f.clock.read(), resetAt: nextReset)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 3 }
+
+        try f.store.removeStatusline()
+        let third = try f.store.previewStatuslineInstall()
+        try f.store.installStatusline(third)
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 2, used: 10, reset: Int(nextReset.timeIntervalSince1970)),
+                            at: f.clock.read(), installationID: third.installationID)
+        try await poll(f)
+        XCTAssertTrue(f.store.passiveReportNeedsConfirmation, "A different producer still requires explicit adoption")
+        f.store.adoptPendingPassiveReport(expectedConfirmationID: try XCTUnwrap(f.store.pendingPassiveConfirmationID))
+        try await Task.sleep(for: .milliseconds(80))
+        XCTAssertEqual(f.notifications.deliveries.count, 3, "Adopting a new stream establishes a baseline, not recovery")
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 2, used: 95, reset: Int(nextReset.timeIntervalSince1970)),
+                            at: f.clock.read(), installationID: third.installationID)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 4 }
+        XCTAssertEqual(f.notifications.deliveries.last, f.notifications.deliveries.first,
+                       "The new producer's later crossing delivers a low-quota alert, not a delayed recovery")
     }
 
     func testCLIOptionCoexistsWithPassiveDataAndDisablingItKeepsThePassiveReport() async throws {

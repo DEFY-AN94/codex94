@@ -350,7 +350,6 @@ final class ClaudeQuotaStore: ObservableObject {
         let installationID = pendingPassiveInstallationID
         guard installer.reportEligibility(installationID: installationID) != .blocked else {
             clearPendingPassiveReport()
-            passiveIssue = .configurationConflict
             projectReport(at: now())
             return
         }
@@ -409,7 +408,7 @@ final class ClaudeQuotaStore: ObservableObject {
     func refreshNotificationAuthorization() { notificationController.refreshAuthorization() }
 
     func refreshSetupState() {
-        statuslineSetupState = installer.setupState
+        assign(\.statuslineSetupState, installer.setupState)
         if isEnabled { projectReport(at: now()) }
     }
 
@@ -573,17 +572,13 @@ final class ClaudeQuotaStore: ObservableObject {
     // MARK: Backup source: statusline bridge reports
 
     private func loadBridgeReport() {
-        statuslineSetupState = installer.setupState
         reconcilePassiveEligibility()
         // The pending candidate stays frozen, but the selected producer can
         // still publish newer values while another report awaits confirmation.
         guard let entry = try? cache.loadEntry() else { return }
         let value = entry.report
         let eligibility = installer.reportEligibility(installationID: entry.installationID)
-        guard eligibility != .blocked else {
-            passiveIssue = .configurationConflict
-            return
-        }
+        guard eligibility != .blocked else { return }
         guard value.snapshot(at: now()) != nil else { return }
         guard value.reportedAt <= now().addingTimeInterval(5) else { passiveIssue = .invalidData; return }
         let confirmedStream = passiveReport != nil && passiveWasExplicitlyConfirmed
@@ -616,20 +611,29 @@ final class ClaudeQuotaStore: ObservableObject {
     /// Revalidate retained reports too: a missing/new installation must not let
     /// an already accepted old report survive through the history projection.
     private func reconcilePassiveEligibility() {
+        let setup = installer.setupState
+        assign(\.statuslineSetupState, setup)
+        let configurationIssue: ClaudeQuotaIssue? = setup == .conflict || setup == .differentConfiguration
+            ? .configurationConflict : nil
+        if configurationIssue != nil || passiveIssue == .configurationConflict {
+            passiveIssue = configurationIssue
+        }
         if passiveReport != nil {
             let eligibility = installer.reportEligibility(installationID: passiveInstallationID)
             if eligibility == .blocked || (eligibility == .confirmationRequired && !passiveWasExplicitlyConfirmed) {
                 passiveReport = nil
                 passiveInstallationID = nil
                 passiveWasExplicitlyConfirmed = false
-                passiveIssue = .configurationConflict
-                resetNotificationBaseline()
+                passiveIssue = configurationIssue
+                // Retiring an installation is not an account boundary. An old
+                // fallback must not rewind notification observations or rearm
+                // thresholds; identity/producer changes reset them separately.
             }
         }
         if pendingPassiveReport != nil,
            installer.reportEligibility(installationID: pendingPassiveInstallationID) == .blocked {
             clearPendingPassiveReport()
-            passiveIssue = .configurationConflict
+            passiveIssue = configurationIssue
         }
     }
 
