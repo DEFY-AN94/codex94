@@ -77,6 +77,75 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
         XCTAssertNil(f.store.sourceHealth(at: f.clock.read()).lastDiagnostic)
     }
 
+    func testCLIOptionRetirementRejectsLateDiagnosticsInBothCleanupOrders() async throws {
+        for shutdownFirst in [false, true] {
+            let shutdownGate = DiagnosticShutdownGate()
+            let f = try fixture(automatic: true, shutdownGate: shutdownGate)
+            try writeLocalReport(f)
+            f.store.start()
+            try await settle { await f.fetcher.count == 1 }
+            let first = diagnostic(result: .success, duration: 110)
+            await f.fetcher.emit(first, for: 1)
+            await f.fetcher.complete(1, .success(report(at: f.clock.read())))
+            try await settle { !f.store.isRefreshing && f.store.lastCLIDiagnostic != nil }
+            let firstCompletedAt = try XCTUnwrap(f.store.lastCLIDiagnostic?.completedAt)
+
+            f.clock.advance(5)
+            f.store.refresh()
+            try await settle { await f.fetcher.count == 2 }
+            f.store.setCLIUsageEnabled(false)
+            try await settle { shutdownGate.started > 0 }
+            XCTAssertNil(f.store.lastCLIDiagnostic, "Switching off retires the previous diagnostic context")
+            XCTAssertEqual(f.store.source, .localCache)
+            XCTAssertFalse(f.preferences.claudeCLIUsageEnabled)
+
+            f.store.setCLIUsageEnabled(true)
+            XCTAssertTrue(f.store.isRetiringCLI)
+            XCTAssertFalse(f.store.canReadOnceWithCLI)
+            let obsolete = diagnostic(result: .failure, issue: .timedOut, duration: 999)
+            await f.fetcher.emit(obsolete, for: 2)
+            if shutdownFirst {
+                shutdownGate.allowShutdown()
+                try await settle { shutdownGate.finished > 0 }
+            } else {
+                await f.fetcher.complete(2, .success(report(at: f.clock.read(), used: 99)))
+                try await settle { await f.fetcher.hasReturned(2) }
+            }
+            XCTAssertTrue(f.store.isRetiringCLI, "Both shutdown and the cancelled fetch tail must finish")
+            let whileRetiring = await f.fetcher.count
+            XCTAssertEqual(whileRetiring, 2)
+            XCTAssertNil(f.store.lastCLIDiagnostic)
+            XCTAssertEqual(f.store.source, .localCache)
+
+            if shutdownFirst {
+                await f.fetcher.complete(2, .success(report(at: f.clock.read(), used: 99)))
+            } else {
+                shutdownGate.allowShutdown()
+            }
+            try await settle { await f.fetcher.count == 3 }
+            XCTAssertNil(f.store.lastCLIDiagnostic)
+            XCTAssertNil(f.store.lastCLIReadIssue)
+            XCTAssertEqual(f.store.source, .localCache, "The retired result must not restore the CLI slot")
+
+            f.clock.advance(20)
+            let currentCompletedAt = f.clock.read()
+            await f.fetcher.complete(3, .success(report(at: currentCompletedAt)))
+            try await settle { !f.store.isRefreshing }
+            XCTAssertNil(f.store.lastCLIDiagnostic, "Wait for this read's own event instead of reusing an old one")
+            let current = diagnostic(result: .success, duration: 330)
+            await f.fetcher.emit(obsolete, for: 2)
+            await f.fetcher.emit(current, for: 3)
+            try await settle { f.store.lastCLIDiagnostic?.diagnostic == current }
+            XCTAssertEqual(f.store.lastCLIDiagnostic?.completedAt, currentCompletedAt)
+            XCTAssertEqual(f.store.lastCLIReadAt, currentCompletedAt)
+            XCTAssertNotEqual(currentCompletedAt, firstCompletedAt)
+            XCTAssertTrue(f.preferences.claudeCLIUsageEnabled)
+            XCTAssertFalse(shutdownGate.timedOut)
+            f.store.stop()
+            try await settle { !f.store.isRetiringCLI }
+        }
+    }
+
     func testPassiveRereadNeverStartsCLIOrRewritesUnchangedSchedule() async throws {
         for automatic in [false, true] {
             let f = try fixture(automatic: automatic)
@@ -122,6 +191,43 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
         XCTAssertEqual(calls, 1)
         XCTAssertEqual(f.store.nextAutomaticRefreshAt,
                        f.clock.read().addingTimeInterval(f.preferences.claudeRefreshInterval.seconds))
+    }
+
+    func testPassiveIdentityChangeWithAutomaticCLIOffClearsDiagnosticWithoutReading() async throws {
+        let f = try fixture(automatic: false)
+        try writeLocalReport(f)
+        f.store.start()
+        let startupCalls = await f.fetcher.count
+        XCTAssertEqual(startupCalls, 0)
+        XCTAssertNil(f.store.nextAutomaticRefreshAt)
+
+        // An explicit read establishes a real diagnostic to invalidate, without
+        // enabling automatic reads or leaving a background client behind.
+        f.store.readOnceWithCLI()
+        try await settle { await f.fetcher.count == 1 }
+        await f.fetcher.emit(diagnostic(result: .success), for: 1)
+        await f.fetcher.complete(1, .success(report(at: f.clock.read())))
+        try await settle { !f.store.isRefreshing && !f.store.isRetiringCLI && f.store.lastCLIDiagnostic != nil }
+        XCTAssertNotNil(f.store.lastCLIReadAt)
+        XCTAssertFalse(f.preferences.claudeCLIUsageEnabled)
+
+        f.clock.advance(3)
+        let replacementAt = f.clock.read()
+        try writeLocalReport(f, account: "00000000-0000-4000-8000-000000000002")
+        for _ in 0..<3 { f.store.rereadPassiveSources() }
+        let afterIdentityChange = await f.fetcher.count
+        XCTAssertEqual(afterIdentityChange, 1, "Only the earlier explicit read ran; local rereads start no CLI")
+        XCTAssertFalse(f.preferences.claudeCLIUsageEnabled)
+        XCTAssertNil(f.store.nextAutomaticRefreshAt)
+        XCTAssertNil(f.store.lastCLIDiagnostic)
+        XCTAssertNil(f.store.lastCLIReadAt)
+        XCTAssertNil(f.store.lastCLIReadIssue)
+        XCTAssertEqual(f.store.source, .localCache)
+        XCTAssertEqual(f.store.reportedAt, replacementAt)
+        XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 75)
+        XCTAssertEqual(f.store.sourceHealth(at: replacementAt).dataState, .current)
+        XCTAssertNil(f.store.sourceHealth(at: replacementAt).lastDiagnostic)
+        XCTAssertEqual(f.notifications.deliveries, 0)
     }
 
     func testSingleReadFailureKeepsLocalHealthAndDoesNotEnableAutomaticReads() async throws {
@@ -214,14 +320,14 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
         let notifications: HealthDiagnosticNotifications
     }
 
-    private func fixture(automatic: Bool) throws -> Fixture {
+    private func fixture(automatic: Bool, shutdownGate: DiagnosticShutdownGate? = nil) throws -> Fixture {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("ClaudeDiagnosticStore-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let suite = "Codex94.DiagnosticTests.\(UUID().uuidString)"
         let preferences = PreferencesStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suite)))
         preferences.claudeMonitoringEnabled = true
         preferences.claudeCLIUsageEnabled = automatic
-        let fetcher = HealthDiagnosticFetcher()
+        let fetcher = HealthDiagnosticFetcher(shutdownGate: shutdownGate)
         let clock = HealthDiagnosticClock()
         let notifications = HealthDiagnosticNotifications()
         let cache = ClaudeStatuslineCache(fileURL: root.appendingPathComponent("support/statusline-quota.json"))
@@ -233,6 +339,7 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
             notificationController: NotificationController(service: notifications), now: { clock.read() },
             sleep: { _ in try await Task.sleep(for: .seconds(86_400)) })
         addTeardownBlock {
+            shutdownGate?.allowShutdown()
             await fetcher.finishAll()
             await MainActor.run { store.shutdown() }
             UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
@@ -266,16 +373,22 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
 }
 
 private actor HealthDiagnosticFetcher: ClaudeQuotaFetching {
+    private nonisolated let shutdownGate: DiagnosticShutdownGate?
     private(set) var count = 0
+    private var returned: Set<Int> = []
     private var continuations: [Int: CheckedContinuation<ClaudeQuotaReport, Error>] = [:]
     private var observers: [Int: @Sendable (ClaudeCLIUsageDiagnostic) -> Void] = [:]
+    init(shutdownGate: DiagnosticShutdownGate? = nil) { self.shutdownGate = shutdownGate }
+    nonisolated func shutdown() { shutdownGate?.waitForRelease() }
     func fetch() async throws -> ClaudeQuotaReport { try await fetch(diagnosticObserver: { _ in }) }
     func fetch(diagnosticObserver: @escaping @Sendable (ClaudeCLIUsageDiagnostic) -> Void) async throws -> ClaudeQuotaReport {
         count += 1
         let index = count
         observers[index] = diagnosticObserver
+        defer { returned.insert(index) }
         return try await withCheckedThrowingContinuation { continuations[index] = $0 }
     }
+    func hasReturned(_ index: Int) -> Bool { returned.contains(index) }
     func emit(_ diagnostic: ClaudeCLIUsageDiagnostic, for index: Int) { observers[index]?(diagnostic) }
     func complete(_ index: Int, _ result: Result<ClaudeQuotaReport, ClaudeQuotaIssue>) {
         guard let continuation = continuations.removeValue(forKey: index) else { return }
@@ -288,6 +401,40 @@ private actor HealthDiagnosticFetcher: ClaudeQuotaFetching {
         let pending = Array(continuations.values)
         continuations.removeAll()
         pending.forEach { $0.resume(throwing: CancellationError()) }
+    }
+}
+
+/// Controls only the fake client's synchronous shutdown half. The continuation
+/// in HealthDiagnosticFetcher independently controls the fetch-return half.
+private final class DiagnosticShutdownGate: @unchecked Sendable {
+    private let condition = NSCondition()
+    private var released = false
+    private var starts = 0
+    private var finishes = 0
+    private var expired = false
+    var started: Int { condition.lock(); defer { condition.unlock() }; return starts }
+    var finished: Int { condition.lock(); defer { condition.unlock() }; return finishes }
+    var timedOut: Bool { condition.lock(); defer { condition.unlock() }; return expired }
+
+    func waitForRelease() {
+        condition.lock()
+        defer { condition.unlock() }
+        starts += 1
+        let deadline = Date().addingTimeInterval(10)
+        while !released {
+            if !condition.wait(until: deadline) {
+                expired = true
+                break
+            }
+        }
+        finishes += 1
+    }
+
+    func allowShutdown() {
+        condition.lock()
+        released = true
+        condition.broadcast()
+        condition.unlock()
     }
 }
 

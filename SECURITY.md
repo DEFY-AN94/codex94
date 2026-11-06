@@ -349,8 +349,10 @@ App acceptance. The synthetic Overview image embedded in the README has been
 visually and privacy reviewed. Contributor validation guidance is documented in
 [CONTRIBUTING.md](CONTRIBUTING.md); static source checks alone are not runtime
 security or release evidence. Every release candidate needs its own checks,
-candidate App acceptance before Ready, and final CI artifact/tag/Release
-verification and maintainer acceptance before publication.
+candidate App acceptance (before Ready unless the maintainer explicitly
+authorizes another order), and final CI artifact/tag/Release verification and
+maintainer acceptance before publication. The authorized 4.2.0 handoff order
+is recorded in [the release workflow](docs/RELEASING.md#unreleased-candidate-420-33).
 
 ## Reporting
 

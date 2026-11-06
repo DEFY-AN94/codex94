@@ -4,6 +4,8 @@ import XCTest
 
 /// Repository-owned synthetic data only. No process, settings, account or network access.
 final class CLICompatibilityReplayTests: XCTestCase {
+    private static let replaySeeds: [UInt64] = [0x94, 0x418, 0x420]
+
     func testCatalogIsPresentOnlyInTheHostedTestBundle() throws {
         let testBundle = Bundle(for: CLICompatibilityReplayTests.self)
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.defyan94.codex94", "This is a hosted App test")
@@ -34,6 +36,38 @@ final class CLICompatibilityReplayTests: XCTestCase {
         }
     }
 
+    func testScreenFixturesSurviveSeededAndFixedCutDelivery() throws {
+        for fixture in try loadFixtures() where fixture.kind == .screen {
+            for seed in Self.replaySeeds {
+                var generator = ReplayChunkGenerator(seed: seed)
+                // Split each declared event independently so its semantic
+                // checkpoint is still observed, even inside a UTF-8 sequence.
+                let chunks = try fixture.events.flatMap { event in
+                    generator.chunks(for: try event.output())
+                }
+                try assertScreenDelivery(chunks, fixture: fixture,
+                                         delivery: "seed 0x\(String(seed, radix: 16))")
+            }
+
+            var bytes = Data()
+            var boundaries = Set<Int>()
+            for event in fixture.events {
+                bytes.append(try event.output())
+                boundaries.insert(bytes.count)
+            }
+            // One additional fixed partition crosses the full report using
+            // short-prefix and interior cuts, retaining all event checkpoints.
+            boundaries.formUnion([1, 2, 3, 7, 17, 31, 64, 127, bytes.count / 2, bytes.count - 1])
+            var start = 0
+            let chunks = boundaries.filter { $0 > 0 && $0 <= bytes.count }.sorted().map { end in
+                let chunk = bytes.subdata(in: start..<end)
+                start = end
+                return chunk
+            }
+            try assertScreenDelivery(chunks, fixture: fixture, delivery: "fixed cuts")
+        }
+    }
+
     func testTerminalQueryFixturesSurviveEverySingleSplitAndBytewiseDelivery() throws {
         for fixture in try loadFixtures() where fixture.kind == .queries {
             let bytes = try fixture.events.reduce(into: Data()) { result, event in
@@ -50,6 +84,13 @@ final class CLICompatibilityReplayTests: XCTestCase {
                               id: fixture.id, delivery: "bytewise")
             try assertReplies(fixture.events.map { try $0.output() }, expected: expected,
                               id: fixture.id, delivery: "declared events")
+            for seed in Self.replaySeeds {
+                var generator = ReplayChunkGenerator(seed: seed)
+                // Unlike screen checkpoints, query framing must also survive
+                // chunks that cross boundaries between declared output events.
+                try assertReplies(generator.chunks(for: bytes), expected: expected,
+                                  id: fixture.id, delivery: "seed 0x\(String(seed, radix: 16))")
+            }
         }
     }
 
@@ -67,40 +108,72 @@ final class CLICompatibilityReplayTests: XCTestCase {
         }
     }
 
-    private func assertScreen(_ bytes: Data, fixture: ReplayFixture,
+    private func assertScreenDelivery(_ chunks: [Data], fixture: ReplayFixture, delivery: String,
+                                      file: StaticString = #filePath, line: UInt = #line) throws {
+        var expectedBytes = Data()
+        var checkpoints: [Int: (event: Int, complete: Bool)] = [:]
+        for (index, event) in fixture.events.enumerated() {
+            expectedBytes.append(try event.output())
+            if let complete = event.expectedComplete {
+                checkpoints[expectedBytes.count] = (index, complete)
+            }
+        }
+        var received = Data()
+        var observedCheckpoints = 0
+        for (index, chunk) in chunks.enumerated() {
+            received.append(chunk)
+            let screen = ClaudeUsageScreen.snapshot(from: received)
+            if let checkpoint = checkpoints[received.count] {
+                observedCheckpoints += 1
+                XCTAssertEqual(screen.isComplete, checkpoint.complete,
+                               "\(fixture.id): \(delivery), event \(checkpoint.event), chunk \(index)",
+                               file: file, line: line)
+            }
+        }
+        XCTAssertEqual(observedCheckpoints, checkpoints.count,
+                       "\(fixture.id): \(delivery), missed declared checkpoints", file: file, line: line)
+        // Compare only a boolean so a failed partition never dumps a transcript.
+        XCTAssertTrue(received == expectedBytes, "\(fixture.id): \(delivery), byte reconstruction",
+                      file: file, line: line)
+        try assertScreen(received, fixture: fixture, delivery: delivery, file: file, line: line)
+    }
+
+    private func assertScreen(_ bytes: Data, fixture: ReplayFixture, delivery: String = "declared events",
                               file: StaticString = #filePath, line: UInt = #line) throws {
+        let context = "\(fixture.id): \(delivery)"
         let screen = ClaudeUsageScreen.snapshot(from: bytes)
-        let complete = try XCTUnwrap(fixture.expected.complete, fixture.id, file: file, line: line)
-        XCTAssertEqual(screen.isComplete, complete, fixture.id, file: file, line: line)
+        let complete = try XCTUnwrap(fixture.expected.complete, context, file: file, line: line)
+        XCTAssertEqual(screen.isComplete, complete, context, file: file, line: line)
         // Completeness is a parser output, not permission to send a key. The
         // production client's input/settling gates retain their existing tests.
         guard complete, screen.isComplete else { return }
-        let ready = try XCTUnwrap(fixture.expected.ready, fixture.id, file: file, line: line)
-        let refreshing = try XCTUnwrap(fixture.expected.refreshing, fixture.id, file: file, line: line)
+        let ready = try XCTUnwrap(fixture.expected.ready, context, file: file, line: line)
+        let refreshing = try XCTUnwrap(fixture.expected.refreshing, context, file: file, line: line)
         XCTAssertEqual(ClaudeUsageScreen.isReadyForUsage(screen.text), ready,
-                       fixture.id, file: file, line: line)
+                       context, file: file, line: line)
         XCTAssertEqual(ClaudeUsageScreen.isRefreshing(screen.text), refreshing,
-                       fixture.id, file: file, line: line)
-        let expected = try XCTUnwrap(fixture.expected.windows, fixture.id, file: file, line: line)
+                       context, file: file, line: line)
+        let expected = try XCTUnwrap(fixture.expected.windows, context, file: file, line: line)
         let date = try fixture.referenceDate()
         if expected.isEmpty {
             XCTAssertThrowsError(try ClaudeUsageScreen.report(from: screen.text, at: date),
-                                 fixture.id, file: file, line: line) { error in
-                XCTAssertEqual(error as? ClaudeQuotaIssue, .noData, fixture.id, file: file, line: line)
+                                 context, file: file, line: line) { error in
+                XCTAssertEqual(error as? ClaudeQuotaIssue, .noData, context, file: file, line: line)
             }
             return
         }
-        let report = try ClaudeUsageScreen.report(from: screen.text, at: date)
-        XCTAssertEqual(report.source, .cliUsage, fixture.id, file: file, line: line)
-        XCTAssertEqual(report.reportedAt, date, fixture.id, file: file, line: line)
-        XCTAssertEqual(report.receivedAt, date, fixture.id, file: file, line: line)
-        XCTAssertNil(report.producerID, fixture.id, file: file, line: line)
-        XCTAssertTrue(report.modelLimits.isEmpty, fixture.id, file: file, line: line)
+        let report = try XCTUnwrap(try? ClaudeUsageScreen.report(from: screen.text, at: date),
+                                  "\(context): expected parsed report", file: file, line: line)
+        XCTAssertEqual(report.source, .cliUsage, context, file: file, line: line)
+        XCTAssertEqual(report.reportedAt, date, context, file: file, line: line)
+        XCTAssertEqual(report.receivedAt, date, context, file: file, line: line)
+        XCTAssertNil(report.producerID, context, file: file, line: line)
+        XCTAssertTrue(report.modelLimits.isEmpty, context, file: file, line: line)
         let windows = try expected.map { value in
             ClaudeQuotaWindow(kind: value.kind, usedPercentage: value.usedPercentage,
                               resetsAt: try value.resetsAt.map(Self.utcDate))
         }
-        XCTAssertEqual(report.windows, windows, fixture.id, file: file, line: line)
+        XCTAssertEqual(report.windows, windows, context, file: file, line: line)
     }
 
     private func assertReplies(_ chunks: [Data], expected: [String], id: String, delivery: String,
@@ -110,9 +183,9 @@ final class CLICompatibilityReplayTests: XCTestCase {
             .map { String(decoding: $0, as: UTF8.self) }.sorted()
         XCTAssertEqual(actual, expected, "\(id): \(delivery)", file: file, line: line)
         XCTAssertTrue(responder.responses(to: Data()).isEmpty,
-                      "\(id): empty delivery duplicated a reply", file: file, line: line)
+                      "\(id): \(delivery), empty delivery duplicated a reply", file: file, line: line)
         XCTAssertTrue(responder.responses(to: Data("synthetic non-query tail".utf8)).isEmpty,
-                      "\(id): later text duplicated a reply", file: file, line: line)
+                      "\(id): \(delivery), later text duplicated a reply", file: file, line: line)
     }
 
     private func loadFixtures() throws -> [ReplayFixture] {
@@ -165,6 +238,30 @@ final class CLICompatibilityReplayTests: XCTestCase {
             throw ReplayError.invalidFixture
         }
         return date
+    }
+}
+
+/// A tiny, fixed SplitMix64 sequence, independent of system random sources.
+/// Each draw advances by at least one byte, with chunks capped at 31 bytes.
+private struct ReplayChunkGenerator {
+    private var state: UInt64
+
+    init(seed: UInt64) { state = seed }
+
+    mutating func chunks(for bytes: Data) -> [Data] {
+        var result: [Data] = []
+        var offset = 0
+        while offset < bytes.count {
+            state &+= 0x9E3779B97F4A7C15
+            var value = state
+            value = (value ^ (value >> 30)) &* 0xBF58476D1CE4E5B9
+            value = (value ^ (value >> 27)) &* 0x94D049BB133111EB
+            value ^= value >> 31
+            let end = min(bytes.count, offset + Int(value % 31) + 1)
+            result.append(bytes.subdata(in: offset..<end))
+            offset = end
+        }
+        return result
     }
 }
 

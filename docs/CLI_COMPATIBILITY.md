@@ -34,13 +34,24 @@ passes the bytes to the existing production `ClaudeUsageScreen` and
 | `control-string-boundary` | An OSC sequence remains incomplete until its full terminator arrives. |
 | `open-synchronized-update` | A later open update cannot reuse an earlier frame's completeness. |
 | `invalid-shared-values` | Out-of-range and nonnumeric percentages yield no shared report. |
-| `terminal-query-boundaries` | Every two-chunk split and bytewise delivery preserve the exact reply multiplicities; later empty or ordinary text does not repeat replies. |
+| `terminal-query-boundaries` | Every two-chunk split, bytewise delivery and fixed-seed delivery preserve the exact reply multiplicities; later empty or ordinary text does not repeat replies. |
 
 Declared incomplete checkpoints are also replayed after an already recognized
 prompt. Earlier readiness must not make an unfinished encoding or terminal frame
 complete. Query replies are compared by multiplicity, because the production
 responder groups query types within a received batch; this test does not impose
 a new reply-ordering contract.
+
+Screen fixtures also run with fixed interior cuts and three deterministic
+SplitMix64 seeds (`0x94`, `0x418`, `0x420`), producing chunks of 1–31 bytes.
+Screen delivery retains every declared event boundary so its completeness
+checkpoint is still asserted, including checkpoints inside UTF-8 and terminal
+control sequences. Each accumulated prefix reaches the production snapshot
+parser; the final report must retain the exact expected windows. Query replay
+also allows seeded chunks to cross declared event boundaries and checks that
+reply multiplicities remain unchanged. Failures identify the fixture and seed
+or cut strategy; neither replay uses system randomness. These are finite
+partitions of the authored output, not exhaustive arbitrary-stream coverage.
 
 The refreshing fixture intentionally checks both raw percentage decoding and
 the refreshing marker. It does **not** claim those percentages are an accepted
@@ -50,11 +61,11 @@ including the existing fake CLI/PTY, continuous redraw, trust, cancellation,
 timeout and process-group cleanup tests. This catalog does not launch a CLI or
 simulate their timing.
 
-The existing named backend tests remain the production client evidence for
+The named backend tests remain the production client evidence for
 those boundaries; record their actual macOS result rather than treating this
 table as a passing result:
 
-| Boundary | Existing `ClaudeQuotaBackendTests` test |
+| Boundary | `ClaudeQuotaBackendTests` test |
 | --- | --- |
 | Terminal handshake before recognized input | `testCLIHandshakeGatesReadyOnDeviceAttributesVersionAndCursorReplies` |
 | Continuous repaint with a stable single-window report | `testContinuousReadyAndUsageRedrawsReturnSingleWeeklyWindow` and `testContinuousUsageRedrawsReturnStableWeeklyWindow` |
@@ -65,7 +76,21 @@ table as a passing result:
 | Login, onboarding and unowned trust do not receive usage/confirmation | `testOnboardingLoginAndUnownedTrustNeverReceiveUsageOrConfirmation` |
 | Exact owned trust path and selected option | `testTrustNeedsExactOwnedDirectoryAndAnExplicitSelectedOption` |
 | Cancellation cleans the owned process group | `testCancellingCLIReadStopsItsOwnedProcessGroup` |
+| Cancellation after the fake process receives `/usage` cleans its parent and child | `testCancellingAfterUsageWasSentStopsTheOwnedProcessGroup` |
+| Cancellation before invocation launches neither the version command nor usage session | `testCancellationBeforeFetchStartsNeverLaunchesVersionOrUsage` |
+| More than 1 MiB of actual PTY output is rejected and the owned process group is cleaned up | `testCLIOutputAboveOneMiBIsRejectedAndItsProcessGroupIsCleanedUp` |
+| A fake process exiting before a report yields `unavailable` | `testCLIExitingBeforeAReportIsAnUnavailableRead` |
 | Silent process respects the injected deadline and cleanup | `testSilentCLIHonorsInjectedShortDeadlineAndCleansUp` |
+
+The output-cap test generates 17 × 64 KiB of synthetic bytes in a fake process;
+it does not enlarge the fixture catalog or production cap. The cancellation
+tests use an invocation gate or an observed process marker written after
+`/usage` was received. They do not guess the cancellation phase using a fixed
+delay. Started reads assert one final diagnostic with the expected result; a
+task cancelled before `fetch` starts has no CLI read and emits no diagnostic.
+Process-marker and cleanup checks use bounded condition polling. These tests
+exercise the production reader and lifecycle with temporary shell scripts,
+without invoking an installed Claude CLI or touching an account.
 
 Exact timing boundaries have a separate production path:
 [`ClaudeUsageReadTiming.swift`](../Codex94/Support/ClaudeUsageReadTiming.swift)
@@ -121,8 +146,8 @@ change rather than pretend output replay establishes process or timing behavior.
 Bounds are 64 fixture files, 256 events per fixture, 256 KiB per JSON file,
 1 MiB for the catalog and all fixture JSON bytes together, and 64 KiB of decoded
 output per fixture. These are test-asset limits and do not alter the production
-reader's 1 MiB output cap. Tests needing the production size boundary should
-generate their synthetic bytes in the existing backend tests.
+reader's 1 MiB output cap. The backend output-cap test generates its own
+synthetic bytes instead of storing oversized transcripts in this catalog.
 
 ## Validation and resource isolation
 
@@ -165,7 +190,7 @@ Keep these evidence categories separate in the PR and release record:
 | Synthetic schema check | Source revision, command and result | Fixture data conforms to the declared schema. |
 | Production parser replay | Source revision, Xcode/macOS and XCTest result | The compiled production parsing paths accepted/rejected these synthetic cases. |
 | Production timing helper | Source revision, Xcode/macOS and XCTest result | Exact elapsed-time boundaries and candidate resets passed without relying on OS scheduling. |
-| Existing fake CLI integration | Source revision, Xcode/macOS and focused/release test result | The identified synthetic process and timing cases passed. |
+| Fake CLI integration | Source revision, Xcode/macOS and focused/release test result | The identified synthetic process and timing cases passed. |
 | Isolated UI smoke | Tested revision, scenario, App version/build and reviewed screenshots | The recorded fake-provider UI interaction passed within that fixture's limits. |
 | Real CLI acceptance | Actual CLI version, macOS, candidate identity, date and performed operations | Only the explicitly recorded real-client operations were accepted. |
 

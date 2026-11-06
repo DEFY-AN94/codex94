@@ -1991,6 +1991,129 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         }
     }
 
+    func testFixedSeedPassiveEventCombinationsPreserveHistoryAndNotificationContinuity() async throws {
+        enum Event: String { case local, statusline, reread, manual, wake, clockChange, poll }
+        // Deliberately bounded permutations, not an open-ended random walk. Each
+        // source write is strictly newer, so the expected observation is known
+        // without reproducing the production source-selection implementation.
+        for seed in [UInt64(0x94), 0x418, 0x420] {
+            let f = try fixture(cliEnabled: false)
+            var alerts = NotificationPreferences()
+            alerts.isEnabled = true
+            alerts.recoveryEnabled = true
+            f.preferences.claudeNotifications = alerts
+            let began = f.clock.read()
+            var reset = began.addingTimeInterval(40)
+            try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: reset)
+            f.store.start()
+            try await wait { f.store.notificationController.authorization == .authorized }
+            var generator = seed
+            var step = 0
+            var expectedSource = ClaudeQuotaSource.localCache
+            var expectedDate = began
+            var expectedRemaining = 90.0
+            var expectedNotifications = 0
+            var isHistory = false
+            let prefix = "seed=0x" + String(seed, radix: 16)
+            await assertPassiveSequenceState(f, source: expectedSource, reportedAt: expectedDate,
+                remaining: expectedRemaining, history: isHistory, notifications: 0, context: prefix + " step=0 start")
+
+            for round in 0..<2 {
+                var events: [Event] = [.local, .statusline, .reread, .manual, .wake, .clockChange, .poll]
+                for index in stride(from: events.count - 1, through: 1, by: -1) {
+                    generator = generator &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+                    events.swapAt(index, Int((generator >> 32) % UInt64(index + 1)))
+                }
+                for event in events {
+                    step += 1
+                    f.clock.advance(1)
+                    let context = "\(prefix) step=\(step) round=\(round) event=\(event.rawValue)"
+                    switch event {
+                    case .local, .statusline:
+                        expectedSource = event == .local ? .localCache : .statusline
+                        expectedDate = f.clock.read()
+                        expectedRemaining = 5
+                        isHistory = false
+                        if event == .local {
+                            try writeLocalCache(f, fiveHourUsed: 95, fetchedAt: expectedDate, resetAt: reset)
+                        } else {
+                            try f.cache.capture(passivePayload(session: 1, used: 95, reset: Int(reset.timeIntervalSince1970)),
+                                                at: expectedDate)
+                        }
+                        f.store.rereadPassiveSources()
+                        if expectedNotifications == 0 {
+                            expectedNotifications = 1
+                            try await wait { f.notifications.deliveries.count == 1 }
+                        }
+                    case .reread: f.store.rereadPassiveSources()
+                    case .manual: f.store.refresh(trigger: .manual)
+                    case .wake: f.store.handleSystemWake(now: f.clock.read())
+                    case .clockChange: f.store.handleSystemClockChange(now: f.clock.read())
+                    case .poll: try await poll(f)
+                    }
+                    await assertPassiveSequenceState(f, source: expectedSource, reportedAt: expectedDate,
+                        remaining: expectedRemaining, history: isHistory, notifications: expectedNotifications,
+                        context: context)
+                }
+
+                step += 1
+                f.clock.advance(reset.timeIntervalSince(f.clock.read()))
+                f.store.rereadPassiveSources()
+                isHistory = true
+                await assertPassiveSequenceState(f, source: expectedSource, reportedAt: expectedDate,
+                    remaining: expectedRemaining, history: true, notifications: 1,
+                    context: "\(prefix) step=\(step) round=\(round) event=expire-at-reset")
+                reset = reset.addingTimeInterval(40)
+            }
+
+            // Expiry and source switches must not mute a genuine recovery or
+            // its next crossing. These positive events also expose any earlier
+            // extra delivery rather than allowing a final no-notification check.
+            for used in [10.0, 95.0] {
+                step += 1
+                f.clock.advance(1)
+                expectedDate = f.clock.read()
+                try writeLocalCache(f, fiveHourUsed: used, fetchedAt: expectedDate, resetAt: reset)
+                f.store.rereadPassiveSources()
+                expectedNotifications += 1
+                let deliveryCount = expectedNotifications
+                try await wait { f.notifications.deliveries.count == deliveryCount }
+                await assertPassiveSequenceState(f, source: .localCache, reportedAt: expectedDate,
+                    remaining: 100 - used, history: false, notifications: deliveryCount,
+                    context: "\(prefix) step=\(step) event=\(used == 10 ? "refill" : "new-crossing")")
+            }
+        }
+    }
+
+    private func assertPassiveSequenceState(
+        _ f: Fixture, source: ClaudeQuotaSource, reportedAt: Date, remaining: Double,
+        history: Bool, notifications: Int, context: String,
+        file: StaticString = #filePath, line: UInt = #line
+    ) async {
+        let calls = await f.fetcher.count()
+        XCTAssertEqual(calls, 0, context, file: file, line: line)
+        XCTAssertEqual(f.factoryCalls.read(), 0, context, file: file, line: line)
+        XCTAssertFalse(f.preferences.claudeCLIUsageEnabled, context, file: file, line: line)
+        XCTAssertFalse(f.store.isRefreshing, context, file: file, line: line)
+        XCTAssertNil(f.store.nextAutomaticRefreshAt, context, file: file, line: line)
+        XCTAssertFalse(f.store.passiveReportNeedsConfirmation, context, file: file, line: line)
+        XCTAssertEqual(f.store.source, source, context, file: file, line: line)
+        XCTAssertEqual(f.store.reportedAt, reportedAt, context, file: file, line: line)
+        XCTAssertEqual(f.notifications.deliveries.count, notifications, context, file: file, line: line)
+        if history {
+            XCTAssertNil(f.store.snapshot, context, file: file, line: line)
+            XCTAssertEqual(f.store.historicalReport?.source, source, context, file: file, line: line)
+            XCTAssertEqual(f.store.historicalReport?.reportedAt, reportedAt, context, file: file, line: line)
+            XCTAssertEqual(f.store.historicalReport?.windows.map(\.usedPercentage), [100 - remaining],
+                           context, file: file, line: line)
+        } else {
+            XCTAssertNil(f.store.historicalReport, context, file: file, line: line)
+            XCTAssertEqual(f.store.snapshot?.fetchedAt, reportedAt, context, file: file, line: line)
+            XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, remaining,
+                           context, file: file, line: line)
+        }
+    }
+
     private func writeLocalCacheBytes(_ fixture: Fixture, _ contents: String) throws {
         try FileManager.default.createDirectory(at: fixture.localCacheURL.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
