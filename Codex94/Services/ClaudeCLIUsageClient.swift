@@ -44,6 +44,7 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
     private let environment: [String: String]
     private let locator: ClaudeExecutableLocator
     private let timeout: TimeInterval
+    private let wallClock: @Sendable () -> Date
     private let diagnosticHandler: @Sendable (ClaudeCLIUsageDiagnostic) -> Void
     private let lifecycle = ManagedSubprocessLifecycle()
     private let queue = DispatchQueue(label: "com.defyan94.codex94.claude-usage", qos: .utility)
@@ -52,6 +53,7 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
     init(executableURL: URL? = nil, runtimeDirectory: URL? = nil,
          environment: [String: String] = ProcessInfo.processInfo.environment, timeout: TimeInterval = 20,
          locator: ClaudeExecutableLocator? = nil,
+         wallClock: @escaping @Sendable () -> Date = { Date() },
          diagnosticHandler: @escaping @Sendable (ClaudeCLIUsageDiagnostic) -> Void = { $0.log() }) {
         self.executableURL = executableURL
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -59,16 +61,23 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
         self.environment = environment
         self.locator = locator ?? ClaudeExecutableLocator(environment: environment)
         self.timeout = max(1, min(timeout, 60))
+        self.wallClock = wallClock
         self.diagnosticHandler = diagnosticHandler
     }
 
     func fetch() async throws -> ClaudeQuotaReport {
+        try await fetch(diagnosticObserver: { _ in })
+    }
+
+    /// The observer belongs to this invocation, even when the client is reused.
+    /// Its payload is the same allowlisted final event sent to the existing log.
+    func fetch(diagnosticObserver: @escaping @Sendable (ClaudeCLIUsageDiagnostic) -> Void) async throws -> ClaudeQuotaReport {
         try Task.checkCancellation()
         do {
             let report = try await withTaskCancellationHandler {
                 try await withCheckedThrowingContinuation { continuation in
                     queue.async { [self] in
-                        do { continuation.resume(returning: try fetchSynchronously()) }
+                        do { continuation.resume(returning: try fetchSynchronously(observer: diagnosticObserver)) }
                         catch { continuation.resume(throwing: error) }
                     }
                 }
@@ -83,18 +92,18 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
 
     func shutdown() { lifecycle.shutdown(gracePeriod: 0.3) }
 
-    private func fetchSynchronously() throws -> ClaudeQuotaReport {
+    private func fetchSynchronously(observer: @Sendable (ClaudeCLIUsageDiagnostic) -> Void) throws -> ClaudeQuotaReport {
         let started = ProcessInfo.processInfo.systemUptime
         var trace = ReadTrace()
         do {
             let report = try readUsage(trace: &trace)
             trace.phase = .completed
-            record(trace, result: .success, issue: nil, started: started)
+            record(trace, result: .success, issue: nil, started: started, observer: observer)
             return report
         } catch {
             let cancelled = error is CancellationError || lifecycle.hasShutDown
             record(trace, result: cancelled ? .cancelled : .failure,
-                   issue: cancelled ? nil : ((error as? ClaudeQuotaIssue) ?? .unavailable), started: started)
+                   issue: cancelled ? nil : ((error as? ClaudeQuotaIssue) ?? .unavailable), started: started, observer: observer)
             throw error
         }
     }
@@ -110,11 +119,14 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
     }
 
     private func record(_ trace: ReadTrace, result: ClaudeCLIUsageDiagnostic.Result,
-                        issue: ClaudeQuotaIssue?, started: TimeInterval) {
-        diagnosticHandler(ClaudeCLIUsageDiagnostic(
+                        issue: ClaudeQuotaIssue?, started: TimeInterval,
+                        observer: @Sendable (ClaudeCLIUsageDiagnostic) -> Void) {
+        let diagnostic = ClaudeCLIUsageDiagnostic(
             phase: trace.phase, result: result, issue: issue,
             usageSent: trace.usageSent, terminalReceived: trace.terminalReceived,
-            durationMilliseconds: Int(max(0, ProcessInfo.processInfo.systemUptime - started) * 1_000)))
+            durationMilliseconds: Int(max(0, ProcessInfo.processInfo.systemUptime - started) * 1_000))
+        diagnosticHandler(diagnostic)
+        observer(diagnostic)
     }
 
     private func readUsage(trace: inout ReadTrace) throws -> ClaudeQuotaReport {
@@ -154,7 +166,9 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
             try? primary.close()
         }
         let clock = ContinuousClock()
-        let deadline = clock.now.advanced(by: .seconds(timeout))
+        let usageStarted = clock.now
+        var timing = ClaudeUsageReadTiming<InputAction>(timeout: .seconds(timeout))
+        func elapsed() -> Duration { usageStarted.duration(to: clock.now) }
         trace.phase = .waitingForPrompt
         var output = Data()
         var terminalQueries = ClaudeTerminalQueries()
@@ -162,12 +176,7 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
         var confirmedUsageAction = false
         var trustSteps = 0
         var lastTrustInput: String?
-        var nextEvaluation = clock.now
-        var pendingAction: InputAction?
-        var actionSince: ContinuousClock.Instant?
-        var candidateWindows: [ClaudeQuotaWindow]?
-        var candidateSince: ContinuousClock.Instant?
-        while clock.now < deadline {
+        while !timing.hasReachedDeadline(at: elapsed()) {
             if lifecycle.hasShutDown { throw CancellationError() }
             var descriptor = pollfd(fd: master, events: Int16(POLLIN | POLLHUP), revents: 0)
             let result = poll(&descriptor, 1, 100)
@@ -187,14 +196,12 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
             }
             // A busy terminal must not postpone parsing indefinitely. Limit work
             // by time, independently of byte arrival or animation frequency.
-            guard clock.now >= nextEvaluation else { continue }
-            nextEvaluation = clock.now.advanced(by: .milliseconds(100))
+            guard timing.beginEvaluation(at: elapsed()) else { continue }
             let frame = ClaudeUsageScreen.snapshot(from: output)
-            guard clock.now < deadline else { break }
+            guard !timing.hasReachedDeadline(at: elapsed()) else { break }
             guard frame.isComplete else {
                 trace.phase = .readingTerminal
-                pendingAction = nil; actionSince = nil
-                candidateWindows = nil; candidateSince = nil
+                timing.invalidateFrame()
                 continue
             }
             let screen = frame.text
@@ -214,7 +221,7 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
                 // Revalidate the complete owned path and selection on every
                 // sample. Partially painted menus never authorize a key.
                 action = (try? trustInput(on: screen)).map(InputAction.trust) ?? .unsupportedTrust
-                candidateWindows = nil; candidateSince = nil
+                _ = timing.observeWindows(nil, at: elapsed())
             } else if !sentUsage {
                 trace.phase = .waitingForPrompt
                 if ClaudeUsageScreen.isReadyForUsage(screen) { action = .usage }
@@ -223,26 +230,21 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
                 // network refresh is still pending. Those are not fresh data.
                 if ClaudeUsageScreen.isRefreshing(screen) {
                     trace.phase = .refreshingUsage
-                    candidateWindows = nil; candidateSince = nil
-                } else if let report = try? ClaudeUsageScreen.report(from: screen, at: Date()) {
+                    _ = timing.observeWindows(nil, at: elapsed())
+                } else if let report = try? ClaudeUsageScreen.report(from: screen, at: wallClock()) {
                     trace.phase = .settlingUsage
-                    if candidateWindows != report.windows {
-                        candidateWindows = report.windows
-                        candidateSince = clock.now
-                    }
                     // Ink may paint session and weekly rows in separate frames.
                     // Settle the recognized values rather than requiring two
                     // windows: a legitimate single-window panel also completes.
                     // This never moves the transaction's original deadline.
-                    if let candidateSince, clock.now - candidateSince >= .seconds(1) {
+                    if timing.observeWindows(report.windows, at: elapsed()) {
                         if lifecycle.hasShutDown { throw CancellationError() }
-                        guard clock.now < deadline else { break }
+                        guard !timing.hasReachedDeadline(at: elapsed()) else { break }
                         return report
                     }
                 } else {
                     trace.phase = .waitingForUsage
-                    candidateWindows = nil
-                    candidateSince = nil
+                    _ = timing.observeWindows(nil, at: elapsed())
                 }
                 if !confirmedUsageAction, normalized.contains("showplan") {
                     action = .confirmUsage
@@ -250,13 +252,9 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
             }
             // Keep the input guard, but settle recognized actions rather than
             // waiting for every unrelated animation byte to become quiet.
-            if action != pendingAction {
-                pendingAction = action
-                actionSince = action == nil ? nil : clock.now
-            }
-            if let action, let since = actionSince, clock.now - since >= .milliseconds(200) {
+            if let action = timing.observeAction(action, at: elapsed()) {
                 if lifecycle.hasShutDown { throw CancellationError() }
-                guard clock.now < deadline else { break }
+                guard !timing.hasReachedDeadline(at: elapsed()) else { break }
                 switch action {
                 case .usage:
                     try primary.write(contentsOf: Data("/usage\r".utf8))
@@ -273,7 +271,6 @@ final class ClaudeCLIUsageClient: ClaudeQuotaFetching, @unchecked Sendable {
                     try primary.write(contentsOf: Data("\r".utf8))
                     confirmedUsageAction = true
                 }
-                pendingAction = nil; actionSince = nil
             }
             if process.pollForExit() { throw ClaudeQuotaIssue.unavailable }
         }

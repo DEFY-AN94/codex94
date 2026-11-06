@@ -572,7 +572,7 @@ final class ClaudeQuotaBackendTests: XCTestCase {
     }
 
     func testSplitCLIFramesReturnBothWindowsAndTheirActualResetTimes() async throws {
-        let reference = Date()
+        let reference = Date(timeIntervalSince1970: 2_000_000_000)
         let sessionReset = Date(timeIntervalSince1970: floor(reference.addingTimeInterval(3_600).timeIntervalSince1970 / 60) * 60)
         let weeklyReset = Date(timeIntervalSince1970: floor(reference.addingTimeInterval(86_400).timeIntervalSince1970 / 60) * 60)
         let formatter = DateFormatter()
@@ -581,9 +581,11 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         formatter.dateFormat = "MMM d, yyyy, HH:mm"
         let firstFrame = "Current session\\r\\n23.5%% used\\r\\nResets \(formatter.string(from: sessionReset)) (UTC)\\r\\n"
         let secondFrame = "Current week (all models)\\r\\n41%% used\\r\\nResets \(formatter.string(from: weeklyReset)) (UTC)\\r\\n"
-        let fixture = try stagedCLI(firstFrame: firstFrame, delayedFrame: secondFrame)
+        let fixture = try stagedCLI(firstFrame: firstFrame, delayedFrame: secondFrame, wallClock: { reference })
         defer { fixture.client.shutdown() }
         let report = try await fixture.client.fetch()
+        XCTAssertEqual(report.reportedAt, reference)
+        XCTAssertEqual(report.receivedAt, reference)
         XCTAssertEqual(report.windows.map(\.kind), [.fiveHour, .weekly])
         XCTAssertEqual(report.windows.map(\.usedPercentage), [23.5, 41])
         XCTAssertEqual(report.windows.map(\.resetsAt), [sessionReset, weeklyReset])
@@ -1042,7 +1044,8 @@ final class ClaudeQuotaBackendTests: XCTestCase {
     private func stagedCLI(firstFrame: String, delayedFrame: String?, environment: [String: String]? = nil,
                            requireProbeEnvironment: Bool = false, expectedConfigDirectory: String? = nil,
                            delay: TimeInterval = 0.4,
-                           timeout: TimeInterval = 5) throws -> (
+                           timeout: TimeInterval = 5,
+                           wallClock: @escaping @Sendable () -> Date = { Date() }) throws -> (
         client: ClaudeCLIUsageClient, requestFile: URL, childPIDFile: URL, secondFrameMarker: URL
     ) {
         let root = try fixtureDirectory()
@@ -1079,7 +1082,8 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         try script.write(to: executable, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
         return (ClaudeCLIUsageClient(executableURL: executable, runtimeDirectory: root.appendingPathComponent("runtime"),
-                                     environment: environment ?? ProcessInfo.processInfo.environment, timeout: timeout),
+                                     environment: environment ?? ProcessInfo.processInfo.environment, timeout: timeout,
+                                     wallClock: wallClock),
                 request, childPID, marker)
     }
 

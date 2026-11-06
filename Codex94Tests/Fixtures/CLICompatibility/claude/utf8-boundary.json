@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "id": "utf8-boundary",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "utf8-boundary",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testScreenSnapshotRejectsTruncatedUTF8AndTerminalSequencesUntilCompleted"
+    ],
+    "notes": "The three bytes encode a synthetic CJK character. Each incomplete UTF-8 prefix suspends screen completeness."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "Current week (all models)\r\n62.5% used\r\n",
+      "expectedComplete": true
+    },
+    {
+      "type": "output",
+      "bytes": [
+        231
+      ],
+      "expectedComplete": false
+    },
+    {
+      "type": "output",
+      "bytes": [
+        149
+      ],
+      "expectedComplete": false
+    },
+    {
+      "type": "output",
+      "bytes": [
+        140
+      ],
+      "expectedComplete": true
+    }
+  ],
+  "expected": {
+    "complete": true,
+    "ready": false,
+    "refreshing": false,
+    "windows": [
+      {
+        "kind": "weekly",
+        "usedPercentage": 62.5,
+        "resetsAt": null
+      }
+    ]
+  }
+}

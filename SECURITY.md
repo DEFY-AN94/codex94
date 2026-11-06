@@ -116,6 +116,30 @@ the user opens that page. The check does not verify an installation package,
 download or install an App, relaunch it, or run in the background. See
 [docs/updating.md](docs/updating.md) for the user flow and maintenance boundary.
 
+## 4.2.0 candidate: source-health actions and replay boundaries
+
+The Claude source-health presentation projects existing accepted report and
+source state; it is not another reader or authentication check. Its local-report
+reread action is passive-only even with automatic CLI reading enabled. It cannot
+silently start a CLI read, approve a pending stream, repair/remove an installation
+or bypass a configuration conflict. The warned one-time CLI action and existing
+statusline confirmation/recovery flows retain those responsibilities.
+
+Completed CLI diagnostics use fixed categories and bounded numeric/Boolean
+fields. Read/context guards reject late diagnostics from retired operations;
+terminal text, raw errors, paths, account identifiers and payloads do not enter
+the new presentation or diagnostic copy. These changes add no source, endpoint,
+credential reader, entitlement or persistent diagnostic record.
+
+Compatibility fixtures are explicitly synthetic, bounded test data. Drivers
+exercise production parsing/client paths with predefined test actions; fixture
+text must not become shell code or an arbitrary command. Test resources belong
+only to the test bundle, and Recovery's disposable source copy still uses an
+explicit per-file build-input allowlist. Public UI artifacts remain limited to
+reviewed synthetic window captures and curated summaries, never raw replay
+transcripts or RPC. A passing replay establishes only the recorded sample's
+behavior, not real-account or whole-version compatibility.
+
 ## 4.1.8 candidate: configuration and installation boundaries
 
 One validated configuration-directory resolver is shared by the Claude local

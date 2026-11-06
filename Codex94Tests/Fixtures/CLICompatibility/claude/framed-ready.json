@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "framed-ready",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "framed-ready",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testNewCLIReadyFooterAcceptsPersistentSeparatedHints"
+    ],
+    "notes": "Synthetic framed prompt with a separated footer hint. Version text is simulated."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "Claude Code v2.1.286\r\n────────────────────────────────────────\r\n❯\r\n────────────────────────────────────────\r\n⏸ plan mode on (shift+tab to cycle) high effort\r\n",
+      "expectedComplete": true
+    }
+  ],
+  "expected": {
+    "complete": true,
+    "ready": true,
+    "refreshing": false,
+    "windows": []
+  }
+}

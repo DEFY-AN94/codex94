@@ -6,6 +6,31 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
+## Unreleased — 4.2.0 (33)
+
+### Added
+
+- Explain Claude's accepted report, source freshness and recovery actions in a
+  source-health card in Dashboard Services, without an additional quota read
+  merely from rendering the card.
+- Add an explicit local-report reread action that does not launch Claude CLI,
+  including when automatic CLI reading is enabled. Preserve source timestamps,
+  confirmation requirements and the separate warned one-time CLI action.
+- Show the latest completed CLI read's bounded diagnostic through the existing
+  Diagnostics flow. Keep it in memory, bind it to the originating read/context,
+  and include it only in user-triggered redacted diagnostic copies.
+- Add synthetic CLI compatibility fixtures, production-path replay
+  tests and source/lifecycle sequence regressions. Keep fixture validation and
+  test resources separate from the production App and live compatibility claims.
+- Extract the existing CLI evaluation, action-settling and report-stability
+  timing into a production helper with deterministic boundary tests. Keep the
+  usage-session deadline separate from version-probe and process-cleanup budgets.
+
+This candidate builds on the separate 4.1.8 PR #71 and retains the changes
+below. Neither candidate is a published release. Stable downloads remain 4.1.7;
+4.2.0 validation and maintainer acceptance are recorded separately in
+[the release workflow](docs/RELEASING.md).
+
 ## 4.1.8 - 2026-11-08
 
 Version `4.1.8 (32)`. Release dates use Australia/Melbourne. Publication and

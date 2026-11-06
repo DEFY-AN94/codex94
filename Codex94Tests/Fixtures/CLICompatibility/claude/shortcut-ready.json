@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "shortcut-ready",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "shortcut-ready",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testCLIHandshakeGatesReadyOnDeviceAttributesVersionAndCursorReplies"
+    ],
+    "notes": "Synthetic shortcut prompt; no official CLI was executed or recorded."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "? for shortcuts\r\n",
+      "expectedComplete": true
+    }
+  ],
+  "expected": {
+    "complete": true,
+    "ready": true,
+    "refreshing": false,
+    "windows": []
+  }
+}

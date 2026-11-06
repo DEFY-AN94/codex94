@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "weekly-only",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "weekly-only",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testStableSingleWindowCLIReportCompletesWithoutInventingWeeklyQuota"
+    ],
+    "notes": "Fixed-date synthetic weekly report; no five-hour window is invented."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "Current week (all models)\r\n62.5% used\r\nResets May 20 at 03:00 (UTC)\r\n",
+      "expectedComplete": true
+    }
+  ],
+  "expected": {
+    "complete": true,
+    "ready": false,
+    "refreshing": false,
+    "windows": [
+      {
+        "kind": "weekly",
+        "usedPercentage": 62.5,
+        "resetsAt": "2033-05-20T03:00:00Z"
+      }
+    ]
+  }
+}

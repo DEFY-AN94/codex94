@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "open-synchronized-update",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "open-synchronized-update",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testScreenSnapshotWaitsForSynchronizedUpdateToClose"
+    ],
+    "notes": "A later unclosed synchronized update cannot reuse an earlier frame as complete."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "Current week (all models)\r\n62.5% used\r\n\u001b[?2026h",
+      "expectedComplete": false
+    }
+  ],
+  "expected": {
+    "complete": false
+  }
+}

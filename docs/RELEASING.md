@@ -29,7 +29,47 @@ An earlier authorization does not authorize a later gate. Candidate App
 acceptance before Ready and final CI DMG/install acceptance are separate.
 Launching an explicitly approved candidate does not authorize replacing an
 installed App or operating real Login Items/System Settings. Keep pending
-acceptance visible in the PR. Never mark Ready merely because CI is green.
+acceptance visible in the PR. Never mark Ready merely because CI is green unless
+the maintainer explicitly authorizes a different order, as recorded for the
+4.2.0 candidate below.
+
+## Unreleased candidate: 4.2.0 (33)
+
+The development baseline is PR #71 head
+`0c2343981c9b5858e575048d213f51f6230fd1e4`, on
+`codex/4.1.8-config-and-refresh-fixes`. The new 4.2.0 PR targets that branch;
+PR #71 remains a separate candidate and is not merged as part of this work.
+Public stable downloads and release assets remain at 4.1.7.
+
+Scope: Claude source-health presentation and recovery guidance, an explicit
+passive-only local reread, per-read completed diagnostics in the existing
+redacted Diagnostics flow, and synthetic compatibility/lifecycle regressions.
+The 4.1.8 configuration, notification and cancellation fixes remain the baseline.
+No tag, GitHub Release, publication or automatic installation is part of this
+candidate handoff.
+
+For this candidate the maintainer explicitly authorized implementation, commit,
+push and a new PR, followed by **Ready only after all executable checks and
+applicable CI pass**. The maintainer will perform the final local candidate
+test **after Ready**. This scoped order supersedes gate 2's default pre-Ready
+acceptance order; Ready does not claim that local acceptance has already happened
+and does not authorize merge or publication. Keep that acceptance pending in the
+PR until the maintainer reports its result.
+
+Validation is pending on the final implementation. Record script/schema checks,
+production-path Swift replay and state-sequence tests, the full macOS release
+gate, all five UI smokes, reviewed screenshots and CodeQL against the exact PR
+head and tested merge/tree. Linux source/script checks do not establish native
+build, UI, DMG or installation acceptance. Synthetic replay and UI fixtures do
+not establish real provider-account or whole-CLI-version compatibility.
+Main-only DMG attestation remains intentionally inapplicable to this PR;
+record any existing hosted-test skip separately rather than counting it as a pass.
+
+The maintainer handoff must identify the candidate App/DMG, version/build, source
+revision and checksum. Local acceptance should check source-health explanations,
+local-only reread versus one-time CLI behavior and the displayed completed-read
+diagnostic. Record any real CLI use separately from synthetic tests. The existing
+4.1.8 statusline downgrade rule below continues to apply.
 
 ## Release preparation: 4.1.8 (32) — 2026-11-08
 

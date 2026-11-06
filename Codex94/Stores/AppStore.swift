@@ -256,6 +256,11 @@ final class AppStore: ObservableObject {
         claudeStore.readOnceWithCLI()
     }
 
+    func rereadClaudePassiveSources() {
+        guard !isShuttingDown else { return }
+        claudeStore.rereadPassiveSources()
+    }
+
     func setClaudeNotificationPreferences(_ value: NotificationPreferences) {
         setNotificationPreferences(value, for: .claude)
     }
@@ -529,7 +534,8 @@ final class AppStore: ObservableObject {
             claudeSource: preferences.claudeMonitoringEnabled ? claudeStore.source : nil,
             claudeIssue: preferences.claudeMonitoringEnabled ? claudeStore.lastIssue : nil,
             claudeLastReport: preferences.claudeMonitoringEnabled ? claudeStore.reportedAt : nil,
-            claudeLocalCache: preferences.claudeMonitoringEnabled ? claudeStore.localCacheState : nil
+            claudeLocalCache: preferences.claudeMonitoringEnabled ? claudeStore.localCacheState : nil,
+            claudeCLIRead: preferences.claudeMonitoringEnabled ? claudeStore.lastCLIDiagnostic : nil
         )
     }
 

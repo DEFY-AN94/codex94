@@ -469,6 +469,10 @@ struct ClaudePopoverQuotaSection: View {
             .font(.caption)
             .help(Text("claude.popoverShowsFable.help"))
             .accessibilityIdentifier("claude-popover-shows-fable")
+            Button("claude.health.viewDetails", action: openSetup)
+                .font(.caption)
+                .controlSize(.small)
+                .accessibilityIdentifier("claude-source-health-details")
         }
     }
 }

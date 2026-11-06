@@ -130,6 +130,31 @@ confirmation is unchanged. Codex94 still does not read `.credentials.json`, the
 Keychain, browser cookies, tokens or conversation transcripts, and the
 repository security scanner forbids those identifiers in production sources.
 
+## 4.2.0 candidate: source health and completed-read diagnostics
+
+The source-health card presents state already held by the Claude store. Merely
+opening or rendering it starts no provider request. Its explicit local-report
+reread uses the existing bounded local readers and never starts a CLI session,
+regardless of the automatic CLI option. It does not obtain new cloud usage or
+replace a source report's original observation time with the reread time.
+
+The most recent completed CLI diagnostic and that read's completion time are
+retained in memory for the current monitoring context. Its fixed phase/result/
+issue categories, two activity booleans and elapsed milliseconds contain no
+terminal output, paths, account identity, quota values or raw RPC. Per-read
+identifiers are internal lifecycle guards, not exported identities. Diagnostics remain distinct from the selected
+quota report: a CLI failure can coexist with valid passive quota data.
+
+The existing user-triggered redacted-diagnostics copy adds only
+`claudeCLIReadAt`, `claudeCLIPhase`, `claudeCLIResult`, `claudeCLIIssue`,
+`claudeCLIUsageSent`, `claudeCLITerminalReceived` and `claudeCLIDurationMs` for
+this record; absent values are `none`. The completion time is not a quota fetch
+time. No background clipboard access, diagnostic history file, new preference,
+cache schema or telemetry upload is added. OSLog retains its existing fixed-field
+diagnostics; the app does not collect or copy unified-log history. Synthetic
+compatibility fixtures and replay drivers are development/test inputs, are not
+bundled into the production App, and never collect a user's CLI transcript.
+
 ## 4.1.8 candidate: consistent configuration and installation records
 
 A valid `CLAUDE_CONFIG_DIR` in Codex94's own environment selects the same Claude

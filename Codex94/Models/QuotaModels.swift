@@ -440,6 +440,7 @@ struct RedactedDiagnostics: Equatable, Sendable {
     var claudeIssue: ClaudeQuotaIssue? = nil
     var claudeLastReport: Date? = nil
     var claudeLocalCache: ClaudeLocalUsageCacheState? = nil
+    var claudeCLIRead: ClaudeCLIReadDiagnosticRecord? = nil
 
     var text: String {
         let iso = ISO8601DateFormatter()
@@ -461,7 +462,14 @@ struct RedactedDiagnostics: Equatable, Sendable {
             "claudeSource: \(claudeSource?.rawValue ?? "none")",
             "claudeIssue: \(claudeIssue?.rawValue ?? "none")",
             "claudeLastReport: \(claudeLastReport.map(iso.string(from:)) ?? "none")",
-            "claudeLocalCache: \(claudeLocalCache?.rawValue ?? "none")"
+            "claudeLocalCache: \(claudeLocalCache?.rawValue ?? "none")",
+            "claudeCLIReadAt: \(claudeCLIRead.map { iso.string(from: $0.completedAt) } ?? "none")",
+            "claudeCLIPhase: \(claudeCLIRead?.diagnostic.phase.rawValue ?? "none")",
+            "claudeCLIResult: \(claudeCLIRead?.diagnostic.result.rawValue ?? "none")",
+            "claudeCLIIssue: \(claudeCLIRead?.diagnostic.issue?.rawValue ?? "none")",
+            "claudeCLIUsageSent: \(claudeCLIRead.map { String($0.diagnostic.usageSent) } ?? "none")",
+            "claudeCLITerminalReceived: \(claudeCLIRead.map { String($0.diagnostic.terminalReceived) } ?? "none")",
+            "claudeCLIDurationMs: \(claudeCLIRead.map { String($0.diagnostic.durationMilliseconds) } ?? "none")"
         ].joined(separator: "\n")
     }
 }

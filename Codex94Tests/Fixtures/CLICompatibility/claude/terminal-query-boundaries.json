@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "terminal-query-boundaries",
+  "provider": "claude",
+  "kind": "queries",
+  "scenario": "terminal-query-boundaries",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testTerminalQueriesSurviveEveryByteBoundaryWithoutRepeatedReplies"
+    ],
+    "notes": "Every query is synthetic. Repeated cursor queries each receive one reply; replay compares reply multiplicity, not ordering within a batched chunk."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "\u001b[6n\u001b[6n\u001b[c\u001b[0c\u001b[>0q"
+    }
+  ],
+  "expected": {
+    "replies": [
+      "\u001b[1;1R",
+      "\u001b[1;1R",
+      "\u001b[?1;2c",
+      "\u001b[?1;2c",
+      "\u001bP>|xterm(400)\u001b\\"
+    ]
+  }
+}

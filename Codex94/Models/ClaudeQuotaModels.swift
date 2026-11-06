@@ -179,9 +179,14 @@ struct ClaudeQuotaHistoryPresentation: Equatable, Sendable {
 
 protocol ClaudeQuotaFetching: Sendable {
     func fetch() async throws -> ClaudeQuotaReport
+    func fetch(diagnosticObserver: @escaping @Sendable (ClaudeCLIUsageDiagnostic) -> Void) async throws -> ClaudeQuotaReport
     func shutdown()
 }
 
 extension ClaudeQuotaFetching {
+    /// Existing injected readers need not manufacture a CLI diagnostic.
+    func fetch(diagnosticObserver: @escaping @Sendable (ClaudeCLIUsageDiagnostic) -> Void) async throws -> ClaudeQuotaReport {
+        try await fetch()
+    }
     func shutdown() {}
 }

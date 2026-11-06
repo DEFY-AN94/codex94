@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    "claude/shortcut-ready.json",
+    "claude/framed-ready.json",
+    "claude/unknown-prompt.json",
+    "claude/weekly-only.json",
+    "claude/fractional-shared-windows.json",
+    "claude/cleared-stale-window.json",
+    "claude/refreshing-panel.json",
+    "claude/synchronized-frame.json",
+    "claude/utf8-boundary.json",
+    "claude/control-string-boundary.json",
+    "claude/open-synchronized-update.json",
+    "claude/invalid-shared-values.json",
+    "claude/terminal-query-boundaries.json"
+  ]
+}
