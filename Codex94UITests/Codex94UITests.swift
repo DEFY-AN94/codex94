@@ -867,9 +867,7 @@ final class Codex94UITests: XCTestCase {
         let key = service + "MonitoringEnabled.v1"
         try require((try fixture.preference(key) as? Bool) != enabled, "The toggle precondition must differ from its target")
         let toggle = try uniqueIdentified("provider-" + service + "-enabled", in: dashboard)
-        try reveal(toggle, in: dashboard)
-        try require(toggle.isEnabled && toggle.isHittable, "The real monitoring control must be interactive")
-        toggle.click()
+        try clickProviderToggle(toggle, in: dashboard)
         try waitUntil("The monitoring toggle did not persist") {
             try self.fixture.preference(key) as? Bool == enabled
         }
@@ -880,12 +878,21 @@ final class Codex94UITests: XCTestCase {
         let key = "claude.cliUsageEnabled.v1"
         try require((try fixture.preference(key) as? Bool) != enabled, "The toggle precondition must differ from its target")
         let toggle = try uniqueIdentified("claude-cli-usage-enabled", in: dashboard)
-        try reveal(toggle, in: dashboard)
-        try require(toggle.isEnabled && toggle.isHittable, "The CLI option control must be interactive")
-        toggle.click()
+        try clickProviderToggle(toggle, in: dashboard)
         try waitUntil("The CLI option did not persist") {
             try self.fixture.preference(key) as? Bool == enabled
         }
+    }
+
+    private func clickProviderToggle(_ toggle: XCUIElement, in dashboard: XCUIElement) throws {
+        try revealProviderElement(toggle, in: dashboard)
+        let frame = toggle.frame
+        try require(toggle.elementType == .checkBox && toggle.isEnabled && toggle.isHittable
+                    && providerElementIsFullyVisible(toggle, in: dashboard) && toggle.frame == frame,
+                    "The exact Services checkbox must remain fully visible at its stable click position")
+        // A partially clipped checkbox may still report isHittable. Click once
+        // at the verified native control's center, after bounded positioning.
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     }
 
     /// Exercise the production health view using only the registered local

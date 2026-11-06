@@ -94,7 +94,9 @@ jobs:
   ui-test:
     name: UI smoke (${{ matrix.scenario }})
     runs-on: macos-15
-    timeout-minutes: 20
+    # Providers also exercises source-health navigation and bilingual captures.
+    # Its earlier scenario already took about 16 minutes on the hosted runner.
+    timeout-minutes: ${{ matrix.scenario == 'providers' && 25 || 20 }}
     strategy:
       fail-fast: false
       matrix:
