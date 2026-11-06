@@ -37,8 +37,11 @@ the maintainer explicitly authorizes a different order, as recorded for the
 
 The development baseline is PR #71 head
 `0c2343981c9b5858e575048d213f51f6230fd1e4`, on
-`codex/4.1.8-config-and-refresh-fixes`. The new 4.2.0 PR targets that branch;
-PR #71 remains a separate candidate and is not merged as part of this work.
+`codex/4.1.8-config-and-refresh-fixes`. The new [4.2.0 PR #72](https://github.com/DEFY-AN94/codex94/pull/72)
+targets `main` so the repository's existing default-branch security checks apply.
+Its history includes #71 and it depends on that PR; #71 remains a separate
+candidate and is not merged as part of this work. After #71 merges, reconcile
+any changes with main and verify the resulting PR head before merge.
 Public stable downloads and release assets remain at 4.1.7.
 
 Scope: Claude source-health presentation and recovery guidance, an explicit
@@ -56,7 +59,8 @@ acceptance order; Ready does not claim that local acceptance has already happene
 and does not authorize merge or publication. Keep that acceptance pending in the
 PR until the maintainer reports its result.
 
-Validation is pending on the final implementation. Record script/schema checks,
+Implementation is complete; final native validation is tracked in PR #72.
+Record script/schema checks,
 production-path Swift replay and state-sequence tests, the full macOS release
 gate, all five UI smokes, reviewed screenshots and CodeQL against the exact PR
 head and tested merge/tree. Linux source/script checks do not establish native
