@@ -31,21 +31,48 @@ Launching an explicitly approved candidate does not authorize replacing an
 installed App or operating real Login Items/System Settings. Keep pending
 acceptance visible in the PR. Never mark Ready merely because CI is green.
 
-## Unreleased candidate: 4.1.8 (32)
+## Release preparation: 4.1.8 (32) — 2026-11-08
 
 Baseline main is `08dee47aa935856234aa3a80c06908e298d88cf7`. This candidate
 addresses Claude configuration/installation consistency and notification
 continuity, Codex discovery cancellation, development Xcode selection, and Token
 statistics retry presentation. The implementation and regression scope is
-recorded in the Unreleased changelog; earlier release test counts do not
+recorded in the dated changelog; earlier release test counts do not
 validate this candidate.
 
 Record the PR head and tested merge SHA/tree, script and hosted tests, all five
 external UI smokes, actual screenshot review and CodeQL results in its Draft PR.
-The current preparation host is Linux: local native build/launch, hosted tests,
-DMG/install transactions and candidate App acceptance are pending macOS evidence.
+The implementation head is `0c2343981c9b5858e575048d213f51f6230fd1e4`, tree
+`cb6c772c779683f0288d18350c05a424eff387ef`. The maintainer completed local
+candidate acceptance on 2026-11-07 using macOS 27.2 and Xcode 27.2 (27B52).
+The installed 4.1.8 (32) executable SHA-256 is
+`c3c5fe3c91200bf88d8d49f2aa58c692758cbbba5b430b1816ad0662201f7cc0`.
+The local release gate passed: 629 tests, 1 existing hosted-focus skip,
+0 failures, script/security checks, Universal App and DMG verification.
 GitHub-hosted UI smokes launch isolated synthetic Apps and do not establish
 maintainer acceptance of the installed production App or real CLI compatibility.
+
+Native acceptance covered Dashboard/Services, custom chart dates, chart styles,
+actual CSV/PNG saves, and Copy Image opened in Preview as a 1920 x 1400 PNG.
+Floating expand/collapse, pin/unpin, Dashboard routing, Tab/Shift-Tab focus and
+Space activation passed. Keyboard navigation was temporarily enabled with
+permission and restored off. Physical dragging, ordinary Spaces and fullscreen
+visibility/operation were confirmed by the maintainer; they are not whole-display
+automated captures. A single authorized post-login Claude CLI 2.1.319 read
+completed successfully in 3492 ms. No real bridge reinstall or real notification
+delivery was performed; those boundaries were tested with synthetic fixtures.
+
+The existing Command-comma empty-Settings route is tracked separately in
+[#73](https://github.com/DEFY-AN94/codex94/issues/73). Its Settings scene is
+unchanged from 4.1.7, and normal Dashboard buttons work. The maintainer requested
+tracking it separately while proceeding with 4.1.8. This release does not claim
+to fix it or provide exhaustive keyboard/focus-stealing acceptance.
+
+The original PR checks passed on merge `624c5506b2efbbc2d055e7361b39bb76449f39f8`
+with the same implementation tree. Their seven-day artifacts have expired.
+This documentation-only date/acceptance change preserves all App inputs and
+candidate acceptance, but requires fresh PR checks and final-main artifacts.
+Use the final-main CI bytes and attestation for publication, not the local build.
 
 Configuration migration must cover default/custom directories, old manifests,
 old commands invoked after reinstall, cache-write/reinstall interleavings and
@@ -56,9 +83,10 @@ Rollback: remove a newly installed statusline connection with this candidate
 before replacing it with 4.1.7 or earlier; those bridge entrypoints do not
 understand the new wrapper argument. Preserve user settings and backups.
 
-Candidate App acceptance before Ready, final-main DMG/install acceptance, a
-release date, tagging and publication remain separate gates. Keep public stable
-links and published artifacts on 4.1.7 until a later publication is confirmed.
+The requested release date is 2026-11-08 (Australia/Melbourne). Final-main
+DMG/install acceptance, tagging and publication remain separately recorded
+checks. Keep public stable links and published artifacts on 4.1.7 until
+publication is confirmed.
 
 ## 2. Local candidate and shared metadata
 

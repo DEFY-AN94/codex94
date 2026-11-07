@@ -37,7 +37,7 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 新的 wrapper 调用格式。
 
 本候选版还修复切换 Claude CLI 开关后的重复通知、Codex 查找取消、Xcode 选择，以及
-Token 统计重试期间的旧数据提示。详见[未发布变更](CHANGELOG.md#unreleased--418-32)。
+Token 统计重试期间的旧数据提示。详见[4.1.8 更新记录](CHANGELOG.md#418---2026-11-08)。
 候选版尚未公开发布，上方稳定版下载仍指向 4.1.7。
 
 ## 功能详情

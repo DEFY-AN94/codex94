@@ -6,7 +6,10 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
-## Unreleased — 4.1.8 (32)
+## 4.1.8 - 2026-11-08
+
+Version `4.1.8 (32)`. Release dates use Australia/Melbourne. Publication and
+final-asset verification are recorded separately in [docs/RELEASING.md](docs/RELEASING.md).
 
 ### Fixed
 
@@ -35,8 +38,15 @@ below applies only to its recorded version and does not validate later releases.
 - Add synthetic regression coverage for configuration/installation boundaries,
   notification continuity, cancellation, retry presentation and Xcode selection.
 
-This is an unpublished candidate. Its validation and acceptance are tracked
-separately from the published 4.1.7 release; stable download links remain there.
+### Known issue
+
+- When Codex94 receives `Command-comma` with the popover closed, its default
+  Settings scene can open an empty window instead of Dashboard. This existing
+  behavior is tracked in [#73](https://github.com/DEFY-AN94/codex94/issues/73)
+  and is not fixed by this release. Use the menu-bar Dashboard action or the
+  floating window's Dashboard button.
+
+Stable download links remain on 4.1.7 until 4.1.8 publication is confirmed.
 
 ## 4.1.7 - 2026-10-18
 

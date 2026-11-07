@@ -45,7 +45,7 @@ candidate using its Services page; older Apps do not understand the new wrapper.
 
 The candidate also fixes repeated notifications after toggling Claude CLI reads,
 Codex discovery cancellation, Xcode selection and the old-data indicator during
-Token statistics retries. See [Unreleased changes](CHANGELOG.md#unreleased--418-32).
+Token statistics retries. See [4.1.8 changes](CHANGELOG.md#418---2026-11-08).
 It is not yet a published release; the stable downloads above remain 4.1.7.
 
 ## Features
