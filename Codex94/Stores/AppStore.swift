@@ -299,8 +299,12 @@ final class AppStore: ObservableObject {
             var successfulFetchedAt: Date?
             var failureIssue: ConnectionIssue?
             do {
+                // The previous stop must settle before capturing this ticket;
+                // capture before enqueueing so a later disable cancels queued
+                // discovery as well as the currently running version probe.
+                let ticket = locator.captureLaunchTicket()
                 let located = try await Task.detached(priority: .utility) { [locator] in
-                    try locator.locate(manualPath: manualPath)
+                    try locator.locate(manualPath: manualPath, ticket: ticket)
                 }.value
                 guard !Task.isCancelled, !isShuttingDown else { return }
                 if requestGeneration == connectionGeneration {

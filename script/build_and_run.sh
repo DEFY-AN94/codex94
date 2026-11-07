@@ -20,7 +20,11 @@ PROJECT="$ROOT_DIR/Codex94.xcodeproj"
 DERIVED_DATA="$ROOT_DIR/.build/DerivedData"
 APP_BUNDLE="$DERIVED_DATA/Build/Products/Debug/$APP_NAME.app"
 APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+# Preserve an explicit toolchain; otherwise let xcodebuild use xcode-select.
+# An inherited empty value should behave like an unset override.
+if [[ -z "${DEVELOPER_DIR:-}" ]]; then
+  unset DEVELOPER_DIR
+fi
 export CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.build/ModuleCache"
 export SWIFT_MODULE_CACHE_PATH="$ROOT_DIR/.build/ModuleCache"
 

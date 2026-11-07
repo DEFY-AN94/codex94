@@ -169,10 +169,6 @@ struct TokenUsageChartView: View {
             hoveredDate = nil
             pinnedDate = nil
         }
-        .onChange(of: presentation.customRange) { _, _ in
-            hoveredDate = nil
-            pinnedDate = nil
-        }
     }
 
     private var activeDate: Date? {

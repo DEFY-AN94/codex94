@@ -31,6 +31,177 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: fixture.cache.fileURL), original)
     }
 
+    func testUnboundReportsRequireConfirmationEvenForAPreviouslySelectedProducer() throws {
+        let f = try fixture(cliEnabled: false, legacyInstallation: false)
+        let payload = passivePayload(session: 1, used: 20)
+        try f.cache.capture(payload, at: f.clock.read())
+        f.preferences.setClaudePassiveProducerID(try ClaudeStatuslineParser.producerID(from: payload))
+        f.store.start()
+        XCTAssertNil(f.store.snapshot, "A saved producer does not bind an uninstalled stream to this configuration")
+        XCTAssertTrue(f.store.passiveReportNeedsConfirmation)
+        f.store.adoptPendingPassiveReport(expectedConfirmationID: try XCTUnwrap(f.store.pendingPassiveConfirmationID))
+        XCTAssertEqual(f.store.source, .statusline)
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 1, used: 21), at: f.clock.read())
+        f.store.refresh()
+        XCTAssertFalse(f.store.passiveReportNeedsConfirmation)
+        XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 79)
+    }
+
+    func testDifferentConfigurationCannotOverrideLocalDataOnAnyRefreshPath() async throws {
+        let f = try fixture(cliEnabled: false, legacyInstallation: false, customConfiguration: true)
+        let other = ClaudeStatuslineInstaller(cache: f.cache, executableURL: URL(fileURLWithPath: "/bin/echo"),
+            supportDirectory: f.directory.appendingPathComponent("support"), environment: [:], homeDirectory: f.directory)
+        try seedLegacyInstallation(other)
+        let began = f.clock.read()
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: began.addingTimeInterval(20_000))
+        try f.cache.capture(passivePayload(session: 1, used: 95), at: began.addingTimeInterval(1))
+        f.preferences.setClaudePassiveProducerID(try ClaudeStatuslineParser.producerID(from: passivePayload(session: 1, used: 95)))
+        f.clock.advance(1)
+        var alerts = NotificationPreferences()
+        alerts.isEnabled = true
+        f.preferences.claudeNotifications = alerts
+        f.store.start()
+        XCTAssertEqual(f.store.statuslineSetupState, .differentConfiguration)
+        for trigger in [RefreshTrigger.manual, .popover, .background, .systemWake, .preferenceChange] {
+            f.clock.advance(1)
+            try f.cache.capture(passivePayload(session: 1, used: 96), at: f.clock.read())
+            f.store.refresh(trigger: trigger)
+            XCTAssertEqual(f.store.source, .localCache)
+            XCTAssertEqual(f.store.reportedAt, began)
+            XCTAssertFalse(f.store.passiveReportNeedsConfirmation, "A known wrong configuration is not adoptable")
+        }
+        try await poll(f)
+        f.store.handleSystemClockChange(now: f.clock.read())
+        f.store.handleSystemWake(now: f.clock.read())
+        XCTAssertEqual(f.store.source, .localCache)
+        XCTAssertNil(f.store.historicalReport)
+        XCTAssertTrue(f.notifications.deliveries.isEmpty)
+        f.store.readOnceWithCLI()
+        try await wait { await f.fetcher.count() == 1 }
+        await f.fetcher.complete(.failure(.timedOut))
+        try await wait { !f.store.isRefreshing }
+        XCTAssertEqual(f.store.source, .localCache, "A failed one-time read cannot admit the other configuration")
+        XCTAssertTrue(f.notifications.deliveries.isEmpty)
+        try FileManager.default.removeItem(at: f.localCacheURL)
+        f.store.refresh()
+        XCTAssertNil(f.store.snapshot)
+        XCTAssertEqual(f.store.lastIssue, .configurationConflict,
+                       "An actual cross-directory installation remains a visible conflict")
+    }
+
+    func testReinstallationInvalidatesRetainedHistoryAndRejectsAnOldCacheGeneration() throws {
+        let f = try fixture(cliEnabled: false, legacyInstallation: false)
+        let first = try f.installer.previewInstall()
+        try f.installer.install(first)
+        try f.cache.capture(passivePayload(session: 1, used: 80, reset: 2_000_000_010), at: f.clock.read(),
+                            installationID: first.installationID)
+        f.store.start()
+        XCTAssertEqual(f.store.source, .statusline)
+        f.clock.advance(11)
+        f.store.handleSystemClockChange(now: f.clock.read())
+        XCTAssertNotNil(f.store.historicalReport)
+        try f.store.removeStatusline()
+        XCTAssertNil(f.store.snapshot)
+        XCTAssertNil(f.store.historicalReport, "Retained history cannot outlive the installation that qualified it")
+        XCTAssertEqual(f.store.statuslineSetupState, .notInstalled)
+        XCTAssertNil(f.store.lastIssue, "Successful removal is not a configuration conflict")
+        f.store.refresh()
+        XCTAssertNil(f.store.lastIssue, "An intentionally retained retired cache is simply ignored")
+        let second = try f.store.previewStatuslineInstall()
+        try f.store.installStatusline(second)
+        f.store.refresh()
+        XCTAssertNil(f.store.source, "Reinstalling does not reinterpret an old cache as new evidence")
+        XCTAssertFalse(f.store.passiveReportNeedsConfirmation)
+        XCTAssertNil(f.store.lastIssue, "A valid new installation may be waiting for its first report")
+        try f.cache.capture(passivePayload(session: 1, used: 30), at: f.clock.read(),
+                            installationID: second.installationID)
+        f.store.refresh()
+        XCTAssertEqual(f.store.source, .statusline)
+        XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 70)
+    }
+
+    func testPendingConfirmationCannotCrossAnInstallationChange() throws {
+        let f = try fixture(cliEnabled: false, legacyInstallation: false)
+        try f.cache.capture(passivePayload(session: 1, used: 30), at: f.clock.read())
+        f.store.start()
+        let confirmationID = try XCTUnwrap(f.store.pendingPassiveConfirmationID)
+        let preview = try f.installer.previewInstall()
+        try f.installer.install(preview)
+        f.store.adoptPendingPassiveReport(expectedConfirmationID: confirmationID)
+        XCTAssertNil(f.store.snapshot)
+        XCTAssertNil(f.store.historicalReport)
+        XCTAssertFalse(f.store.passiveReportNeedsConfirmation)
+    }
+
+    func testRemovingAndReinstallingBridgeKeepsSameAccountNotificationBaseline() async throws {
+        let f = try fixture(cliEnabled: false, legacyInstallation: false)
+        var alerts = NotificationPreferences()
+        alerts.isEnabled = true
+        alerts.recoveryEnabled = true
+        f.preferences.claudeNotifications = alerts
+        let began = f.clock.read()
+        let reset = began.addingTimeInterval(20_000)
+        let first = try f.store.previewStatuslineInstall()
+        try f.store.installStatusline(first)
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: reset)
+        f.store.start()
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 1, used: 95, reset: Int(reset.timeIntervalSince1970)),
+                            at: f.clock.read(), installationID: first.installationID)
+        f.store.refresh()
+        try await wait { f.notifications.deliveries.count == 1 }
+
+        try f.store.removeStatusline()
+        XCTAssertEqual(f.store.source, .localCache)
+        XCTAssertEqual(f.store.reportedAt, began, "Removal falls back to the old source observation")
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 96, fetchedAt: f.clock.read(), resetAt: reset)
+        try await poll(f)
+        XCTAssertEqual(f.notifications.deliveries.count, 1,
+                       "An installation retirement cannot rearm the same account's low-quota alert")
+
+        let second = try f.store.previewStatuslineInstall()
+        try f.store.installStatusline(second)
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 1, used: 97, reset: Int(reset.timeIntervalSince1970)),
+                            at: f.clock.read(), installationID: second.installationID)
+        try await poll(f)
+        XCTAssertEqual(f.store.source, .statusline)
+        XCTAssertFalse(f.store.passiveReportNeedsConfirmation)
+        XCTAssertEqual(f.notifications.deliveries.count, 1, "The same producer in a new installation retains cycle deduplication")
+
+        // A genuine refill/new cycle must still recover and permit a later alert.
+        let nextReset = reset.addingTimeInterval(20_000)
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: f.clock.read(), resetAt: nextReset)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 2 }
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 95, fetchedAt: f.clock.read(), resetAt: nextReset)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 3 }
+
+        try f.store.removeStatusline()
+        let third = try f.store.previewStatuslineInstall()
+        try f.store.installStatusline(third)
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 2, used: 10, reset: Int(nextReset.timeIntervalSince1970)),
+                            at: f.clock.read(), installationID: third.installationID)
+        try await poll(f)
+        XCTAssertTrue(f.store.passiveReportNeedsConfirmation, "A different producer still requires explicit adoption")
+        f.store.adoptPendingPassiveReport(expectedConfirmationID: try XCTUnwrap(f.store.pendingPassiveConfirmationID))
+        try await Task.sleep(for: .milliseconds(80))
+        XCTAssertEqual(f.notifications.deliveries.count, 3, "Adopting a new stream establishes a baseline, not recovery")
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 2, used: 95, reset: Int(nextReset.timeIntervalSince1970)),
+                            at: f.clock.read(), installationID: third.installationID)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 4 }
+        XCTAssertEqual(f.notifications.deliveries.last, f.notifications.deliveries.first,
+                       "The new producer's later crossing delivers a low-quota alert, not a delayed recovery")
+    }
+
     func testCLIOptionCoexistsWithPassiveDataAndDisablingItKeepsThePassiveReport() async throws {
         let fixture = try fixture()
         let payload = Data(#"{"session_id":"00000000-0000-0000-0000-000000000001","rate_limits":{"five_hour":{"used_percentage":50,"resets_at":2000010000}}}"#.utf8)
@@ -93,6 +264,74 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertNil(fixture.store.nextAutomaticRefreshAt)
         XCTAssertEqual(fixture.store.connectionState, .idle)
         XCTAssertTrue(fixture.preferences.claudeMonitoringEnabled)
+    }
+
+    func testCLIOptionChangesKeepNotificationWatermarkAndCycleDeduplication() async throws {
+        let f = try fixture()
+        var alerts = NotificationPreferences()
+        alerts.isEnabled = true
+        alerts.recoveryEnabled = true
+        f.preferences.claudeNotifications = alerts
+        let began = f.clock.read()
+        let reset = began.addingTimeInterval(20_000)
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: reset)
+        f.store.start()
+        try await wait { await f.fetcher.count() == 1 }
+        f.clock.advance(1)
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 95, resetAt: reset)))
+        try await wait { !f.store.isRefreshing && f.notifications.deliveries.count == 1 }
+
+        f.store.setCLIUsageEnabled(false)
+        XCTAssertEqual(f.store.reportedAt, began, "Source fallback retains the older observation time")
+        try await wait { !f.store.isRetiringCLI }
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 96, fetchedAt: f.clock.read(), resetAt: reset)
+        try await poll(f)
+        XCTAssertEqual(f.notifications.deliveries.count, 1,
+                       "The old high reading is not recovery and the new low reading is not a second alert")
+
+        f.store.setCLIUsageEnabled(true)
+        try await wait { await f.fetcher.count() == 2 }
+        f.clock.advance(1)
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 97, resetAt: reset)))
+        try await wait { !f.store.isRefreshing }
+        f.store.setCLIUsageEnabled(false)
+        try await wait { !f.store.isRetiringCLI }
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 98, fetchedAt: f.clock.read(), resetAt: reset)
+        try await poll(f)
+        XCTAssertEqual(f.notifications.deliveries.count, 1, "Repeated toggles do not rearm the same thresholds")
+
+        let nextReset = reset.addingTimeInterval(20_000)
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: f.clock.read(), resetAt: nextReset)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 2 }
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 95, fetchedAt: f.clock.read(), resetAt: nextReset)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 3 }
+    }
+
+    func testCLIOptionChangeStillAllowsAnUnsentLowerThreshold() async throws {
+        let f = try fixture()
+        var alerts = NotificationPreferences()
+        alerts.isEnabled = true
+        f.preferences.claudeNotifications = alerts
+        let began = f.clock.read()
+        let reset = began.addingTimeInterval(20_000)
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: reset)
+        f.store.start()
+        try await wait { await f.fetcher.count() == 1 }
+        f.clock.advance(1)
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 85, resetAt: reset)))
+        try await wait { !f.store.isRefreshing && f.notifications.deliveries.count == 1 }
+        f.store.setCLIUsageEnabled(false)
+        try await wait { !f.store.isRetiringCLI }
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 92, fetchedAt: f.clock.read(), resetAt: reset)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 2 }
     }
 
     func testResetUsesExistingPollingAfterGraceAndNeverInventsRecoveredQuota() async throws {
@@ -505,9 +744,10 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let fetcher = fixture.fetcher, counter = fixture.factoryCalls, clock = fixture.clock
         let restarted = ClaudeQuotaStore(
             preferences: preferences, cache: fixture.cache,
-            installer: ClaudeStatuslineInstaller(settingsURL: fixture.directory.appendingPathComponent("settings.json"),
+            installer: ClaudeStatuslineInstaller(settingsURL: fixture.directory.appendingPathComponent(".claude/settings.json"),
                 cache: fixture.cache, executableURL: URL(fileURLWithPath: "/bin/echo"),
-                supportDirectory: fixture.directory.appendingPathComponent("support")),
+                supportDirectory: fixture.directory.appendingPathComponent("support"), environment: [:],
+                homeDirectory: fixture.directory),
             localCache: ClaudeLocalUsageCacheReader(fileURL: fixture.localCacheURL),
             fetcherFactory: { counter.increment(); return fetcher },
             notificationController: NotificationController(service: ClaudeStoreTestNotifications()),
@@ -1566,6 +1806,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let preferences: PreferencesStore
         let defaults: UserDefaults
         let cache: ClaudeStatuslineCache
+        let installer: ClaudeStatuslineInstaller
         let fetcher: ClaudeStoreTestFetcher
         let sleeper: ClaudeStoreTestSleeper
         let clock: ClaudeStoreTestClock
@@ -1574,7 +1815,9 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let localCacheURL: URL
     }
 
-    private func fixture(cliEnabled: Bool = true, fetcherFactory: (@Sendable (URL) -> any ClaudeQuotaFetching)? = nil) throws -> Fixture {
+    private func fixture(cliEnabled: Bool = true, legacyInstallation: Bool = true,
+                         customConfiguration: Bool = false,
+                         fetcherFactory: (@Sendable (URL) -> any ClaudeQuotaFetching)? = nil) throws -> Fixture {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("ClaudeStoreTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let suite = "Codex94.ClaudeStoreTests.\(UUID().uuidString)"
@@ -1583,8 +1826,11 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         preferences.claudeMonitoringEnabled = true
         preferences.claudeCLIUsageEnabled = cliEnabled
         let cache = ClaudeStatuslineCache(fileURL: root.appendingPathComponent("support/statusline-quota.json"))
-        let installer = ClaudeStatuslineInstaller(settingsURL: root.appendingPathComponent("settings.json"), cache: cache,
-            executableURL: URL(fileURLWithPath: "/bin/echo"), supportDirectory: root.appendingPathComponent("support"))
+        let environment = customConfiguration ? ["CLAUDE_CONFIG_DIR": root.appendingPathComponent("custom-profile").path] : [:]
+        let installer = ClaudeStatuslineInstaller(cache: cache,
+            executableURL: URL(fileURLWithPath: "/bin/echo"), supportDirectory: root.appendingPathComponent("support"),
+            environment: environment, homeDirectory: root)
+        if legacyInstallation { try seedLegacyInstallation(installer) }
         let fetcher = ClaudeStoreTestFetcher()
         let sleeper = ClaudeStoreTestSleeper()
         let clock = ClaudeStoreTestClock()
@@ -1595,7 +1841,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
             if let fetcherFactory { return fetcherFactory(root) }
             return fetcher
         }
-        let localCacheURL = root.appendingPathComponent("claude-config/.claude.json")
+        let localCacheURL = ClaudeLocalUsageCacheReader.defaultFileURL(environment: environment, homeDirectory: root)
         let store = ClaudeQuotaStore(preferences: preferences, cache: cache, installer: installer,
             localCache: ClaudeLocalUsageCacheReader(fileURL: localCacheURL),
             fetcherFactory: factory, notificationController: NotificationController(service: notifications),
@@ -1607,9 +1853,28 @@ final class ClaudeQuotaStoreTests: XCTestCase {
             UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
             try? FileManager.default.removeItem(at: root)
         }
-        return Fixture(directory: root, store: store, preferences: preferences, defaults: defaults, cache: cache, fetcher: fetcher,
+        return Fixture(directory: root, store: store, preferences: preferences, defaults: defaults, cache: cache,
+                       installer: installer, fetcher: fetcher,
                        sleeper: sleeper, clock: clock, notifications: notifications, factoryCalls: factoryCalls,
                        localCacheURL: localCacheURL)
+    }
+
+    /// Existing source-selection tests model a previously installed default
+    /// connection. Its old cache has no installation generation metadata.
+    private func seedLegacyInstallation(_ installer: ClaudeStatuslineInstaller) throws {
+        let preview = try installer.previewInstall()
+        try installer.install(preview)
+        let current = try JSONDecoder().decode(ClaudeStatuslineInstaller.Manifest.self,
+                                              from: Data(contentsOf: installer.manifestURL))
+        let command = String(preview.bridgeCommand.dropLast(preview.installationID.count + 3))
+        let line = try JSONSerialization.data(withJSONObject: ["type": "command", "command": command], options: [.sortedKeys, .prettyPrinted])
+        let legacy = ClaudeStatuslineInstaller.Manifest(version: current.version, settingsPath: current.settingsPath,
+            cachePath: current.cachePath, installedCommand: command, installedStatusline: line,
+            previousStatusline: current.previousStatusline, originalCommand: current.originalCommand,
+            backupPath: current.backupPath)
+        try ClaudeLocalFile.write(try JSONEncoder().encode(legacy), to: installer.manifestURL)
+        try ClaudeLocalFile.write(try JSONSerialization.data(withJSONObject: ["statusLine": ["type": "command", "command": command]]),
+                                  to: installer.settingsURL)
     }
 
     private func passivePayload(session: Int, used: Double, reset: Int = 2_000_010_000) -> Data {

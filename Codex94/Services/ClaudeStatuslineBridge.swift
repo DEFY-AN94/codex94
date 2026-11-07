@@ -8,29 +8,57 @@ enum ClaudeStatuslineBridge {
 
     static func runIfRequested(arguments: [String] = CommandLine.arguments) -> Int32? {
         guard arguments.dropFirst().first == argument else { return nil }
-        guard arguments.count == 3 else { return 2 }
+        guard arguments.count == 3 || arguments.count == 4 else { return 2 }
         let cancellation = CancellationState()
         do {
             let url = URL(fileURLWithPath: arguments[2])
-            let manifest = try manifest(at: url)
+            let installationID = arguments.count == 4 ? arguments[3] : nil
+            let directories = ClaudeConfigurationDirectories()
+            let manifest = try manifest(at: url, installationID: installationID, directories: directories)
             let value = UserDefaults.standard.object(forKey: "claudeMonitoringEnabled.v1") as? NSNumber
             let enabled = value.map { CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue } ?? false
-            let status = try forward(manifest: manifest, captureEnabled: enabled, cancellation: cancellation)
+            let status = try forward(manifest: manifest, manifestURL: url, directories: directories,
+                                     captureEnabled: enabled, cancellation: cancellation)
             return cancellation.exitStatus ?? status
         } catch { return cancellation.exitStatus ?? 2 }
     }
 
-    static func capture(_ data: Data, manifestURL: URL, enabled: Bool, now: Date = Date()) throws {
+    static func capture(_ data: Data, manifestURL: URL, enabled: Bool, now: Date = Date(),
+                        installationID: String? = nil,
+                        environment: [String: String] = ProcessInfo.processInfo.environment,
+                        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) throws {
         guard enabled else { return }
-        let value = try manifest(at: manifestURL)
-        try ClaudeStatuslineCache(fileURL: URL(fileURLWithPath: value.cachePath)).capture(data, at: now)
+        let directories = ClaudeConfigurationDirectories(environment: environment, homeDirectory: homeDirectory)
+        let value = try manifest(at: manifestURL, installationID: installationID, directories: directories)
+        try capture(data, manifest: value, manifestURL: manifestURL, directories: directories, now: now)
     }
 
-    private static func manifest(at url: URL) throws -> ClaudeStatuslineInstaller.Manifest {
+    static func capture(_ data: Data, manifest value: ClaudeStatuslineInstaller.Manifest,
+                                manifestURL: URL, directories: ClaudeConfigurationDirectories,
+                                now: Date = Date()) throws {
+        try ClaudeStatuslineCache(fileURL: URL(fileURLWithPath: value.cachePath)).capture(
+            data, at: now, installationID: value.installationID
+        ) {
+            // Installer changes share the cache lock: a retired process cannot
+            // overwrite a new installation after its terminal read completes.
+            let current = try manifest(at: manifestURL, installationID: value.installationID, directories: directories)
+            guard current.cachePath == value.cachePath,
+                  current.installedCommand == value.installedCommand else {
+                throw ClaudeQuotaIssue.configurationConflict
+            }
+        }
+    }
+
+    private static func manifest(at url: URL, installationID: String?,
+                                 directories: ClaudeConfigurationDirectories) throws -> ClaudeStatuslineInstaller.Manifest {
         let data = try ClaudeLocalFile.read(url, maximumBytes: 1_048_576)
         guard let value = try? JSONDecoder().decode(ClaudeStatuslineInstaller.Manifest.self, from: data),
-              value.version == 1, URL(fileURLWithPath: value.cachePath).isFileURL,
-              value.cachePath.hasPrefix("/"), value.settingsPath.hasPrefix("/") else {
+              value.version == 1, value.cachePath.hasPrefix("/"),
+              ClaudeStatuslineInstaller.validInstallationID(installationID),
+              ClaudeStatuslineInstaller.validInstallationID(value.installationID),
+              value.installationID == installationID,
+              value.settingsPath == directories.settingsURL.path,
+              installationID != nil || directories.overrideDirectory == nil else {
             throw ClaudeQuotaIssue.configurationConflict
         }
         return value
@@ -52,6 +80,8 @@ enum ClaudeStatuslineBridge {
 
     private static func forward(
         manifest: ClaudeStatuslineInstaller.Manifest,
+        manifestURL: URL,
+        directories: ClaudeConfigurationDirectories,
         captureEnabled: Bool,
         cancellation: CancellationState
     ) throws -> Int32 {
@@ -131,7 +161,7 @@ enum ClaudeStatuslineBridge {
         try? input.fileHandleForWriting.close()
         if captureEnabled, inputFits, cancellation.exitStatus == nil {
             // A malformed quota payload never changes the pre-existing statusline's output.
-            try? ClaudeStatuslineCache(fileURL: URL(fileURLWithPath: manifest.cachePath)).capture(captured)
+            try? capture(captured, manifest: manifest, manifestURL: manifestURL, directories: directories)
         }
         guard let child else { return cancellation.exitStatus ?? 0 }
         while !child.pollForExit(), clock.now < deadline { usleep(10_000) }

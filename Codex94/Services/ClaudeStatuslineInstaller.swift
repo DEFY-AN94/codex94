@@ -4,6 +4,11 @@ enum ClaudeStatuslineSetupState: Equatable, Sendable {
     case notInstalled
     case installed
     case conflict
+    case differentConfiguration
+}
+
+enum ClaudeStatuslineReportEligibility: Equatable, Sendable {
+    case allowed, confirmationRequired, blocked
 }
 
 struct ClaudeStatuslineInstallPreview: Sendable {
@@ -11,6 +16,7 @@ struct ClaudeStatuslineInstallPreview: Sendable {
     let originalCommand: String?
     let bridgeCommand: String
     let preservesExistingStatusline: Bool
+    let installationID: String
     fileprivate let expectedDigest: String
     fileprivate let originalSettings: Data
     fileprivate let installedStatusline: Data
@@ -27,18 +33,23 @@ struct ClaudeStatuslineInstaller: Sendable {
         let previousStatusline: Data?
         let originalCommand: String?
         let backupPath: String
+        var installationID: String? = nil
     }
 
     let settingsURL: URL
     let cache: ClaudeStatuslineCache
     let executableURL: URL
     let supportDirectory: URL
+    private let directories: ClaudeConfigurationDirectories
     var manifestURL: URL { supportDirectory.appendingPathComponent("statusline-installation.json") }
 
     init(settingsURL: URL? = nil, cache: ClaudeStatuslineCache = ClaudeStatuslineCache(),
-         executableURL: URL? = nil, supportDirectory: URL? = nil) {
-        self.settingsURL = settingsURL ?? FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/settings.json")
+         executableURL: URL? = nil, supportDirectory: URL? = nil,
+         environment: [String: String] = ProcessInfo.processInfo.environment,
+         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
+        let directories = ClaudeConfigurationDirectories(environment: environment, homeDirectory: homeDirectory)
+        self.directories = directories
+        self.settingsURL = settingsURL ?? directories.settingsURL
         self.cache = cache
         self.executableURL = executableURL ?? Bundle.main.executableURL
             ?? URL(fileURLWithPath: "/Applications/Codex94.app/Contents/MacOS/Codex94")
@@ -47,6 +58,8 @@ struct ClaudeStatuslineInstaller: Sendable {
 
     var setupState: ClaudeStatuslineSetupState {
         guard FileManager.default.fileExists(atPath: manifestURL.path) else { return .notInstalled }
+        guard let observed = try? readAnyManifest() else { return .conflict }
+        guard observed.settingsPath == settingsURL.path else { return .differentConfiguration }
         guard let manifest = try? readManifest(), let settings = try? readSettings(),
               let object = try? Self.object(settings),
               let line = object["statusLine"], let canonical = try? Self.encode(line) else { return .conflict }
@@ -54,6 +67,30 @@ struct ClaudeStatuslineInstaller: Sendable {
     }
 
     var isInstalled: Bool { setupState == .installed }
+
+    /// A report stream has no authenticated account identity. Configuration and
+    /// installation ownership are eligibility checks before stream confirmation.
+    func reportEligibility(installationID: String?) -> ClaudeStatuslineReportEligibility {
+        guard FileManager.default.fileExists(atPath: manifestURL.path) else {
+            return installationID == nil ? .confirmationRequired : .blocked
+        }
+        guard setupState == .installed, let manifest = try? readManifest() else { return .blocked }
+        if let expected = manifest.installationID {
+            return installationID == expected ? .allowed : .blocked
+        }
+        guard installationID == nil else { return .blocked }
+        return directories.overrideDirectory == nil && settingsURL.path == directories.defaultSettingsURL.path
+            ? .allowed : .confirmationRequired
+    }
+
+    static func validInstallationID(_ value: String?) -> Bool {
+        value.map { UUID(uuidString: $0)?.uuidString == $0 } ?? true
+    }
+
+    private func bridgeCommand(installationID: String?) -> String {
+        let command = Self.quote(executableURL.path) + " " + ClaudeStatuslineBridge.argument + " " + Self.quote(manifestURL.path)
+        return installationID.map { command + " " + Self.quote($0) } ?? command
+    }
 
     func previewInstall() throws -> ClaudeStatuslineInstallPreview {
         guard !FileManager.default.fileExists(atPath: manifestURL.path) else {
@@ -73,17 +110,22 @@ struct ClaudeStatuslineInstaller: Sendable {
             originalCommand = command
             previous = try Self.encode(object)
         } else { previous = nil }
-        let command = Self.quote(executableURL.path) + " --claude-statusline-bridge " + Self.quote(manifestURL.path)
+        let installationID = UUID().uuidString
+        let command = bridgeCommand(installationID: installationID)
         line["type"] = "command"
         line["command"] = command
         return ClaudeStatuslineInstallPreview(
             settingsURL: settingsURL, originalCommand: originalCommand, bridgeCommand: command,
-            preservesExistingStatusline: previous != nil, expectedDigest: ClaudeLocalFile.digest(data),
+            preservesExistingStatusline: previous != nil, installationID: installationID, expectedDigest: ClaudeLocalFile.digest(data),
             originalSettings: data, installedStatusline: try Self.encode(line), previousStatusline: previous
         )
     }
 
     func install(_ preview: ClaudeStatuslineInstallPreview) throws {
+        try cache.withExclusiveAccess { try installLocked(preview) }
+    }
+
+    private func installLocked(_ preview: ClaudeStatuslineInstallPreview) throws {
         guard preview.settingsURL == settingsURL,
               preview.expectedDigest == ClaudeLocalFile.digest(try readSettings()),
               !FileManager.default.fileExists(atPath: manifestURL.path),
@@ -103,7 +145,7 @@ struct ClaudeStatuslineInstaller: Sendable {
             version: 1, settingsPath: settingsURL.path, cachePath: cache.fileURL.path,
             installedCommand: preview.bridgeCommand, installedStatusline: preview.installedStatusline,
             previousStatusline: preview.previousStatusline, originalCommand: preview.originalCommand,
-            backupPath: backup.path
+            backupPath: backup.path, installationID: preview.installationID
         )
         let manifestData = try JSONEncoder().encode(manifest)
         try ClaudeLocalFile.write(manifestData, to: manifestURL)
@@ -124,6 +166,10 @@ struct ClaudeStatuslineInstaller: Sendable {
     }
 
     func remove() throws {
+        try cache.withExclusiveAccess { try removeLocked() }
+    }
+
+    private func removeLocked() throws {
         let manifest = try readManifest()
         let originalData = try readSettings()
         var settings = try Self.object(originalData)
@@ -143,6 +189,10 @@ struct ClaudeStatuslineInstaller: Sendable {
     /// Explicit conflict recovery: only forget our retired integration record.
     /// Current settings, the original backup, and quota evidence are untouched.
     func forgetConflictingInstallation() throws {
+        try cache.withExclusiveAccess { try forgetConflictingInstallationLocked() }
+    }
+
+    private func forgetConflictingInstallationLocked() throws {
         let manifestData = try ClaudeLocalFile.read(manifestURL, maximumBytes: 1_048_576)
         let manifest = try recoveryManifest(from: manifestData)
         let settingsData = try readSettings()
@@ -165,8 +215,10 @@ struct ClaudeStatuslineInstaller: Sendable {
     }
 
     private func recoveryManifest(from data: Data) throws -> Manifest {
-        let expectedCommand = Self.quote(executableURL.path) + " " + ClaudeStatuslineBridge.argument + " " + Self.quote(manifestURL.path)
         guard let manifest = try? JSONDecoder().decode(Manifest.self, from: data), manifest.version == 1,
+              Self.validInstallationID(manifest.installationID) else { throw ClaudeQuotaIssue.configurationConflict }
+        let expectedCommand = bridgeCommand(installationID: manifest.installationID)
+        guard
               manifest.settingsPath == settingsURL.path, manifest.cachePath == cache.fileURL.path,
               manifest.installedCommand == expectedCommand,
               let installed = try? Self.object(manifest.installedStatusline),
@@ -205,10 +257,19 @@ struct ClaudeStatuslineInstaller: Sendable {
         return try ClaudeLocalFile.read(settingsURL, maximumBytes: 1_048_576)
     }
 
-    private func readManifest() throws -> Manifest {
+    private func readAnyManifest() throws -> Manifest {
         let data = try ClaudeLocalFile.read(manifestURL, maximumBytes: 1_048_576)
         guard let value = try? JSONDecoder().decode(Manifest.self, from: data), value.version == 1,
-              value.settingsPath == settingsURL.path, value.cachePath == cache.fileURL.path else {
+              value.settingsPath.hasPrefix("/"), value.cachePath.hasPrefix("/"),
+              Self.validInstallationID(value.installationID) else {
+            throw ClaudeQuotaIssue.configurationConflict
+        }
+        return value
+    }
+
+    private func readManifest() throws -> Manifest {
+        let value = try readAnyManifest()
+        guard value.settingsPath == settingsURL.path, value.cachePath == cache.fileURL.path else {
             throw ClaudeQuotaIssue.configurationConflict
         }
         return value

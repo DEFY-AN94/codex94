@@ -113,7 +113,7 @@ final class TokenUsageStoreTests: XCTestCase {
                        "A corrected daily record replaces its predecessor; it is never added twice")
     }
 
-    func testTransientFailureKeepsTimestampButLogoutClearsData() async throws {
+    func testRetryKeepsStaleSnapshotUntilSuccessfulReplacement() async throws {
         let fixture = makeStore()
         defer { fixture.store.shutdown() }
         fixture.preferences.hasChosenIdentityMode = true
@@ -129,35 +129,99 @@ final class TokenUsageStoreTests: XCTestCase {
         XCTAssertEqual(fixture.store.issue, .unavailable)
         fixture.store.refresh()
         try await wait { await fixture.fetcher.count == 3 }
-        await fixture.fetcher.complete(2, with: .failure(.notLoggedIn))
+        XCTAssertTrue(fixture.store.isRefreshing)
+        XCTAssertEqual(fixture.store.issue, .unavailable)
+        XCTAssertEqual(fixture.store.snapshot?.summary.lifetimeTokens, 100)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, Date(timeIntervalSince1970: 1))
+        await fixture.fetcher.complete(2, with: .failure(.invalidData))
         try await wait { !fixture.store.isRefreshing }
-        XCTAssertNil(fixture.store.snapshot)
-        XCTAssertEqual(fixture.store.issue, .notLoggedIn)
+        XCTAssertEqual(fixture.store.issue, .invalidData)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, Date(timeIntervalSince1970: 1))
+
+        fixture.store.refresh()
+        try await wait { await fixture.fetcher.count == 4 }
+        XCTAssertEqual(fixture.store.issue, .invalidData)
+        await fixture.fetcher.complete(3, with: .success(snapshot(200, date: 2)))
+        try await wait { !fixture.store.isRefreshing }
+        XCTAssertNil(fixture.store.issue)
+        XCTAssertEqual(fixture.store.snapshot?.summary.lifetimeTokens, 200)
+        XCTAssertEqual(fixture.store.snapshot?.fetchedAt, Date(timeIntervalSince1970: 2))
+    }
+
+    func testLogoutAndUnsupportedRetryClearStaleData() async throws {
+        for terminalIssue in [TokenUsageIssue.notLoggedIn, .unsupported] {
+            let fixture = makeStore()
+            defer { fixture.store.shutdown() }
+            fixture.preferences.hasChosenIdentityMode = true
+            fixture.store.refresh()
+            try await wait { await fixture.fetcher.count == 1 }
+            await fixture.fetcher.complete(0, with: .success(snapshot(100, date: 1)))
+            try await wait { !fixture.store.isRefreshing }
+            fixture.store.refresh()
+            try await wait { await fixture.fetcher.count == 2 }
+            await fixture.fetcher.complete(1, with: .failure(.unavailable))
+            try await wait { !fixture.store.isRefreshing }
+
+            fixture.store.refresh()
+            try await wait { await fixture.fetcher.count == 3 }
+            XCTAssertEqual(fixture.store.issue, .unavailable)
+            await fixture.fetcher.complete(2, with: .failure(terminalIssue))
+            try await wait { !fixture.store.isRefreshing }
+            XCTAssertNil(fixture.store.snapshot)
+            XCTAssertEqual(fixture.store.issue, terminalIssue)
+
+            fixture.store.refresh()
+            try await wait { await fixture.fetcher.count == 4 }
+            XCTAssertTrue(fixture.store.isRefreshing)
+            XCTAssertNil(fixture.store.snapshot)
+            XCTAssertNil(fixture.store.issue, "Without a retained snapshot, retry uses the loading state")
+            await fixture.fetcher.complete(3, with: .success(snapshot(200, date: 2)))
+            try await wait { !fixture.store.isRefreshing }
+            XCTAssertNil(fixture.store.issue)
+        }
     }
 
     func testResetAndShutdownDiscardLateResponses() async throws {
         let fixture = makeStore()
+        defer { fixture.store.shutdown() }
         fixture.preferences.hasChosenIdentityMode = true
         fixture.store.refresh()
         try await wait { await fixture.fetcher.count == 1 }
-        fixture.store.reset()
+        await fixture.fetcher.complete(0, with: .success(snapshot(100, date: 1)))
+        try await wait { !fixture.store.isRefreshing }
         fixture.store.refresh()
         try await wait { await fixture.fetcher.count == 2 }
-        await fixture.fetcher.complete(0, with: .success(snapshot(999, date: 1)))
+        await fixture.fetcher.complete(1, with: .failure(.unavailable))
+        try await wait { !fixture.store.isRefreshing }
+        fixture.store.refresh()
+        try await wait { await fixture.fetcher.count == 3 }
+        XCTAssertEqual(fixture.store.issue, .unavailable)
+        fixture.store.reset()
+        XCTAssertNil(fixture.store.issue)
+        XCTAssertNil(fixture.store.snapshot)
+        fixture.store.refresh()
+        try await wait { await fixture.fetcher.count == 4 }
+        await fixture.fetcher.complete(2, with: .success(snapshot(999, date: 1)))
         XCTAssertNil(fixture.store.snapshot)
         XCTAssertTrue(fixture.store.isRefreshing)
-        await fixture.fetcher.complete(1, with: .success(snapshot(10, date: 2)))
+        await fixture.fetcher.complete(3, with: .success(snapshot(10, date: 2)))
         try await wait { !fixture.store.isRefreshing }
         XCTAssertEqual(fixture.store.snapshot?.summary.lifetimeTokens, 10)
         fixture.store.refresh()
-        try await wait { await fixture.fetcher.count == 3 }
+        try await wait { await fixture.fetcher.count == 5 }
+        await fixture.fetcher.complete(4, with: .failure(.unavailable))
+        try await wait { !fixture.store.isRefreshing }
+        fixture.store.refresh()
+        try await wait { await fixture.fetcher.count == 6 }
+        XCTAssertEqual(fixture.store.issue, .unavailable)
         fixture.store.shutdown()
-        await fixture.fetcher.complete(2, with: .success(snapshot(888, date: 3)))
+        await fixture.fetcher.complete(5, with: .success(snapshot(888, date: 3)))
         fixture.store.refresh()
         XCTAssertFalse(fixture.store.isRefreshing)
         XCTAssertNil(fixture.store.snapshot)
+        XCTAssertNil(fixture.store.issue)
         let count = await fixture.fetcher.count
-        XCTAssertEqual(count, 3)
+        XCTAssertEqual(count, 6)
     }
 
     private func makeStore() -> (store: TokenUsageStore, preferences: PreferencesStore, fetcher: ControlledUsageFetcher) {

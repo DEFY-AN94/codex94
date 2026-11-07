@@ -33,15 +33,26 @@ struct CodexExecutableLocator: Sendable {
         processLifecycle.cancelActive(gracePeriod: 0.5)
     }
 
-    func locate(manualPath: String?) throws -> LocatedCodex {
+    /// Async callers capture after retiring old work, before queueing discovery.
+    func captureLaunchTicket() -> ManagedSubprocessLifecycle.LaunchTicket {
+        processLifecycle.captureLaunchTicket()
+    }
+
+    func locate(
+        manualPath: String?,
+        ticket: ManagedSubprocessLifecycle.LaunchTicket? = nil
+    ) throws -> LocatedCodex {
+        let ticket = ticket ?? captureLaunchTicket()
+        try checkRequest(ticket)
         if let manualPath,
            !manualPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return try locateManual(path: manualPath)
+            return try locateManual(path: manualPath, ticket: ticket)
         }
 
         var sawExistingFile = false
 
         for candidate in candidateURLs(manualPath: manualPath) {
+            try checkRequest(ticket)
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(
                 atPath: candidate.url.path,
@@ -54,7 +65,12 @@ struct CodexExecutableLocator: Sendable {
                 continue
             }
 
-            guard let version = try? validatedVersion(at: candidate.url) else {
+            let version: String
+            do {
+                version = try validatedVersion(at: candidate.url, ticket: ticket)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
                 continue
             }
 
@@ -65,12 +81,13 @@ struct CodexExecutableLocator: Sendable {
             )
         }
 
+        try checkRequest(ticket)
         throw sawExistingFile
             ? ConnectionIssue.invalidCodexVersion
             : ConnectionIssue.codexNotFound
     }
 
-    private func locateManual(path: String) throws -> LocatedCodex {
+    private func locateManual(path: String, ticket: ManagedSubprocessLifecycle.LaunchTicket) throws -> LocatedCodex {
         let expanded = NSString(string: path).expandingTildeInPath
         let url = URL(fileURLWithPath: expanded).standardizedFileURL
         var isDirectory: ObjCBool = false
@@ -84,7 +101,9 @@ struct CodexExecutableLocator: Sendable {
 
         let version: String
         do {
-            version = try validatedVersion(at: url)
+            version = try validatedVersion(at: url, ticket: ticket)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw ConnectionIssue.invalidCodexVersion
         }
@@ -133,13 +152,25 @@ struct CodexExecutableLocator: Sendable {
         }
     }
 
-    private func validatedVersion(at executableURL: URL) throws -> String {
+    private func checkRequest(_ ticket: ManagedSubprocessLifecycle.LaunchTicket) throws {
+        do {
+            try processLifecycle.checkLaunchTicket(ticket)
+        } catch {
+            throw CancellationError()
+        }
+    }
+
+    private func validatedVersion(
+        at executableURL: URL,
+        ticket: ManagedSubprocessLifecycle.LaunchTicket
+    ) throws -> String {
+        try checkRequest(ticket)
         let output = Pipe()
         let deadline = Date().addingTimeInterval(3)
 
         let process: ManagedSubprocess
         do {
-            process = try processLifecycle.launch {
+            process = try processLifecycle.launch(ticket: ticket) {
                 try ManagedSubprocess.launch(
                     executableURL: executableURL,
                     arguments: ["--version"],
@@ -148,6 +179,7 @@ struct CodexExecutableLocator: Sendable {
                 )
             }
         } catch {
+            try checkRequest(ticket)
             throw ConnectionIssue.processLaunchFailed
         }
         defer { processLifecycle.stopIfActive(process, gracePeriod: 0.5) }
@@ -163,9 +195,11 @@ struct CodexExecutableLocator: Sendable {
                 throw ConnectionIssue.invalidCodexVersion
             }
         } catch {
+            try checkRequest(ticket)
             throw ConnectionIssue.invalidCodexVersion
         }
 
+        try checkRequest(ticket)
         guard process.terminationStatus == 0,
               let value = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines),

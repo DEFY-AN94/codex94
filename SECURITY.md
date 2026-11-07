@@ -116,6 +116,30 @@ the user opens that page. The check does not verify an installation package,
 download or install an App, relaunch it, or run in the background. See
 [docs/updating.md](docs/updating.md) for the user flow and maintenance boundary.
 
+## 4.1.8 candidate: configuration and installation boundaries
+
+One validated configuration-directory resolver is shared by the Claude local
+usage reader, optional CLI environment and statusline installer. Only a valid
+`CLAUDE_CONFIG_DIR` override is added to the Claude child environment; the Codex
+environment allowlist and credential boundary remain unchanged. The resolver
+does not read files. The existing local usage reader remains the sole reader of
+Claude's global state and retains its file restrictions.
+
+New statusline installations bind an opaque random installation identifier to
+the generated wrapper command, installation manifest and report-cache metadata.
+The bridge checks the invocation and configuration against the current
+installation before forwarding/capturing. A retired invocation cannot borrow a
+new installation's original command or label old quota with its identifier.
+Report fingerprints and observation watermarks are scoped to an installation;
+the identifier proves neither an account identity nor publisher trust.
+
+A manifest for another configuration does not authorize writes to its recorded
+path or automatic adoption of its reports. The user must return to that
+configuration to remove its connection before installing another. Legacy and
+unbound report handling retains explicit source-confirmation boundaries; known
+configuration/installation mismatches cannot be approved around those checks.
+All regressions use synthetic settings, subprocesses and notifications.
+
 ## Distribution trust boundary
 
 Since version `0.2.0`, Codex94 offers a Universal 2 DMG for technical users alongside the

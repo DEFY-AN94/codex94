@@ -43,7 +43,7 @@ struct ClaudeLocalUsageCacheReading: Equatable, Sendable {
 /// never writes, never follows symlinks and never touches credentials.
 struct ClaudeLocalUsageCacheReader: Sendable {
     static let fileName = ".claude.json"
-    static let configDirectoryVariable = "CLAUDE_CONFIG_DIR"
+    static let configDirectoryVariable = ClaudeConfigurationDirectories.environmentKey
     static let usageKey = "cachedUsageUtilization"
     static let maximumBytes = 16 * 1_048_576
     static let maximumModelLimits = 16
@@ -61,19 +61,8 @@ struct ClaudeLocalUsageCacheReader: Sendable {
 
     /// Claude Code keeps every global path under `CLAUDE_CONFIG_DIR` when set.
     static func defaultFileURL(environment: [String: String], homeDirectory: URL) -> URL {
-        if let directory = environment[configDirectoryVariable], isUsableDirectoryPath(directory) {
-            return URL(fileURLWithPath: directory, isDirectory: true).appendingPathComponent(fileName)
-        }
-        return homeDirectory.appendingPathComponent(fileName)
-    }
-
-    private static func isUsableDirectoryPath(_ path: String) -> Bool {
-        guard path.hasPrefix("/"), path.utf8.count <= 1_024, !path.utf8.contains(0),
-              !path.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
-            return false
-        }
-        let parts = path.split(separator: "/")
-        return !parts.contains(".") && !parts.contains("..")
+        ClaudeConfigurationDirectories(environment: environment, homeDirectory: homeDirectory)
+            .usageDirectory.appendingPathComponent(fileName)
     }
 
     func read(now: Date, unchangedSince previous: ClaudeLocalUsageCacheStamp? = nil) -> ClaudeLocalUsageCacheReading {
