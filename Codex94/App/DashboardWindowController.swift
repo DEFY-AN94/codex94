@@ -67,7 +67,6 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
         windowState.select(section: section)
         windowState.isVisible = true
         NSApp.activate(ignoringOtherApps: true)
-        if window.isMiniaturized { window.deminiaturize(nil) }
         showWindow(nil)
         window.makeKeyAndOrderFront(nil)
     }

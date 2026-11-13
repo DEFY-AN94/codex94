@@ -68,22 +68,6 @@ struct ClaudeStatuslineInstaller: Sendable {
 
     var isInstalled: Bool { setupState == .installed }
 
-    /// A diagnostic belongs to this installation, not a selected producer or
-    /// account. Anonymous legacy connections continue without this diagnostic.
-    func bridgeHealth(at now: Date = Date()) -> ClaudeBridgeHealthState {
-        guard setupState == .installed, let manifest = try? readManifest(),
-              let installationID = manifest.installationID else { return .unavailable }
-        do {
-            guard let observation = try ClaudeBridgeHealthStore(cache: cache).read(installationID: installationID, at: now) else {
-                return .waiting
-            }
-            // Do not return old activity if the installation changed during I/O.
-            guard let current = try? readManifest(), current.installationID == installationID,
-                  setupState == .installed else { return .unavailable }
-            return .observed(observation)
-        } catch { return .unreadable }
-    }
-
     /// A report stream has no authenticated account identity. Configuration and
     /// installation ownership are eligibility checks before stream confirmation.
     func reportEligibility(installationID: String?) -> ClaudeStatuslineReportEligibility {
@@ -199,7 +183,6 @@ struct ClaudeStatuslineInstaller: Sendable {
         guard try readSettings() == originalData else { throw ClaudeQuotaIssue.configurationConflict }
         try ClaudeLocalFile.write(try Self.encode(settings), to: settingsURL)
         try FileManager.default.removeItem(at: manifestURL)
-        ClaudeBridgeHealthStore(cache: cache).removeLocked(installationID: manifest.installationID)
         // Backups and quota evidence remain user-owned recovery material.
     }
 
@@ -229,7 +212,6 @@ struct ClaudeStatuslineInstaller: Sendable {
             throw ClaudeQuotaIssue.configurationConflict
         }
         try FileManager.default.removeItem(at: manifestURL)
-        ClaudeBridgeHealthStore(cache: cache).removeLocked(installationID: manifest.installationID)
     }
 
     private func recoveryManifest(from data: Data) throws -> Manifest {

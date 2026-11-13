@@ -27,12 +27,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         AppStore(preferences: preferences)
     }
 
-    var dashboardCommands: DashboardSettingsCommands {
-        DashboardSettingsCommands(preferences: preferences) { [weak self] in
-            self?.openDashboard()
-        }
-    }
-
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
             return

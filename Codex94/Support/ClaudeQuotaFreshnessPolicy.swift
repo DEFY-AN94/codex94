@@ -1,11 +1,12 @@
 import Foundation
 
-/// Pure report-age and selection rules. The store establishes source eligibility
-/// before calling this policy and owns notification watermarks, reset targets
-/// and scheduling. Receipt of a file or a bridge heartbeat is not an observation.
+/// Pure freshness and selection rules for the three Claude sources. The store
+/// owns the slots and the schedule; this type only decides which report to show
+/// and whether it still counts as current.
 enum ClaudeQuotaFreshnessPolicy {
-    static let recentReportMaximumAge: TimeInterval = 600
-    static let localCacheMaximumAge: TimeInterval = recentReportMaximumAge
+    /// Claude Code itself treats a cached usage snapshot as "last known" for one
+    /// hour, so the same boundary separates current from cached presentation.
+    static let localCacheMaximumAge: TimeInterval = 3_600
 
     static func maximumAge(
         for source: ClaudeQuotaSource,
@@ -13,9 +14,11 @@ enum ClaudeQuotaFreshnessPolicy {
         refreshInterval: TimeInterval,
         localCache: TimeInterval = localCacheMaximumAge
     ) -> TimeInterval {
-        // A slower check interval does not make a report newer. The local
-        // override remains injectable, but cannot extend the common boundary.
-        source == .localCache ? min(baseline, localCache) : baseline
+        switch source {
+        case .localCache: localCache
+        case .statusline: baseline
+        case .cliUsage: max(baseline, refreshInterval + 60)
+        }
     }
 
     static func isCurrent(
@@ -25,47 +28,11 @@ enum ClaudeQuotaFreshnessPolicy {
         refreshInterval: TimeInterval,
         localCache: TimeInterval = localCacheMaximumAge
     ) -> Bool {
-        isRecent(report, at: now, maximumAge: maximumAge(
-            for: report.source, baseline: baseline, refreshInterval: refreshInterval, localCache: localCache
-        ))
-    }
-
-    /// Notification age qualification is separate from display retention. A
-    /// caller may also supply its observation watermark; an older fallback or
-    /// a repeated report must not become a new notification observation.
-    static func canNotify(
-        _ report: ClaudeQuotaReport,
-        at now: Date,
-        baseline: TimeInterval = recentReportMaximumAge,
-        refreshInterval: TimeInterval = 300,
-        localCache: TimeInterval = localCacheMaximumAge,
-        after lastNotifiedAt: Date? = nil
-    ) -> Bool {
-        guard lastNotifiedAt.map({ report.reportedAt > $0 }) ?? true else { return false }
-        return isRecent(report, at: now, maximumAge: maximumAge(
-            for: report.source, baseline: baseline, refreshInterval: refreshInterval, localCache: localCache
-        ))
-    }
-
-    /// Only an accepted recent report can defer an automatic CLI check. Reset
-    /// targets and source/identity eligibility remain independent store gates.
-    /// Missing five-hour data is not a failure: a weekly-only report is usable.
-    static func canDeferAutomaticRead(
-        _ report: ClaudeQuotaReport,
-        at now: Date,
-        baseline: TimeInterval = recentReportMaximumAge,
-        refreshInterval: TimeInterval = 300,
-        localCache: TimeInterval = localCacheMaximumAge
-    ) -> Bool {
-        isRecent(report, at: now, maximumAge: maximumAge(
-            for: report.source, baseline: baseline, refreshInterval: refreshInterval, localCache: localCache
-        ))
-    }
-
-    private static func isRecent(_ report: ClaudeQuotaReport, at now: Date, maximumAge: TimeInterval) -> Bool {
         let age = now.timeIntervalSince(report.reportedAt)
-        return maximumAge.isFinite && maximumAge > 0 && age.isFinite
-            && age >= 0 && age < maximumAge && report.snapshot(at: now) != nil
+        let allowed = maximumAge(
+            for: report.source, baseline: baseline, refreshInterval: refreshInterval, localCache: localCache
+        )
+        return age >= 0 && age <= allowed && report.snapshot(at: now) != nil
     }
 
     /// The local cache is the primary report. A backup replaces it only when

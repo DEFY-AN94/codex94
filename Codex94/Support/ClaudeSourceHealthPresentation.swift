@@ -33,9 +33,6 @@ struct ClaudeSourceHealthPresentation: Equatable, Sendable {
     let lastReadIssue: ClaudeQuotaIssue?
     let lastReadAt: Date?
     let lastDiagnostic: ClaudeCLIReadDiagnosticRecord?
-    let bridgeHealth: ClaudeBridgeHealthState
-    let automaticReadState: ClaudeAutomaticReadPolicy.State
-    let nextAutomaticCheckAt: Date?
 
     var actions: [Action] {
         guard dataState != .disabled else { return [.openDiagnostics] }
@@ -65,10 +62,7 @@ struct ClaudeSourceHealthPresentation: Equatable, Sendable {
         canReadOnceWithCLI: Bool = false,
         lastReadIssue: ClaudeQuotaIssue? = nil,
         lastReadAt: Date? = nil,
-        lastDiagnostic: ClaudeCLIReadDiagnosticRecord? = nil,
-        bridgeHealth: ClaudeBridgeHealthState = .unavailable,
-        automaticReadState: ClaudeAutomaticReadPolicy.State = .disabled,
-        nextAutomaticCheckAt: Date? = nil
+        lastDiagnostic: ClaudeCLIReadDiagnosticRecord? = nil
     ) -> Self {
         let state: DataState
         if !isEnabled { state = .disabled }
@@ -97,10 +91,7 @@ struct ClaudeSourceHealthPresentation: Equatable, Sendable {
             canReadOnceWithCLI: isEnabled && canReadOnceWithCLI && !isRefreshing && !isRetiringCLI,
             lastReadIssue: isEnabled ? lastReadIssue : nil,
             lastReadAt: isEnabled ? lastReadAt : nil,
-            lastDiagnostic: isEnabled ? lastDiagnostic : nil,
-            bridgeHealth: isEnabled ? bridgeHealth : .unavailable,
-            automaticReadState: isEnabled && isCLIUsageEnabled ? automaticReadState : .disabled,
-            nextAutomaticCheckAt: isEnabled && isCLIUsageEnabled ? nextAutomaticCheckAt : nil
+            lastDiagnostic: isEnabled ? lastDiagnostic : nil
         )
     }
 }

@@ -141,46 +141,19 @@ struct ClaudeStatuslineCache: Sendable {
     }
 
     func capture(_ data: Data, at now: Date = Date(), installationID: String? = nil,
-                 health: ClaudeBridgeHealthStore? = nil,
                  validateInstallation: () throws -> Void = {}) throws {
         guard ClaudeStatuslineInstaller.validInstallationID(installationID) else { throw ClaudeQuotaIssue.invalidData }
-        // Parse once, but report even missing/malformed quota only after the
-        // caller has revalidated the current installation under its shared lock.
-        let parsed = Result { try ClaudeStatuslineParser.parse(data) }
-        if health == nil {
-            let value = try parsed.get()
-            guard value.windows.contains(where: { $0.resetsAt.map { $0 > now } ?? false }) else { return }
-        }
+        let parsed = try ClaudeStatuslineParser.parse(data)
+        let windows = parsed.windows
+        guard windows.contains(where: { $0.resetsAt.map { $0 > now } ?? false }) else { return }
         try withExclusiveAccess {
             try validateInstallation()
-            func observe(_ outcome: ClaudeBridgeHealthOutcome) {
-                guard let installationID else { return }
-                try? health?.recordLocked(outcome, installationID: installationID, at: now)
-            }
-            let value: ClaudeStatuslineParser.ParsedInput
-            switch parsed {
-            case let .success(input): value = input
-            case let .failure(error):
-                observe(.invalidInput)
-                throw error
-            }
-            guard !value.windows.isEmpty else { observe(.noQuotaFields); return }
-            guard value.windows.contains(where: { $0.resetsAt.map { $0 > now } ?? false }) else {
-                observe(.expiredWindows)
-                return
-            }
-            do {
-                let outcome = try captureLocked(value, at: now, installationID: installationID)
-                observe(outcome)
-            } catch {
-                observe(.captureFailed)
-                throw error
-            }
+            try captureLocked(parsed, at: now, installationID: installationID)
         }
     }
 
     private func captureLocked(_ parsed: ClaudeStatuslineParser.ParsedInput, at now: Date,
-                               installationID: String?) throws -> ClaudeBridgeHealthOutcome {
+                               installationID: String?) throws {
         let windows = parsed.windows
         let producerID = parsed.producerID
         // Reports and duplicate timestamps never cross installation generations.
@@ -204,7 +177,6 @@ struct ClaudeStatuslineCache: Sendable {
         let encoded = try encoder.encode(Record(version: 1, report: selected, producers: producers, installationID: installationID))
         guard encoded.count <= Self.maximumCacheBytes else { throw ClaudeQuotaIssue.invalidData }
         try ClaudeLocalFile.write(encoded, to: fileURL)
-        return priorProducer?.fingerprint == fingerprint ? .unchanged : .captured
     }
 }
 

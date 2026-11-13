@@ -1,4 +1,4 @@
-name: UI launch diagnostic
+name: Released Intel launch diagnostic
 
 on:
   push:
@@ -12,28 +12,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ui-test:
-    name: UI smoke (${{ matrix.scenario }})
-    # Independent of packaging, with bounded requests to the standard image.
+  baseline-launch:
+    name: Released 4.2.0 Intel startup
     runs-on: macos-15-intel
-    # Display completed its assertions but exceeded the overall 20-minute limit.
-    # Providers also exercises source-health navigation and bilingual captures.
-    timeout-minutes: ${{ (matrix.scenario == 'display' || matrix.scenario == 'providers') && 25 || 20 }}
-    strategy:
-      fail-fast: false
-      # Bound requests while hosted macOS capacity is constrained.
-      max-parallel: 1
-      matrix:
-        include:
-          - scenario: providers
-            method: testProvidersSmoke
-            artifact: codex94-ui-providers
+    timeout-minutes: 15
+    env:
+      BASELINE_PRODUCT_REVISION: c13f886151b5932518352a3b92caafb71dbbf44f
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify exact released product source
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code "$BASELINE_PRODUCT_REVISION" -- Codex94 Codex94.xcodeproj
+          test -z "$(git ls-files --others --exclude-standard -- Codex94 Codex94.xcodeproj)"
 
       - name: Select Xcode 16.4
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
@@ -43,49 +39,33 @@ jobs:
           test "$(xcode-select -p)" = "/Applications/Xcode_16.4.app/Contents/Developer"
           test "$(xcodebuild -version | sed -n '1p')" = "Xcode 16.4"
 
-      - name: Prepare synthetic UI fixtures
+      - name: Prepare synthetic Providers fixtures
         id: fixtures
         env:
-          CODEX94_UI_SCENARIO: ${{ matrix.scenario }}
+          CODEX94_UI_SCENARIO: providers
         run: /usr/bin/python3 -I Codex94UITests/Fixtures/prepare.py
 
-      - name: Run UI smoke
+      - name: Build released native Debug App
+        id: build
         env:
           CODEX94_UI_FIXTURE_ROOT: ${{ steps.fixtures.outputs.fixture-root }}
-          CODEX94_UI_ARTIFACT_ROOT: ${{ steps.fixtures.outputs.artifact-root }}
-          CODEX94_UI_TEST_ENTITLEMENTS: ${{ steps.fixtures.outputs.entitlements-file }}
           CODEX94_UI_PROJECT: ${{ steps.fixtures.outputs.project-file }}
-          CODEX94_UI_TEST_METHOD: ${{ matrix.method }}
         run: |
           test -d "$CODEX94_UI_FIXTURE_ROOT"
-          test -d "$CODEX94_UI_ARTIFACT_ROOT"
-          test -f "$CODEX94_UI_TEST_ENTITLEMENTS"
-          test -f "$CODEX94_UI_PROJECT/project.pbxproj"
-          if [ "$CODEX94_UI_TEST_METHOD" = testRecoverySmoke ]; then
-            test "$CODEX94_UI_PROJECT" = "$CODEX94_UI_FIXTURE_ROOT/recovery-source/Codex94.xcodeproj"
-          else
-            test "$CODEX94_UI_PROJECT" = "$GITHUB_WORKSPACE/Codex94.xcodeproj"
-          fi
+          test "$CODEX94_UI_PROJECT" = "$GITHUB_WORKSPACE/Codex94.xcodeproj"
+          git diff --exit-code "$BASELINE_PRODUCT_REVISION" -- Codex94 Codex94.xcodeproj
           xcodebuild \
             -project "$CODEX94_UI_PROJECT" \
-            -scheme Codex94UI \
+            -scheme Codex94 \
             -configuration Debug \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=x86_64' \
             -derivedDataPath "$CODEX94_UI_FIXTURE_ROOT/DerivedData" \
-            -resultBundlePath "$CODEX94_UI_FIXTURE_ROOT/results/Codex94UI.xcresult" \
-            -parallel-testing-enabled NO \
-            "-only-testing:Codex94UITests/Codex94UITests/$CODEX94_UI_TEST_METHOD" \
-            CODEX94_UI_FIXTURE_ROOT="$CODEX94_UI_FIXTURE_ROOT" \
-            CODEX94_UI_ARTIFACT_ROOT="$CODEX94_UI_ARTIFACT_ROOT" \
-            CODEX94_UI_TEST_ENTITLEMENTS="$CODEX94_UI_TEST_ENTITLEMENTS" \
-            CODEX94_UI_GITHUB_ACTIONS="$GITHUB_ACTIONS" \
-            CODEX94_UI_RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
-            CODEX94_UI_RUNNER_OS="$RUNNER_OS" \
             CODE_SIGNING_ALLOWED=YES \
-            test
+            ONLY_ACTIVE_ARCH=YES \
+            build
 
-      - name: Classify synthetic startup failure
-        if: ${{ failure() && steps.fixtures.outputs.fixture-root != '' }}
+      - name: Classify guarded direct startup
+        if: ${{ always() && steps.fixtures.outputs.fixture-root != '' }}
         env:
           CODEX94_UI_FIXTURE_ROOT: ${{ steps.fixtures.outputs.fixture-root }}
           CODEX94_UI_ARTIFACT_ROOT: ${{ steps.fixtures.outputs.artifact-root }}
@@ -93,14 +73,37 @@ jobs:
           /usr/bin/python3 -I script/ci_launch_diagnostic.py --fixture-root "$CODEX94_UI_FIXTURE_ROOT" --launch > "$CODEX94_UI_ARTIFACT_ROOT/startup-diagnostic.json"
           /bin/cat "$CODEX94_UI_ARTIFACT_ROOT/startup-diagnostic.json"
 
-      - name: Upload synthetic UI evidence
+      - name: Upload bounded startup evidence
         if: ${{ always() && steps.fixtures.outputs.artifact-root != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ matrix.artifact }}
+          name: codex94-released-420-intel-launch
           path: |
-            ${{ steps.fixtures.outputs.artifact-root }}/*.png
-            ${{ steps.fixtures.outputs.artifact-root }}/*.json
+            ${{ steps.fixtures.outputs.artifact-root }}/isolation.json
+            ${{ steps.fixtures.outputs.artifact-root }}/startup-diagnostic.json
           if-no-files-found: error
           include-hidden-files: false
           retention-days: 7
+
+      - name: Require observed startup survival
+        if: ${{ always() && steps.fixtures.outputs.artifact-root != '' }}
+        env:
+          CODEX94_UI_ARTIFACT_ROOT: ${{ steps.fixtures.outputs.artifact-root }}
+        run: |
+          /usr/bin/python3 -I - <<'PY'
+          import json, os, pathlib, sys
+          try:
+              report = json.loads((pathlib.Path(os.environ['CODEX94_UI_ARTIFACT_ROOT']) / 'startup-diagnostic.json').read_text())
+              candidate = report.get('candidate', {})
+              launch = report.get('directLaunch', {})
+              passed = (report.get('status') == 'complete'
+                        and candidate.get('version') == '4.2.0' and candidate.get('build') == '33'
+                        and candidate.get('architectures') == ['x86_64']
+                        and launch.get('runningAtDeadline') is True
+                        and launch.get('naturalExitCode') is None
+                        and launch.get('naturalSignal') is None)
+          except Exception:
+              passed = False
+          print('Startup observation passed.' if passed else 'Startup observation failed; inspect bounded diagnostic.')
+          sys.exit(0 if passed else 1)
+          PY

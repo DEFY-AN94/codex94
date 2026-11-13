@@ -7,30 +7,6 @@ struct Codex94App: App {
         Settings {
             EmptyView()
         }
-        .commands {
-            appDelegate.dashboardCommands
-        }
-    }
-}
-
-/// Replace SwiftUI's empty Settings route at application scope. The command
-/// remains available while the menu-bar popover is closed and uses the same
-/// Dashboard controller as the other navigation buttons.
-@MainActor
-struct DashboardSettingsCommands: Commands {
-    @ObservedObject var preferences: PreferencesStore
-    let openDashboard: () -> Void
-
-    var body: some Commands {
-        CommandGroup(replacing: .appSettings) {
-            Button(action: openDashboard) {
-                Text(verbatim: StatusAccessibilityString.localized(
-                    "command.dashboard", language: preferences.language, bundle: .main
-                ))
-            }
-            .keyboardShortcut(",", modifiers: .command)
-            .accessibilityIdentifier("settings-dashboard-command")
-        }
     }
 }
 

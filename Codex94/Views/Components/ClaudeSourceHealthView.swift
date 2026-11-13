@@ -96,8 +96,6 @@ struct ClaudeSourceHealthView: View {
 
             if presentation.dataState != .disabled {
                 sourceChecks
-                bridgeActivity
-                automaticReading
                 if let operationKey {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small).accessibilityHidden(true)
@@ -130,50 +128,6 @@ struct ClaudeSourceHealthView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("claude-source-health")
-    }
-
-    var bridgeActivityKey: String {
-        switch presentation.bridgeHealth {
-        case .unavailable: "claude.health.bridge.unavailable"
-        case .waiting: "claude.health.bridge.waiting"
-        case .unreadable: "claude.health.bridge.unreadable"
-        case .observed(let observation): "claude.health.bridge." + observation.outcome.rawValue
-        }
-    }
-
-    private var bridgeActivity: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: localized(bridgeActivityKey))
-                .accessibilityIdentifier("claude-health-bridge-state")
-            if case .observed(let observation) = presentation.bridgeHealth,
-               let time = QuotaFormatting.absoluteReset(
-                to: observation.recordedAt, locale: language.locale,
-                calendar: Calendar(identifier: .gregorian), timeZone: timeZone
-               ) {
-                Text(verbatim: localized("claude.health.bridge.recordedAt %@", arguments: [time]))
-                    .monospacedDigit()
-                    .accessibilityIdentifier("claude-health-bridge-time")
-                Text(verbatim: localized("claude.health.bridge.boundary"))
-                    .accessibilityIdentifier("claude-health-bridge-boundary")
-            }
-        }
-        .font(.caption).foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var automaticReading: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: localized("claude.health.automatic." + presentation.automaticReadState.rawValue))
-                .accessibilityIdentifier("claude-health-automatic-state")
-            if let date = presentation.nextAutomaticCheckAt,
-               let time = QuotaFormatting.automaticRefreshTime(at: date, timeZone: timeZone) {
-                Text(verbatim: localized("claude.health.automatic.next %@", arguments: [time]))
-                    .monospacedDigit()
-                    .accessibilityIdentifier("claude-health-automatic-next")
-            }
-        }
-        .font(.caption).foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var sourceChecks: some View {
