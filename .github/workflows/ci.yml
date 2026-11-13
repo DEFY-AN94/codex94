@@ -14,7 +14,9 @@ concurrency:
 
 jobs:
   test:
-    runs-on: macos-15
+    # Pin the standard Intel image while arm64 hosted capacity is constrained.
+    # The release gate still builds and verifies both Universal architectures.
+    runs-on: macos-15-intel
     timeout-minutes: 20
     outputs:
       version: ${{ steps.metadata.outputs.version }}
@@ -93,10 +95,7 @@ jobs:
 
   ui-test:
     name: UI smoke (${{ matrix.scenario }})
-    # Prioritize the release gate before requesting the five UI runners.
-    needs: test
-    # Keep native arm64 release tests and exercise UI on the supported Intel
-    # image; macOS 15 arm64 capacity has repeatedly prevented UI job startup.
+    # Independent of packaging, with bounded requests to the standard image.
     runs-on: macos-15-intel
     # Display completed its assertions but exceeded the overall 20-minute limit.
     # Providers also exercises source-health navigation and bilingual captures.
