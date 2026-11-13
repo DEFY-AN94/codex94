@@ -10,7 +10,7 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 自动调用 Claude CLI 是独立且默认关闭的选项。项目采用 MIT 许可，以 SwiftUI/AppKit 构建，
 不捆绑第三方运行时框架。
 
-**最新稳定版：**[`4.1.7 (31)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7)
+**最新稳定版：**[`4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0)
 · macOS 14+ · Apple Silicon 与 Intel · English 与简体中文
 
 [功能详情](#功能详情) · [界面截图](#界面截图) · [安装](#安装)
@@ -27,9 +27,9 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 账号信息或用量数值；
 详见[4.1.7 更新记录](CHANGELOG.md#417---2026-10-18)。
 
-### 开发候选版：4.2.0 (33)
+### 当前版本：4.2.0 (33)
 
-本候选版尚未发布，在 **Dashboard → 服务**中新增 Claude 来源健康卡、独立的本地报告
+4.2.0 在 **Dashboard → 服务**中新增 Claude 来源健康卡、独立的本地报告
 重读操作，并在现有诊断流程中展示最近一次已结束的 CLI 读取诊断。健康卡说明已接受的
 报告、数据年龄及可用恢复操作；显示卡片不会获取额度。**重新读取本地报告**不会启动 CLI，
 即使自动 CLI 读取已经开启，也不会获取新云端用量或改变报告原始时间。
@@ -42,20 +42,24 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 [兼容性证据](docs/CLI_COMPATIBILITY.md)；候选检查和维护者验收分别记入
 [发布记录](docs/RELEASING.md)。
 
-本候选已同步到合入
-[4.1.8 PR #71](https://github.com/DEFY-AN94/codex94/pull/71) 后的 `main`。
+本版本包含经 [4.1.8 PR #71](https://github.com/DEFY-AN94/codex94/pull/71) 合入的变更。
 4.1.8 未单独发布，以下修复包含在 4.2.0 中：
 
-当前源码候选版让 Claude 本地缓存、可选 CLI 和新安装的状态栏连接使用同一个经校验的
+本版本让 Claude 本地缓存、可选 CLI 和新安装的状态栏连接使用同一个经校验的
 `CLAUDE_CONFIG_DIR`。已有连接时切换目录，请先以原配置环境启动 Codex94，在服务页移除
 旧连接，再为新目录安装。目录不匹配或已退役安装的报告不会被自动采用；安装标识不代表
 账号身份验证。
-退回 4.1.7 或更早版本前，请使用本候选版的服务页移除由它安装的连接；旧 App 无法识别
-新的 wrapper 调用格式。
+退回 4.1.7 或更早版本前，请使用 4.2.0 的服务页移除由 4.2.0 或未发布的
+4.1.8 候选版安装的连接；旧 App 无法识别新的 wrapper 调用格式。
 
 继承的变更还修复切换 Claude CLI 开关后的重复通知、Codex 查找取消、Xcode 选择，以及
 Token 统计重试期间的旧数据提示。详见[继承的 4.1.8 变更](CHANGELOG.md#inherited-418-changes-unpublished)。
-候选版尚未公开发布，上方稳定版下载仍指向 4.1.7。
+本版本已于 **2026-11-14**（Australia/Melbourne）发布，详见
+[发布核验记录](docs/RELEASING.md#420-release-verification--2026-11-14)。
+
+已知问题：弹出面板关闭时，Command-comma 可能打开空白 Settings 窗口
+（[#73](https://github.com/DEFY-AN94/codex94/issues/73)）。请使用菜单栏的 Dashboard
+操作或悬浮窗中的 Dashboard 按钮。
 
 ## 功能详情
 
@@ -191,7 +195,7 @@ Claude 监控每次只显示**一份已接受的报告**：
 
 ## 界面截图
 
-所有截图均采用隔离的合成数据，不包含真实账号或实时用量。以下为历史截图，不代表当前 4.1.7 的界面。
+所有截图均采用隔离的合成数据，不包含真实账号或实时用量。以下为历史截图，不代表当前 4.2.0 的界面。
 以下**柱状图**与**折线图**采集于 `0.3.0 (14)` 候选测试阶段，使用相同的七天日记录。
 原始合成截图保持不变，
 这些英文界面截图来自
@@ -234,8 +238,8 @@ Claude 监控每次只显示**一份已接受的报告**：
 
 ## 安装
 
-已发布稳定版为 [`v4.1.7 (31)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7)，
-于 **2026-10-18**（Australia/Melbourne）发布，提供 Universal 2 DMG 与同一个 annotated 标签
+已发布稳定版为 [`v4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0)，
+于 **2026-11-14**（Australia/Melbourne）发布，提供 Universal 2 DMG 与同一个 annotated 标签
 的源码。下方下载和 clone 指令指向该版本；后续文档提交不会移动标签或替换已发布资产。
 
 DMG **未签名，也未经过 Apple 公证**。内部 App 只有 ad-hoc Hardened Runtime 签名，
@@ -262,27 +266,27 @@ Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
 
 ### 安装 Universal DMG
 
-请从 [`v4.1.7` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7)
+请从 [`v4.2.0` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0)
 下载以下两个正式资产：
 
-- `Codex94-4.1.7-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.7-SHA256SUMS.txt`
+- `Codex94-4.2.0-macos-universal-unnotarized.dmg`
+- `Codex94-4.2.0-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-4.1.7-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.2.0-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-4.1.7-macos-universal-unnotarized.dmg \
+gh attestation verify Codex94-4.2.0-macos-universal-unnotarized.dmg \
   -R DEFY-AN94/codex94 \
   --signer-workflow DEFY-AN94/codex94/.github/workflows/ci.yml \
   --source-ref refs/heads/main \
-  --source-digest 0ec67e917ea9a96ddee993d280fcc377a93bdc0c \
+  --source-digest c13f886151b5932518352a3b92caafb71dbbf44f \
   --deny-self-hosted-runners
 ```
 
@@ -303,7 +307,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 仓库公开，无需 GitHub 认证。Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v4.1.7 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.2.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：

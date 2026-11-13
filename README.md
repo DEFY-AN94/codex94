@@ -12,7 +12,7 @@ existing local usage reports by default; automatic Claude CLI reads are a
 separate, default-off choice. The app is MIT-licensed, built with SwiftUI/AppKit,
 and bundles no third-party runtime frameworks.
 
-**Latest stable:** [`4.1.7 (31)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7)
+**Latest stable:** [`4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0)
 · macOS 14+ · Apple Silicon and Intel · English and Simplified Chinese
 
 [Features](#features) · [Screenshots](#screenshots) · [Install](#installation)
@@ -32,9 +32,9 @@ only fixed-enum `phase`, `result` and `issue` values, `usage_sent` and
 account details or quota values. See
 [4.1.7 changes](CHANGELOG.md#417---2026-10-18).
 
-### Development candidate: 4.2.0 (33)
+### Current release: 4.2.0 (33)
 
-This unpublished candidate adds a Claude source-health card in **Dashboard →
+Version 4.2.0 adds a Claude source-health card in **Dashboard →
 Services**, a separate local-report reread action that never starts the CLI,
 and the latest completed CLI diagnostic in the existing Diagnostics flow.
 The card explains the accepted report, its age and available recovery actions;
@@ -53,7 +53,7 @@ See [4.2.0 changes](CHANGELOG.md#420---2026-11-14) and the
 [compatibility evidence](docs/CLI_COMPATIBILITY.md). Candidate checks and
 maintainer acceptance are recorded separately in the [release records](docs/RELEASING.md).
 
-This candidate is synchronized with `main` after the merge of
+This release includes the changes merged through
 [4.1.8 PR #71](https://github.com/DEFY-AN94/codex94/pull/71). Version 4.1.8 was
 not published separately; 4.2.0 includes its fixes:
 
@@ -63,13 +63,19 @@ connection, start Codex94 with the original
 configuration and remove the connection in Services before installing it for
 the new directory. Reports from a mismatched or retired installation are not
 adopted automatically; an installation identifier is not account verification.
-Before downgrading to 4.1.7 or earlier, remove a connection installed by this
-candidate using its Services page; older Apps do not understand the new wrapper.
+Before downgrading to 4.1.7 or earlier, use 4.2.0's Services page to remove
+any connection installed by 4.2.0 or the unpublished 4.1.8 candidate. Older
+Apps do not understand the new wrapper.
 
 The inherited changes also fix repeated notifications after toggling Claude CLI reads,
 Codex discovery cancellation, Xcode selection and the old-data indicator during
 Token statistics retries. See [inherited 4.1.8 changes](CHANGELOG.md#inherited-418-changes-unpublished).
-It is not yet a published release; the stable downloads above remain 4.1.7.
+Published on **2026-11-14** (Australia/Melbourne); see the
+[release verification record](docs/RELEASING.md#420-release-verification--2026-11-14).
+
+Known issue: Command-comma can open an empty Settings window when the
+popover is closed ([#73](https://github.com/DEFY-AN94/codex94/issues/73)).
+Use the menu-bar Dashboard action or the floating window's Dashboard button.
 
 ## Features
 
@@ -259,7 +265,7 @@ can start; repeated one-time clicks do not queue extra reads.
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.
-These are historical captures, not screenshots of the current 4.1.7 interface.
+These are historical captures, not screenshots of the current 4.2.0 interface.
 The chart previews were captured during `0.3.0 (14)` candidate testing and
 show **Bar chart** and **Line chart** over the same seven reported days. These
 original synthetic captures remain unchanged, from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
@@ -304,8 +310,8 @@ statistics and update UI.
 ## Installation
 
 The published stable release is
-[`v4.1.7 (31)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7),
-released on **2026-10-18** (Australia/Melbourne), with a Universal 2 DMG and source
+[`v4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0),
+released on **2026-11-14** (Australia/Melbourne), with a Universal 2 DMG and source
 from the same annotated tag. The download and clone instructions below use
 that release; later documentation commits do not move its tag or replace assets.
 
@@ -339,27 +345,27 @@ precedence; an invalid manual choice is not silently bypassed.
 ### Install the Universal DMG
 
 Download both stable assets from the
-[`v4.1.7` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7):
+[`v4.2.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0):
 
-- `Codex94-4.1.7-macos-universal-unnotarized.dmg`
-- `Codex94-4.1.7-SHA256SUMS.txt`
+- `Codex94-4.2.0-macos-universal-unnotarized.dmg`
+- `Codex94-4.2.0-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-4.1.7-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.2.0-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-4.1.7-macos-universal-unnotarized.dmg \
+gh attestation verify Codex94-4.2.0-macos-universal-unnotarized.dmg \
   -R DEFY-AN94/codex94 \
   --signer-workflow DEFY-AN94/codex94/.github/workflows/ci.yml \
   --source-ref refs/heads/main \
-  --source-digest 0ec67e917ea9a96ddee993d280fcc377a93bdc0c \
+  --source-digest c13f886151b5932518352a3b92caafb71dbbf44f \
   --deny-self-hosted-runners
 ```
 
@@ -383,7 +389,7 @@ This public repository needs no GitHub authentication. Clone the published
 stable source tag:
 
 ```bash
-git clone --branch v4.1.7 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.2.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:

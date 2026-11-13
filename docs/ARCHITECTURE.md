@@ -1,14 +1,14 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints for the published
-[`4.1.7 (31)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7),
-published on 2026-10-18 (Australia/Melbourne), including the unpublished
-`4.0.2 (23)` candidate it carries forward, and the explicitly labelled 4.1.8
-and 4.2.0 development candidates below.
+[`4.2.0 (33)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0),
+published on 2026-11-14 (Australia/Melbourne). It includes the changes
+developed for the unpublished `4.1.8 (32)` candidate and retains the
+unpublished `4.0.2 (23)` work carried into 4.1.0.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.2.0 candidate: source-health projection and per-read diagnostics
+## 4.2.0 release: source-health projection and per-read diagnostics
 
 `ClaudeQuotaStore` owns the accepted source slots, current/history selection,
 pending source confirmation and CLI lifecycle. `sourceHealth(at:)` uses the pure
@@ -56,7 +56,7 @@ to the unit-test target; Recovery copies each required tracked input explicitly.
 See [CLI compatibility evidence](CLI_COMPATIBILITY.md) for the implemented sample
 scope and its distinction from real CLI acceptance.
 
-## 4.1.8 candidate: configuration, cancellation and retry continuity
+## Unpublished 4.1.8 changes included in 4.2.0: configuration, cancellation and retry continuity
 
 The Claude configuration resolver owns only path/environment selection. The
 local usage reader remains the sole global-state reader. The statusline
