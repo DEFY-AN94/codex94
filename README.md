@@ -49,7 +49,7 @@ Completed-read diagnostics stay in memory and enter the clipboard only when
 you choose to copy redacted diagnostics. Synthetic CLI replay fixtures and
 source/lifecycle sequence tests cover production parsing and state paths;
 they do not establish live compatibility with every upstream CLI version.
-See [4.2.0 changes](CHANGELOG.md#420---2026-11-13) and the
+See [4.2.0 changes](CHANGELOG.md#420---2026-11-14) and the
 [compatibility evidence](docs/CLI_COMPATIBILITY.md). Candidate checks and
 maintainer acceptance are recorded separately in the [release records](docs/RELEASING.md).
 

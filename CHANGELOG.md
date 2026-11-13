@@ -6,9 +6,9 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
-## 4.2.0 - 2026-11-13
+## 4.2.0 - 2026-11-14
 
-Version `4.2.0 (33)`. The confirmed release date uses Australia/Melbourne.
+Version `4.2.0 (33)`. The planned release date uses Australia/Melbourne.
 Publication and final-asset verification remain separate from candidate
 acceptance and are recorded in [docs/RELEASING.md](docs/RELEASING.md).
 

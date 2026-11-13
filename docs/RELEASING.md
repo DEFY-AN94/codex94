@@ -35,7 +35,7 @@ the maintainer explicitly authorizes a different order, as recorded for the
 
 <a id="unreleased-candidate-420-33"></a>
 
-## Release preparation: 4.2.0 (33) — 2026-11-13
+## Release preparation: 4.2.0 (33) — 2026-11-14
 
 The initial development baseline was PR #71 head
 `0c2343981c9b5858e575048d213f51f6230fd1e4`. After #71 was squash-merged,
@@ -46,7 +46,7 @@ duplicate 4.1.8 history. The App, tests and build inputs are preserved; document
 conflicts retain main's 4.1.8 date, acceptance record and known Issue #73.
 The synchronized candidate was revalidated as recorded below. PR #72 continues
 to target `main` so the existing default-branch security checks apply. The
-confirmed 4.2.0 release date is 2026-11-13 (Australia/Melbourne). Public stable
+planned 4.2.0 release date is 2026-11-14 (Australia/Melbourne). Public stable
 downloads and release assets remain at 4.1.7 until publication is verified.
 
 Scope: Claude source-health presentation and recovery guidance, an explicit
@@ -108,8 +108,15 @@ authorization supersedes the development/synchronization-only handoff limits
 recorded above and in the implementation plan. It is not evidence that those
 release actions or their verification have already completed.
 
-This date/acceptance documentation change leaves App/build/test inputs unchanged,
-but its resulting PR revision still needs fresh applicable checks. After merge,
+During release preparation, the dated-revision Usage UI job could not acquire
+a hosted runner and never started testing. Display completed all assertions
+successfully, but the full job exceeded its 20-minute limit.
+Display now has the same bounded 25-minute CI job budget as Providers. Test
+assertions, App sources/resources/project settings, build scripts and the CLI's
+own deadlines are unchanged. The cancelled jobs are not counted as passes;
+the revised PR head needs fresh applicable checks. Runner delays moved the
+planned publication to 2026-11-14; verify the actual Melbourne date before tagging.
+After merge,
 freeze the final main commit and verify fresh main CI, all required UI smokes,
 CodeQL, main-only attestation and the exact final distribution assets. Final-asset
 installation/acceptance, annotated-tag verification, and public Release/asset
