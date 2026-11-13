@@ -8,9 +8,9 @@ below applies only to its recorded version and does not validate later releases.
 
 ## 4.2.0 - 2026-11-14
 
-Version `4.2.0 (33)`. The planned release date uses Australia/Melbourne.
-Publication and final-asset verification remain separate from candidate
-acceptance and are recorded in [docs/RELEASING.md](docs/RELEASING.md).
+Version `4.2.0 (33)` was published on the date above, following the published
+`4.1.7 (31)` release. Release dates use Australia/Melbourne. Exact source,
+CI, package and acceptance evidence is recorded in [docs/RELEASING.md](docs/RELEASING.md#420-release-verification--2026-11-14).
 
 ### Added
 
@@ -30,10 +30,10 @@ acceptance and are recorded in [docs/RELEASING.md](docs/RELEASING.md).
   timing into a production helper with deterministic boundary tests. Keep the
   usage-session deadline separate from version-probe and process-cleanup budgets.
 
-This release candidate includes the changes from merged 4.1.8 PR #71 below.
-Version 4.1.8 was not published separately. Stable downloads remain 4.1.7 until
-4.2.0 publication is confirmed; validation and maintainer acceptance are
-recorded separately in [the release workflow](docs/RELEASING.md).
+This release includes the changes from merged 4.1.8 PR #71 below. Version
+4.1.8 was not published separately. Its original preparation and candidate
+acceptance remain distinct from the 4.2.0 release evidence in
+[the release workflow](docs/RELEASING.md).
 
 ### Inherited 4.1.8 changes (unpublished)
 
@@ -76,7 +76,8 @@ and earlier candidate acceptance remain in [docs/RELEASING.md](docs/RELEASING.md
   and is not fixed by this release. Use the menu-bar Dashboard action or the
   floating window's Dashboard button.
 
-Stable download links remain on 4.1.7 until 4.2.0 publication is confirmed.
+Stable download links identify 4.2.0. Later documentation commits do not
+move its tag or replace its published assets.
 
 ## 4.1.7 - 2026-10-18
 

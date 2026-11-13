@@ -2,8 +2,8 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v4.1.7 (31)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7),
-released on 2026-10-18 (Australia/Melbourne). It includes the user-triggered
+stable version is [`v4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0),
+released on 2026-11-14 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
 Version `4.1.7 (31)` evaluates Claude CLI usage output
@@ -130,7 +130,7 @@ confirmation is unchanged. Codex94 still does not read `.credentials.json`, the
 Keychain, browser cookies, tokens or conversation transcripts, and the
 repository security scanner forbids those identifiers in production sources.
 
-## 4.2.0 candidate: source health and completed-read diagnostics
+## 4.2.0: source health and completed-read diagnostics
 
 The source-health card presents state already held by the Claude store. Merely
 opening or rendering it starts no provider request. Its explicit local-report
@@ -155,7 +155,10 @@ diagnostics; the app does not collect or copy unified-log history. Synthetic
 compatibility fixtures and replay drivers are development/test inputs, are not
 bundled into the production App, and never collect a user's CLI transcript.
 
-## 4.1.8 candidate: consistent configuration and installation records
+## Inherited unpublished 4.1.8 changes: configuration and installation records
+
+These changes were developed for the 4.1.8 candidate, never published
+separately, and are included in 4.2.0.
 
 A valid `CLAUDE_CONFIG_DIR` in Codex94's own environment selects the same Claude
 configuration for the read-only local cache, optional CLI child and new
@@ -177,9 +180,10 @@ Services, then install for the new configuration. Original settings and backups
 remain protected by the existing conflict checks. Known mismatched or retired
 reports cannot enter current quota, history or notifications. Unbound streams
 still require source confirmation and do not establish account identity.
-Before downgrading to 4.1.7 or earlier, use this candidate's Services page to
-remove any connection it installed. The older bridge entrypoint does not
-understand the installation identifier in a new wrapper invocation.
+Before downgrading to 4.1.7 or earlier, use Codex94 4.2.0's Services page
+to remove any connection installed by 4.2.0 or the 4.1.8 candidate. The
+older bridge entrypoint does not understand the installation identifier
+in a new wrapper invocation.
 
 ## Optional Claude monitoring (4.0.1)
 

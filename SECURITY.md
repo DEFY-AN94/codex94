@@ -116,7 +116,7 @@ the user opens that page. The check does not verify an installation package,
 download or install an App, relaunch it, or run in the background. See
 [docs/updating.md](docs/updating.md) for the user flow and maintenance boundary.
 
-## 4.2.0 candidate: source-health actions and replay boundaries
+## 4.2.0: source-health actions and replay boundaries
 
 The Claude source-health presentation projects existing accepted report and
 source state; it is not another reader or authentication check. Its local-report
@@ -140,7 +140,10 @@ reviewed synthetic window captures and curated summaries, never raw replay
 transcripts or RPC. A passing replay establishes only the recorded sample's
 behavior, not real-account or whole-version compatibility.
 
-## 4.1.8 candidate: configuration and installation boundaries
+## Inherited unpublished 4.1.8 changes: configuration and installation boundaries
+
+These changes were developed for the 4.1.8 candidate, never published
+separately, and are included in 4.2.0.
 
 One validated configuration-directory resolver is shared by the Claude local
 usage reader, optional CLI environment and statusline installer. Only a valid
@@ -174,15 +177,15 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-4.1.7-SHA256SUMS.txt` before opening the DMG. The optional
+Verify `Codex94-4.2.0-SHA256SUMS.txt` before opening the DMG. The optional
 GitHub command can verify repository/workflow/commit provenance for the exact DMG:
 
 ```bash
-gh attestation verify Codex94-4.1.7-macos-universal-unnotarized.dmg \
+gh attestation verify Codex94-4.2.0-macos-universal-unnotarized.dmg \
   -R DEFY-AN94/codex94 \
   --signer-workflow DEFY-AN94/codex94/.github/workflows/ci.yml \
   --source-ref refs/heads/main \
-  --source-digest 0ec67e917ea9a96ddee993d280fcc377a93bdc0c \
+  --source-digest c13f886151b5932518352a3b92caafb71dbbf44f \
   --deny-self-hosted-runners
 ```
 
@@ -324,8 +327,8 @@ Version `4.0.1 (22)` uses passive Claude reports by default with explicit
 report-stream adoption and a separate default-off CLI reader. The retained
 `v4.0.0` tag identifies an unpublished candidate, not a supported stable release.
 
-The supported published stable version is [`v4.1.7 (31)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7),
-released on 2026-10-18 (Australia/Melbourne).
+The supported published stable version is [`v4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0),
+released on 2026-11-14 (Australia/Melbourne).
 Feature branches and `main` may contain development work that has not passed
 release acceptance. Current stable-version links identify the published release.
 Version `3.1.4` adjusts bounded quota deadlines and permits three extra
@@ -351,8 +354,8 @@ visually and privacy reviewed. Contributor validation guidance is documented in
 security or release evidence. Every release candidate needs its own checks,
 candidate App acceptance (before Ready unless the maintainer explicitly
 authorizes another order), and final CI artifact/tag/Release verification and
-maintainer acceptance before publication. The authorized 4.2.0 handoff order
-is recorded in [the release workflow](docs/RELEASING.md#unreleased-candidate-420-33).
+maintainer acceptance before publication. The 4.2.0 authorization and acceptance
+are recorded in [the release workflow](docs/RELEASING.md#420-release-verification--2026-11-14).
 
 ## Reporting
 

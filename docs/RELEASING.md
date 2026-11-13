@@ -1,7 +1,7 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v4.1.7 (31)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7),
-released on 2026-10-18 (Australia/Melbourne). Later docs-only commits do not
+The published stable version is [`v4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0),
+released on 2026-11-14 (Australia/Melbourne). Later docs-only commits do not
 move its tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -35,7 +35,7 @@ the maintainer explicitly authorizes a different order, as recorded for the
 
 <a id="unreleased-candidate-420-33"></a>
 
-## Release preparation: 4.2.0 (33) — 2026-11-14
+## 4.2.0 candidate acceptance and release scope — 2026-11-14
 
 The initial development baseline was PR #71 head
 `0c2343981c9b5858e575048d213f51f6230fd1e4`. After #71 was squash-merged,
@@ -44,10 +44,10 @@ on 2026-11-13 with main commit `7adf5a079481e94e5bc4c1c9e5aa096d00c19ef9`.
 Only the four 4.2.0 commits after that original baseline were replayed, avoiding
 duplicate 4.1.8 history. The App, tests and build inputs are preserved; document
 conflicts retain main's 4.1.8 date, acceptance record and known Issue #73.
-The synchronized candidate was revalidated as recorded below. PR #72 continues
-to target `main` so the existing default-branch security checks apply. The
-planned 4.2.0 release date is 2026-11-14 (Australia/Melbourne). Public stable
-downloads and release assets remain at 4.1.7 until publication is verified.
+The synchronized candidate was revalidated as recorded below. PR #72 targeted
+`main` so the default-branch security checks applied. Version 4.2.0 was
+published on 2026-11-14 (Australia/Melbourne); public stable downloads now
+identify it. Final source and distribution evidence is recorded [below](#420-release-verification--2026-11-14).
 
 Scope: Claude source-health presentation and recovery guidance, an explicit
 passive-only local reread, per-read completed diagnostics in the existing
@@ -80,7 +80,7 @@ and their source/hash bindings checked.
 passed Actions, Python and Swift analysis. Main-only DMG attestation was
 intentionally skipped on the PR, not treated as a successful attestation.
 
-The installed CI candidate is 4.2.0 (33), executable SHA-256
+The accepted, pre-release CI candidate was 4.2.0 (33), executable SHA-256
 `b4ce84b050756357cbe99443107ec0d1e180cdfdd95fe0c4b4014f4ca7842d18`, from
 the PR candidate DMG with SHA-256
 `69c110334849dc1405fca8f5fc0ed182e730f6b8c5464f4bf58adb24e2b880dc`.
@@ -114,16 +114,16 @@ successfully, but the full job exceeded its 20-minute limit.
 Display now has the same bounded 25-minute CI job budget as Providers. Test
 assertions, App sources/resources/project settings, build scripts and the CLI's
 own deadlines are unchanged. The cancelled jobs are not counted as passes;
-the revised PR head needs fresh applicable checks. Runner delays moved the
-planned publication to 2026-11-14; verify the actual Melbourne date before tagging.
-After merge,
-freeze the final main commit and verify fresh main CI, all required UI smokes,
-CodeQL, main-only attestation and the exact final distribution assets. Final-asset
-installation/acceptance, annotated-tag verification, and public Release/asset
-readback remain separately recorded gates; do not substitute the accepted PR
-candidate or its hashes for that evidence. Keep stable download links on 4.1.7
-until 4.2.0 publication is confirmed. The inherited statusline downgrade rule
-below continues to apply.
+the revised PR and final-main check outcomes are recorded separately below.
+Runner delays moved the planned publication to 2026-11-14.
+App sources, project settings, tests and build scripts were preserved.
+The CI workflow changed only the Display job budget; the earlier 178-input
+identity comparison applies to the accepted candidate before that change.
+The final PR revision, frozen main commit, CI/CodeQL, main-only attestation,
+distribution acceptance and public-asset verification are recorded separately
+below. The accepted PR candidate and its hashes are not substitutes for the
+final release artifacts. The inherited statusline downgrade rule below
+continues to apply; 4.1.8 was never a separate published release.
 
 ## Unpublished 4.1.8 (32) preparation — 2026-11-08
 
@@ -210,7 +210,7 @@ The maintainer confirmed the manual retry works and requested Issue #68,
 a PR, green checks, merge and full tag/Release publication. No extra real CLI
 read was run by the agent. PR checks, final-main attestation, exact CI assets
 and final distribution verification are separate evidence recorded in the
-final 4.1.7 release record below. Public stable links now point to 4.1.7.
+final 4.1.7 release record below. Stable links were updated to 4.1.7 after that publication.
 
 The **4.1.6 (30)** release was published on **2026-10-18**
 (Australia/Melbourne), following **4.1.5 (29)**. The
@@ -445,7 +445,7 @@ The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
 do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
 records do not establish validation of these source boundaries. Final checks,
 artifacts and installation need separate records. Its release records remain
-historical; current stable links point to 4.1.7.
+historical; current stable links point to 4.2.0.
 
 During the earlier 4.0 release work, the maintainer approved a ten-minute
 live-observation scope.
@@ -1677,3 +1677,106 @@ Later documentation commits do not move the tag or replace release assets.
 - Subsequent publication documentation updates stable links and records only.
   They do not move `v4.1.7`, change App/build inputs or regenerate assets.
   Immutable Releases is not enabled; the manual no-replacement policy remains.
+
+
+### 4.2.0 release verification — 2026-11-14
+
+- [PR #72](https://github.com/DEFY-AN94/codex94/pull/72) added Claude source-health
+  presentation, passive-only local rereading, completed-read diagnostics and
+  synthetic CLI compatibility/lifecycle regressions. It includes the merged,
+  never-separately-published 4.1.8 configuration, installation, notification,
+  cancellation and retry fixes. Issue #73 remains unfixed.
+- Final reviewed PR head: `f00c899967b51b274b6b3a65518f24bd0b79001e`; tested PR merge: `cd7af28274fc2bdbe47663aecc70b6ac6fa44129`.
+  Frozen release commit: `c13f886151b5932518352a3b92caafb71dbbf44f`; tree: `fe6639120455f46af9bc4295d1ef5bb01f109e98`.
+  The annotated `v4.2.0` tag and both manual assets remain bound to that frozen
+  commit. Documentation-only commits may advance main without moving the tag
+  or regenerating the release assets.
+- Final-main [CI run](https://github.com/DEFY-AN94/codex94/actions/runs/43430067162)
+  and [CodeQL run](https://github.com/DEFY-AN94/codex94/actions/runs/43430067447)
+  record the final revision's build/package, five required UI scenarios and
+  Actions/Python/Swift analysis. Their observed outcomes, reviewed UI evidence
+  and any skips or limits belong to the final acceptance record below; the
+  earlier PR candidate's green checks are separate evidence.
+- The maintainer accepted the installed 4.2.0 (33) PR candidate on 2026-11-13,
+  bound to head `bb3945236e53b603f04f965d34e37e39e0fb4482`, tested merge
+  `22bf6a9651fa08033a654537cca8c89ab3df0945`, tree
+  `491dc7448984c4626e966cd6503f8d6593298402`, and executable SHA-256
+  `b4ce84b050756357cbe99443107ec0d1e180cdfdd95fe0c4b4014f4ca7842d18`.
+  The local and PR gates each executed 675 XCTest cases with one existing
+  hosted-key-window skip and zero failures; 61 Python tests and 13 synthetic
+  fixtures passed, and all 53 original UI PNGs were newly reviewed. This
+  acceptance is not a new real-CLI, Gatekeeper or exhaustive keyboard test.
+- Release preparation increased the Display CI job budget from 20 to 25 minutes
+  after its assertions passed but the overall job timed out. Providers already
+  had 25 minutes; the other UI scenarios kept 20. The queued Usage job never
+  began testing. Neither cancelled job counts as a passing gate. App sources,
+  test assertions, build scripts and the CLI's own deadlines were unchanged;
+  the later CI workflow is not included in the accepted candidate's earlier
+  178-input identity claim.
+- Recovery's synthetic UI acceptance remains click-functional; keyboard
+  activation, AX Press and localized tooltip acceptance are not promoted by
+  this publication. Its read-only focus probe uses an instrumented AUT. The
+  earlier 4.1.8 native observations retain their own candidate scope and do
+  not establish new 4.2.0 desktop or provider compatibility.
+- [Release v4.2.0](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0)
+  has two manual assets from the final-main distribution:
+  [Universal DMG](https://github.com/DEFY-AN94/codex94/releases/download/v4.2.0/Codex94-4.2.0-macos-universal-unnotarized.dmg),
+  SHA-256 `7f9b0db2772defa41f16c10999b260740731b26d38b05030e732c18ff358b01d`, and
+  [checksum file](https://github.com/DEFY-AN94/codex94/releases/download/v4.2.0/Codex94-4.2.0-SHA256SUMS.txt),
+  file SHA-256 `1ac66b4984b43e086df8819e747b31f575e7d2bf4a1e6242646c0bfe711454a1`. The checksum text records the DMG digest;
+  its own file digest is separate. The DMG remains unsigned and unnotarized;
+  the Universal App uses only ad-hoc signing with Hardened Runtime.
+- [Artifact attestation](https://github.com/DEFY-AN94/codex94/attestations/67184868) binds the final DMG to this
+  repository's `.github/workflows/ci.yml`, `refs/heads/main` and the frozen
+  source commit. Verification denies self-hosted runners. Provenance is not
+  Apple signing, notarization, malware review or Gatekeeper approval; the
+  checksum file is not a separately attested subject.
+- Final CI App executable SHA-256: `b4ce84b050756357cbe99443107ec0d1e180cdfdd95fe0c4b4014f4ca7842d18`.
+  Final CI, package, installation, tag and publication verification:
+  The final reviewed PR CI 43422778364 and CodeQL 43422770716 passed on the exact
+  final PR revision: 675 tests, one existing skip, zero failures, five UI scenarios,
+  and 53 reviewed PNGs (49 new reviews plus four exact-hash reuses). The final-main
+  test and five UI jobs succeeded on producer attempt 1. Its Attest job waited
+  1,579 seconds with no runner or started step; after all other jobs had finished,
+  only that remaining wait was cancelled and the Attest job was rerun on attempt 2.
+  The test/UI outputs and all six existing artifacts were retained unchanged.
+  Attest job 131918651084 succeeded. The release-gating CI and original main CodeQL
+  43430067447 passed; the latter's Actions/Python/Swift analyses reported zero
+  results, errors or warnings, with no open main alerts. All final-main UI reports
+  and 53 PNGs were verified: 52 new visual reviews and one exact-hash reuse.
+
+  The final CI DMG passed the strict two-entry payload, 4.2.0 (33), arm64/x86_64,
+  signature, Hardened Runtime and no-entitlement checks. Its entire App matched
+  the accepted installed candidate across all 15 file/link/POSIX-mode entries;
+  both signatures and the accepted executable hash were verified separately.
+  The existing installation was retained, without a replacement, relaunch,
+  provider CLI read or system-setting change. Timestamps, other extended
+  attributes, ownership and ACLs were not compared. Quarantine was absent on both
+  App bundles and was not modified; first-launch Gatekeeper acceptance remains
+  unestablished. The candidate installation's recoverable 4.1.8 backup was retained.
+
+  Annotated tag object `1f02e9fccac4d67a223131564f0c0e046280ac78` was narrowly pushed
+  and its remote peeled commit verified as `c13f886151b5932518352a3b92caafb71dbbf44f`.
+  A shallow tag clone verified only source identity and version metadata, not a
+  full-history scan. The automatic source ZIP and TAR each matched the contents
+  of all 214 tracked files in the frozen Git tree.
+
+  Release ID `444284574` was published at `2026-11-13T13:58:53Z`, or
+  `2026-11-14 00:58:53` Australia/Melbourne, and verified public, Latest and not a
+  prerelease. It has exactly two manual assets: DMG `743825043` (3,921,749 bytes)
+  and checksum `743825036` (112 bytes). Draft and unauthenticated public downloads
+  matched both GitHub API digests and the final-main hashes recorded above.
+  Both downloaded DMGs passed package and provenance verification against the
+  repository, workflow, main ref, frozen source digest and hosted-runner policy.
+
+  GitHub Advanced Security separately started a `Scheduled` dynamic scan,
+  [run 43435814996](https://github.com/DEFY-AN94/codex94/actions/runs/43435814996),
+  on the same unchanged commit after the release CodeQL run had passed. That
+  extra scan was still pending at publication and was not counted as passed
+  then. It later completed successfully with zero results, errors and warnings
+  in all three analyses, and no open main alerts. It remains separate evidence
+  from the completed release-gating runs above.
+- [Issue #73](https://github.com/DEFY-AN94/codex94/issues/73) still tracks the
+  existing Command-comma empty-Settings route. Use the menu-bar Dashboard
+  action or the floating window's Dashboard button. No 4.1.8 Release is
+  implied by its inherited changelog or retained preparation record.
