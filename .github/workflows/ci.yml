@@ -95,7 +95,9 @@ jobs:
     name: UI smoke (${{ matrix.scenario }})
     # Prioritize the release gate before requesting the five UI runners.
     needs: test
-    runs-on: macos-15
+    # Keep native arm64 release tests and exercise UI on the supported Intel
+    # image; macOS 15 arm64 capacity has repeatedly prevented UI job startup.
+    runs-on: macos-15-intel
     # Display completed its assertions but exceeded the overall 20-minute limit.
     # Providers also exercises source-health navigation and bilingual captures.
     timeout-minutes: ${{ (matrix.scenario == 'display' || matrix.scenario == 'providers') && 25 || 20 }}
@@ -105,6 +107,9 @@ jobs:
       max-parallel: 2
       matrix:
         include:
+          - scenario: providers
+            method: testProvidersSmoke
+            artifact: codex94-ui-providers
           - scenario: display
             method: testDisplaySmoke
             artifact: codex94-ui-display
@@ -117,9 +122,6 @@ jobs:
           - scenario: floating
             method: testFloatingWindowSmoke
             artifact: codex94-ui-floating
-          - scenario: providers
-            method: testProvidersSmoke
-            artifact: codex94-ui-providers
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
