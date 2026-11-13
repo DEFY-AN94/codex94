@@ -93,12 +93,16 @@ jobs:
 
   ui-test:
     name: UI smoke (${{ matrix.scenario }})
+    # Prioritize the release gate before requesting the five UI runners.
+    needs: test
     runs-on: macos-15
     # Display completed its assertions but exceeded the overall 20-minute limit.
     # Providers also exercises source-health navigation and bilingual captures.
     timeout-minutes: ${{ (matrix.scenario == 'display' || matrix.scenario == 'providers') && 25 || 20 }}
     strategy:
       fail-fast: false
+      # Bound requests while hosted macOS capacity is constrained.
+      max-parallel: 2
       matrix:
         include:
           - scenario: display
