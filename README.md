@@ -53,7 +53,7 @@ See [4.2.0 candidate changes](CHANGELOG.md#unreleased--420-33) and the
 [compatibility evidence](docs/CLI_COMPATIBILITY.md). Candidate checks and
 maintainer acceptance are recorded separately in the [release records](docs/RELEASING.md).
 
-This candidate builds on the separate, unmerged
+This candidate is synchronized with `main` after the merge of
 [4.1.8 PR #71](https://github.com/DEFY-AN94/codex94/pull/71), retaining its fixes:
 
 Claude's local cache, optional CLI and new statusline connections use the same

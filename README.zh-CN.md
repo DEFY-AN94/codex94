@@ -42,8 +42,8 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 [兼容性证据](docs/CLI_COMPATIBILITY.md)；候选检查和维护者验收分别记入
 [发布记录](docs/RELEASING.md)。
 
-本候选基于仍独立、尚未合并的
-[4.1.8 PR #71](https://github.com/DEFY-AN94/codex94/pull/71)，保留以下修复：
+本候选已同步到合入
+[4.1.8 PR #71](https://github.com/DEFY-AN94/codex94/pull/71) 后的 `main`，保留以下修复：
 
 当前源码候选版让 Claude 本地缓存、可选 CLI 和新安装的状态栏连接使用同一个经校验的
 `CLAUDE_CONFIG_DIR`。已有连接时切换目录，请先以原配置环境启动 Codex94，在服务页移除

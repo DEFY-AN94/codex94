@@ -26,8 +26,8 @@ below applies only to its recorded version and does not validate later releases.
   timing into a production helper with deterministic boundary tests. Keep the
   usage-session deadline separate from version-probe and process-cleanup budgets.
 
-This candidate builds on the separate 4.1.8 PR #71 and retains the changes
-below. Neither candidate is a published release. Stable downloads remain 4.1.7;
+This candidate builds on main after 4.1.8 PR #71 merged and retains the changes
+below. Neither version has been published. Stable downloads remain 4.1.7;
 4.2.0 validation and maintainer acceptance are recorded separately in
 [the release workflow](docs/RELEASING.md).
 

@@ -35,13 +35,16 @@ the maintainer explicitly authorizes a different order, as recorded for the
 
 ## Unreleased candidate: 4.2.0 (33)
 
-The development baseline is PR #71 head
-`0c2343981c9b5858e575048d213f51f6230fd1e4`, on
-`codex/4.1.8-config-and-refresh-fixes`. The new [4.2.0 PR #72](https://github.com/DEFY-AN94/codex94/pull/72)
-targets `main` so the repository's existing default-branch security checks apply.
-Its history includes #71 and it depends on that PR; #71 remains a separate
-candidate and is not merged as part of this work. After #71 merges, reconcile
-any changes with main and verify the resulting PR head before merge.
+The initial development baseline was PR #71 head
+`0c2343981c9b5858e575048d213f51f6230fd1e4`. After #71 was squash-merged,
+[4.2.0 PR #72](https://github.com/DEFY-AN94/codex94/pull/72) was synchronized
+on 2026-11-13 with main commit `7adf5a079481e94e5bc4c1c9e5aa096d00c19ef9`.
+Only the four 4.2.0 commits after that original baseline were replayed, avoiding
+duplicate 4.1.8 history. The App, tests and build inputs are preserved; document
+conflicts retain main's 4.1.8 date, acceptance record and known Issue #73.
+The resulting PR head needs fresh checks; the earlier green run does not
+validate this integration. PR #72 continues to target `main` so the existing
+default-branch security checks apply.
 Public stable downloads and release assets remain at 4.1.7.
 
 Scope: Claude source-health presentation and recovery guidance, an explicit
@@ -50,6 +53,12 @@ redacted Diagnostics flow, and synthetic compatibility/lifecycle regressions.
 The 4.1.8 configuration, notification and cancellation fixes remain the baseline.
 No tag, GitHub Release, publication or automatic installation is part of this
 candidate handoff.
+
+For the 2026-11-13 synchronization, the maintainer authorized updating the PR,
+rerunning CI and then replacing the local App with the verified candidate for
+acceptance after applicable checks pass. Merge and publication are explicitly
+excluded. Preserve the previous installed App as a recoverable backup and keep
+real CLI usage reads separate from installation and synthetic validation.
 
 For this candidate the maintainer explicitly authorized implementation, commit,
 push and a new PR, followed by **Ready only after all executable checks and
