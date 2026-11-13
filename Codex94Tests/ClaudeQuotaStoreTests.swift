@@ -1767,6 +1767,353 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         }
     }
 
+    func testThreeSourceRoundTripKeepsUnsentThresholdsAndIgnoresEqualTimeRecovery() async throws {
+        let f = try fixture()
+        var alerts = NotificationPreferences()
+        alerts.isEnabled = true
+        alerts.recoveryEnabled = true
+        f.preferences.claudeNotifications = alerts
+        let began = f.clock.read(), reset = began.addingTimeInterval(20_000)
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: reset)
+        f.store.start()
+        try await wait { await f.fetcher.count() == 1 }
+        XCTAssertEqual(f.store.source, .localCache)
+        XCTAssertTrue(f.notifications.deliveries.isEmpty)
+
+        f.clock.advance(1)
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 85, resetAt: reset)))
+        try await wait { !f.store.isRefreshing && f.notifications.deliveries.count == 1 }
+        XCTAssertEqual(f.store.source, .cliUsage)
+        XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 15)
+        f.store.setCLIUsageEnabled(false)
+        try await wait { !f.store.isRetiringCLI }
+        XCTAssertEqual(f.store.source, .localCache)
+        XCTAssertEqual(f.store.reportedAt, began, "The older high reading is not a recovery observation")
+
+        f.clock.advance(1)
+        let bridgeDate = f.clock.read()
+        try f.cache.capture(passivePayload(session: 1, used: 95, reset: Int(reset.timeIntervalSince1970)), at: bridgeDate)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 2 }
+        let criticalAlert = try XCTUnwrap(f.notifications.deliveries.last)
+        XCTAssertEqual(f.store.source, .statusline)
+        XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 5,
+                       "The previously unsent critical threshold survives the CLI-to-passive transition")
+
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: bridgeDate, resetAt: reset)
+        try await poll(f)
+        XCTAssertEqual(f.store.source, .localCache, "The primary source wins an equal-time tie")
+        XCTAssertEqual(f.store.reportedAt, bridgeDate)
+        XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 90)
+        XCTAssertEqual(f.notifications.deliveries.count, 2,
+                       "Different values at the same observation time cannot create a recovery")
+
+        f.store.setCLIUsageEnabled(true)
+        try await wait { await f.fetcher.count() == 2 }
+        f.clock.advance(1)
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 96, resetAt: reset)))
+        try await wait { !f.store.isRefreshing }
+        XCTAssertEqual(f.store.source, .cliUsage)
+        f.store.setCLIUsageEnabled(false)
+        try await wait { !f.store.isRetiringCLI }
+        try await poll(f)
+        XCTAssertEqual(f.store.source, .localCache)
+        XCTAssertEqual(f.store.reportedAt, bridgeDate)
+        XCTAssertEqual(f.notifications.deliveries.count, 2,
+                       "Neither another CLI low reading nor fallback may replay either threshold")
+        XCTAssertNil(f.store.historicalReport)
+        XCTAssertNil(f.store.nextAutomaticRefreshAt)
+        let calls = await f.fetcher.count()
+        XCTAssertEqual(calls, 2)
+        XCTAssertEqual(f.factoryCalls.read(), 2)
+
+        let nextReset = reset.addingTimeInterval(20_000)
+        f.clock.advance(1)
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: f.clock.read(), resetAt: nextReset)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 3 }
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 1, used: 95, reset: Int(nextReset.timeIntervalSince1970)), at: f.clock.read())
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 4 }
+        XCTAssertEqual(f.store.source, .statusline)
+        XCTAssertEqual(f.notifications.deliveries.last, criticalAlert,
+                       "A genuine new cycle still permits the same critical alert")
+        XCTAssertFalse(f.preferences.claudeCLIUsageEnabled)
+    }
+
+    func testInstallationChangeInvalidatesPendingAdoptionAfterCLIFailureAndLocalHistory() async throws {
+        let f = try fixture(cliEnabled: false, legacyInstallation: false)
+        var alerts = NotificationPreferences()
+        alerts.isEnabled = true
+        alerts.recoveryEnabled = true
+        f.preferences.claudeNotifications = alerts
+        let began = f.clock.read(), localReset = began.addingTimeInterval(10)
+        try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: localReset)
+        f.store.start()
+        try await wait { f.store.notificationController.authorization == .authorized }
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 1, used: 95), at: f.clock.read())
+        f.store.refresh()
+        let oldConfirmation = try XCTUnwrap(f.store.pendingPassiveConfirmationID)
+        XCTAssertEqual(f.store.source, .localCache)
+        XCTAssertEqual(f.store.reportedAt, began)
+
+        f.store.readOnceWithCLI()
+        try await wait { await f.fetcher.count() == 1 }
+        await f.fetcher.complete(.failure(.timedOut))
+        try await wait { !f.store.isRefreshing && !f.store.isRetiringCLI }
+        XCTAssertEqual(f.store.lastCLIReadIssue, .timedOut)
+        XCTAssertNil(f.store.lastIssue, "The failed one-time read does not replace valid local data")
+        XCTAssertEqual(f.store.pendingPassiveConfirmationID, oldConfirmation)
+        XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 90)
+
+        f.clock.advance(10)
+        try await poll(f)
+        let history = try XCTUnwrap(f.store.historicalReport)
+        XCTAssertEqual(history.source, .localCache)
+        XCTAssertEqual(history.reportedAt, began)
+        XCTAssertNil(f.store.snapshot)
+        XCTAssertEqual(f.store.pendingPassiveConfirmationID, oldConfirmation,
+                       "The pending report must not silently replace accepted history")
+
+        let installation = try f.store.previewStatuslineInstall()
+        try f.store.installStatusline(installation)
+        XCTAssertFalse(f.store.passiveReportNeedsConfirmation)
+        XCTAssertNil(f.store.pendingPassiveConfirmationID)
+        f.store.adoptPendingPassiveReport(expectedConfirmationID: oldConfirmation)
+        f.store.refresh()
+        XCTAssertEqual(f.store.historicalReport, history)
+        XCTAssertNil(f.store.snapshot, "The old dialog and unbound disk report cannot cross the new installation")
+        XCTAssertNil(f.preferences.claudePassiveProducerID)
+        XCTAssertTrue(f.notifications.deliveries.isEmpty)
+
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 1, used: 50), at: f.clock.read(),
+                            installationID: installation.installationID)
+        try await poll(f)
+        XCTAssertEqual(f.store.source, .statusline)
+        XCTAssertEqual(f.store.reportedAt, f.clock.read())
+        XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 50)
+        XCTAssertNil(f.store.historicalReport)
+        XCTAssertFalse(f.store.passiveReportNeedsConfirmation)
+        f.clock.advance(1)
+        try f.cache.capture(passivePayload(session: 1, used: 95), at: f.clock.read(),
+                            installationID: installation.installationID)
+        try await poll(f)
+        try await wait { f.notifications.deliveries.count == 1 }
+        XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 5)
+        XCTAssertEqual(f.store.lastCLIReadIssue, .timedOut, "The last explicit attempt remains separate from the selected source")
+        let calls = await f.fetcher.count()
+        XCTAssertEqual(calls, 1)
+        XCTAssertEqual(f.factoryCalls.read(), 1)
+        XCTAssertFalse(f.preferences.claudeCLIUsageEnabled)
+        XCTAssertNil(f.store.nextAutomaticRefreshAt)
+    }
+
+    func testMonitoringRestartKeepsNewAccountHistoryWhileBothCLIRetirementHalvesFinish() async throws {
+        for shutdownFirst in [true, false] {
+            let pool = ClaudeRetirementTestPool()
+            let f = try fixture(fetcherFactory: { _ in pool.make() })
+            addTeardownBlock { pool.releaseAndFinishAll() }
+            var alerts = NotificationPreferences()
+            alerts.isEnabled = true
+            alerts.recoveryEnabled = true
+            f.preferences.claudeNotifications = alerts
+            let began = f.clock.read()
+            try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: began.addingTimeInterval(10_000))
+            f.store.start()
+            try await wait { pool.client(0)?.fetches.read() == 1 }
+            let first = try XCTUnwrap(pool.client(0))
+            XCTAssertEqual(f.store.source, .localCache)
+            f.store.stop()
+            try await wait { first.shutdownStarted.read() == 1 }
+
+            f.clock.advance(1)
+            let replacementDate = f.clock.read()
+            try writeLocalCache(f, fiveHourUsed: 40, fetchedAt: replacementDate,
+                                resetAt: replacementDate.addingTimeInterval(10),
+                                account: "00000000-0000-4000-8000-000000000002")
+            f.store.start()
+            XCTAssertEqual(f.store.source, .localCache)
+            XCTAssertEqual(f.store.reportedAt, replacementDate)
+            XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 60)
+            XCTAssertTrue(f.store.isRetiringCLI)
+            XCTAssertFalse(f.store.canReadOnceWithCLI)
+            XCTAssertEqual(pool.count, 1)
+
+            f.clock.advance(11)
+            try await poll(f)
+            let history = try XCTUnwrap(f.store.historicalReport)
+            XCTAssertEqual(history.source, .localCache)
+            XCTAssertEqual(history.reportedAt, replacementDate)
+            XCTAssertNil(f.store.snapshot, "Passive expiry keeps progressing while CLI cleanup is blocked")
+            for _ in 0..<3 {
+                f.store.refresh(trigger: .manual)
+                f.store.readOnceWithCLI()
+            }
+            if shutdownFirst {
+                first.allowShutdown()
+                try await wait { first.shutdownFinished.read() == 1 }
+            } else {
+                first.complete(.success(report(at: f.clock.read(), used: 99)))
+                try await wait { first.fetchReturned.read() == 1 }
+            }
+            try await poll(f)
+            XCTAssertTrue(f.store.isRetiringCLI)
+            XCTAssertEqual(pool.count, 1, "One completed half cannot admit a replacement after monitoring restarts")
+            XCTAssertEqual(f.store.historicalReport, history)
+            XCTAssertNil(f.store.snapshot)
+            XCTAssertTrue(f.notifications.deliveries.isEmpty)
+
+            if shutdownFirst { first.complete(.success(report(at: f.clock.read(), used: 99))) }
+            else { first.allowShutdown() }
+            try await wait { pool.client(1)?.fetches.read() == 1 }
+            let second = try XCTUnwrap(pool.client(1))
+            XCTAssertEqual(pool.count, 2, "Restart and repeated refreshes coalesce into one new automatic read")
+            XCTAssertEqual(pool.maximumActive, 1)
+            XCTAssertEqual(f.store.historicalReport, history)
+            XCTAssertNil(f.store.snapshot, "The old account's late success cannot replace the new account's history")
+            XCTAssertNil(f.store.lastCLIReadAt)
+            XCTAssertNil(f.store.lastCLIReadIssue)
+            f.clock.advance(1)
+            second.complete(.success(report(at: f.clock.read(), used: 95)))
+            try await wait { !f.store.isRefreshing && f.notifications.deliveries.count == 1 }
+            XCTAssertEqual(f.store.source, .cliUsage)
+            XCTAssertEqual(f.store.reportedAt, f.clock.read())
+            XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 5)
+            XCTAssertNil(f.store.historicalReport)
+            XCTAssertEqual(second.fetches.read(), 1)
+            f.store.stop()
+            try await wait { !f.store.isRetiringCLI }
+            XCTAssertEqual(pool.active, 0)
+            XCTAssertFalse(first.shutdownTimedOut)
+        }
+    }
+
+    func testFixedSeedPassiveEventCombinationsPreserveHistoryAndNotificationContinuity() async throws {
+        enum Event: String { case local, statusline, reread, manual, wake, clockChange, poll }
+        // Deliberately bounded permutations, not an open-ended random walk. Each
+        // source write is strictly newer, so the expected observation is known
+        // without reproducing the production source-selection implementation.
+        for seed in [UInt64(0x94), 0x418, 0x420] {
+            let f = try fixture(cliEnabled: false)
+            var alerts = NotificationPreferences()
+            alerts.isEnabled = true
+            alerts.recoveryEnabled = true
+            f.preferences.claudeNotifications = alerts
+            let began = f.clock.read()
+            var reset = began.addingTimeInterval(40)
+            try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: reset)
+            f.store.start()
+            try await wait { f.store.notificationController.authorization == .authorized }
+            var generator = seed
+            var step = 0
+            var expectedSource = ClaudeQuotaSource.localCache
+            var expectedDate = began
+            var expectedRemaining = 90.0
+            var expectedNotifications = 0
+            var isHistory = false
+            let prefix = "seed=0x" + String(seed, radix: 16)
+            await assertPassiveSequenceState(f, source: expectedSource, reportedAt: expectedDate,
+                remaining: expectedRemaining, history: isHistory, notifications: 0, context: prefix + " step=0 start")
+
+            for round in 0..<2 {
+                var events: [Event] = [.local, .statusline, .reread, .manual, .wake, .clockChange, .poll]
+                for index in stride(from: events.count - 1, through: 1, by: -1) {
+                    generator = generator &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+                    events.swapAt(index, Int((generator >> 32) % UInt64(index + 1)))
+                }
+                for event in events {
+                    step += 1
+                    f.clock.advance(1)
+                    let context = "\(prefix) step=\(step) round=\(round) event=\(event.rawValue)"
+                    switch event {
+                    case .local, .statusline:
+                        expectedSource = event == .local ? .localCache : .statusline
+                        expectedDate = f.clock.read()
+                        expectedRemaining = 5
+                        isHistory = false
+                        if event == .local {
+                            try writeLocalCache(f, fiveHourUsed: 95, fetchedAt: expectedDate, resetAt: reset)
+                        } else {
+                            try f.cache.capture(passivePayload(session: 1, used: 95, reset: Int(reset.timeIntervalSince1970)),
+                                                at: expectedDate)
+                        }
+                        f.store.rereadPassiveSources()
+                        if expectedNotifications == 0 {
+                            expectedNotifications = 1
+                            try await wait { f.notifications.deliveries.count == 1 }
+                        }
+                    case .reread: f.store.rereadPassiveSources()
+                    case .manual: f.store.refresh(trigger: .manual)
+                    case .wake: f.store.handleSystemWake(now: f.clock.read())
+                    case .clockChange: f.store.handleSystemClockChange(now: f.clock.read())
+                    case .poll: try await poll(f)
+                    }
+                    await assertPassiveSequenceState(f, source: expectedSource, reportedAt: expectedDate,
+                        remaining: expectedRemaining, history: isHistory, notifications: expectedNotifications,
+                        context: context)
+                }
+
+                step += 1
+                f.clock.advance(reset.timeIntervalSince(f.clock.read()))
+                f.store.rereadPassiveSources()
+                isHistory = true
+                await assertPassiveSequenceState(f, source: expectedSource, reportedAt: expectedDate,
+                    remaining: expectedRemaining, history: true, notifications: 1,
+                    context: "\(prefix) step=\(step) round=\(round) event=expire-at-reset")
+                reset = reset.addingTimeInterval(40)
+            }
+
+            // Expiry and source switches must not mute a genuine recovery or
+            // its next crossing. These positive events also expose any earlier
+            // extra delivery rather than allowing a final no-notification check.
+            for used in [10.0, 95.0] {
+                step += 1
+                f.clock.advance(1)
+                expectedDate = f.clock.read()
+                try writeLocalCache(f, fiveHourUsed: used, fetchedAt: expectedDate, resetAt: reset)
+                f.store.rereadPassiveSources()
+                expectedNotifications += 1
+                let deliveryCount = expectedNotifications
+                try await wait { f.notifications.deliveries.count == deliveryCount }
+                await assertPassiveSequenceState(f, source: .localCache, reportedAt: expectedDate,
+                    remaining: 100 - used, history: false, notifications: deliveryCount,
+                    context: "\(prefix) step=\(step) event=\(used == 10 ? "refill" : "new-crossing")")
+            }
+        }
+    }
+
+    private func assertPassiveSequenceState(
+        _ f: Fixture, source: ClaudeQuotaSource, reportedAt: Date, remaining: Double,
+        history: Bool, notifications: Int, context: String,
+        file: StaticString = #filePath, line: UInt = #line
+    ) async {
+        let calls = await f.fetcher.count()
+        XCTAssertEqual(calls, 0, context, file: file, line: line)
+        XCTAssertEqual(f.factoryCalls.read(), 0, context, file: file, line: line)
+        XCTAssertFalse(f.preferences.claudeCLIUsageEnabled, context, file: file, line: line)
+        XCTAssertFalse(f.store.isRefreshing, context, file: file, line: line)
+        XCTAssertNil(f.store.nextAutomaticRefreshAt, context, file: file, line: line)
+        XCTAssertFalse(f.store.passiveReportNeedsConfirmation, context, file: file, line: line)
+        XCTAssertEqual(f.store.source, source, context, file: file, line: line)
+        XCTAssertEqual(f.store.reportedAt, reportedAt, context, file: file, line: line)
+        XCTAssertEqual(f.notifications.deliveries.count, notifications, context, file: file, line: line)
+        if history {
+            XCTAssertNil(f.store.snapshot, context, file: file, line: line)
+            XCTAssertEqual(f.store.historicalReport?.source, source, context, file: file, line: line)
+            XCTAssertEqual(f.store.historicalReport?.reportedAt, reportedAt, context, file: file, line: line)
+            XCTAssertEqual(f.store.historicalReport?.windows.map(\.usedPercentage), [100 - remaining],
+                           context, file: file, line: line)
+        } else {
+            XCTAssertNil(f.store.historicalReport, context, file: file, line: line)
+            XCTAssertEqual(f.store.snapshot?.fetchedAt, reportedAt, context, file: file, line: line)
+            XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, remaining,
+                           context, file: file, line: line)
+        }
+    }
+
     private func writeLocalCacheBytes(_ fixture: Fixture, _ contents: String) throws {
         try FileManager.default.createDirectory(at: fixture.localCacheURL.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)

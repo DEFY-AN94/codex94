@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "invalid-shared-values",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "invalid-shared-values",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testUsageParserSkipsModelScopedWindowsAndClearedTerminalFrames"
+    ],
+    "notes": "New synthetic rejection case: out-of-range and nonnumeric percentages yield no shared report."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "Current session\r\n101% used\r\nCurrent week (all models)\r\nNaN% used\r\n",
+      "expectedComplete": true
+    }
+  ],
+  "expected": {
+    "complete": true,
+    "ready": false,
+    "refreshing": false,
+    "windows": []
+  }
+}

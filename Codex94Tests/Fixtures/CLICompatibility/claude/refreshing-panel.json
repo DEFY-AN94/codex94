@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "refreshing-panel",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "refreshing-panel",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testRefreshingUsageFramesWaitForUpdatedWindows"
+    ],
+    "notes": "Raw parser may decode visible values while the refreshing predicate is true. Acceptance and settle timing remain covered by existing client tests, not this fixture."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "Current week (all models)\r\n62.5% used\r\nRefreshing…\r\n",
+      "expectedComplete": true
+    }
+  ],
+  "expected": {
+    "complete": true,
+    "ready": false,
+    "refreshing": true,
+    "windows": [
+      {
+        "kind": "weekly",
+        "usedPercentage": 62.5,
+        "resetsAt": null
+      }
+    ]
+  }
+}

@@ -94,7 +94,9 @@ jobs:
   ui-test:
     name: UI smoke (${{ matrix.scenario }})
     runs-on: macos-15
-    timeout-minutes: 20
+    # Display completed its assertions but exceeded the overall 20-minute limit.
+    # Providers also exercises source-health navigation and bilingual captures.
+    timeout-minutes: ${{ (matrix.scenario == 'display' || matrix.scenario == 'providers') && 25 || 20 }}
     strategy:
       fail-fast: false
       matrix:

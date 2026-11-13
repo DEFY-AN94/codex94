@@ -572,7 +572,7 @@ final class ClaudeQuotaBackendTests: XCTestCase {
     }
 
     func testSplitCLIFramesReturnBothWindowsAndTheirActualResetTimes() async throws {
-        let reference = Date()
+        let reference = Date(timeIntervalSince1970: 2_000_000_000)
         let sessionReset = Date(timeIntervalSince1970: floor(reference.addingTimeInterval(3_600).timeIntervalSince1970 / 60) * 60)
         let weeklyReset = Date(timeIntervalSince1970: floor(reference.addingTimeInterval(86_400).timeIntervalSince1970 / 60) * 60)
         let formatter = DateFormatter()
@@ -581,9 +581,11 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         formatter.dateFormat = "MMM d, yyyy, HH:mm"
         let firstFrame = "Current session\\r\\n23.5%% used\\r\\nResets \(formatter.string(from: sessionReset)) (UTC)\\r\\n"
         let secondFrame = "Current week (all models)\\r\\n41%% used\\r\\nResets \(formatter.string(from: weeklyReset)) (UTC)\\r\\n"
-        let fixture = try stagedCLI(firstFrame: firstFrame, delayedFrame: secondFrame)
+        let fixture = try stagedCLI(firstFrame: firstFrame, delayedFrame: secondFrame, wallClock: { reference })
         defer { fixture.client.shutdown() }
         let report = try await fixture.client.fetch()
+        XCTAssertEqual(report.reportedAt, reference)
+        XCTAssertEqual(report.receivedAt, reference)
         XCTAssertEqual(report.windows.map(\.kind), [.fiveHour, .weekly])
         XCTAssertEqual(report.windows.map(\.usedPercentage), [23.5, 41])
         XCTAssertEqual(report.windows.map(\.resetsAt), [sessionReset, weeklyReset])
@@ -961,6 +963,179 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         XCTAssertEqual(kill(process, 0), -1)
     }
 
+    func testCLIOutputAboveOneMiBIsRejectedAndItsProcessGroupIsCleanedUp() async throws {
+        let root = try fixtureDirectory()
+        let executable = root.appendingPathComponent("claude")
+        let parentPIDFile = root.appendingPathComponent("parent-pid")
+        let childPIDFile = root.appendingPathComponent("child-pid")
+        let script = """
+        #!/bin/sh
+        if [ "$1" = "--version" ]; then printf '2.1.999 (Claude Code)\\n'; exit 0; fi
+        printf '%s' $$ > '\(parentPIDFile.path)'
+        /bin/sleep 30 &
+        printf '%s' $! > '\(childPIDFile.path)'
+        /bin/dd if=/dev/zero bs=65536 count=17 2>/dev/null
+        wait
+        """
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let diagnostics = CLIDiagnosticRecorder()
+        let client = ClaudeCLIUsageClient(executableURL: executable,
+            runtimeDirectory: root.appendingPathComponent("runtime"), timeout: 10,
+            diagnosticHandler: { diagnostics.append($0) })
+        defer { client.shutdown() }
+        do { _ = try await client.fetch(); XCTFail("The usage reader must reject more than 1 MiB") }
+        catch { XCTAssertEqual(error as? ClaudeQuotaIssue, .invalidData) }
+        let parent = try await waitForSyntheticPID(at: parentPIDFile)
+        let child = try await waitForSyntheticPID(at: childPIDFile)
+        try await assertSyntheticProcessesGone([parent, child], processGroup: parent)
+        let values = diagnostics.read()
+        XCTAssertEqual(values.count, 1)
+        let diagnostic = try XCTUnwrap(values.first)
+        XCTAssertEqual(diagnostic.result, .failure)
+        XCTAssertEqual(diagnostic.issue, .invalidData)
+        XCTAssertFalse(diagnostic.usageSent, "A bounded output failure cannot authorize usage input")
+        XCTAssertTrue(diagnostic.terminalReceived)
+    }
+
+    func testCancellingAfterUsageWasSentStopsTheOwnedProcessGroup() async throws {
+        let root = try fixtureDirectory()
+        let executable = root.appendingPathComponent("claude")
+        let requestFile = root.appendingPathComponent("usage-input")
+        let parentPIDFile = root.appendingPathComponent("parent-pid")
+        let childPIDFile = root.appendingPathComponent("child-pid")
+        let script = """
+        #!/bin/sh
+        if [ "$1" = "--version" ]; then printf '2.1.999 (Claude Code)\\n'; exit 0; fi
+        printf '%s' $$ > '\(parentPIDFile.path)'
+        printf '? for shortcuts\\r\\n'
+        IFS= read -r request
+        printf '%s' "$request" > '\(requestFile.path)'
+        /bin/sleep 30 &
+        printf '%s' $! > '\(childPIDFile.path)'
+        wait
+        """
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let diagnostics = CLIDiagnosticRecorder()
+        let client = ClaudeCLIUsageClient(executableURL: executable,
+            runtimeDirectory: root.appendingPathComponent("runtime"), timeout: 10,
+            diagnosticHandler: { diagnostics.append($0) })
+        let request = Task { try await client.fetch() }
+        defer { request.cancel(); client.shutdown() }
+        // The fake creates this child only after receiving and recording /usage.
+        // Waiting for its complete PID is an observed barrier, not a timed guess.
+        let child = try await waitForSyntheticPID(at: childPIDFile)
+        let parent = try await waitForSyntheticPID(at: parentPIDFile)
+        XCTAssertEqual(try String(contentsOf: requestFile, encoding: .utf8), "/usage")
+        request.cancel()
+        do { _ = try await request.value; XCTFail("Cancelled usage reads cannot return a report") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        try await assertSyntheticProcessesGone([parent, child], processGroup: parent)
+        XCTAssertEqual(try String(contentsOf: requestFile, encoding: .utf8), "/usage")
+        let values = diagnostics.read()
+        XCTAssertEqual(values.count, 1)
+        let diagnostic = try XCTUnwrap(values.first)
+        XCTAssertEqual(diagnostic.result, .cancelled)
+        XCTAssertNil(diagnostic.issue)
+        XCTAssertTrue(diagnostic.usageSent)
+        XCTAssertTrue(diagnostic.terminalReceived)
+    }
+
+    func testCancellationBeforeFetchStartsNeverLaunchesVersionOrUsage() async throws {
+        let root = try fixtureDirectory()
+        let executable = root.appendingPathComponent("claude")
+        let invocationFile = root.appendingPathComponent("invoked")
+        let runtime = root.appendingPathComponent("runtime")
+        let script = """
+        #!/bin/sh
+        printf 'invoked' > '\(invocationFile.path)'
+        if [ "$1" = "--version" ]; then printf '2.1.999 (Claude Code)\\n'; exit 0; fi
+        exit 90
+        """
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let diagnostics = CLIDiagnosticRecorder()
+        let client = ClaudeCLIUsageClient(executableURL: executable, runtimeDirectory: runtime,
+            diagnosticHandler: { diagnostics.append($0) })
+        defer { client.shutdown() }
+        let gate = CLIInvocationStartGate()
+        let request = Task {
+            await gate.wait()
+            return try await client.fetch()
+        }
+        request.cancel()
+        await gate.release()
+        do { _ = try await request.value; XCTFail("A pre-cancelled task must fail before discovery") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: invocationFile.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: runtime.path))
+        XCTAssertTrue(diagnostics.read().isEmpty, "No read began, so no terminal result is manufactured")
+    }
+
+    func testCLIExitingBeforeAReportIsAnUnavailableRead() async throws {
+        let root = try fixtureDirectory()
+        let executable = root.appendingPathComponent("claude")
+        let parentPIDFile = root.appendingPathComponent("parent-pid")
+        let script = """
+        #!/bin/sh
+        if [ "$1" = "--version" ]; then printf '2.1.999 (Claude Code)\\n'; exit 0; fi
+        printf '%s' $$ > '\(parentPIDFile.path)'
+        printf 'Synthetic startup ended before usage\\r\\n'
+        exit 7
+        """
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let diagnostics = CLIDiagnosticRecorder()
+        let client = ClaudeCLIUsageClient(executableURL: executable,
+            runtimeDirectory: root.appendingPathComponent("runtime"), timeout: 3,
+            diagnosticHandler: { diagnostics.append($0) })
+        defer { client.shutdown() }
+        do { _ = try await client.fetch(); XCTFail("Early exit cannot produce a quota report") }
+        catch { XCTAssertEqual(error as? ClaudeQuotaIssue, .unavailable) }
+        let parent = try await waitForSyntheticPID(at: parentPIDFile)
+        try await assertSyntheticProcessesGone([parent], processGroup: parent)
+        let values = diagnostics.read()
+        XCTAssertEqual(values.count, 1)
+        XCTAssertEqual(values.first?.result, .failure)
+        XCTAssertEqual(values.first?.issue, .unavailable)
+        XCTAssertEqual(values.first?.usageSent, false)
+    }
+
+    private func waitForSyntheticPID(at url: URL) async throws -> pid_t {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(3))
+        while clock.now < deadline {
+            if let text = try? String(contentsOf: url, encoding: .utf8), let pid = pid_t(text), pid > 0 { return pid }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let missingPID: pid_t? = nil
+        return try XCTUnwrap(missingPID, "Synthetic CLI did not publish a complete process marker")
+    }
+
+    private func assertSyntheticProcessesGone(_ pids: [pid_t], processGroup: pid_t,
+                                             file: StaticString = #filePath, line: UInt = #line) async throws {
+        // ManagedSubprocess creates a group with the launched parent's PID.
+        // Check the group as well as marked PIDs so an unmarked dd cannot survive.
+        let targets = [-processGroup] + pids
+        defer {
+            // Preserve the original assertion result, then avoid leaking a fake
+            // process if a lifecycle regression makes the test fail.
+            for target in targets where kill(target, 0) == 0 { _ = kill(target, SIGKILL) }
+        }
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(3))
+        while targets.contains(where: { kill($0, 0) == 0 }), clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        for target in targets {
+            let result = kill(target, 0)
+            let processError = errno
+            XCTAssertEqual(result, -1, "The reader must stop the entire synthetic process group", file: file, line: line)
+            if result == -1 { XCTAssertEqual(processError, ESRCH, file: file, line: line) }
+        }
+    }
+
     private func assertGatedCLIUsage(readyScreen: String) async throws {
         let root = try fixtureDirectory()
         let executable = root.appendingPathComponent("claude")
@@ -1042,7 +1217,8 @@ final class ClaudeQuotaBackendTests: XCTestCase {
     private func stagedCLI(firstFrame: String, delayedFrame: String?, environment: [String: String]? = nil,
                            requireProbeEnvironment: Bool = false, expectedConfigDirectory: String? = nil,
                            delay: TimeInterval = 0.4,
-                           timeout: TimeInterval = 5) throws -> (
+                           timeout: TimeInterval = 5,
+                           wallClock: @escaping @Sendable () -> Date = { Date() }) throws -> (
         client: ClaudeCLIUsageClient, requestFile: URL, childPIDFile: URL, secondFrameMarker: URL
     ) {
         let root = try fixtureDirectory()
@@ -1079,7 +1255,8 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         try script.write(to: executable, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
         return (ClaudeCLIUsageClient(executableURL: executable, runtimeDirectory: root.appendingPathComponent("runtime"),
-                                     environment: environment ?? ProcessInfo.processInfo.environment, timeout: timeout),
+                                     environment: environment ?? ProcessInfo.processInfo.environment, timeout: timeout,
+                                     wallClock: wallClock),
                 request, childPID, marker)
     }
 
@@ -1410,5 +1587,23 @@ final class ClaudeQuotaBackendTests: XCTestCase {
             XCTFail("Synthetic bridge exceeded the test deadline")
         }
         process.waitUntilExit()
+    }
+}
+
+/// Release remains usable when cancellation happens before the task reaches wait.
+/// This gate controls invocation order without replacing the reader's own checks.
+private actor CLIInvocationStartGate {
+    private var released = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        guard !released else { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func release() {
+        released = true
+        continuation?.resume()
+        continuation = nil
     }
 }

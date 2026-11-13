@@ -2,8 +2,15 @@ import SwiftUI
 
 struct ProviderSettingsView: View {
     @ObservedObject var store: AppStore
+    var openDiagnostics: (() -> Void)? = nil
 
     var body: some View {
+        ScrollViewReader { reader in
+            settingsPage(reader: reader)
+        }
+    }
+
+    private func settingsPage(reader: ScrollViewProxy) -> some View {
         SettingsPage(title: "dashboard.providers") {
             SettingsRow("providers.monitoring") {
                 VStack(alignment: .leading, spacing: 12) {
@@ -15,6 +22,16 @@ struct ProviderSettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+            }
+            SettingsDivider()
+            SettingsRow("claude.health.title") {
+                ClaudeSourcesSummaryView(
+                    store: store.claudeStore, language: store.preferences.language,
+                    rereadLocalReports: { store.rereadClaudePassiveSources() },
+                    reviewStatusline: { reader.scrollTo("claude-statusline-settings-section", anchor: .top) },
+                    reviewCLIOptions: { reader.scrollTo("claude-cli-settings-section", anchor: .top) },
+                    openDiagnostics: openDiagnostics
+                )
             }
             SettingsDivider()
             SettingsRow("providers.menuBar") {
@@ -58,17 +75,15 @@ struct ProviderSettingsView: View {
                 )
             }
             SettingsDivider()
-            SettingsRow("claude.sources.title") {
-                ClaudeSourcesSummaryView(store: store.claudeStore, language: store.preferences.language)
-            }
-            SettingsDivider()
             SettingsRow("claude.passive.title") {
                 ClaudeStatuslineSetupView(store: store.claudeStore)
             }
+            .id("claude-statusline-settings-section")
             SettingsDivider()
             SettingsRow("claude.cliUsage.title") {
                 ClaudeCLIUsageSettingsView(store: store)
             }
+            .id("claude-cli-settings-section")
             if store.preferences.claudeMonitoringEnabled && store.preferences.claudeCLIUsageEnabled {
                 SettingsDivider()
                 SettingsRow("claude.refreshInterval") {
@@ -121,42 +136,22 @@ struct ProviderSettingsView: View {
 struct ClaudeSourcesSummaryView: View {
     @ObservedObject var store: ClaudeQuotaStore
     let language: LanguagePreference
+    var rereadLocalReports: (() -> Void)? = nil
+    var reviewStatusline: (() -> Void)? = nil
+    var reviewCLIOptions: (() -> Void)? = nil
+    var openDiagnostics: (() -> Void)? = nil
+    var referenceDate: Date? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("claude.sources.help")
-                .font(.callout).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if !store.isCLIUsageEnabled {
-                Text("claude.passive.reread.help")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("claude-local-reread-help")
-            }
-            Text(verbatim: currentSourceText)
-                .font(.caption)
-                .accessibilityIdentifier("claude-sources-current")
-            if store.isEnabled {
-                // The cache is examined only while monitoring is on.
-                Text(verbatim: localCacheText)
-                    .font(.caption).foregroundStyle(.secondary)
-                    .accessibilityIdentifier("claude-sources-local-cache")
-            }
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let now = referenceDate ?? context.date
+            ClaudeSourceHealthView(
+                presentation: store.sourceHealth(at: now), language: language, now: now,
+                rereadLocalReports: rereadLocalReports,
+                reviewStatusline: reviewStatusline, reviewCLIOptions: reviewCLIOptions,
+                openDiagnostics: openDiagnostics
+            )
         }
-    }
-
-    private func localized(_ key: String, arguments: [CVarArg] = []) -> String {
-        StatusAccessibilityString.localized(key, arguments: arguments, language: language, bundle: .main)
-    }
-
-    private var currentSourceText: String {
-        guard store.isEnabled else { return localized("claude.monitoring.off") }
-        let name = store.source.map { localized($0.localizationKey) } ?? localized("claude.sources.none")
-        return localized("claude.sources.current %@", arguments: [name])
-    }
-
-    private var localCacheText: String {
-        localized("claude.localCache.status." + store.localCacheState.rawValue)
     }
 }
 

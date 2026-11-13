@@ -64,7 +64,7 @@ struct DashboardView: View {
                         }
                     }
                 case .providers:
-                    ProviderSettingsView(store: store)
+                    ProviderSettingsView(store: store, openDiagnostics: { windowState.select(section: .diagnostics) })
                 case .connection:
                     ConnectionSettingsView(
                         store: store,
@@ -395,12 +395,20 @@ private struct DiagnosticsView: View {
         let diagnostics = store.diagnostics().text
         SettingsPage(title: "dashboard.diagnostics") {
             VStack(alignment: .leading, spacing: 12) {
+                if let record = store.claudeStore.lastCLIDiagnostic {
+                    ClaudeCLIDiagnosticSummaryView(
+                        record: record, language: store.preferences.language,
+                        identifier: "claude-diagnostics-last-read"
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 ScrollView {
                     Text(diagnostics)
                         .font(.system(size: 12, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                         .padding(14)
+                        .accessibilityIdentifier("diagnostics-text")
                 }
                 .background(.quaternary.opacity(0.35))
                 .clipShape(RoundedRectangle(cornerRadius: 6))

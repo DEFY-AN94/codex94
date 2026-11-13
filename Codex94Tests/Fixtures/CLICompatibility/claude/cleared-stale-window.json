@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "cleared-stale-window",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "cleared-stale-window",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testUsageParserSkipsModelScopedWindowsAndClearedTerminalFrames"
+    ],
+    "notes": "A clear-screen redraw replaces the earlier five-hour report; parser must not retain erased quota."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "Current session\r\n99% used\r\n",
+      "expectedComplete": true
+    },
+    {
+      "type": "output",
+      "text": "\u001b[2J\u001b[HCurrent week (all models)\r\n62.5% used\r\n",
+      "expectedComplete": true
+    }
+  ],
+  "expected": {
+    "complete": true,
+    "ready": false,
+    "refreshing": false,
+    "windows": [
+      {
+        "kind": "weekly",
+        "usedPercentage": 62.5,
+        "resetsAt": null
+      }
+    ]
+  }
+}

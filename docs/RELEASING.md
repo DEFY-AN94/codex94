@@ -29,12 +29,110 @@ An earlier authorization does not authorize a later gate. Candidate App
 acceptance before Ready and final CI DMG/install acceptance are separate.
 Launching an explicitly approved candidate does not authorize replacing an
 installed App or operating real Login Items/System Settings. Keep pending
-acceptance visible in the PR. Never mark Ready merely because CI is green.
+acceptance visible in the PR. Never mark Ready merely because CI is green unless
+the maintainer explicitly authorizes a different order, as recorded for the
+4.2.0 candidate below.
 
-## Release preparation: 4.1.8 (32) — 2026-11-08
+<a id="unreleased-candidate-420-33"></a>
 
-Baseline main is `08dee47aa935856234aa3a80c06908e298d88cf7`. This candidate
-addresses Claude configuration/installation consistency and notification
+## Release preparation: 4.2.0 (33) — 2026-11-14
+
+The initial development baseline was PR #71 head
+`0c2343981c9b5858e575048d213f51f6230fd1e4`. After #71 was squash-merged,
+[4.2.0 PR #72](https://github.com/DEFY-AN94/codex94/pull/72) was synchronized
+on 2026-11-13 with main commit `7adf5a079481e94e5bc4c1c9e5aa096d00c19ef9`.
+Only the four 4.2.0 commits after that original baseline were replayed, avoiding
+duplicate 4.1.8 history. The App, tests and build inputs are preserved; document
+conflicts retain main's 4.1.8 date, acceptance record and known Issue #73.
+The synchronized candidate was revalidated as recorded below. PR #72 continues
+to target `main` so the existing default-branch security checks apply. The
+planned 4.2.0 release date is 2026-11-14 (Australia/Melbourne). Public stable
+downloads and release assets remain at 4.1.7 until publication is verified.
+
+Scope: Claude source-health presentation and recovery guidance, an explicit
+passive-only local reread, per-read completed diagnostics in the existing
+redacted Diagnostics flow, and synthetic compatibility/lifecycle regressions.
+The 4.1.8 configuration, notification and cancellation fixes are included in
+4.2.0. Version 4.1.8 was merged but never published separately; its original
+preparation date and local acceptance are retained in the historical section below.
+
+For the initial 2026-11-13 synchronization, the maintainer authorized updating the PR,
+rerunning CI and then replacing the local App with the verified candidate for
+acceptance after applicable checks passed; that stage excluded merge and
+publication. The earlier implementation authorization also permitted Ready
+after green checks, followed by local acceptance, overriding gate 2's default
+order for this candidate. Neither earlier authorization itself allowed publication.
+
+The accepted candidate is bound to PR head
+`bb3945236e53b603f04f965d34e37e39e0fb4482`, tested merge
+`22bf6a9651fa08033a654537cca8c89ab3df0945`, and their shared tree
+`491dc7448984c4626e966cd6503f8d6593298402`. The 178 App, resource, project,
+test, build-script and CI inputs match the original 4.2.0 head byte for byte.
+The local Xcode 27.2 (27B52) release gate and
+[PR CI run 43393170679](https://github.com/DEFY-AN94/codex94/actions/runs/43393170679)
+each executed 675 XCTest cases with 0 failures and 1 existing hosted-key-window
+skip. The skip is not counted as a pass. The validation also passed 61 Python
+tests, 13 synthetic CLI fixtures, full-history static security and resource/
+localization checks, and Universal App/DMG verification. All five synthetic
+UI smokes passed; all 53 original PNGs were newly reviewed, with 45 JSON reports
+and their source/hash bindings checked.
+[CodeQL run 43393165476](https://github.com/DEFY-AN94/codex94/actions/runs/43393165476)
+passed Actions, Python and Swift analysis. Main-only DMG attestation was
+intentionally skipped on the PR, not treated as a successful attestation.
+
+The installed CI candidate is 4.2.0 (33), executable SHA-256
+`b4ce84b050756357cbe99443107ec0d1e180cdfdd95fe0c4b4014f4ca7842d18`, from
+the PR candidate DMG with SHA-256
+`69c110334849dc1405fca8f5fc0ed182e730f6b8c5464f4bf58adb24e2b880dc`.
+The preceding 4.1.8 App was retained as a recoverable backup. On 2026-11-13,
+the maintainer explicitly confirmed this installed candidate's local acceptance
+as passed. This is overall candidate acceptance; it does not relabel individual
+unperformed checks as verified. Automatic Claude CLI remained off and the agent
+performed no real Claude usage read during this 4.2.0 acceptance. Quarantine was
+absent before and after launch and was not modified, so first-launch
+Gatekeeper/Open Anyway acceptance is not established.
+
+Recovery CI remains click-functional: keyboard activation, AX Press and localized
+tooltip acceptance remain pending. Its read-only focus diagnostic is an
+instrumented AUT, not production-App keyboard evidence. Other synthetic UI
+checks do not establish real-provider login, whole-CLI-version compatibility,
+Spaces/fullscreen, every keyboard path or actual clipboard/save acceptance.
+Earlier 4.1.8 observations below retain their original candidate scope.
+[Issue #73](https://github.com/DEFY-AN94/codex94/issues/73), the existing
+Command-comma empty-Settings route, remains unfixed in 4.2.0.
+
+After accepting the candidate, the maintainer explicitly authorized merging
+PR #72 and the full 4.2.0 release: the verified annotated tag, final CI DMG and
+checksum assets, and public stable GitHub Release with release notes. This later
+authorization supersedes the development/synchronization-only handoff limits
+recorded above and in the implementation plan. It is not evidence that those
+release actions or their verification have already completed.
+
+During release preparation, the dated-revision Usage UI job could not acquire
+a hosted runner and never started testing. Display completed all assertions
+successfully, but the full job exceeded its 20-minute limit.
+Display now has the same bounded 25-minute CI job budget as Providers. Test
+assertions, App sources/resources/project settings, build scripts and the CLI's
+own deadlines are unchanged. The cancelled jobs are not counted as passes;
+the revised PR head needs fresh applicable checks. Runner delays moved the
+planned publication to 2026-11-14; verify the actual Melbourne date before tagging.
+After merge,
+freeze the final main commit and verify fresh main CI, all required UI smokes,
+CodeQL, main-only attestation and the exact final distribution assets. Final-asset
+installation/acceptance, annotated-tag verification, and public Release/asset
+readback remain separately recorded gates; do not substitute the accepted PR
+candidate or its hashes for that evidence. Keep stable download links on 4.1.7
+until 4.2.0 publication is confirmed. The inherited statusline downgrade rule
+below continues to apply.
+
+## Unpublished 4.1.8 (32) preparation — 2026-11-08
+
+This section preserves the original preparation date and acceptance record.
+PR #71 was merged, but 4.1.8 was never published separately; its changes are
+included in 4.2.0.
+
+Baseline main was `08dee47aa935856234aa3a80c06908e298d88cf7`. This candidate
+addressed Claude configuration/installation consistency and notification
 continuity, Codex discovery cancellation, development Xcode selection, and Token
 statistics retry presentation. The implementation and regression scope is
 recorded in the dated changelog; earlier release test counts do not
@@ -65,8 +163,8 @@ delivery was performed; those boundaries were tested with synthetic fixtures.
 The existing Command-comma empty-Settings route is tracked separately in
 [#73](https://github.com/DEFY-AN94/codex94/issues/73). Its Settings scene is
 unchanged from 4.1.7, and normal Dashboard buttons work. The maintainer requested
-tracking it separately while proceeding with 4.1.8. This release does not claim
-to fix it or provide exhaustive keyboard/focus-stealing acceptance.
+tracking it separately while proceeding with the candidate. Neither that
+candidate nor 4.2.0 fixes it or establishes exhaustive keyboard/focus-stealing acceptance.
 
 The original PR checks passed on merge `624c5506b2efbbc2d055e7361b39bb76449f39f8`
 with the same implementation tree. Their seven-day artifacts have expired.
@@ -83,10 +181,10 @@ Rollback: remove a newly installed statusline connection with this candidate
 before replacing it with 4.1.7 or earlier; those bridge entrypoints do not
 understand the new wrapper argument. Preserve user settings and backups.
 
-The requested release date is 2026-11-08 (Australia/Melbourne). Final-main
-DMG/install acceptance, tagging and publication remain separately recorded
-checks. Keep public stable links and published artifacts on 4.1.7 until
-publication is confirmed.
+The originally requested release date was 2026-11-08 (Australia/Melbourne),
+but no separate 4.1.8 publication followed. Its changes are carried into the
+4.2.0 release preparation above; this historical acceptance is not final 4.2.0
+distribution evidence.
 
 ## 2. Local candidate and shared metadata
 

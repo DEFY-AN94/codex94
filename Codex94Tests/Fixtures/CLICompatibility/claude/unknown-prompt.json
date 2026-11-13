@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "unknown-prompt",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "unknown-prompt",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testContinuouslyRedrawnUnknownStartupNeverReceivesInput"
+    ],
+    "notes": "A banner and selection marker alone are not a recognized input prompt. This parser case does not execute the input controller."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "Claude Code v2.1.286\r\n❯ Unknown synthetic selection\r\n",
+      "expectedComplete": true
+    }
+  ],
+  "expected": {
+    "complete": true,
+    "ready": false,
+    "refreshing": false,
+    "windows": []
+  }
+}

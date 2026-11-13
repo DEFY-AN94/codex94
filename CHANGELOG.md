@@ -6,12 +6,42 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
-## 4.1.8 - 2026-11-08
+## 4.2.0 - 2026-11-14
 
-Version `4.1.8 (32)`. Release dates use Australia/Melbourne. Publication and
-final-asset verification are recorded separately in [docs/RELEASING.md](docs/RELEASING.md).
+Version `4.2.0 (33)`. The planned release date uses Australia/Melbourne.
+Publication and final-asset verification remain separate from candidate
+acceptance and are recorded in [docs/RELEASING.md](docs/RELEASING.md).
 
-### Fixed
+### Added
+
+- Explain Claude's accepted report, source freshness and recovery actions in a
+  source-health card in Dashboard Services, without an additional quota read
+  merely from rendering the card.
+- Add an explicit local-report reread action that does not launch Claude CLI,
+  including when automatic CLI reading is enabled. Preserve source timestamps,
+  confirmation requirements and the separate warned one-time CLI action.
+- Show the latest completed CLI read's bounded diagnostic through the existing
+  Diagnostics flow. Keep it in memory, bind it to the originating read/context,
+  and include it only in user-triggered redacted diagnostic copies.
+- Add synthetic CLI compatibility fixtures, production-path replay
+  tests and source/lifecycle sequence regressions. Keep fixture validation and
+  test resources separate from the production App and live compatibility claims.
+- Extract the existing CLI evaluation, action-settling and report-stability
+  timing into a production helper with deterministic boundary tests. Keep the
+  usage-session deadline separate from version-probe and process-cleanup budgets.
+
+This release candidate includes the changes from merged 4.1.8 PR #71 below.
+Version 4.1.8 was not published separately. Stable downloads remain 4.1.7 until
+4.2.0 publication is confirmed; validation and maintainer acceptance are
+recorded separately in [the release workflow](docs/RELEASING.md).
+
+### Inherited 4.1.8 changes (unpublished)
+
+The `4.1.8 (32)` candidate was merged but never published as its own release.
+Its fixes are included in 4.2.0. The original 2026-11-08 release-preparation date
+and earlier candidate acceptance remain in [docs/RELEASING.md](docs/RELEASING.md).
+
+#### Fixed
 
 - Use the same validated `CLAUDE_CONFIG_DIR` for the local usage reader,
   optional Claude CLI and new statusline installations, while preserving the
@@ -32,7 +62,7 @@ final-asset verification are recorded separately in [docs/RELEASING.md](docs/REL
 - Keep the previous Token statistics failure/stale marker visible while retrying
   with an existing snapshot, clearing it only after a successful response.
 
-### Changed
+#### Changed
 
 - Remove the duplicate custom-date-range change handler in the Token chart.
 - Add synthetic regression coverage for configuration/installation boundaries,
@@ -46,7 +76,7 @@ final-asset verification are recorded separately in [docs/RELEASING.md](docs/REL
   and is not fixed by this release. Use the menu-bar Dashboard action or the
   floating window's Dashboard button.
 
-Stable download links remain on 4.1.7 until 4.1.8 publication is confirmed.
+Stable download links remain on 4.1.7 until 4.2.0 publication is confirmed.
 
 ## 4.1.7 - 2026-10-18
 

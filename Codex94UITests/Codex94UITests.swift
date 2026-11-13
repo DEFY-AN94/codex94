@@ -386,6 +386,11 @@ final class Codex94UITests: XCTestCase {
         let savedCodexSelection = try selectedQuotaPreference()
         var dashboard = try openDashboard(from: currentPopover())
         try selectPage(.providers, in: dashboard)
+        try require(identified("claude-health-data-state", in: dashboard).waitForExistence(timeout: 5)
+                    && elementText(identified("claude-health-data-state", in: dashboard)).contains("Monitoring is off"),
+                    "A disabled source must be labelled unexamined rather than missing or invalid")
+        XCTAssertEqual(try fixture.claudeUsageRequestCount(), 0,
+                       "Browsing disabled source health must not launch the CLI")
         try setProviderEnabled("claude", enabled: true, in: dashboard)
         var popover = try openProviderPopover(service: "codex", marker: "provider-quota-sections")
         try waitForProviderCards(in: popover, codex: true)
@@ -615,6 +620,8 @@ final class Codex94UITests: XCTestCase {
             return current.exists && [current.label, current.title, current.value as? String ?? ""]
                 .contains { $0.contains("Claude Code local cache") }
         }
+        try require(elementText(identified("claude-health-data-state", in: dashboard)).contains("Cached report"),
+                    "A parsed but old local report must remain visibly cached in source health")
         popover = try openProviderPopover(service: "claude", marker: "claude-quota-section")
         try waitUntil("The cached Claude windows did not appear", timeout: 10) {
             self.identified("claude-quota-fiveHour", in: popover).exists
@@ -685,6 +692,9 @@ final class Codex94UITests: XCTestCase {
         // Overview intentionally shares the provider section identifier. Leave
         // that page before the strict app-wide popover-closed precondition.
         try selectPage(.providers, in: dashboard)
+        try require(elementText(identified("claude-health-data-state", in: dashboard))
+            .contains("Last usage record — current quota unknown"),
+                    "Source health must distinguish historical quota from current or merely cached values")
         popover = try openProviderPopover(service: "claude", marker: "claude-quota-section")
         try fixture.setClaudeLocalCacheExpired(false)
         try uniqueIdentified("claude-refresh", in: popover).click()
@@ -710,11 +720,15 @@ final class Codex94UITests: XCTestCase {
         XCTAssertEqual(try fixture.requestCount(), disabledCodexCount)
         dashboard = try openDashboard(from: popover)
         try selectPage(.providers, in: dashboard)
+        try exerciseSourceHealth(in: dashboard)
         let beforeRegularCLI = try fixture.claudeUsageRequestCount()
         try setClaudeCLIUsageEnabled(true, in: dashboard)
         try waitUntil("Re-enabling the CLI option must perform one read", timeout: 30) {
             try self.fixture.claudeUsageRequestCount() == beforeRegularCLI + 1
+                && self.identified("claude-cli-read-once", in: dashboard).isEnabled
+                && self.identified("claude-cli-last-read", in: dashboard).exists
         }
+        try assertPassiveHealthReadDoesNotLaunchCLI(in: dashboard, automaticCLIEnabled: true)
         let beforeAllOff = try providerRequestCounts()
         try setProviderEnabled("claude", enabled: false, in: dashboard)
         _ = try providerStatusItems(expected: ["codex"], neutral: true)
@@ -782,6 +796,14 @@ final class Codex94UITests: XCTestCase {
             "fableToggleMixedAndClaudeOnlyCurrentAndHistoryVerified": true,
             "fableTogglePreservesNativeItemsRequestsAndCaches": true,
             "fableCurrentSegmentedMeterPixelsVerified": true, "fableDashboardWhilePopoverOffVerified": true,
+            "sourceHealthCurrentLocalReportVerified": true,
+            "sourceHealthDisabledCachedAndHistoricalStatesVerified": true,
+            "sourceHealthPassiveReadWithoutCLIInBothAutomaticModes": true,
+            "sourceHealthSingleCLIErrorPreservesCurrentLocalReport": true,
+            "sourceHealthDiagnosticResultAndTimestampVerified": true,
+            "sourceHealthSetupCLIAndPopoverNavigationVerified": true,
+            "sourceHealthBrowsingPreservesRequestsAndCaches": true,
+            "sourceHealthEnglishDarkAndChineseLightCaptured": true,
             "authenticationUIOperated": false, "realAccountDataUsed": false,
             "keyboardAcceptance": "not-tested", "spacesAndFullscreenAcceptance": "not-tested",
             "rawTestResultsUploaded": false
@@ -845,9 +867,7 @@ final class Codex94UITests: XCTestCase {
         let key = service + "MonitoringEnabled.v1"
         try require((try fixture.preference(key) as? Bool) != enabled, "The toggle precondition must differ from its target")
         let toggle = try uniqueIdentified("provider-" + service + "-enabled", in: dashboard)
-        try reveal(toggle, in: dashboard)
-        try require(toggle.isEnabled && toggle.isHittable, "The real monitoring control must be interactive")
-        toggle.click()
+        try clickProviderToggle(toggle, in: dashboard)
         try waitUntil("The monitoring toggle did not persist") {
             try self.fixture.preference(key) as? Bool == enabled
         }
@@ -858,12 +878,274 @@ final class Codex94UITests: XCTestCase {
         let key = "claude.cliUsageEnabled.v1"
         try require((try fixture.preference(key) as? Bool) != enabled, "The toggle precondition must differ from its target")
         let toggle = try uniqueIdentified("claude-cli-usage-enabled", in: dashboard)
-        try reveal(toggle, in: dashboard)
-        try require(toggle.isEnabled && toggle.isHittable, "The CLI option control must be interactive")
-        toggle.click()
+        try clickProviderToggle(toggle, in: dashboard)
         try waitUntil("The CLI option did not persist") {
             try self.fixture.preference(key) as? Bool == enabled
         }
+    }
+
+    private func clickProviderToggle(_ toggle: XCUIElement, in dashboard: XCUIElement) throws {
+        try revealProviderElement(toggle, in: dashboard)
+        let frame = toggle.frame
+        try require(toggle.elementType == .checkBox && toggle.isEnabled && toggle.isHittable
+                    && providerElementIsFullyVisible(toggle, in: dashboard) && toggle.frame == frame,
+                    "The exact Services checkbox must remain fully visible at its stable click position")
+        // A partially clipped checkbox may still report isHittable. Click once
+        // at the verified native control's center, after bounded positioning.
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    }
+
+    /// Exercise the production health view using only the registered local
+    /// cache and fake CLI. The synthetic timestamp advances once, after the
+    /// earlier fixed-date history checks have finished.
+    private func exerciseSourceHealth(in dashboard: XCUIElement) throws {
+        try require(fixture.scenario == "providers" && language == .english,
+                    "Source health requires the English Providers fixture")
+        try require((try fixture.preference("claude.cliUsageEnabled.v1") as? Bool) == false,
+                    "The first health check must keep automatic CLI reads off")
+        let originalThemeName = try XCTUnwrap(fixture.preference("theme") as? String)
+        let originalTheme = try XCTUnwrap(UITheme(rawValue: originalThemeName))
+        try fixture.setClaudeLocalCacheExpired(false, refreshReportedAt: true)
+        try assertPassiveHealthReadDoesNotLaunchCLI(in: dashboard, automaticCLIEnabled: false)
+        try waitUntil("A fresh local report must be shown separately from the last CLI result") {
+            let state = self.identified("claude-health-data-state", in: dashboard)
+            let source = self.identified("claude-sources-current", in: dashboard)
+            return state.exists && source.exists
+                && self.elementText(state).contains("Current report")
+                && self.elementText(source).contains("Claude Code local cache")
+        }
+
+        let beforeFailure = try providerRequestCounts()
+        let quotaCache = try fixture.cacheFingerprint()
+        let claudeCache = try fixture.claudeCacheFingerprint()
+        try fixture.setClaudeMode("error")
+        let once = try uniqueIdentified("claude-cli-read-once", in: dashboard)
+        try reveal(once, in: dashboard)
+        try require(once.isEnabled && once.isHittable,
+                    "The explicit CLI action must be available after previous cleanup")
+        once.click()
+        try waitUntil("The health view must show one completed failed CLI attempt", timeout: 30) {
+            try self.fixture.claudeUsageRequestCount() == beforeFailure[1] + 1
+                && once.isEnabled
+                && self.identified("claude-health-cli-issue", in: dashboard).exists
+                && self.identified("claude-health-diagnostic-phase", in: dashboard).exists
+        }
+        try require(elementText(identified("claude-health-data-state", in: dashboard)).contains("Current report")
+                    && elementText(identified("claude-sources-current", in: dashboard)).contains("Claude Code local cache"),
+                    "A failed CLI attempt must not replace a current accepted local report with an error state")
+        XCTAssertEqual(try providerRequestCounts(), [beforeFailure[0], beforeFailure[1] + 1])
+        XCTAssertEqual(try fixture.preference("claude.cliUsageEnabled.v1") as? Bool, false)
+        XCTAssertEqual(try fixture.cacheFingerprint(), quotaCache)
+        XCTAssertEqual(try fixture.claudeCacheFingerprint(), claudeCache)
+
+        let beforeBrowsing = try providerRequestCounts()
+        try exerciseSourceHealthNavigation(in: dashboard)
+        try selectPage(.display, in: dashboard)
+        try setTheme(.terminalDark, in: dashboard)
+        try selectPage(.providers, in: dashboard)
+        try captureSourceHealth(in: dashboard, named: "providers-health-current-error-en-dark.png")
+
+        let diagnostics = try uniqueIdentified("claude-health-open-diagnostics", in: dashboard)
+        try reveal(diagnostics, in: dashboard)
+        try require(diagnostics.isEnabled && diagnostics.isHittable,
+                    "Source health must offer a native diagnostics action")
+        diagnostics.click()
+        try require(identified("diagnostics-text", in: dashboard).waitForExistence(timeout: 5),
+                    "The health diagnostics action must navigate to the existing diagnostics page")
+        try require(identified("claude-diagnostics-last-read-completed-at", in: dashboard).exists,
+                    "Detailed diagnostics must show the matching attempt's completion time")
+        try waitUntil("The exported diagnostic must describe the same completed CLI failure") {
+            let text = self.elementText(self.identified("diagnostics-text", in: dashboard))
+            return text.contains("claudeCLIResult: failure")
+                && text.contains("claudeCLIIssue: loginRequired")
+                && text.contains("claudeCLIUsageSent: true")
+                && text.contains("claudeCLITerminalReceived: true")
+                && text.range(of: #"claudeCLIReadAt: [0-9]{4}-"#, options: .regularExpression) != nil
+                && text.range(of: #"claudeCLIDurationMs: [0-9]+"#, options: .regularExpression) != nil
+        }
+        // Inspect existing redacted text in memory only. No clipboard action,
+        // raw diagnostic screenshot, or raw text is included in artifacts.
+        let diagnosticText = elementText(identified("diagnostics-text", in: dashboard))
+        try require(!diagnosticText.contains("readID:") && !diagnosticText.contains("generation:"),
+                    "Internal diagnostic correlation values must not be exported")
+
+        try selectPage(.display, in: dashboard)
+        try setLanguage(.simplifiedChinese, in: dashboard)
+        try setTheme(.terminalLight, in: dashboard)
+        try selectPage(.providers, in: dashboard)
+        try captureSourceHealth(in: dashboard, named: "providers-health-current-error-zh-Hans-light.png")
+        try selectPage(.display, in: dashboard)
+        try setLanguage(.english, in: dashboard)
+        try setTheme(originalTheme, in: dashboard)
+        try selectPage(.providers, in: dashboard)
+        XCTAssertEqual(try providerRequestCounts(), beforeBrowsing,
+                       "Health navigation, localization and theme rendering must not request either provider")
+        XCTAssertEqual(try fixture.cacheFingerprint(), quotaCache)
+        XCTAssertEqual(try fixture.claudeCacheFingerprint(), claudeCache)
+        try fixture.setClaudeMode("normal")
+    }
+
+    private func exerciseSourceHealthNavigation(in dashboard: XCUIElement) throws {
+        let before = try providerRequestCounts()
+        let quotaCache = try fixture.cacheFingerprint()
+        let claudeCache = try fixture.claudeCacheFingerprint()
+        let preferenceKeys = [
+            "claude.cliUsageEnabled.v1", "codexMonitoringEnabled.v1", "claudeMonitoringEnabled.v1",
+            "menuBarServiceMode.v1", "primaryProvider.v1", "claude.popoverShowsFable.v1"
+        ]
+        let preferences = try fixture.preferenceSnapshot(keys: preferenceKeys)
+        func assertUnchanged() throws {
+            let deadline = Date().addingTimeInterval(0.35)
+            repeat {
+                XCTAssertEqual(try providerRequestCounts(), before,
+                               "Source health navigation must not request Codex or launch the fake Claude CLI")
+                RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            } while Date() < deadline
+            XCTAssertEqual(try fixture.cacheFingerprint(), quotaCache)
+            XCTAssertEqual(try fixture.claudeCacheFingerprint(), claudeCache)
+            XCTAssertEqual(try fixture.preferenceSnapshot(keys: preferenceKeys), preferences)
+        }
+
+        for (actionID, targetID) in [
+            ("claude-health-review-statusline", "claude-setup-preview"),
+            ("claude-health-review-cli", "claude-cli-usage-enabled")
+        ] {
+            let action = try uniqueIdentified(actionID, in: dashboard)
+            try revealProviderElement(action, in: dashboard)
+            try require(action.isEnabled && action.isHittable,
+                        "The source health navigation action must be an available native button")
+            let target = try uniqueIdentified(targetID, in: dashboard)
+            let previousFrame = target.frame
+            action.click()
+            // Do not reveal the destination here: the production action itself
+            // must scroll its existing section into the Services viewport.
+            try waitUntil("The health action must scroll to its existing settings control") {
+                target.isHittable && target.frame != previousFrame
+                    && self.providerElementIsFullyVisible(target, in: dashboard)
+            }
+            try require(!identified("claude-setup-preview-sheet", in: dashboard).exists,
+                        "Reviewing statusline settings must not begin an installation preview")
+            try assertUnchanged()
+        }
+
+        let originalWindowNumber = try ownedWindowNumber(dashboard)
+        try selectPage(.display, in: dashboard)
+        try require(!identified("provider-settings-page", in: dashboard).exists,
+                    "Source details must start from a different Dashboard page")
+        let popover = try openProviderPopover(service: "claude", marker: "claude-quota-section")
+        let details = try uniqueIdentified("claude-source-health-details", in: popover)
+        try reveal(details, in: popover)
+        try require(details.isEnabled && details.isHittable,
+                    "The provider popover must expose its source-details action")
+        details.click()
+        try waitUntil("Opening source details must close the Claude popover") {
+            !self.identified("claude-quota-section", in: self.application).exists
+        }
+        let destination = try dashboardWindow()
+        try require(try ownedWindowNumber(destination) == originalWindowNumber,
+                    "Source details must reuse the existing Dashboard window")
+        try require(identified("provider-settings-page", in: destination).waitForExistence(timeout: 5)
+                    && identified("claude-source-health", in: destination).exists,
+                    "Source details must navigate to the existing Services health view")
+        try assertUnchanged()
+    }
+
+    private func assertPassiveHealthReadDoesNotLaunchCLI(
+        in dashboard: XCUIElement, automaticCLIEnabled: Bool
+    ) throws {
+        try require((try fixture.preference("claude.cliUsageEnabled.v1") as? Bool) == automaticCLIEnabled,
+                    "The local-read action must be checked in the declared automatic mode")
+        let before = try providerRequestCounts()
+        let quotaCache = try fixture.cacheFingerprint()
+        let claudeCache = try fixture.claudeCacheFingerprint()
+        let reread = try uniqueIdentified("claude-reread-local", in: dashboard)
+        try reveal(reread, in: dashboard)
+        try require(reread.isEnabled && reread.isHittable,
+                    "The passive-only action must be available while monitoring is enabled")
+        reread.click()
+        // A bounded observation catches accidental admission of a fake CLI
+        // without making the test wait for the unrelated 30-minute schedule.
+        let deadline = Date().addingTimeInterval(1)
+        repeat {
+            XCTAssertEqual(try providerRequestCounts(), before,
+                           "Reading local reports must not launch CLI or request Codex, even with automatic CLI enabled")
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        } while Date() < deadline
+        XCTAssertEqual(try fixture.preference("claude.cliUsageEnabled.v1") as? Bool, automaticCLIEnabled)
+        XCTAssertEqual(try fixture.cacheFingerprint(), quotaCache)
+        XCTAssertEqual(try fixture.claudeCacheFingerprint(), claudeCache)
+    }
+
+    private func captureSourceHealth(in dashboard: XCUIElement, named name: String) throws {
+        try require(fixture.scenario == "providers"
+                    && ["providers-health-current-error-en-dark.png", "providers-health-current-error-zh-Hans-light.png"].contains(name)
+                    && identified("provider-settings-page", in: dashboard).exists
+                    && !identified("copy-diagnostics", in: dashboard).exists
+                    && !identified("connection-menu-bar-reset", in: dashboard).exists,
+                    "Health images may contain only the registered Providers surface")
+        let health = try uniqueIdentified("claude-source-health", in: dashboard)
+        try revealProviderElement(health, in: dashboard)
+        try require(health.exists && providerElementIsFullyVisible(health, in: dashboard)
+                    && dashboard.frame.contains(health.frame),
+                    "The complete source health card must fit inside its Services viewport and Dashboard window")
+        try require(identified("claude-health-data-state", in: health).exists
+                    && identified("claude-health-cli-issue", in: health).exists
+                    && identified("claude-health-diagnostic-phase", in: health).exists,
+                    "Health screenshots must contain both the accepted data state and failed-operation details")
+        try fixture.writeArtifact(health.screenshot().pngRepresentation, named: name)
+    }
+
+    private func providerElementIsFullyVisible(_ element: XCUIElement, in dashboard: XCUIElement) -> Bool {
+        let page = identified("provider-settings-page", in: dashboard)
+        guard page.exists && element.exists else { return false }
+        let frame = element.frame
+        let viewport = page.frame.intersection(dashboard.frame)
+        return [frame.minX, frame.minY, frame.width, frame.height,
+                viewport.minX, viewport.minY, viewport.width, viewport.height].allSatisfy(\.isFinite)
+            && frame.width > 0 && frame.height > 0 && viewport.contains(frame)
+    }
+
+    private func revealProviderElement(_ element: XCUIElement, in dashboard: XCUIElement) throws {
+        let page = try uniqueIdentified("provider-settings-page", in: dashboard)
+        try require(page.elementType == .scrollView,
+                    "Source health evidence must scroll only its Services page")
+        var previousFrame: CGRect?
+        var previousViewport: CGRect?
+        var stableSamples = 0
+        let deadline = Date().addingTimeInterval(20)
+        for _ in 0..<12 where Date() < deadline {
+            let frame = element.frame
+            let viewport = page.frame.intersection(dashboard.frame)
+            try require([frame.minX, frame.minY, frame.width, frame.height,
+                         viewport.minX, viewport.minY, viewport.width, viewport.height].allSatisfy(\.isFinite)
+                        && frame.width > 0 && frame.height > 0 && viewport.width > 0 && viewport.height > 0,
+                        "The Services component and viewport must expose finite visible geometry")
+            try require(frame.width <= viewport.width && frame.height <= viewport.height,
+                        "The complete Services component must fit its actual scroll viewport")
+            if viewport.contains(frame) {
+                stableSamples = previousFrame == frame && previousViewport == viewport ? stableSamples + 1 : 1
+                if stableSamples >= 2 { return }
+                previousFrame = frame
+                previousViewport = viewport
+            } else {
+                stableSamples = 0
+                previousFrame = nil
+                previousViewport = nil
+                // Position the entire card, not just one hittable child. As in
+                // the token capture helper, AX screen coordinates start at top left.
+                let margin = min(12, (viewport.height - frame.height) / 2)
+                let delta = frame.maxY > viewport.maxY
+                    ? -min(360, frame.maxY - viewport.maxY + margin)
+                    : min(360, viewport.minY - frame.minY + margin)
+                page.scroll(byDeltaX: 0, deltaY: delta)
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        throw UITestFailure("The complete Services component must be fully visible at a stable position")
+    }
+
+    private func elementText(_ element: XCUIElement) -> String {
+        [element.label, element.title, element.value as? String ?? ""].joined(separator: " ")
     }
 
     /// Exercise the real switch without dismissing or reopening the supplied
@@ -4368,9 +4650,10 @@ private struct SyntheticFixture {
 
     /// Mutates only the already-created synthetic cache inside the existing
     /// control exception. No extra sandbox directory or production path is writable.
-    func setClaudeLocalCacheExpired(_ expired: Bool) throws {
+    func setClaudeLocalCacheExpired(_ expired: Bool, refreshReportedAt: Bool = false) throws {
         guard scenario == "providers", let directory = claudeConfigDirectory,
-              directory == root.appendingPathComponent("control/claude-config", isDirectory: true) else {
+              directory == root.appendingPathComponent("control/claude-config", isDirectory: true),
+              !refreshReportedAt || !expired else {
             throw UITestFailure("Historical report transitions require the fixed Providers control cache")
         }
         try Self.validate(directory, type: .typeDirectory, mode: 0o700)
@@ -4396,6 +4679,11 @@ private struct SyntheticFixture {
             utilization["limits"] = limits
         }
         report["utilization"] = utilization
+        if refreshReportedAt {
+            // Advance only this known synthetic report, once the fixed-date
+            // history assertions are complete. No account or quota is captured.
+            report["fetchedAtMs"] = Int64(Date().timeIntervalSince1970 * 1_000)
+        }
         document["cachedUsageUtilization"] = report
         try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]).write(to: file, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
@@ -4598,6 +4886,7 @@ private struct SyntheticFixture {
             "providers-history-en.png", "dashboard-providers-history-en.png", "providers-history-rings-en.png",
             "providers-mixed-fable-en.png", "providers-mixed-history-fable-en.png",
             "providers-history-fable-en.png", "providers-local-cache-fable-off-en.png",
+            "providers-health-current-error-en-dark.png", "providers-health-current-error-zh-Hans-light.png",
             "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
             "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
             "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",

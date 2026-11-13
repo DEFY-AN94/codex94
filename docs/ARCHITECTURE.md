@@ -3,9 +3,58 @@
 This describes ownership and reuse constraints for the published
 [`4.1.7 (31)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.1.7),
 published on 2026-10-18 (Australia/Melbourne), including the unpublished
-`4.0.2 (23)` candidate it carries forward.
+`4.0.2 (23)` candidate it carries forward, and the explicitly labelled 4.1.8
+and 4.2.0 development candidates below.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
+
+## 4.2.0 candidate: source-health projection and per-read diagnostics
+
+`ClaudeQuotaStore` owns the accepted source slots, current/history selection,
+pending source confirmation and CLI lifecycle. `sourceHealth(at:)` uses the pure
+`ClaudeSourceHealthPresentation` projection, keeping `DataState`
+(`disabled/current/cached/history/unavailable`) separate from `OperationState`
+(`idle/reading/retiring`). Views render its status and recovery action
+without starting readers, changing notification baselines or adopting reports.
+An operation's failure and the freshness of the displayed quota are separate:
+a failed CLI read must not hide valid quota from a passive source.
+
+`rereadPassiveSources()` calls the existing passive readers
+without entering the CLI admission path, regardless of the automatic CLI
+preference. It preserves original source timestamps and installation/account
+eligibility. One-time CLI reads continue through the existing guarded action;
+source adoption and statusline recovery continue through their existing
+confirmation flows.
+
+`ClaudeQuotaFetching.fetch(diagnosticObserver:)` binds a narrow observer to each
+fetch; its default adapter preserves existing fake readers. The production
+client keeps its existing diagnostic handler/OSLog event and separately forwards
+that same event to the per-read observer without duplicating the log entry.
+Each CLI diagnostic observation belongs to one read and monitoring generation.
+The store accepts only that operation's completed summary while its context is
+still valid; a retired or late callback cannot overwrite a later operation.
+`ClaudeCLIReadDiagnosticRecord` pairs the accepted event with its own completion
+time. That record is distinct from the active-read state and quota observation
+time. It contains fixed categories, Boolean activity flags and
+elapsed time, stays in memory, and is projected into the existing redacted
+diagnostics flow without terminal text, raw errors, identity or paths.
+
+The compatibility corpus is test-only. Claude terminal/query fixture replay and
+the existing Codex RPC/discovery tests retain separate production paths. The
+initial catalog's output-only schema does not execute or time a CLI session.
+Tests use fixed clocks/controlled completions for state sequences
+and a bounded subset of synthetic subprocess replay for transport behavior.
+The production reader uses `ClaudeUsageReadTiming` for its 100 ms evaluation
+cadence, 200 ms recognized-action settling, one-second parsed-window stability
+and the usage-session deadline. It accepts monotonic elapsed time and performs
+no I/O, parsing or input authorization. The usage deadline starts after PTY
+launch and defaults to 20 seconds; the version probe and process cleanup retain
+their separate budgets. A fixed wall clock can be injected for reset parsing
+without replacing the real monotonic clock used by subprocess reads.
+No fixture payload is evaluated as executable source. Bundle resources belong
+to the unit-test target; Recovery copies each required tracked input explicitly.
+See [CLI compatibility evidence](CLI_COMPATIBILITY.md) for the implemented sample
+scope and its distinction from real CLI acceptance.
 
 ## 4.1.8 candidate: configuration, cancellation and retry continuity
 

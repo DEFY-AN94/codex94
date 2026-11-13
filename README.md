@@ -32,20 +32,43 @@ only fixed-enum `phase`, `result` and `issue` values, `usage_sent` and
 account details or quota values. See
 [4.1.7 changes](CHANGELOG.md#417---2026-10-18).
 
-### Development candidate: 4.1.8 (32)
+### Development candidate: 4.2.0 (33)
 
-The current source candidate aligns Claude's local cache, optional CLI and new
-statusline connections with the same validated `CLAUDE_CONFIG_DIR`. When changing
-that directory with an existing connection, start Codex94 with the original
+This unpublished candidate adds a Claude source-health card in **Dashboard →
+Services**, a separate local-report reread action that never starts the CLI,
+and the latest completed CLI diagnostic in the existing Diagnostics flow.
+The card explains the accepted report, its age and available recovery actions;
+displaying it does not fetch quota. **Read local reports again** does not obtain new cloud
+usage or change the report's original timestamp, even when automatic CLI
+reading is enabled. **Read once with the CLI** remains a separate explicit
+action with its existing warning. **View source details** in the Claude popover
+opens Services; **Review statusline setup** returns to the existing setup and
+confirmation controls.
+
+Completed-read diagnostics stay in memory and enter the clipboard only when
+you choose to copy redacted diagnostics. Synthetic CLI replay fixtures and
+source/lifecycle sequence tests cover production parsing and state paths;
+they do not establish live compatibility with every upstream CLI version.
+See [4.2.0 changes](CHANGELOG.md#420---2026-11-14) and the
+[compatibility evidence](docs/CLI_COMPATIBILITY.md). Candidate checks and
+maintainer acceptance are recorded separately in the [release records](docs/RELEASING.md).
+
+This candidate is synchronized with `main` after the merge of
+[4.1.8 PR #71](https://github.com/DEFY-AN94/codex94/pull/71). Version 4.1.8 was
+not published separately; 4.2.0 includes its fixes:
+
+Claude's local cache, optional CLI and new statusline connections use the same
+validated `CLAUDE_CONFIG_DIR`. When changing that directory with an existing
+connection, start Codex94 with the original
 configuration and remove the connection in Services before installing it for
 the new directory. Reports from a mismatched or retired installation are not
 adopted automatically; an installation identifier is not account verification.
 Before downgrading to 4.1.7 or earlier, remove a connection installed by this
 candidate using its Services page; older Apps do not understand the new wrapper.
 
-The candidate also fixes repeated notifications after toggling Claude CLI reads,
+The inherited changes also fix repeated notifications after toggling Claude CLI reads,
 Codex discovery cancellation, Xcode selection and the old-data indicator during
-Token statistics retries. See [4.1.8 changes](CHANGELOG.md#418---2026-11-08).
+Token statistics retries. See [inherited 4.1.8 changes](CHANGELOG.md#inherited-418-changes-unpublished).
 It is not yet a published release; the stable downloads above remain 4.1.7.
 
 ## Features

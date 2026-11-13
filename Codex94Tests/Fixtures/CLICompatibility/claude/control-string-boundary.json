@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "control-string-boundary",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "control-string-boundary",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testScreenSnapshotRejectsTruncatedUTF8AndTerminalSequencesUntilCompleted"
+    ],
+    "notes": "An OSC title ends only after the full ST terminator; title bytes are not screen quota content."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "Current week (all models)\r\n62.5% used\r\n\u001b]0;synthetic-title",
+      "expectedComplete": false
+    },
+    {
+      "type": "output",
+      "text": "\u001b",
+      "expectedComplete": false
+    },
+    {
+      "type": "output",
+      "text": "\\",
+      "expectedComplete": true
+    }
+  ],
+  "expected": {
+    "complete": true,
+    "ready": false,
+    "refreshing": false,
+    "windows": [
+      {
+        "kind": "weekly",
+        "usedPercentage": 62.5,
+        "resetsAt": null
+      }
+    ]
+  }
+}

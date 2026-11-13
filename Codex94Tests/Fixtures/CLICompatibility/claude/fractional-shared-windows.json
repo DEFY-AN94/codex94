@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "fractional-shared-windows",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "fractional-shared-windows",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testUsageParserSkipsModelScopedWindowsAndClearedTerminalFrames"
+    ],
+    "notes": "Model-scoped title is synthetic and must not create a third shared quota window."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "Current session\r\n23.5% used\r\nResets 04:00 (UTC)\r\nCurrent week (all models)\r\n41% used\r\nResets May 20 at 03:00 (UTC)\r\nCurrent week (Opus)\r\n99% used\r\n",
+      "expectedComplete": true
+    }
+  ],
+  "expected": {
+    "complete": true,
+    "ready": false,
+    "refreshing": false,
+    "windows": [
+      {
+        "kind": "fiveHour",
+        "usedPercentage": 23.5,
+        "resetsAt": "2033-05-18T04:00:00Z"
+      },
+      {
+        "kind": "weekly",
+        "usedPercentage": 41,
+        "resetsAt": "2033-05-20T03:00:00Z"
+      }
+    ]
+  }
+}

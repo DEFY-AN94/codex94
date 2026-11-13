@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "synchronized-frame",
+  "provider": "claude",
+  "kind": "screen",
+  "scenario": "synchronized-frame",
+  "provenance": {
+    "kind": "synthetic",
+    "sourceTests": [
+      "Codex94Tests/ClaudeQuotaBackendTests.swift#testScreenSnapshotWaitsForSynchronizedUpdateToClose"
+    ],
+    "notes": "The complete-looking report remains incomplete until the synchronized update closes."
+  },
+  "fixtureDeclaredVersion": "2.1.286 (Claude Code)",
+  "referenceTime": "2033-05-18T03:33:20Z",
+  "locale": "en_US",
+  "timezone": "UTC",
+  "events": [
+    {
+      "type": "output",
+      "text": "\u001b[?2026h\u001b[2J\u001b[HCurrent week (all models)\r\n62.5% used\r\n",
+      "expectedComplete": false
+    },
+    {
+      "type": "output",
+      "text": "\u001b[?2026l",
+      "expectedComplete": true
+    }
+  ],
+  "expected": {
+    "complete": true,
+    "ready": false,
+    "refreshing": false,
+    "windows": [
+      {
+        "kind": "weekly",
+        "usedPercentage": 62.5,
+        "resetsAt": null
+      }
+    ]
+  }
+}

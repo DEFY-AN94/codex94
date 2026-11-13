@@ -24,6 +24,7 @@ final class ClaudeQuotaStore: ObservableObject {
     @Published private(set) var localCacheState: ClaudeLocalUsageCacheState = .absent
     @Published private(set) var lastCLIReadIssue: ClaudeQuotaIssue?
     @Published private(set) var lastCLIReadAt: Date?
+    @Published private(set) var lastCLIDiagnostic: ClaudeCLIReadDiagnosticRecord?
     var isStatuslineInstalled: Bool { statuslineSetupState == .installed }
     var isCLIUsageEnabled: Bool { preferences.claudeCLIUsageEnabled }
     var canReadOnceWithCLI: Bool { isEnabled && !stopped && requestTask == nil && !isRetiringCLI }
@@ -62,6 +63,9 @@ final class ClaudeQuotaStore: ObservableObject {
     private var pendingAutomaticCLITrigger: RefreshTrigger?
     private var pollingTask: Task<Void, Never>?
     private var generation = 0
+    private var latestCLIReadID: UUID?
+    private var pendingCLIDiagnostic: ClaudeCLIUsageDiagnostic?
+    private var latestCLICompletedAt: Date?
     private var stopped = false
     private var activeReadIssue: ClaudeQuotaIssue?
     private var nextBackgroundRefreshAt: Date?
@@ -177,6 +181,34 @@ final class ClaudeQuotaStore: ObservableObject {
         startCLIRead(using: currentFetcher, trigger: trigger, oneShot: false)
     }
 
+    /// A user-requested local reread never starts or queues a CLI read, including
+    /// when automatic CLI reads are enabled. Actual identity invalidation keeps
+    /// its existing cleanup and schedule-reconciliation responsibilities.
+    func rereadPassiveSources() {
+        guard isEnabled, !stopped else { return }
+        readLocalCache()
+        loadBridgeReport()
+        projectReport(at: now())
+        updateNextAutomaticRefresh()
+    }
+
+    /// Reads only existing state. In particular this must not call projectReport,
+    /// which owns notification observations as well as the selected report.
+    func sourceHealth(at date: Date) -> ClaudeSourceHealthPresentation {
+        .project(
+            isEnabled: isEnabled, acceptedReport: report, at: date,
+            baseline: maximumReportAge, refreshInterval: preferences.claudeRefreshInterval.seconds,
+            localCacheMaximumAge: localCacheMaximumAge,
+            localCacheState: localCacheState, statuslineSetupState: statuslineSetupState,
+            needsSourceConfirmation: passiveReportNeedsConfirmation,
+            pendingReportedAt: pendingPassiveReportedAt,
+            isRefreshing: isRefreshing, isRetiringCLI: isRetiringCLI,
+            isCLIUsageEnabled: isCLIUsageEnabled, canReadOnceWithCLI: canReadOnceWithCLI,
+            lastReadIssue: lastCLIReadIssue, lastReadAt: lastCLIReadAt,
+            lastDiagnostic: lastCLIDiagnostic
+        )
+    }
+
     /// One explicit CLI read, independent of the automatic option. While the
     /// option is off, the client exists only for this read and retires afterwards.
     func readOnceWithCLI() {
@@ -202,6 +234,10 @@ final class ClaudeQuotaStore: ObservableObject {
 
     private func startCLIRead(using currentFetcher: any ClaudeQuotaFetching, trigger: RefreshTrigger, oneShot: Bool) {
         let expectedGeneration = generation
+        let readID = UUID()
+        latestCLIReadID = readID
+        pendingCLIDiagnostic = nil
+        latestCLICompletedAt = nil
         let startedAt = ProcessInfo.processInfo.systemUptime
         let requestStartedAt = now()
         logger.info("refresh=started trigger=\(trigger.rawValue, privacy: .public) once=\(oneShot, privacy: .public)")
@@ -216,7 +252,11 @@ final class ClaudeQuotaStore: ObservableObject {
         requestTask = Task { [weak self] in
             guard !Task.isCancelled, self?.generation == expectedGeneration, self?.isEnabled == true else { return }
             do {
-                let value = try await currentFetcher.fetch()
+                let value = try await currentFetcher.fetch(diagnosticObserver: { [weak self] diagnostic in
+                    Task { @MainActor [weak self] in
+                        self?.receiveCLIDiagnostic(diagnostic, readID: readID, expectedGeneration: expectedGeneration)
+                    }
+                })
                 guard let self, !Task.isCancelled, generation == expectedGeneration, isEnabled, !stopped else { return }
                 acceptCLI(value, requestStartedAt: oneShot ? nil : requestStartedAt)
                 logRefresh(trigger: trigger, startedAt: startedAt, issue: lastCLIReadIssue)
@@ -237,7 +277,10 @@ final class ClaudeQuotaStore: ObservableObject {
                 logRefresh(trigger: trigger, startedAt: startedAt, issue: issue)
             }
             guard let self, generation == expectedGeneration, !stopped else { return }
-            lastCLIReadAt = now()
+            let completedAt = now()
+            lastCLIReadAt = completedAt
+            latestCLICompletedAt = completedAt
+            publishCLIDiagnostic()
             isRefreshing = false
             let finishedRequest = requestTask
             requestTask = nil
@@ -301,6 +344,7 @@ final class ClaudeQuotaStore: ObservableObject {
 
     private func retireCLIRequest() {
         generation += 1
+        clearCLIDiagnosticContext()
         pendingAutomaticCLITrigger = nil
         let retiredRequest = requestTask
         retiredRequest?.cancel()
@@ -310,6 +354,30 @@ final class ClaudeQuotaStore: ObservableObject {
         fetcher = nil
         oneShotFetcher = false
         beginCLIRetirement(fetcher: retired, request: retiredRequest)
+    }
+
+    private func clearCLIDiagnosticContext() {
+        latestCLIReadID = nil
+        pendingCLIDiagnostic = nil
+        latestCLICompletedAt = nil
+        assign(\.lastCLIDiagnostic, nil)
+    }
+
+    private func receiveCLIDiagnostic(_ diagnostic: ClaudeCLIUsageDiagnostic,
+                                      readID: UUID, expectedGeneration: Int) {
+        guard isEnabled, !stopped, generation == expectedGeneration,
+              latestCLIReadID == readID, pendingCLIDiagnostic == nil else { return }
+        pendingCLIDiagnostic = diagnostic
+        if latestCLICompletedAt != nil { publishCLIDiagnostic() }
+    }
+
+    private func publishCLIDiagnostic() {
+        guard let completedAt = latestCLICompletedAt else { return }
+        // A new completion without its diagnostic must not borrow the previous
+        // read's event. A late callback can still fill this exact read's record.
+        assign(\.lastCLIDiagnostic, pendingCLIDiagnostic.map {
+            ClaudeCLIReadDiagnosticRecord(diagnostic: $0, completedAt: completedAt)
+        })
     }
 
     private func beginCLIRetirement(fetcher retired: (any ClaudeQuotaFetching)?, request retiredRequest: Task<Void, Never>?) {
@@ -368,6 +436,7 @@ final class ClaudeQuotaStore: ObservableObject {
             return
         }
         preferences.setClaudePassiveProducerID(ClaudeStatuslineParser.identifiableProducerID(pending.producerID))
+        clearCLIDiagnosticContext()
         passiveRequiresReconfirmation = false
         passiveReport = nil
         resetNotificationBaseline()
@@ -642,6 +711,7 @@ final class ClaudeQuotaStore: ObservableObject {
               value.reportedAt <= now().addingTimeInterval(5),
               value.receivedAt >= value.reportedAt else { passiveIssue = .invalidData; return }
         if let passiveReport, passiveReport.producerID != value.producerID {
+            clearCLIDiagnosticContext()
             resetNotificationBaseline()
         }
         passiveIssue = nil
