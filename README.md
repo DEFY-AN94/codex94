@@ -49,12 +49,13 @@ Completed-read diagnostics stay in memory and enter the clipboard only when
 you choose to copy redacted diagnostics. Synthetic CLI replay fixtures and
 source/lifecycle sequence tests cover production parsing and state paths;
 they do not establish live compatibility with every upstream CLI version.
-See [4.2.0 candidate changes](CHANGELOG.md#unreleased--420-33) and the
+See [4.2.0 changes](CHANGELOG.md#420---2026-11-13) and the
 [compatibility evidence](docs/CLI_COMPATIBILITY.md). Candidate checks and
 maintainer acceptance are recorded separately in the [release records](docs/RELEASING.md).
 
 This candidate is synchronized with `main` after the merge of
-[4.1.8 PR #71](https://github.com/DEFY-AN94/codex94/pull/71), retaining its fixes:
+[4.1.8 PR #71](https://github.com/DEFY-AN94/codex94/pull/71). Version 4.1.8 was
+not published separately; 4.2.0 includes its fixes:
 
 Claude's local cache, optional CLI and new statusline connections use the same
 validated `CLAUDE_CONFIG_DIR`. When changing that directory with an existing
@@ -67,7 +68,7 @@ candidate using its Services page; older Apps do not understand the new wrapper.
 
 The inherited changes also fix repeated notifications after toggling Claude CLI reads,
 Codex discovery cancellation, Xcode selection and the old-data indicator during
-Token statistics retries. See [4.1.8 changes](CHANGELOG.md#418---2026-11-08).
+Token statistics retries. See [inherited 4.1.8 changes](CHANGELOG.md#inherited-418-changes-unpublished).
 It is not yet a published release; the stable downloads above remain 4.1.7.
 
 ## Features

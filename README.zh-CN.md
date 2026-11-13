@@ -38,12 +38,13 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 
 结束诊断保存在内存中，仅在主动复制脱敏诊断时进入剪贴板。合成 CLI 回放样本及来源／
 生命周期序列测试覆盖生产解析和状态路径，不代表所有上游 CLI 版本均已通过真实兼容
-验收。详见 [4.2.0 候选更新](CHANGELOG.md#unreleased--420-33)与
+验收。详见 [4.2.0 更新记录](CHANGELOG.md#420---2026-11-13)与
 [兼容性证据](docs/CLI_COMPATIBILITY.md)；候选检查和维护者验收分别记入
 [发布记录](docs/RELEASING.md)。
 
 本候选已同步到合入
-[4.1.8 PR #71](https://github.com/DEFY-AN94/codex94/pull/71) 后的 `main`，保留以下修复：
+[4.1.8 PR #71](https://github.com/DEFY-AN94/codex94/pull/71) 后的 `main`。
+4.1.8 未单独发布，以下修复包含在 4.2.0 中：
 
 当前源码候选版让 Claude 本地缓存、可选 CLI 和新安装的状态栏连接使用同一个经校验的
 `CLAUDE_CONFIG_DIR`。已有连接时切换目录，请先以原配置环境启动 Codex94，在服务页移除
@@ -53,7 +54,7 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 新的 wrapper 调用格式。
 
 继承的变更还修复切换 Claude CLI 开关后的重复通知、Codex 查找取消、Xcode 选择，以及
-Token 统计重试期间的旧数据提示。详见[4.1.8 更新记录](CHANGELOG.md#418---2026-11-08)。
+Token 统计重试期间的旧数据提示。详见[继承的 4.1.8 变更](CHANGELOG.md#inherited-418-changes-unpublished)。
 候选版尚未公开发布，上方稳定版下载仍指向 4.1.7。
 
 ## 功能详情
