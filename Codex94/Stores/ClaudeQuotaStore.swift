@@ -17,9 +17,12 @@ final class ClaudeQuotaStore: ObservableObject {
     @Published private(set) var reportedAt: Date?
     @Published private(set) var isEnabled = false
     @Published private(set) var nextAutomaticRefreshAt: Date?
+    @Published private(set) var automaticReadState: ClaudeAutomaticReadPolicy.State = .disabled
+    var automaticReadBlockedIssue: ClaudeQuotaIssue? { automaticReadPolicy.suspendedIssue }
     @Published private(set) var passiveReportNeedsConfirmation = false
     @Published private(set) var pendingPassiveReportedAt: Date?
     @Published private(set) var pendingPassiveConfirmationID: UUID?
+    @Published private(set) var bridgeHealth: ClaudeBridgeHealthState = .unavailable
     @Published private(set) var statuslineSetupState: ClaudeStatuslineSetupState = .notInstalled
     @Published private(set) var localCacheState: ClaudeLocalUsageCacheState = .absent
     @Published private(set) var lastCLIReadIssue: ClaudeQuotaIssue?
@@ -40,10 +43,16 @@ final class ClaudeQuotaStore: ObservableObject {
     private var oneShotFetcher = false
     private let sleep: @Sendable (TimeInterval) async throws -> Void
     private let now: @Sendable () -> Date
+    private let monotonicNow: @Sendable () -> TimeInterval
+    private var automaticReadPolicy = ClaudeAutomaticReadPolicy()
+    private var deferredAutomaticRefreshAt: Date?
     private let maximumReportAge: TimeInterval
     private let localCacheMaximumAge: TimeInterval
     private var localReport: ClaudeQuotaReport?
     private var localAccountID: UUID?
+    /// Retained in memory across monitoring toggles solely to distinguish a real
+    /// account change from a stop/start when preserving CLI rate gates.
+    private var automaticReadAccountID: UUID?
     private var localStamp: ClaudeLocalUsageCacheStamp?
     private var localTimeRecheckAt: Date?
     private var passiveRequiresReconfirmation = false
@@ -70,8 +79,9 @@ final class ClaudeQuotaStore: ObservableObject {
     private var activeReadIssue: ClaudeQuotaIssue?
     private var nextBackgroundRefreshAt: Date?
     private var resetContext: ResetContext?
-    private var resetTargets: [Date] = []
-    private var resetCoveredAt: Date?
+    private var resetTargets: [ResetTarget] = []
+    private var resetAttemptedAt: Date?
+    private var resetSatisfiedThrough: [QuotaWindowKind: Date] = [:]
     private let cleanup = DispatchQueue(label: "com.defyan94.codex94.claude-cleanup", qos: .utility)
     private let logger = Logger(subsystem: "com.defyan94.codex94", category: "claude-state")
 
@@ -85,6 +95,7 @@ final class ClaudeQuotaStore: ObservableObject {
         maximumReportAge: TimeInterval = 600,
         localCacheMaximumAge: TimeInterval = ClaudeQuotaFreshnessPolicy.localCacheMaximumAge,
         now: @escaping @Sendable () -> Date = { Date() },
+        monotonicNow: @escaping @Sendable () -> TimeInterval = { ClaudeAutomaticReadPolicy.monotonicTime() },
         sleep: (@Sendable (TimeInterval) async throws -> Void)? = nil
     ) {
         self.preferences = preferences
@@ -96,6 +107,7 @@ final class ClaudeQuotaStore: ObservableObject {
         self.maximumReportAge = maximumReportAge
         self.localCacheMaximumAge = localCacheMaximumAge
         self.now = now
+        self.monotonicNow = monotonicNow
         self.sleep = sleep ?? Self.sleepForPolling
     }
 
@@ -134,6 +146,9 @@ final class ClaudeQuotaStore: ObservableObject {
         clearResetSchedule()
         clearPendingPassiveReport()
         nextAutomaticRefreshAt = nil
+        deferredAutomaticRefreshAt = nil
+        automaticReadState = .disabled
+        bridgeHealth = .unavailable
         resetNotificationBaseline(enabled: false)
         // The cache is read only while monitoring is on; a disabled monitor must
         // not publish a state that was never re-examined.
@@ -162,23 +177,57 @@ final class ClaudeQuotaStore: ObservableObject {
         notificationController.shutdown()
     }
 
-    /// Passive sources are reread on every trigger. The CLI reader joins only
-    /// while its option is on and no read is already in flight.
+    /// Every trigger first rereads passive state. Automatic intent is evaluated
+    /// against the accepted report and shared monotonic CLI gates.
     func refresh(trigger: RefreshTrigger = .manual) {
         guard isEnabled, !stopped else { return }
         readLocalCache()
         loadBridgeReport()
-        guard preferences.claudeCLIUsageEnabled, requestTask == nil, !isRetiringCLI else {
-            // Only automatic-mode intents may wait behind cleanup. A one-time
-            // read never schedules a second read when its client retires.
-            if preferences.claudeCLIUsageEnabled, isRetiringCLI { pendingAutomaticCLITrigger = trigger }
-            projectReport(at: now())
+        projectReport(at: now())
+        guard preferences.claudeCLIUsageEnabled else {
+            updateNextAutomaticRefresh()
+            return
+        }
+        guard requestTask == nil, !isRetiringCLI else {
+            if isRetiringCLI { pendingAutomaticCLITrigger = trigger }
+            updateNextAutomaticRefresh()
+            return
+        }
+        let date = now()
+        if canDeferAutomaticRead(at: date) {
+            satisfyResetTargets(with: report, at: date)
+            deferredAutomaticRefreshAt = nil
+            if nextBackgroundRefreshAt == nil || nextBackgroundRefreshAt! <= date {
+                nextBackgroundRefreshAt = date.addingTimeInterval(preferences.claudeRefreshInterval.seconds)
+            }
+            updateNextAutomaticRefresh()
+            return
+        }
+        if automaticReadPolicy.waitingState(at: monotonicNow()) != nil {
+            // Keep one pending intent; the effective deadline includes the
+            // gate, so the 15-second poll cannot turn this into a retry loop.
+            deferredAutomaticRefreshAt = date
             updateNextAutomaticRefresh()
             return
         }
         let currentFetcher = fetcher ?? fetcherFactory()
         fetcher = currentFetcher
         startCLIRead(using: currentFetcher, trigger: trigger, oneShot: false)
+    }
+
+    private func canDeferAutomaticRead(at date: Date) -> Bool {
+        guard let report,
+              !passiveReportNeedsConfirmation || report.source != .statusline,
+              ClaudeQuotaFreshnessPolicy.canDeferAutomaticRead(
+                report, at: date, baseline: maximumReportAge,
+                refreshInterval: preferences.claudeRefreshInterval.seconds,
+                localCache: localCacheMaximumAge
+              ) else { return false }
+        return dueResetTargets(at: date).allSatisfy { target in
+            report.reportedAt >= target.resetAt && report.windows.contains { window in
+                window.kind == target.kind && window.resetsAt.map { $0 > target.resetAt && $0 > date } == true
+            }
+        }
     }
 
     /// A user-requested local reread never starts or queues a CLI read, including
@@ -205,7 +254,8 @@ final class ClaudeQuotaStore: ObservableObject {
             isRefreshing: isRefreshing, isRetiringCLI: isRetiringCLI,
             isCLIUsageEnabled: isCLIUsageEnabled, canReadOnceWithCLI: canReadOnceWithCLI,
             lastReadIssue: lastCLIReadIssue, lastReadAt: lastCLIReadAt,
-            lastDiagnostic: lastCLIDiagnostic
+            lastDiagnostic: lastCLIDiagnostic, bridgeHealth: bridgeHealth,
+            automaticReadState: automaticReadState, nextAutomaticCheckAt: nextAutomaticRefreshAt
         )
     }
 
@@ -217,7 +267,6 @@ final class ClaudeQuotaStore: ObservableObject {
         loadBridgeReport()
         // Local identity inspection may have retired the previous idle client.
         guard canReadOnceWithCLI else {
-            if preferences.claudeCLIUsageEnabled, isRetiringCLI { pendingAutomaticCLITrigger = .manual }
             projectReport(at: now())
             return
         }
@@ -229,7 +278,7 @@ final class ClaudeQuotaStore: ObservableObject {
             fetcher = client
             oneShotFetcher = true
         }
-        startCLIRead(using: client, trigger: .manual, oneShot: !preferences.claudeCLIUsageEnabled)
+        startCLIRead(using: client, trigger: .manual, oneShot: true)
     }
 
     private func startCLIRead(using currentFetcher: any ClaudeQuotaFetching, trigger: RefreshTrigger, oneShot: Bool) {
@@ -243,10 +292,12 @@ final class ClaudeQuotaStore: ObservableObject {
         logger.info("refresh=started trigger=\(trigger.rawValue, privacy: .public) once=\(oneShot, privacy: .public)")
         isRefreshing = true
         lastCLIReadIssue = nil
-        if !oneShot {
+        automaticReadPolicy.started(at: monotonicNow())
+        deferredAutomaticRefreshAt = nil
+        if preferences.claudeCLIUsageEnabled {
             nextBackgroundRefreshAt = requestStartedAt.addingTimeInterval(preferences.claudeRefreshInterval.seconds)
-            coverResets(through: requestStartedAt)
         }
+        attemptResets(through: requestStartedAt)
         projectReport(at: requestStartedAt)
         updateNextAutomaticRefresh()
         requestTask = Task { [weak self] in
@@ -258,7 +309,7 @@ final class ClaudeQuotaStore: ObservableObject {
                     }
                 })
                 guard let self, !Task.isCancelled, generation == expectedGeneration, isEnabled, !stopped else { return }
-                acceptCLI(value, requestStartedAt: oneShot ? nil : requestStartedAt)
+                acceptCLI(value, requestStartedAt: requestStartedAt, oneShot: oneShot)
                 logRefresh(trigger: trigger, startedAt: startedAt, issue: lastCLIReadIssue)
             } catch {
                 guard let self, !Task.isCancelled, generation == expectedGeneration, isEnabled, !stopped else { return }
@@ -278,6 +329,12 @@ final class ClaudeQuotaStore: ObservableObject {
             }
             guard let self, generation == expectedGeneration, !stopped else { return }
             let completedAt = now()
+            automaticReadPolicy.completed(issue: lastCLIReadIssue, at: monotonicNow())
+            if preferences.claudeCLIUsageEnabled {
+                // Explicit reads share the background cadence and failure gate,
+                // but their errors remain local to the one-time action.
+                nextBackgroundRefreshAt = completedAt.addingTimeInterval(preferences.claudeRefreshInterval.seconds)
+            }
             lastCLIReadAt = completedAt
             latestCLICompletedAt = completedAt
             publishCLIDiagnostic()
@@ -332,6 +389,7 @@ final class ClaudeQuotaStore: ObservableObject {
         activeReadIssue = nil
         lastCLIReadIssue = nil
         nextBackgroundRefreshAt = nil
+        deferredAutomaticRefreshAt = nil
         clearResetSchedule()
         cliReport = nil
         // The source option is not an account boundary. Keep the notification
@@ -478,6 +536,7 @@ final class ClaudeQuotaStore: ObservableObject {
 
     func refreshSetupState() {
         assign(\.statuslineSetupState, installer.setupState)
+        refreshBridgeHealth()
         if isEnabled { projectReport(at: now()) }
     }
 
@@ -578,6 +637,11 @@ final class ClaudeQuotaStore: ObservableObject {
                 invalidateLocalIdentity()
                 logger.info("source=localCache account=changed")
             }
+            if automaticReadAccountID.map({ $0 != accountID }) == true {
+                automaticReadPolicy = ClaudeAutomaticReadPolicy()
+                deferredAutomaticRefreshAt = nil
+            }
+            automaticReadAccountID = accountID
             localAccountID = accountID
             localIdentityInterrupted = false
             guard value.reportedAt <= date.addingTimeInterval(5), value.receivedAt >= value.reportedAt else {
@@ -612,6 +676,7 @@ final class ClaudeQuotaStore: ObservableObject {
         passiveReport = nil
         passiveIssue = nil
         cliReport = nil
+        deferredAutomaticRefreshAt = nil
         clearPendingPassiveReport()
         passiveRequiresReconfirmation = true
         activeReadIssue = nil
@@ -640,7 +705,12 @@ final class ClaudeQuotaStore: ObservableObject {
 
     // MARK: Backup source: statusline bridge reports
 
+    private func refreshBridgeHealth() {
+        assign(\.bridgeHealth, isEnabled && !stopped ? installer.bridgeHealth(at: now()) : .unavailable)
+    }
+
     private func loadBridgeReport() {
+        refreshBridgeHealth()
         reconcilePassiveEligibility()
         // The pending candidate stays frozen, but the selected producer can
         // still publish newer values while another report awaits confirmation.
@@ -723,10 +793,9 @@ final class ClaudeQuotaStore: ObservableObject {
 
     // MARK: Last option: the CLI reader
 
-    /// `requestStartedAt` is nil for a one-time read, whose failures are
-    /// reported beside its button and never drive the card.
-    private func acceptCLI(_ value: ClaudeQuotaReport, requestStartedAt: Date?) {
-        let oneShot = requestStartedAt == nil
+    /// Explicit-read failures stay beside their button, while every read
+    /// contributes scheduling evidence and the shared automatic failure gate.
+    private func acceptCLI(_ value: ClaudeQuotaReport, requestStartedAt: Date, oneShot: Bool) {
         guard value.source == .cliUsage,
               value.reportedAt <= now().addingTimeInterval(5),
               value.receivedAt >= value.reportedAt else {
@@ -803,7 +872,12 @@ final class ClaudeQuotaStore: ObservableObject {
         else if current { assign(\.lastIssue, nil); assign(\.connectionState, .connected) }
         else { setIssue(.staleData) }
 
-        guard let snapshot, current, lastNotifiedReport.map({ selected.reportedAt > $0.reportedAt }) ?? true,
+        guard let snapshot,
+              ClaudeQuotaFreshnessPolicy.canNotify(
+                selected, at: date, baseline: maximumReportAge,
+                refreshInterval: preferences.claudeRefreshInterval.seconds,
+                localCache: localCacheMaximumAge, after: lastNotifiedReport?.reportedAt
+              ),
               !passiveReportNeedsConfirmation || selected.source != .statusline else { return }
         lastNotifiedReport = selected
         let events = policy.events(for: snapshot, preferences: preferences.claudeNotifications)
@@ -833,43 +907,91 @@ final class ClaudeQuotaStore: ObservableObject {
         let producerID: String?
     }
 
-    private var nextResetRefreshAt: Date? {
-        resetTargets.first { target in resetCoveredAt.map { target > $0 } ?? true }
+    private struct ResetTarget: Equatable {
+        let kind: QuotaWindowKind
+        let resetAt: Date
+        var dueAt: Date { resetAt.addingTimeInterval(RefreshPolicy.quotaResetDelay) }
     }
+
+    private func pendingResetTargets() -> [ResetTarget] {
+        resetTargets.filter { target in
+            (resetAttemptedAt.map { target.dueAt > $0 } ?? true)
+                && (resetSatisfiedThrough[target.kind].map { target.resetAt > $0 } ?? true)
+        }
+    }
+
+    private func dueResetTargets(at date: Date) -> [ResetTarget] {
+        pendingResetTargets().filter { $0.dueAt <= date }
+    }
+
+    private var nextResetRefreshAt: Date? { pendingResetTargets().map(\.dueAt).min() }
 
     private func updateResetSchedule(from value: ClaudeQuotaReport, requestStartedAt: Date? = nil) {
         let context = ResetContext(source: value.source, producerID: value.producerID)
         if resetContext != context {
             resetContext = context
-            resetCoveredAt = nil
+            resetAttemptedAt = nil
+            resetSatisfiedThrough.removeAll()
         }
-        resetTargets = Array(Set(value.windows.compactMap { window -> Date? in
-            guard let reset = window.resetsAt, reset.timeIntervalSince1970.isFinite else { return nil }
-            let target = reset.addingTimeInterval(RefreshPolicy.quotaResetDelay)
-            return target.timeIntervalSince1970.isFinite ? target : nil
-        })).sorted()
-        if let requestStartedAt { coverResets(through: requestStartedAt) }
+        resetTargets = value.windows.compactMap { window in
+            guard let reset = window.resetsAt, reset.timeIntervalSince1970.isFinite,
+                  reset.addingTimeInterval(RefreshPolicy.quotaResetDelay).timeIntervalSince1970.isFinite else { return nil }
+            return ResetTarget(kind: window.kind, resetAt: reset)
+        }.sorted { $0.dueAt < $1.dueAt }
+        if let requestStartedAt { attemptResets(through: requestStartedAt) }
         updateNextAutomaticRefresh()
     }
 
-    private func coverResets(through requestStartedAt: Date) {
+    private func attemptResets(through requestStartedAt: Date) {
         guard resetContext != nil else { return }
-        // Only an accepted read covers due targets; completion and passive file
-        // receipt times cannot consume a reset that occurred while it was busy.
-        resetCoveredAt = max(resetCoveredAt ?? requestStartedAt, requestStartedAt)
+        // This is an attempt watermark, not proof of a new quota observation.
+        // A read begun before a target cannot consume it merely by finishing late.
+        resetAttemptedAt = max(resetAttemptedAt ?? requestStartedAt, requestStartedAt)
+    }
+
+    private func satisfyResetTargets(with value: ClaudeQuotaReport?, at date: Date) {
+        guard let value else { return }
+        for target in dueResetTargets(at: date) where value.reportedAt >= target.resetAt {
+            guard value.windows.contains(where: { window in
+                window.kind == target.kind && window.resetsAt.map { $0 > target.resetAt && $0 > date } == true
+            }) else { continue }
+            resetSatisfiedThrough[target.kind] = max(resetSatisfiedThrough[target.kind] ?? target.resetAt, target.resetAt)
+        }
     }
 
     private func clearResetSchedule() {
         resetContext = nil
         resetTargets = []
-        resetCoveredAt = nil
+        resetAttemptedAt = nil
+        resetSatisfiedThrough.removeAll()
     }
 
     private func updateNextAutomaticRefresh() {
-        guard isEnabled, !stopped, preferences.claudeCLIUsageEnabled else { assign(\.nextAutomaticRefreshAt, nil); return }
-        // These are due times. The existing 15-second poll performs the read
-        // after the earliest deadline; no additional reset timer is created.
-        assign(\.nextAutomaticRefreshAt, [nextBackgroundRefreshAt, nextResetRefreshAt].compactMap { $0 }.min())
+        guard isEnabled, !stopped, preferences.claudeCLIUsageEnabled else {
+            assign(\.nextAutomaticRefreshAt, nil)
+            assign(\.automaticReadState, .disabled)
+            return
+        }
+        let date = now()
+        let instant = monotonicNow()
+        if automaticReadPolicy.suspendedIssue != nil {
+            assign(\.nextAutomaticRefreshAt, nil)
+            assign(\.automaticReadState, requestTask != nil || isRefreshing || isRetiringCLI ? .reading : .suspended)
+            return
+        }
+        let due = [nextBackgroundRefreshAt, nextResetRefreshAt, deferredAutomaticRefreshAt].compactMap { $0 }.min()
+        let delay = automaticReadPolicy.remainingDelay(at: instant)
+        // Preserve an already-due timestamp once its monotonic gate opens.
+        // Replacing it with a newer Date() on every poll would perpetually
+        // move it beyond that poll's captured wall time.
+        let effective = delay > 0 ? due.map { max($0, date.addingTimeInterval(delay)) } : due
+        assign(\.nextAutomaticRefreshAt, effective)
+        let state: ClaudeAutomaticReadPolicy.State
+        if requestTask != nil || isRefreshing || isRetiringCLI { state = .reading }
+        else if let waiting = automaticReadPolicy.waitingState(at: instant) { state = waiting }
+        else if canDeferAutomaticRead(at: date) { state = .recentReport }
+        else { state = .scheduled }
+        assign(\.automaticReadState, state)
     }
 
     private func logRefresh(trigger: RefreshTrigger, startedAt: TimeInterval, issue: ClaudeQuotaIssue?) {

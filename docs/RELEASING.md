@@ -33,6 +33,43 @@ acceptance visible in the PR. Never mark Ready merely because CI is green unless
 the maintainer explicitly authorizes a different order, as recorded for the
 4.2.0 candidate below.
 
+## 4.3.0 candidate scope and authorization — Unreleased
+
+Candidate `4.3.0 (34)` starts from main
+`70f9d413438d0f7a19141b19f34dddfda3164532`, after the published 4.2.0 source
+`c13f886151b5932518352a3b92caafb71dbbf44f`. Its scope is A/C/D/E: repair
+application Settings/Command-comma routing (#73), record bounded local bridge
+activity, separate Claude report eligibility from retained display, and admit
+automatic CLI reads only when needed under shared timing/cooldown rules.
+The separate HTTP/OAuth research is not a production feature or release gate.
+
+For this candidate the maintainer explicitly authorized development, committing
+and pushing the branch, creating the PR, completing all cloud-capable validation,
+and marking the PR **Ready after all required cloud checks are green**. The
+maintainer explicitly reserved local acceptance for themselves and instructed
+**do not merge**. This changes gate 2's order for this candidate only: local
+candidate acceptance remains pending after Ready and is not represented as a
+pass. This authorization does not extend to merge, tag, Draft Release assets,
+installation/replacement of the maintainer's App, or public publication.
+
+The PR must identify its exact head SHA and tested merge SHA/tree, link the
+current release-gate/UI/CodeQL runs and reviewed synthetic artifacts, and keep
+local acceptance visible. A green workflow badge alone is not screenshot review
+or real-account compatibility evidence. Main-only release provenance may be
+inapplicable on a PR; record an intentional skip rather than claiming it passed.
+Do not change or relax a required assertion to obtain a green result.
+
+Cloud results are recorded as they are actually obtained in the PR and the
+[4.3.0 acceptance checklist](4.3.0-ACCEPTANCE.md). At the start of implementation,
+App build, hosted tests, all five UI scenarios, screenshot review and CodeQL are
+pending for this new candidate. Previous 4.2.0 results do not validate 4.3.0.
+Local original-App keyboard, real-provider behavior, bridge coexistence and
+maintainer installation acceptance remain separate and pending.
+
+Keep the candidate date Unreleased until a later release-date decision. Stable
+download links, the v4.2.0 tag and its public assets remain unchanged. A Ready PR
+does not publish a new stable version or authorize any later gate.
+
 <a id="unreleased-candidate-420-33"></a>
 
 ## 4.2.0 candidate acceptance and release scope — 2026-11-14

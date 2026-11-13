@@ -51,6 +51,21 @@ final class ClaudeSourceHealthRenderingTests: XCTestCase {
         ))
     }
 
+    func testOldLocalReportKeepsItsValueAndSourceTimeWithCachedPresentation() throws {
+        let now = reportDate.addingTimeInterval(3_000)
+        let accepted = report()
+        let presentation = ClaudeSourceHealthPresentation.project(
+            isEnabled: true, acceptedReport: accepted, at: now,
+            refreshInterval: 1_800, localCacheState: .valid
+        )
+        let view = content(presentation, now: now)
+        XCTAssertEqual(view.dataStateKey, "claude.health.data.cached")
+        XCTAssertEqual(presentation.reportedAt, reportDate)
+        XCTAssertNotNil(accepted.snapshot(at: now), "Old but unexpired values remain available for display")
+        XCTAssertTrue(try XCTUnwrap(view.reportTimeText).contains("Claude Code fetched"))
+        XCTAssertNotNil(view.reportAgeText)
+    }
+
     func testDisabledAndHistoricalTextNeverInventCurrentQuotaOrLoginState() throws {
         let disabled = content(.project(isEnabled: false, acceptedReport: report(), at: reportDate), now: reportDate)
         XCTAssertEqual(disabled.dataStateKey, "claude.health.data.disabled")
@@ -84,8 +99,15 @@ final class ClaudeSourceHealthRenderingTests: XCTestCase {
             "claude.health.statusline.notInstalled", "claude.health.statusline.installed",
             "claude.health.cache.absentHelp", "claude.health.cache.unreadableHelp",
             "claude.health.cache.invalidHelp", "claude.health.pendingSource",
-            "claude.health.result.success", "claude.health.result.failure", "claude.health.result.cancelled"
+            "claude.health.result.success", "claude.health.result.failure", "claude.health.result.cancelled",
+            "claude.health.bridge.unavailable", "claude.health.bridge.waiting",
+            "claude.health.bridge.unreadable", "claude.health.bridge.boundary",
+            "claude.health.automatic.disabled", "claude.health.automatic.scheduled",
+            "claude.health.automatic.recentReport", "claude.health.automatic.minimumInterval",
+            "claude.health.automatic.cooldown", "claude.health.automatic.suspended",
+            "claude.health.automatic.reading"
         ] + phases.map { "claude.health.phase." + $0.rawValue }
+            + ClaudeBridgeHealthOutcome.allCases.map { "claude.health.bridge." + $0.rawValue }
         for language in [LanguagePreference.english, .simplifiedChinese] {
             for key in keys {
                 let translated = StatusAccessibilityString.localized(key, language: language, bundle: .main)

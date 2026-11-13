@@ -419,7 +419,6 @@ struct QuotaPopoverView: View {
                 shortcut: "⌘,",
                 action: { openDashboard(nil) }
             )
-            .keyboardShortcut(",", modifiers: .command)
 
             if let showFloatingWindow {
                 CommandRow(

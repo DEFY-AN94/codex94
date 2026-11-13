@@ -77,6 +77,39 @@ Known issue: Command-comma can open an empty Settings window when the
 popover is closed ([#73](https://github.com/DEFY-AN94/codex94/issues/73)).
 Use the menu-bar Dashboard action or the floating window's Dashboard button.
 
+### Development candidate: 4.3.0 (34), Unreleased
+
+The current development branch implements these changes; **4.2.0 remains the
+published stable release** and the installation links below still select it.
+
+- Application Settings and **⌘,** open or restore the existing Dashboard,
+  including when the popover is closed, addressing
+  [#73](https://github.com/DEFY-AN94/codex94/issues/73). The shortcut remains
+  application-local and does not register a global hotkey.
+- Services distinguishes **recently recorded statusline activity** from the
+  quota report itself. A connection can be active without receiving quota
+  fields or a changed quota value. Missing activity records do not prove that
+  the bridge was not invoked, and activity never makes an old report fresh.
+- All Claude sources use a strict **less than 10 minutes** recent-report
+  boundary. Older values remain cached or historical; they cannot drive new
+  quota alerts or defer a needed automatic CLI read. Source timestamps,
+  pending-source confirmation and weekly-only support are preserved.
+- Optional automatic CLI checks first reuse an eligible recent report. The
+  selected **1/5/15/30-minute** check interval stays in effect; automatic
+  starts are at least **60 seconds** apart, and transient failures cool down
+  for **1/2/5/10/15 minutes**, capped at 15 minutes. Opening the popover or
+  waking the Mac does not bypass the cooldown. **Read local reports again**
+  still never starts the CLI; **Read once with the CLI** remains one explicit
+  read without enabling automatic checks or queueing repeated clicks.
+
+The candidate adds one bounded, local installation-scoped bridge-health record;
+it contains no account identity or quota values. CLI failure/cooldown state stays
+in memory. It adds no OAuth, credential access, direct Claude HTTP client or
+guarantee of live App/web usage. See [privacy details](PRIVACY.md#430-candidate-local-bridge-health-and-on-demand-cli)
+and the [candidate acceptance checklist](docs/4.3.0-ACCEPTANCE.md).
+Cloud checks and local maintainer acceptance are recorded separately; a Ready PR
+is not a published release or evidence of local acceptance.
+
 ## Features
 
 The following describes the published release. Release-by-release changes live

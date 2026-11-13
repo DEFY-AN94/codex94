@@ -1,5 +1,50 @@
 # Security
 
+## 4.3.0 candidate: local activity and automatic-read admission
+
+The unpublished `4.3.0 (34)` candidate retains the existing official-client
+authentication boundary. No OAuth, token, cookie, Keychain, direct Claude HTTP
+client, entitlement or new external service is added. Separate HTTP research
+does not enter the candidate's production build.
+
+One new application-owned `statusline-health.json` sidecar records only schema,
+installation identifier, observation time and a fixed outcome. It is capped at
+4 KiB and at one write per fifteen seconds per installation across bridge
+processes. Its path is derived from the existing private Claude support directory,
+not supplied by statusline input. Safe local-file validation, private permissions,
+atomic replacement and the installation lock protect it; the bridge revalidates
+the current installation under that lock. Retired invocations cannot write a
+new installation's activity. Removal targets only a matching owned record.
+The existing quota cache schema and wrapper arguments remain unchanged.
+
+Activity proves neither an account identity nor a server quota sample. It does
+not alter report timestamps, notification baselines, source adoption or reset
+coverage. A missing/unreadable diagnostic cannot prove the bridge was not called:
+lock, permission and early-exit failures may prevent recording. Health writes
+are best-effort and must not change the original statusline's output, exit status,
+cancellation or process cleanup. No raw input, quota value, account/session data,
+filesystem path or free-form error is persisted in the new record; its installation
+identifier is not included in redacted diagnostic copies.
+
+The candidate separates cached display from strict recent-report eligibility
+(less than ten minutes for all Claude sources). Only eligible accepted reports
+may drive quota alerts or defer an automatic CLI attempt. Pending producers and
+configuration/installation mismatches retain the existing isolation. Missing
+five-hour data is not a failure when a valid weekly report exists.
+
+Automatic CLI admission remains default-off, single-flight and bounded by the
+existing process limits. Ordinary triggers first check the accepted report;
+automatic starts are at least sixty seconds apart and transient failures share
+completion-based 1/2/5/10/15-minute cooldowns. These deadlines and failure counts
+are memory-only, and do not grant authority to read credentials or execute model
+prompts. The explicitly requested one-time action remains distinct from automatic
+admission and the passive-only reread action. Late results remain bound to their
+original read/context. Codex's own refresh behavior is unchanged.
+
+Published-version boundaries and historical changes follow below. Candidate
+validation and pending local acceptance are recorded separately in
+[the release workflow](docs/RELEASING.md#430-candidate-scope-and-authorization--unreleased).
+
 ## Boundary
 
 Codex94 launches the user's existing Codex executable with the fixed command

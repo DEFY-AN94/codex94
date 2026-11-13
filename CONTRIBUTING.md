@@ -3,6 +3,51 @@
 Issues and focused pull requests are welcome. Codex94 targets macOS 14+, Swift 6,
 and a zero third-party runtime dependency model.
 
+## 4.3.0 candidate behavior
+
+The `4.3.0 (34)` candidate changes A/C/D/E only: application Settings routing,
+local bridge activity, Claude report eligibility and automatic CLI admission.
+These candidate rules supersede the historical 4.1.0 freshness/no-new-cache
+statements below only for those changes. The published stable release remains
+4.2.0. OAuth/HTTP research is separate; do not add it to the App target, settings,
+credential access, network paths or scanner exceptions.
+
+- AppKit keeps the single Dashboard controller and existing AppStore. Application
+  Settings/Command-comma reuse that route; navigation does not request quota.
+  Preserve the Token page's separate first-load behavior rather than changing it
+  to satisfy an overly broad no-request assertion.
+- A bridge-health sidecar is the one new local record. Keep it at most 4 KiB,
+  installation-scoped, private, limited to schema/installation/time/fixed outcome,
+  and written at most once per fifteen seconds across bridge processes. Reuse
+  installation locking and safe local-file rules. No quota, identity, raw session,
+  path, terminal text or payload belongs in the record. Failed/absent diagnostics
+  must not be presented as proof that the bridge was not invoked.
+- Preserve the v1 quota cache and wrapper arguments. Activity does not renew
+  quota `reportedAt`, establish account identity, approve a producer, trigger
+  quota notifications or satisfy a reset. Legacy/unmatched records remain
+  unavailable; only the current installation's health record may be removed.
+- Keep display retention, notification eligibility and automatic-read deferral
+  as separate pure decisions. Every source must be strictly less than ten
+  minutes old to qualify as recent. Report time is not file-read/heartbeat time;
+  weekly-only is valid and an expired window never becomes 100% remaining.
+- `ClaudeQuotaStore` remains the sole owner of CLI tasks, retirement and polling.
+  Reuse accepted recent reports for ordinary automatic triggers, keep the user's
+  1/5/15/30-minute cadence, enforce sixty seconds between automatic starts, and
+  share completion-based transient-failure cooldowns of 1/2/5/10/15 minutes.
+  Interval edits, wake/popover events and toggling the automatic option must not
+  bypass active cooldowns. Explicit one-time reads remain one request with no
+  queued repeats; their outcomes still coordinate later automatic attempts.
+- Keep timing gates and failure state in memory; use injected monotonic time
+  for elapsed-time decisions and wall time for report/reset presentation.
+  A skipped check must advance its due time. Reset attempt, fresh corresponding
+  window and passive deferral are different evidence; no missing-window loop.
+
+The maintainer explicitly authorized this candidate's commit/push/Draft PR and
+Ready transition after all cloud gates, leaving local acceptance for later and
+forbidding merge. Record that exception and pending local acceptance as described
+in [RELEASING.md](docs/RELEASING.md#430-candidate-scope-and-authorization--unreleased).
+It does not authorize a tag, release, installation or publication.
+
 ## Before opening a pull request
 
 1. Keep credential access inside the existing Codex subprocess boundary. Do not

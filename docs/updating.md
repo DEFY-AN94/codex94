@@ -5,6 +5,13 @@ This document describes the published stable release
 on 2026-11-14 (Australia/Melbourne). README download and source instructions
 refer to this release. Update checks are manual; installation remains user-managed.
 
+The development candidate `4.3.0 (34)` is **Unreleased**. Its Settings routing,
+bridge-health record and Claude automatic-read policy do not add an updater,
+download or installation flow. Stable discovery continues to return the latest
+published Release; a candidate version ahead of 4.2.0 does not create a new
+stable download. Candidate checks and pending maintainer-local acceptance are
+tracked in [4.3.0 acceptance](4.3.0-ACCEPTANCE.md).
+
 Versions `4.0.1 (22)`, `4.1.0 (24)`, `4.1.1 (25)`, `4.1.2 (26)`,
 `4.1.3 (27)`, `4.1.4 (28)`, `4.1.5 (29)`, `4.1.6 (30)`, `4.1.7 (31)` and
 `4.2.0 (33)` retain this
@@ -124,6 +131,11 @@ be proposed. This document does not claim that path already exists.
 用户点击后查询本仓库最新公开稳定 Release，显示版本和纯文本说明，并可通过系统
 浏览器打开经过验证的发布页面。下载、校验和安装仍由用户完成，不会自动替换或重启
 App。`0.2.2` 用户需先手动安装 `0.3.0` 或之后的正式稳定版本，才能使用检查入口。
+
+开发候选 `4.3.0 (34)` 尚未发布。设置入口、桥接健康记录和 Claude 自动读取策略不会
+新增更新器、下载或安装流程；稳定版本发现仍跟随最新公开 Release。候选版本号高于
+4.2.0 不代表已有新的稳定下载，云端检查与维护者本地待验收项分别见
+[4.3.0 验收清单](4.3.0-ACCEPTANCE.md)。
 
 未发布的 `4.0.2 (23)` 候选版（已并入 4.1.0）继续沿用此更新机制。通知回调修复和
 紧凑额度布局不会新增自动检查或安装；“查看官方 Claude 用量”仅打开浏览器页面，不是

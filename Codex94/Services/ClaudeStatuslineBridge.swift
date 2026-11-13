@@ -36,8 +36,10 @@ enum ClaudeStatuslineBridge {
     static func capture(_ data: Data, manifest value: ClaudeStatuslineInstaller.Manifest,
                                 manifestURL: URL, directories: ClaudeConfigurationDirectories,
                                 now: Date = Date()) throws {
-        try ClaudeStatuslineCache(fileURL: URL(fileURLWithPath: value.cachePath)).capture(
-            data, at: now, installationID: value.installationID
+        let cache = ClaudeStatuslineCache(fileURL: URL(fileURLWithPath: value.cachePath))
+        try cache.capture(
+            data, at: now, installationID: value.installationID,
+            health: value.installationID == nil ? nil : ClaudeBridgeHealthStore(cache: cache)
         ) {
             // Installer changes share the cache lock: a retired process cannot
             // overwrite a new installation after its terminal read completes.
