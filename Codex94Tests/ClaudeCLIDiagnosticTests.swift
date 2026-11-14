@@ -18,7 +18,9 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
 
         f.clock.advance(20)
         let secondCompletion = f.clock.read()
-        f.store.refresh()
+        // This test requests a diagnostic retry explicitly; ordinary automatic
+        // refresh now respects the shared failure cooldown.
+        f.store.readOnceWithCLI()
         try await settle { await f.fetcher.count == 2 }
         XCTAssertEqual(f.store.lastCLIDiagnostic, firstRecord, "Retry retains a clearly previous, complete record")
         XCTAssertEqual(f.store.sourceHealth(at: f.clock.read()).operationState, .reading)
@@ -41,7 +43,7 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
         try await settle { await f.fetcher.count == 1 }
         await f.fetcher.complete(1, .success(report(at: f.clock.read())))
         try await settle { !f.store.isRefreshing }
-        f.store.refresh()
+        f.store.readOnceWithCLI()
         try await settle { await f.fetcher.count == 2 }
         await f.fetcher.emit(diagnostic(result: .failure, issue: .invalidData), for: 1)
         await f.fetcher.emit(diagnostic(result: .failure, issue: .timedOut), for: 2)
@@ -50,7 +52,7 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
         XCTAssertEqual(f.store.lastCLIDiagnostic?.diagnostic.issue, .timedOut)
         await f.fetcher.emit(diagnostic(result: .success), for: 1)
         // The third read creates an observable barrier after the old observer.
-        f.store.refresh()
+        f.store.readOnceWithCLI()
         try await settle { await f.fetcher.count == 3 }
         XCTAssertEqual(f.store.lastCLIDiagnostic?.diagnostic.issue, .timedOut)
     }
@@ -63,6 +65,10 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
         f.store.start()
         await f.fetcher.emit(diagnostic(result: .failure, issue: .invalidData), for: 1)
         await f.fetcher.complete(1, .success(report(at: f.clock.read())))
+        try await settle { !f.store.isRetiringCLI }
+        let afterRestart = await f.fetcher.count
+        XCTAssertEqual(afterRestart, 1, "Restart must not bypass the automatic minimum interval")
+        f.store.readOnceWithCLI()
         try await settle { await f.fetcher.count == 2 }
         XCTAssertNil(f.store.lastCLIDiagnostic)
         f.clock.advance(5)
@@ -83,6 +89,7 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
             let f = try fixture(automatic: true, shutdownGate: shutdownGate)
             try writeLocalReport(f)
             f.store.start()
+            f.store.readOnceWithCLI()
             try await settle { await f.fetcher.count == 1 }
             let first = diagnostic(result: .success, duration: 110)
             await f.fetcher.emit(first, for: 1)
@@ -91,7 +98,7 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
             let firstCompletedAt = try XCTUnwrap(f.store.lastCLIDiagnostic?.completedAt)
 
             f.clock.advance(5)
-            f.store.refresh()
+            f.store.readOnceWithCLI()
             try await settle { await f.fetcher.count == 2 }
             f.store.setCLIUsageEnabled(false)
             try await settle { shutdownGate.started > 0 }
@@ -122,6 +129,12 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
             } else {
                 shutdownGate.allowShutdown()
             }
+            try await settle { !f.store.isRetiringCLI }
+            let afterRetirement = await f.fetcher.count
+            XCTAssertEqual(afterRetirement, 2,
+                           "Fresh local quota suppresses the queued automatic intent after cleanup")
+            XCTAssertNil(f.store.lastCLIDiagnostic)
+            f.store.readOnceWithCLI()
             try await settle { await f.fetcher.count == 3 }
             XCTAssertNil(f.store.lastCLIDiagnostic)
             XCTAssertNil(f.store.lastCLIReadIssue)
@@ -151,7 +164,8 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
             let f = try fixture(automatic: automatic)
             try writeLocalReport(f)
             f.store.start()
-            if automatic { try await settle { await f.fetcher.count == 1 } }
+            let startupCalls = await f.fetcher.count
+            XCTAssertEqual(startupCalls, 0, "Fresh local quota does not require an automatic CLI read")
             let original = try XCTUnwrap(f.store.snapshot)
             let deadline = f.store.nextAutomaticRefreshAt
             let bytes = try Data(contentsOf: f.localURL)
@@ -161,7 +175,7 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
                 _ = f.store.sourceHealth(at: f.clock.read())
             }
             let count = await f.fetcher.count
-            XCTAssertEqual(count, automatic ? 1 : 0)
+            XCTAssertEqual(count, 0)
             XCTAssertEqual(f.store.snapshot, original)
             XCTAssertEqual(f.store.reportedAt, original.fetchedAt)
             XCTAssertEqual(f.store.nextAutomaticRefreshAt, deadline)
@@ -175,6 +189,7 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
         let f = try fixture(automatic: true)
         try writeLocalReport(f)
         f.store.start()
+        f.store.readOnceWithCLI()
         try await settle { await f.fetcher.count == 1 }
         f.clock.advance(3)
         try writeLocalReport(f, account: "00000000-0000-4000-8000-000000000002")

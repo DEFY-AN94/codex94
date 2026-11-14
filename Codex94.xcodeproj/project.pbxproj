@@ -136,6 +136,10 @@
 		C1420000000000000000000E /* CLICompatibility in Resources */ = {isa = PBXBuildFile; fileRef = C1420000000000000000000D /* CLICompatibility */; };
 		C14200000000000000000010 /* ClaudeUsageReadTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1420000000000000000000F /* ClaudeUsageReadTiming.swift */; };
 		C14200000000000000000012 /* ClaudeUsageReadTimingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14200000000000000000011 /* ClaudeUsageReadTimingTests.swift */; };
+		C14300000000000000000002 /* ClaudeBridgeHealthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14300000000000000000001 /* ClaudeBridgeHealthStore.swift */; };
+		C14300000000000000000004 /* ClaudeAutomaticReadPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14300000000000000000003 /* ClaudeAutomaticReadPolicy.swift */; };
+		C14300000000000000000006 /* ClaudeBridgeHealthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14300000000000000000005 /* ClaudeBridgeHealthTests.swift */; };
+		C14300000000000000000008 /* ClaudeAutomaticReadPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14300000000000000000007 /* ClaudeAutomaticReadPolicyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -289,6 +293,10 @@
 		C1420000000000000000000D /* CLICompatibility */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Fixtures/CLICompatibility"; sourceTree = "<group>"; };
 		C1420000000000000000000F /* ClaudeUsageReadTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Support/ClaudeUsageReadTiming.swift"; sourceTree = "<group>"; };
 		C14200000000000000000011 /* ClaudeUsageReadTimingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeUsageReadTimingTests.swift"; sourceTree = "<group>"; };
+		C14300000000000000000001 /* ClaudeBridgeHealthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ClaudeBridgeHealthStore.swift"; sourceTree = "<group>"; };
+		C14300000000000000000003 /* ClaudeAutomaticReadPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Support/ClaudeAutomaticReadPolicy.swift"; sourceTree = "<group>"; };
+		C14300000000000000000005 /* ClaudeBridgeHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeBridgeHealthTests.swift"; sourceTree = "<group>"; };
+		C14300000000000000000007 /* ClaudeAutomaticReadPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeAutomaticReadPolicyTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -321,6 +329,8 @@
 		A00000000000000000000004 /* Codex94 */ = {
 			isa = PBXGroup;
 			children = (
+				C14300000000000000000003 /* ClaudeAutomaticReadPolicy.swift */,
+				C14300000000000000000001 /* ClaudeBridgeHealthStore.swift */,
 				C1420000000000000000000F /* ClaudeUsageReadTiming.swift */,
 				C14200000000000000000001 /* ClaudeSourceHealthPresentation.swift */,
 				C14200000000000000000003 /* ClaudeSourceHealthView.swift */,
@@ -417,6 +427,8 @@
 		A00000000000000000000005 /* Codex94Tests */ = {
 			isa = PBXGroup;
 			children = (
+				C14300000000000000000007 /* ClaudeAutomaticReadPolicyTests.swift */,
+				C14300000000000000000005 /* ClaudeBridgeHealthTests.swift */,
 				C14200000000000000000011 /* ClaudeUsageReadTimingTests.swift */,
 				C14200000000000000000005 /* CLICompatibilityReplayTests.swift */,
 				C14200000000000000000007 /* ClaudeSourceHealthTests.swift */,
@@ -561,6 +573,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C14300000000000000000004 /* ClaudeAutomaticReadPolicy.swift in Sources */,
+				C14300000000000000000002 /* ClaudeBridgeHealthStore.swift in Sources */,
 				C14200000000000000000010 /* ClaudeUsageReadTiming.swift in Sources */,
 				C14200000000000000000002 /* ClaudeSourceHealthPresentation.swift in Sources */,
 				C14200000000000000000004 /* ClaudeSourceHealthView.swift in Sources */,
@@ -654,6 +668,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C14300000000000000000008 /* ClaudeAutomaticReadPolicyTests.swift in Sources */,
+				C14300000000000000000006 /* ClaudeBridgeHealthTests.swift in Sources */,
 				C14200000000000000000012 /* ClaudeUsageReadTimingTests.swift in Sources */,
 				C14200000000000000000006 /* CLICompatibilityReplayTests.swift in Sources */,
 				C14200000000000000000008 /* ClaudeSourceHealthTests.swift in Sources */,
@@ -764,7 +780,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 33;
+				CURRENT_PROJECT_VERSION = 34;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -772,7 +788,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 4.2.0;
+				MARKETING_VERSION = 4.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -790,7 +806,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 33;
+				CURRENT_PROJECT_VERSION = 34;
 				DEAD_CODE_STRIPPING = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				ENABLE_APP_SANDBOX = NO;
@@ -798,7 +814,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Codex94/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MARKETING_VERSION = 4.2.0;
+				MARKETING_VERSION = 4.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.defyan94.codex94;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

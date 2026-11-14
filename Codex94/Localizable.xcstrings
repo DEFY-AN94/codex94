@@ -1,6 +1,329 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "claude.health.bridge.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection activity diagnostics are unavailable for this installation."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此安装的连接活动诊断不可用。"
+          }
+        }
+      }
+    },
+    "claude.health.bridge.waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No activity record yet. This does not establish whether Claude called the connection."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无活动记录，无法据此判断 Claude 是否调用了连接。"
+          }
+        }
+      }
+    },
+    "claude.health.bridge.unreadable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The connection activity record could not be read."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取连接活动记录。"
+          }
+        }
+      }
+    },
+    "claude.health.bridge.captured": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection activity: a quota report was captured."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接活动：已采集额度报告。"
+          }
+        }
+      }
+    },
+    "claude.health.bridge.unchanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection activity: the quota values were unchanged."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接活动：额度数值未变化。"
+          }
+        }
+      }
+    },
+    "claude.health.bridge.noQuotaFields": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection activity: Claude supplied no quota fields."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接活动：Claude 未提供额度字段。"
+          }
+        }
+      }
+    },
+    "claude.health.bridge.expiredWindows": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection activity: the supplied quota windows had expired."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接活动：提供的额度窗口已过期。"
+          }
+        }
+      }
+    },
+    "claude.health.bridge.invalidInput": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection activity: the supplied report could not be parsed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接活动：提供的报告无法解析。"
+          }
+        }
+      }
+    },
+    "claude.health.bridge.captureFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection activity: quota capture did not complete."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接活动：额度采集未完成。"
+          }
+        }
+      }
+    },
+    "claude.health.bridge.recordedAt %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last recorded connection activity: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近记录的连接活动：%@"
+          }
+        }
+      }
+    },
+    "claude.health.bridge.boundary": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity belongs to this installation; it does not confirm a new server reading or the selected account."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活动属于此安装，不代表服务端额度已更新，也不能确认所选账号。"
+          }
+        }
+      }
+    },
+    "claude.health.automatic.disabled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic CLI reading is off."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动 CLI 读取已关闭。"
+          }
+        }
+      }
+    },
+    "claude.health.automatic.scheduled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic checks read with the CLI only when needed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动检查仅在需要时使用 CLI 读取。"
+          }
+        }
+      }
+    },
+    "claude.health.automatic.recentReport": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A recent accepted report lets this automatic check skip the CLI."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已有最近的已接受报告，本次自动检查可跳过 CLI。"
+          }
+        }
+      }
+    },
+    "claude.health.automatic.minimumInterval": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting before another automatic CLI read."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待下次自动 CLI 读取的最小间隔。"
+          }
+        }
+      }
+    },
+    "claude.health.automatic.cooldown": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic CLI reads are cooling down after a failed attempt."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取失败后，自动 CLI 正在冷却。"
+          }
+        }
+      }
+    },
+    "claude.health.automatic.suspended": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic CLI reads are paused. Review the last error or retry once after resolving it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动 CLI 已暂停。请查看最近错误，处理后可单次重试。"
+          }
+        }
+      }
+    },
+    "claude.health.automatic.reading": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A CLI read is in progress."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在使用 CLI 读取。"
+          }
+        }
+      }
+    },
+    "claude.health.automatic.next %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next automatic check: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下次自动检查：%@"
+          }
+        }
+      }
+    },
     "claude.health.reviewCLI": {
       "extractionState": "manual",
       "localizations": {
@@ -58,13 +381,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Current report"
+            "value": "Recent report"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "当前报告"
+            "value": "最近报告"
           }
         }
       }
@@ -1010,13 +1333,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Regular refresh is allowed to start Claude Code. It may consume Tokens and five-hour or weekly subscription quota."
+            "value": "Checks local reports first. When automatic CLI reading is enabled, it reads with the CLI only when needed and allowed by the cooldown."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已允许常规刷新启动 Claude Code，可能消耗 Token 和五小时、每周订阅额度。"
+            "value": "先检查本地报告。自动 CLI 开启时，仅在需要且冷却允许时使用 CLI 读取。"
           }
         }
       }
@@ -1809,13 +2132,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Off by default. When enabled, scheduled and regular refreshes can start Claude Code. When disabled, these refreshes only reread local files. The one-time button below is separate."
+            "value": "Off by default. Automatic checks skip CLI reads when an accepted report is less than 10 minutes old. Otherwise they may start Claude Code, subject to spacing and failure cooldown. The one-time button below is separate."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "默认关闭。开启后，定时和常规刷新可启动 Claude Code；关闭后，这些刷新只重读本地文件。下方单次按钮独立生效。"
+            "value": "默认关闭。已接受报告不足 10 分钟时，自动检查跳过 CLI；否则可在满足间隔和失败冷却后启动 Claude Code。下方单次按钮独立生效。"
           }
         }
       }
@@ -2484,13 +2807,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "CLI query interval"
+            "value": "Automatic check interval"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "CLI 查询间隔"
+            "value": "自动检查间隔"
           }
         }
       }

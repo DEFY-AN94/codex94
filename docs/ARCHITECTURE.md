@@ -8,6 +8,97 @@ unpublished `4.0.2 (23)` work carried into 4.1.0.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
+## 4.3.0 candidate: window routing, bridge activity and CLI admission
+
+The unpublished `4.3.0 (34)` candidate extends those responsibilities as follows.
+Its rules supersede the historical freshness policy below; the stable release
+remains 4.2.0. OAuth/HTTP research is not part of the production dependency graph.
+
+### Application Settings
+
+The application Settings command/Command-comma forwards to AppDelegate's existing
+Dashboard route. The same AppKit controller and AppStore own the window for every
+entry point. Restore a minimized window, preserve its section/frame and avoid a
+second Settings content tree or a temporary empty-window redirect. The popover
+button does not own a competing shortcut. Navigation adds no quota read; the
+Token page retains its separate first-load behavior.
+
+### Bridge-health sidecar
+
+The bridge records observable capture outcomes independently of the v1 quota
+record. `ClaudeBridgeHealthStore` owns a fixed `statusline-health.json` sibling
+of the existing quota file, capped at 4 KiB. Its schema contains installation,
+recorded time and a fixed outcome, not quota, account or raw input. Installation
+locking, safe file reads/writes and generation revalidation remain shared with
+the installer/cache. Avoid recursive acquisition of that lock. At most one
+record per fifteen seconds for an installation is written across processes;
+it represents the latest recorded activity, not a complete event history.
+
+The installer exposes health only for the current matching installation. Legacy,
+retired, absent and unreadable records remain distinguishable without adopting
+another quota producer. The app uses its existing fifteen-second passive poll;
+views project the health state without I/O. Removal only targets a matching
+owned health record. Existing wrapper arguments, manifest and quota format stay
+compatible with the previous App.
+
+An observed invocation can have no quota fields or unchanged/expired values.
+That still differs from no activity evidence, but cannot renew `reportedAt`,
+notify, authenticate an account or cover a reset. Lock/write failures and early
+exit may leave no health record; do not infer a specific cause from absence.
+Health reporting is best-effort and cannot change statusline forwarding, exit
+status, cancellation or subprocess cleanup.
+
+### Report eligibility
+
+`ClaudeQuotaFreshnessPolicy` keeps retained display, notification eligibility
+and automatic-read deferral as separate pure decisions. Default eligibility is
+strictly `0 <= age < 600` seconds for every source, with an unexpired usable
+window and the existing source/context eligibility. Future timestamps are not
+recent. The check interval does not extend this boundary. Source selection still
+chooses one eligible report by its original time, with the local cache winning
+ties; never merge windows across reports.
+
+`reportedAt`, local receipt and bridge activity are different clocks. Re-reading
+a file or receiving an unchanged statusline payload cannot renew report time.
+Cached values remain visible until window expiry makes them history; the expiry
+does not create a fresh 100% value. Weekly-only is valid. The notification
+watermark and cycle baseline do not reset merely because data ages or falls
+back to an older source.
+
+### Automatic CLI policy and lifecycle
+
+The store owns one polling task, one CLI read/retirement lifecycle and the source
+slots. A pure automatic-read policy supplies admission/defer decisions; it does
+not launch processes or create another timer. Ordinary launch, interval, wake,
+popover and reset triggers first read passive state and assess the accepted
+report. Pending/unverified streams and heartbeat records cannot defer a query.
+A skipped due check advances its next decision time instead of firing on every
+fifteen-second poll.
+
+Normal checks retain the user's 1/5/15/30-minute cadence. Automatic starts have
+a sixty-second minimum, and temporary failures share completion-based cooldowns
+of 1/2/5/10/15 minutes, capped at fifteen minutes. Elapsed-time gates use an
+injected monotonic clock; wall dates describe reports, resets and the next known
+attempt. Wake/clock events, interval changes and automatic-option toggles do not
+erase active gates. Failure/schedule state is memory-only; restart is not a
+persistent account-wide rate limiter.
+
+Authentication, missing CLI, setup or configuration failures require an explicit
+retry or a relevant recovery/context change rather than short automatic retries.
+Manual one-time reads bypass ordinary freshness deferral and automatic cooldown,
+but never overlap running/retiring work or queue repeated clicks. Their success
+or failure still updates shared automatic timing; manual errors remain scoped
+to that explicit action. Passive-only rereads never start or enqueue CLI work.
+
+Keep reset attempts distinct from successful new-cycle evidence. Only a valid
+new period for the corresponding window satisfies that window's reset target;
+a newer weekly report does not prove a five-hour reset succeeded. Missing
+windows stay unknown and do not create immediate retry loops. Generation/read
+guards reject old completions and diagnostics after context changes or shutdown.
+
+See [the candidate acceptance checklist](4.3.0-ACCEPTANCE.md) for the required
+combination tests and pending native acceptance.
+
 ## 4.2.0 release: source-health projection and per-read diagnostics
 
 `ClaudeQuotaStore` owns the accepted source slots, current/history selection,

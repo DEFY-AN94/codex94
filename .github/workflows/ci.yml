@@ -93,14 +93,22 @@ jobs:
 
   ui-test:
     name: UI smoke (${{ matrix.scenario }})
+    # Hosted Intel images fail Metal initialization; use the validated arm64
+    # image and request one UI runner at a time after the release gate.
+    needs: test
     runs-on: macos-15
     # Display completed its assertions but exceeded the overall 20-minute limit.
     # Providers also exercises source-health navigation and bilingual captures.
     timeout-minutes: ${{ (matrix.scenario == 'display' || matrix.scenario == 'providers') && 25 || 20 }}
     strategy:
       fail-fast: false
+      # Bound requests while hosted macOS capacity is constrained.
+      max-parallel: 1
       matrix:
         include:
+          - scenario: providers
+            method: testProvidersSmoke
+            artifact: codex94-ui-providers
           - scenario: display
             method: testDisplaySmoke
             artifact: codex94-ui-display
@@ -113,9 +121,6 @@ jobs:
           - scenario: floating
             method: testFloatingWindowSmoke
             artifact: codex94-ui-floating
-          - scenario: providers
-            method: testProvidersSmoke
-            artifact: codex94-ui-providers
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

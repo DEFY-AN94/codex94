@@ -6,6 +6,57 @@ stable version is [`v4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/
 released on 2026-11-14 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
+## 4.3.0 candidate: local bridge health and on-demand CLI
+
+The unpublished `4.3.0 (34)` candidate adds one application-owned file:
+`~/Library/Application Support/Codex94/Claude/statusline-health.json`.
+It keeps only the latest recorded bridge activity, with a schema version,
+installation identifier, observation time and a fixed result. The record is at
+most 4 KiB, uses private local-file protections, and is written no more than once
+per fifteen seconds for that installation across short-lived bridge processes.
+It contains no quota values, account identity, raw session identifier, input JSON,
+terminal text, filesystem paths or arbitrary error text. It is not uploaded or
+included in release assets.
+
+The installation identifier matches activity to the existing bridge installation;
+it is not account verification and is not copied into redacted diagnostics.
+Only a matching installation's health record is eligible for removal. Old or
+unmatched records are not interpreted as current activity. Legacy installations
+without an identifier can keep their quota behavior without gaining attributed
+health diagnostics. Older Apps ignore the new sidecar; the existing quota-cache
+format and wrapper invocation stay unchanged.
+
+Services can display the most recently recorded activity and whether that
+observable invocation supplied new/unchanged quota, no quota fields, expired
+windows or a capture failure. A missing diagnostic is unknown rather than proof
+that Claude did not call the bridge. The activity time is separate from the quota
+report time: repeated values, empty input and health records never refresh quota
+age or generate quota notifications. These bounded records are not a quota or
+session history.
+
+All three Claude sources now need an age strictly below ten minutes to count as
+recent, notify, or defer a needed automatic CLI read. Older reports remain visible
+as cached or historical with their original time. This replaces the published
+4.2.0 local-cache sixty-minute and refresh-dependent CLI eligibility rules; it
+does not fetch new cloud data or guarantee that a server sample is recent.
+
+Automatic CLI remains a separate default-off choice. When enabled, ordinary
+checks reuse an eligible recent report before considering the CLI. The existing
+check interval is retained, automatic starts have a sixty-second minimum, and
+transient failures share 1/2/5/10/15-minute cooldowns from completion. Failure
+counts, cooldowns and scheduling state remain in memory and do not survive an
+App restart. Changing the interval or toggling the option does not bypass the
+current run's cooldown. Explicit single reads remain independent of the switch;
+their outcomes still coordinate subsequent automatic reads. Local rereads stay
+passive even while automatic CLI is enabled.
+
+The application Settings/Command-comma route reuses the existing Dashboard;
+it adds no global keyboard listener, quota request or persistent UI state.
+There is no new OAuth, HTTP quota client, credential access, telemetry upload or
+real-account experiment. Separate HTTP research is outside this candidate.
+See the [acceptance checklist](docs/4.3.0-ACCEPTANCE.md) for the distinction between
+cloud verification and pending maintainer-local acceptance.
+
 Version `4.1.7 (31)` evaluates Claude CLI usage output
 even while the terminal continues redrawing. It retains the probe's 20-second
 default deadline, 1 MiB output cap and one-second report stability requirement,

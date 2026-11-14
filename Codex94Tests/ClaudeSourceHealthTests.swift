@@ -4,6 +4,41 @@ import XCTest
 final class ClaudeSourceHealthTests: XCTestCase {
     private let instant = Date(timeIntervalSince1970: 2_000_000_000)
 
+    func testBridgeActivityDoesNotRenewAnOldReportOrManufactureQuota() {
+        let activity = ClaudeBridgeHealthState.observed(.init(recordedAt: instant, outcome: .unchanged))
+        let oldReport = ClaudeQuotaReport(
+            source: .localCache, reportedAt: instant.addingTimeInterval(-3_000), receivedAt: instant,
+            windows: [.init(kind: .weekly, usedPercentage: 40, resetsAt: instant.addingTimeInterval(3_600))]
+        )
+        let value = ClaudeSourceHealthPresentation.project(
+            isEnabled: true, acceptedReport: oldReport, at: instant,
+            isCLIUsageEnabled: true, bridgeHealth: activity,
+            automaticReadState: .cooldown, nextAutomaticCheckAt: instant.addingTimeInterval(60)
+        )
+        XCTAssertEqual(value.dataState, .cached)
+        XCTAssertEqual(value.reportedAt, oldReport.reportedAt)
+        XCTAssertEqual(value.bridgeHealth, activity)
+        XCTAssertEqual(value.automaticReadState, .cooldown)
+        XCTAssertEqual(value.nextAutomaticCheckAt, instant.addingTimeInterval(60))
+        let empty = ClaudeSourceHealthPresentation.project(
+            isEnabled: true, acceptedReport: nil, at: instant, bridgeHealth: activity
+        )
+        XCTAssertEqual(empty.dataState, .unavailable)
+        XCTAssertNil(empty.reportedAt)
+    }
+
+    func testDisabledMonitoringHidesBridgeActivityAndAutomaticSchedule() {
+        let value = ClaudeSourceHealthPresentation.project(
+            isEnabled: false, acceptedReport: report(), at: instant,
+            isCLIUsageEnabled: true,
+            bridgeHealth: .observed(.init(recordedAt: instant, outcome: .captured)),
+            automaticReadState: .cooldown, nextAutomaticCheckAt: instant.addingTimeInterval(60)
+        )
+        XCTAssertEqual(value.bridgeHealth, .unavailable)
+        XCTAssertEqual(value.automaticReadState, .disabled)
+        XCTAssertNil(value.nextAutomaticCheckAt)
+    }
+
     func testDisabledHealthDoesNotPublishPreviousSourceChecksOrAttempts() {
         let value = ClaudeSourceHealthPresentation.project(
             isEnabled: false, acceptedReport: report(), at: instant,
@@ -24,17 +59,17 @@ final class ClaudeSourceHealthTests: XCTestCase {
         XCTAssertEqual(value.actions, [.openDiagnostics])
     }
 
-    func testAgeUsesAcceptedSourcePolicyInsteadOfLastOperationIssue() {
-        for (source, freshThrough) in [(ClaudeQuotaSource.localCache, 3_600.0), (.statusline, 600.0), (.cliUsage, 960.0)] {
+    func testAgeUsesStrictTenMinuteBoundaryInsteadOfLastOperationIssueOrRefreshInterval() {
+        for source in [ClaudeQuotaSource.localCache, .statusline, .cliUsage] {
             let accepted = report(source: source)
             let fresh = ClaudeSourceHealthPresentation.project(
-                isEnabled: true, acceptedReport: accepted, at: instant.addingTimeInterval(freshThrough),
+                isEnabled: true, acceptedReport: accepted, at: instant.addingTimeInterval(599.999),
                 refreshInterval: 900, localCacheState: .invalid, lastReadIssue: .timedOut
             )
             XCTAssertEqual(fresh.dataState, .current)
             XCTAssertEqual(fresh.lastReadIssue, .timedOut)
             let cached = ClaudeSourceHealthPresentation.project(
-                isEnabled: true, acceptedReport: accepted, at: instant.addingTimeInterval(freshThrough + 1),
+                isEnabled: true, acceptedReport: accepted, at: instant.addingTimeInterval(600),
                 refreshInterval: 900, localCacheState: .valid
             )
             XCTAssertEqual(cached.dataState, .cached)

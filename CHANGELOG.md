@@ -6,6 +6,50 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
+## 4.3.0 - Unreleased
+
+Development candidate `4.3.0 (34)`. The published stable release remains
+`4.2.0 (33)`; no release date, tag, replacement asset or local App acceptance
+is implied by this entry.
+
+### Fixed
+
+- Route the application Settings command and Command-comma through the existing
+  Dashboard controller, including when the popover is closed. Restore minimized
+  windows and preserve the existing section and size instead of opening an empty
+  Settings window ([#73](https://github.com/DEFY-AN94/codex94/issues/73)).
+
+### Added
+
+- Record bounded installation-scoped statusline activity separately from quota:
+  captured/unchanged data, absent quota fields, expired windows and observable
+  capture failures. A small private health file is rate-limited across bridge
+  processes and does not store quota, account identity or payloads. Activity is
+  not evidence of a new server sample; unavailable diagnostics stay unknown.
+
+### Changed
+
+- Use a strict ten-minute recent-report boundary for every Claude source,
+  separating retained display, notification eligibility and automatic-read
+  deferral. Preserve original observation times, confirmation boundaries,
+  weekly-only reports and cached/history presentation.
+- Make optional automatic CLI checks conditional on the accepted report.
+  Preserve the configured check cadence, enforce a sixty-second automatic-start
+  minimum and shared transient-failure cooldowns of one, two, five, ten and
+  fifteen minutes. Keep explicit one-time reads independent of the automatic
+  switch, merge competing triggers and reject retired results.
+- Keep local rereads passive-only and prevent duplicate/heartbeat data from
+  renewing quota freshness, notification eligibility or reset coverage.
+
+### Validation and acceptance
+
+Cloud/static checks, macOS CI, UI evidence and local acceptance must be recorded
+against the actual candidate in [the release record](docs/RELEASING.md#430-candidate-scope-and-authorization--unreleased).
+The maintainer explicitly requested Ready after all cloud gates, with local
+acceptance deferred to the maintainer and no merge. The [acceptance checklist](docs/4.3.0-ACCEPTANCE.md)
+tracks that remaining work. OAuth/HTTP research is separate and absent from
+the candidate's production scope.
+
 ## 4.2.0 - 2026-11-14
 
 Version `4.2.0 (33)` was published on the date above, following the published

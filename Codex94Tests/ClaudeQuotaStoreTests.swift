@@ -209,6 +209,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let cachedAt = fixture.clock.read()
         let original = try Data(contentsOf: fixture.cache.fileURL)
         fixture.store.start()
+        fixture.store.readOnceWithCLI()
         XCTAssertEqual(fixture.store.source, .statusline, "Passive data is shown while the first CLI read is pending")
         XCTAssertEqual(fixture.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 50)
         XCTAssertTrue(fixture.store.isRefreshing)
@@ -218,7 +219,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try await wait { !fixture.store.isRefreshing }
         XCTAssertEqual(fixture.store.source, .cliUsage, "A strictly newer CLI result replaces the passive report")
         XCTAssertEqual(fixture.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 70)
-        fixture.store.refresh()
+        fixture.store.readOnceWithCLI()
         try await wait { await fixture.fetcher.count() == 2 }
         fixture.store.setCLIUsageEnabled(false)
         XCTAssertFalse(fixture.preferences.claudeCLIUsageEnabled)
@@ -239,6 +240,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let disabledCalls = await fixture.fetcher.count()
         XCTAssertEqual(disabledCalls, 2)
         fixture.store.setCLIUsageEnabled(true)
+        fixture.store.readOnceWithCLI()
         XCTAssertEqual(fixture.store.source, .statusline, "Re-enabling the option keeps the passive report visible while it reads")
         XCTAssertNotNil(fixture.store.snapshot)
         try await wait { await fixture.fetcher.count() == 3 }
@@ -276,6 +278,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let reset = began.addingTimeInterval(20_000)
         try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: reset)
         f.store.start()
+        f.store.readOnceWithCLI()
         try await wait { await f.fetcher.count() == 1 }
         f.clock.advance(1)
         await f.fetcher.complete(.success(report(at: f.clock.read(), used: 95, resetAt: reset)))
@@ -291,6 +294,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
                        "The old high reading is not recovery and the new low reading is not a second alert")
 
         f.store.setCLIUsageEnabled(true)
+        f.store.readOnceWithCLI()
         try await wait { await f.fetcher.count() == 2 }
         f.clock.advance(1)
         await f.fetcher.complete(.success(report(at: f.clock.read(), used: 97, resetAt: reset)))
@@ -322,6 +326,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let reset = began.addingTimeInterval(20_000)
         try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: reset)
         f.store.start()
+        f.store.readOnceWithCLI()
         try await wait { await f.fetcher.count() == 1 }
         f.clock.advance(1)
         await f.fetcher.complete(.success(report(at: f.clock.read(), used: 85, resetAt: reset)))
@@ -346,7 +351,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         await fixture.fetcher.complete(.success(ClaudeQuotaReport(source: .cliUsage, reportedAt: began,
             receivedAt: began, windows: windows)))
         try await wait { !fixture.store.isRefreshing }
-        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, reset.addingTimeInterval(5))
+        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(60))
 
         fixture.clock.advance(30)
         try await poll(fixture)
@@ -359,6 +364,10 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         count = await fixture.fetcher.count()
         XCTAssertEqual(count, 1, "Reset grace has not elapsed")
         fixture.clock.advance(1)
+        try await poll(fixture)
+        count = await fixture.fetcher.count()
+        XCTAssertEqual(count, 1, "Reset grace does not bypass the 60-second automatic minimum")
+        fixture.clock.advance(25)
         try await poll(fixture)
         try await wait { await fixture.fetcher.count() == 2 }
         XCTAssertNil(fixture.store.snapshot)
@@ -401,7 +410,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try await wait { await fixture.fetcher.count() == 3 }
         await fixture.fetcher.complete(.failure(.timedOut))
         try await wait { !fixture.store.isRefreshing }
-        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(180))
+        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(240))
     }
 
     func testReadStartedBeforeResetLeavesExactlyOneFollowupWhenOldReplyFinishesAfterReset() async throws {
@@ -415,7 +424,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try await wait { !fixture.store.isRefreshing }
         fixture.clock.advance(29)
         let requestStartedAt = fixture.clock.read()
-        fixture.store.refresh()
+        fixture.store.readOnceWithCLI()
         try await wait { await fixture.fetcher.count() == 2 }
         fixture.clock.advance(6)
         try await poll(fixture)
@@ -423,9 +432,9 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertEqual(count, 2, "The due poll cannot overlap an accepted read")
         await fixture.fetcher.complete(.success(report(at: requestStartedAt, used: 70, resetAt: reset)))
         try await wait { !fixture.store.isRefreshing }
-        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, reset.addingTimeInterval(5))
+        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(95))
         XCTAssertNil(fixture.store.snapshot)
-        fixture.clock.advance(15)
+        fixture.clock.advance(60)
         try await poll(fixture)
         try await wait { await fixture.fetcher.count() == 3 }
         await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 12)))
@@ -469,7 +478,8 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try await wait { !fixture.store.isRefreshing }
         XCTAssertNil(fixture.store.snapshot)
         XCTAssertEqual(fixture.store.lastIssue, .noData)
-        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(35))
+        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(95))
+        fixture.clock.advance(60)
         try await poll(fixture)
         try await wait { await fixture.fetcher.count() == 2 }
         await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 40)))
@@ -502,7 +512,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
                                                      receivedAt: fixture.clock.read(), windows: windows)))
         try await wait { !fixture.store.isRefreshing }
         XCTAssertEqual(fixture.store.source, .cliUsage, "The newer CLI reply takes over again")
-        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(1_860),
+        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(1_865),
                        "Switching back to CLI preserves this request's start-time coverage")
         fixture.clock.advance(15)
         try await poll(fixture)
@@ -518,14 +528,14 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try await wait { await fixture.fetcher.count() == 1 }
         await fixture.fetcher.complete(.success(report(at: began, used: 70, resetAt: began.addingTimeInterval(30))))
         try await wait { !fixture.store.isRefreshing }
-        fixture.clock.advance(35)
+        fixture.clock.advance(60)
         try await poll(fixture)
         try await wait { await fixture.fetcher.count() == 2 }
         await fixture.fetcher.complete(.failure(.timedOut))
         try await wait { !fixture.store.isRefreshing }
         fixture.clock.advance(-20)
         fixture.store.handleSystemClockChange(now: fixture.clock.read())
-        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(1_815))
+        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(1_840))
         fixture.clock.advance(20)
         try await poll(fixture)
         let count = await fixture.fetcher.count()
@@ -540,12 +550,12 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try await wait { await fixture.fetcher.count() == 1 }
         await fixture.fetcher.complete(.success(report(at: began, used: 70, resetAt: began.addingTimeInterval(30))))
         try await wait { !fixture.store.isRefreshing }
-        fixture.clock.advance(20)
+        fixture.clock.advance(600)
         fixture.store.refresh()
         try await wait { await fixture.fetcher.count() == 2 }
         await fixture.fetcher.complete(.failure(.loginRequired))
         try await wait { !fixture.store.isRefreshing }
-        XCTAssertEqual(fixture.store.nextAutomaticRefreshAt, began.addingTimeInterval(1_820))
+        XCTAssertNil(fixture.store.nextAutomaticRefreshAt, "Rejected authentication suspends automatic attempts")
         fixture.clock.advance(15)
         try await poll(fixture)
         let count = await fixture.fetcher.count()
@@ -573,11 +583,10 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try await wait { await fixture.sleeper.count() >= 1 }
         await fixture.sleeper.tick()
         try await wait { await fixture.sleeper.count() >= 2 }
-        XCTAssertEqual(fixture.store.connectionState, .connected)
-        XCTAssertNil(fixture.store.lastIssue)
+        XCTAssertEqual(fixture.store.lastIssue, .staleData)
 
         try fixture.cache.capture(passivePayload(session: 2, used: 95), at: fixture.clock.read())
-        fixture.store.refresh()
+        fixture.store.readOnceWithCLI()
         try await wait { await fixture.fetcher.count() == 2 }
         await fixture.fetcher.complete(.failure(.timedOut))
         try await wait { !fixture.store.isRefreshing }
@@ -603,7 +612,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         fixture.clock.advance(20)
         let json = #"{"session_id":"00000000-0000-0000-0000-000000000002","rate_limits":{"five_hour":{"used_percentage":95,"resets_at":2000010000}}}"#
         try fixture.cache.capture(Data(json.utf8), at: fixture.clock.read())
-        fixture.store.refresh()
+        fixture.store.readOnceWithCLI()
         try await wait { await fixture.fetcher.count() == 2 }
         await fixture.fetcher.complete(.failure(.loginRequired))
         try await wait { !fixture.store.isRefreshing }
@@ -632,6 +641,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         XCTAssertTrue(fixture.store.isRetiringCLI)
         let retiringCalls = await fixture.fetcher.count()
         XCTAssertEqual(retiringCalls, 1, "Re-enable waits for the old fetch tail, even after shutdown returns")
+        fixture.clock.advance(60)
         await fixture.fetcher.complete(.success(report(at: fixture.clock.read(), used: 99)))
         try await wait { await fixture.fetcher.count() == 2 }
         XCTAssertNil(fixture.store.snapshot)
@@ -751,7 +761,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
             localCache: ClaudeLocalUsageCacheReader(fileURL: fixture.localCacheURL),
             fetcherFactory: { counter.increment(); return fetcher },
             notificationController: NotificationController(service: ClaudeStoreTestNotifications()),
-            now: { clock.read() }, sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
+            now: { clock.read() }, monotonicNow: { clock.elapsed() }, sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
         )
         defer { restarted.shutdown() }
         restarted.start()
@@ -955,9 +965,9 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try writeLocalCache(fixture, fiveHourUsed: 40, fetchedAt: began, resetAt: began.addingTimeInterval(7_200))
         fixture.store.start()
         XCTAssertEqual(fixture.store.connectionState, .connected)
-        fixture.clock.advance(3_600)
+        fixture.clock.advance(599)
         try await poll(fixture)
-        XCTAssertEqual(fixture.store.connectionState, .connected, "One hour is still current, matching Claude Code")
+        XCTAssertEqual(fixture.store.connectionState, .connected, "The strict recent-report boundary has not elapsed")
         fixture.clock.advance(1)
         try await poll(fixture)
         XCTAssertEqual(fixture.store.lastIssue, .staleData)
@@ -965,7 +975,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
                        "Cached data stays visible with its original time")
         XCTAssertEqual(fixture.store.reportedAt, began)
         guard case .stale = fixture.store.connectionState else { return XCTFail("Aged cache must be marked cached") }
-        fixture.clock.advance(3_600)
+        fixture.clock.advance(6_601)
         try await poll(fixture)
         XCTAssertNil(fixture.store.snapshot, "An expired window disappears instead of showing 100%")
         XCTAssertEqual(fixture.store.lastIssue, .noData)
@@ -1233,6 +1243,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: began.addingTimeInterval(10_000))
         try f.cache.capture(passivePayload(session: 1, used: 20), at: began)
         f.store.start()
+        f.store.readOnceWithCLI()
         try await wait { await f.fetcher.count() == 1 }
         let producer = f.preferences.claudePassiveProducerID
         f.clock.advance(10)
@@ -1255,7 +1266,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
                             account: "00000000-0000-4000-8000-000000000002")
         try await poll(f)
         XCTAssertEqual(f.store.snapshot?.defaultBucket?.window(.fiveHour)?.preciseRemainingPercent, 60)
-        f.store.refresh()
+        f.store.readOnceWithCLI()
         try await wait { await f.fetcher.count() == 2 }
         await f.fetcher.complete(.success(report(at: f.clock.read(), used: 40)))
         try await wait { !f.store.isRefreshing }
@@ -1267,6 +1278,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let began = f.clock.read()
         try writeLocalCache(f, fiveHourUsed: 40, fetchedAt: began, resetAt: began.addingTimeInterval(5_000))
         f.store.start()
+        f.store.readOnceWithCLI()
         try await wait { await f.fetcher.count() == 1 }
         try writeLocalCacheBytes(f, #"{"cachedUsageUtilization": {"#)
         try await poll(f)
@@ -1721,6 +1733,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
             }
             XCTAssertTrue(f.store.isRetiringCLI, "Completing just one half must not release the gate")
             XCTAssertEqual(pool.count, 1)
+            f.clock.advance(60)
             if shutdownFirst { first.complete(.success(report(at: f.clock.read(), used: 99))) }
             else { first.allowShutdown() }
             try await wait { pool.client(1)?.fetches.read() == 1 }
@@ -1776,6 +1789,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let began = f.clock.read(), reset = began.addingTimeInterval(20_000)
         try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: reset)
         f.store.start()
+        f.store.readOnceWithCLI()
         try await wait { await f.fetcher.count() == 1 }
         XCTAssertEqual(f.store.source, .localCache)
         XCTAssertTrue(f.notifications.deliveries.isEmpty)
@@ -1809,6 +1823,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
                        "Different values at the same observation time cannot create a recovery")
 
         f.store.setCLIUsageEnabled(true)
+        f.store.readOnceWithCLI()
         try await wait { await f.fetcher.count() == 2 }
         f.clock.advance(1)
         await f.fetcher.complete(.success(report(at: f.clock.read(), used: 96, resetAt: reset)))
@@ -1923,6 +1938,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
             let began = f.clock.read()
             try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: began.addingTimeInterval(10_000))
             f.store.start()
+            f.store.readOnceWithCLI()
             try await wait { pool.client(0)?.fetches.read() == 1 }
             let first = try XCTUnwrap(pool.client(0))
             XCTAssertEqual(f.store.source, .localCache)
@@ -2085,6 +2101,183 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         }
     }
 
+    func testAdvancingWallClockDoesNotMoveOverdueAutomaticWorkPastEveryPoll() async throws {
+        let f = try fixture()
+        f.preferences.claudeRefreshInterval = .oneMinute
+        f.store.start()
+        try await wait { await f.fetcher.count() == 1 }
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 40)))
+        try await wait { !f.store.isRefreshing }
+        f.clock.advance(601)
+        f.clock.setReadStep(0.001)
+        try await poll(f)
+        try await wait { await f.fetcher.count() == 2 }
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 45)))
+        try await wait { !f.store.isRefreshing }
+    }
+
+    func testRecentAcceptedPassiveDataSkipsAutomaticCLIUntilOriginalTimeExpires() async throws {
+        let f = try fixture()
+        f.preferences.claudeRefreshInterval = .oneMinute
+        let began = f.clock.read()
+        try f.cache.capture(passivePayload(session: 1, used: 40), at: began)
+        f.store.start()
+        for _ in 0..<9 {
+            f.clock.advance(60)
+            try f.cache.capture(passivePayload(session: 1, used: 40), at: f.clock.read())
+            try await poll(f)
+            f.store.refresh(trigger: .popover)
+        }
+        XCTAssertEqual(f.factoryCalls.read(), 0)
+        XCTAssertEqual(f.store.reportedAt, began, "Duplicate receipt is not a new observation")
+        XCTAssertEqual(f.store.nextAutomaticRefreshAt, began.addingTimeInterval(600))
+        f.clock.advance(60)
+        try await poll(f)
+        try await wait { await f.fetcher.count() == 1 }
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 45)))
+        try await wait { !f.store.isRefreshing }
+    }
+
+    func testWeeklyOnlyFreshReportAndThirtyMinuteCadenceDoNotCauseMissingWindowReads() async throws {
+        let f = try fixture()
+        f.preferences.claudeRefreshInterval = .thirtyMinutes
+        let began = f.clock.read()
+        try writeLocalCache(f, fiveHourUsed: nil, weeklyUsed: 40, fetchedAt: began,
+                            resetAt: began.addingTimeInterval(20_000))
+        f.store.start()
+        XCTAssertEqual(f.factoryCalls.read(), 0)
+        f.clock.advance(600)
+        try await poll(f)
+        XCTAssertEqual(f.store.lastIssue, .staleData)
+        XCTAssertEqual(f.factoryCalls.read(), 0, "A display age boundary does not shorten the chosen cadence")
+        XCTAssertEqual(f.store.nextAutomaticRefreshAt, began.addingTimeInterval(1_800))
+        f.clock.advance(1_200)
+        try await poll(f)
+        try await wait { await f.fetcher.count() == 1 }
+        let weekly = ClaudeQuotaReport(source: .cliUsage, reportedAt: f.clock.read(), receivedAt: f.clock.read(),
+            windows: [.init(kind: .weekly, usedPercentage: 41, resetsAt: began.addingTimeInterval(20_000))])
+        await f.fetcher.complete(.success(weekly))
+        try await wait { !f.store.isRefreshing }
+        f.clock.advance(15)
+        try await poll(f)
+        let calls = await f.fetcher.count()
+        XCTAssertEqual(calls, 1)
+        XCTAssertNil(f.store.snapshot?.defaultBucket?.window(.fiveHour))
+    }
+
+    func testAutomaticCooldownUsesElapsedTimeAndSurvivesOptionAndIntervalChanges() async throws {
+        let f = try fixture()
+        f.store.start()
+        try await wait { await f.fetcher.count() == 1 }
+        f.clock.advance(20)
+        await f.fetcher.complete(.failure(.timedOut))
+        try await wait { !f.store.isRefreshing }
+        f.clock.moveWallClock(8_000)
+        f.store.handleSystemClockChange(now: f.clock.read())
+        f.store.refresh(trigger: .systemWake)
+        XCTAssertEqual(f.store.automaticReadState, .cooldown)
+        XCTAssertEqual(f.store.nextAutomaticRefreshAt, f.clock.read().addingTimeInterval(60))
+        f.store.setCLIUsageEnabled(false)
+        try await wait { !f.store.isRetiringCLI }
+        f.store.setRefreshInterval(.oneMinute)
+        f.store.setCLIUsageEnabled(true)
+        for trigger in [RefreshTrigger.popover, .systemWake, .quotaReset, .background] { f.store.refresh(trigger: trigger) }
+        var calls = await f.fetcher.count()
+        XCTAssertEqual(calls, 1)
+        f.clock.advance(59)
+        try await poll(f)
+        calls = await f.fetcher.count()
+        XCTAssertEqual(calls, 1)
+        f.clock.advance(1)
+        try await poll(f)
+        try await wait { await f.fetcher.count() == 2 }
+        await f.fetcher.complete(.failure(.timedOut))
+        try await wait { !f.store.isRefreshing }
+        XCTAssertEqual(f.store.nextAutomaticRefreshAt, f.clock.read().addingTimeInterval(120))
+    }
+
+    func testExplicitReadBypassesRecentDataAndSharesFailureGateWithoutBackgroundError() async throws {
+        let f = try fixture()
+        try writeLocalCache(f, fiveHourUsed: 40, fetchedAt: f.clock.read(), resetAt: f.clock.read().addingTimeInterval(20_000))
+        f.store.start()
+        XCTAssertEqual(f.factoryCalls.read(), 0)
+        f.store.readOnceWithCLI()
+        f.store.readOnceWithCLI()
+        try await wait { await f.fetcher.count() == 1 }
+        await f.fetcher.complete(.failure(.timedOut))
+        try await wait { !f.store.isRefreshing }
+        XCTAssertEqual(f.store.lastCLIReadIssue, .timedOut)
+        XCTAssertNil(f.store.lastIssue, "An explicit failure remains independent of accepted passive data")
+        XCTAssertEqual(f.store.automaticReadState, .cooldown)
+        f.store.readOnceWithCLI()
+        try await wait { await f.fetcher.count() == 2 }
+        f.clock.advance(1)
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 45)))
+        try await wait { !f.store.isRefreshing }
+        f.store.refresh(trigger: .background)
+        let calls = await f.fetcher.count()
+        XCTAssertEqual(calls, 2, "Explicit success does not immediately provoke another automatic read")
+        XCTAssertTrue(f.preferences.claudeCLIUsageEnabled)
+    }
+
+    func testLoginSuspendsAutomaticReadsUntilAnExplicitSuccessfulRead() async throws {
+        let f = try fixture()
+        f.store.start()
+        try await wait { await f.fetcher.count() == 1 }
+        await f.fetcher.complete(.failure(.loginRequired))
+        try await wait { !f.store.isRefreshing }
+        XCTAssertEqual(f.store.automaticReadState, .suspended)
+        XCTAssertNil(f.store.nextAutomaticRefreshAt)
+        f.clock.advance(10_000)
+        try await poll(f)
+        f.store.refresh(trigger: .systemWake)
+        let calls = await f.fetcher.count()
+        XCTAssertEqual(calls, 1)
+        f.store.readOnceWithCLI()
+        try await wait { await f.fetcher.count() == 2 }
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 20)))
+        try await wait { !f.store.isRefreshing }
+        XCTAssertNotEqual(f.store.automaticReadState, .suspended)
+        XCTAssertNotNil(f.store.nextAutomaticRefreshAt)
+    }
+
+    func testNewWeeklyPassiveReportCannotSatisfyAnExpiredFiveHourResetTarget() async throws {
+        let f = try fixture()
+        f.preferences.claudeRefreshInterval = .thirtyMinutes
+        let began = f.clock.read()
+        f.store.start()
+        try await wait { await f.fetcher.count() == 1 }
+        await f.fetcher.complete(.success(report(at: began, used: 90, resetAt: began.addingTimeInterval(55))))
+        try await wait { !f.store.isRefreshing }
+        f.clock.advance(60)
+        let payload = Data(#"{"session_id":"00000000-0000-0000-0000-000000000001","rate_limits":{"seven_day":{"used_percentage":40,"resets_at":2000020000}}}"#.utf8)
+        try f.cache.capture(payload, at: f.clock.read())
+        try await poll(f)
+        try await wait { await f.fetcher.count() == 2 }
+        let weekly = ClaudeQuotaReport(source: .cliUsage, reportedAt: f.clock.read(), receivedAt: f.clock.read(),
+            windows: [.init(kind: .weekly, usedPercentage: 40, resetsAt: began.addingTimeInterval(20_000))])
+        await f.fetcher.complete(.success(weekly))
+        try await wait { !f.store.isRefreshing }
+        f.clock.advance(15)
+        try await poll(f)
+        let calls = await f.fetcher.count()
+        XCTAssertEqual(calls, 2, "A successful weekly-only observation ends the attempt without a missing-5h loop")
+    }
+
+    func testPendingDifferentProducerCannotSuppressAutomaticReadOfOldAcceptedData() async throws {
+        let f = try fixture()
+        let began = f.clock.read()
+        try f.cache.capture(passivePayload(session: 1, used: 40), at: began)
+        f.store.start()
+        f.clock.advance(601)
+        try f.cache.capture(passivePayload(session: 2, used: 50), at: f.clock.read())
+        f.store.refresh(trigger: .background)
+        XCTAssertTrue(f.store.passiveReportNeedsConfirmation)
+        try await wait { await f.fetcher.count() == 1 }
+        await f.fetcher.complete(.success(report(at: f.clock.read(), used: 45)))
+        try await wait { !f.store.isRefreshing }
+    }
+
     private func assertPassiveSequenceState(
         _ f: Fixture, source: ClaudeQuotaSource, reportedAt: Date, remaining: Double,
         history: Bool, notifications: Int, context: String,
@@ -2123,13 +2316,14 @@ final class ClaudeQuotaStoreTests: XCTestCase {
     }
 
     private func writeLocalCache(
-        _ fixture: Fixture, fiveHourUsed: Double, weeklyUsed: Double? = nil, fetchedAt: Date, resetAt: Date,
+        _ fixture: Fixture, fiveHourUsed: Double?, weeklyUsed: Double? = nil, fetchedAt: Date, resetAt: Date,
         account: String = "00000000-0000-4000-8000-000000000001", modelLimits: [(String, Double)] = []
     ) throws {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         let reset = formatter.string(from: resetAt)
-        var windows = ["\"five_hour\": {\"utilization\": \(fiveHourUsed), \"resets_at\": \"\(reset)\"}"]
+        var windows: [String] = []
+        if let fiveHourUsed { windows.append("\"five_hour\": {\"utilization\": \(fiveHourUsed), \"resets_at\": \"\(reset)\"}") }
         if let weeklyUsed { windows.append("\"seven_day\": {\"utilization\": \(weeklyUsed), \"resets_at\": \"\(reset)\"}") }
         let limits = modelLimits.map {
             "{\"kind\": \"weekly_scoped\", \"percent\": \($0.1), \"resets_at\": \"\(reset)\", \"scope\": {\"model\": {\"display_name\": \"\($0.0)\"}}}"
@@ -2192,7 +2386,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let store = ClaudeQuotaStore(preferences: preferences, cache: cache, installer: installer,
             localCache: ClaudeLocalUsageCacheReader(fileURL: localCacheURL),
             fetcherFactory: factory, notificationController: NotificationController(service: notifications),
-            now: { clock.read() }, sleep: { try await sleeper.sleep($0) })
+            now: { clock.read() }, monotonicNow: { clock.elapsed() }, sleep: { try await sleeper.sleep($0) })
         addTeardownBlock { [store] in
             await MainActor.run { store.shutdown() }
             await fetcher.finishAll()
@@ -2304,8 +2498,17 @@ private actor ClaudeStoreTestSleeper {
 private final class ClaudeStoreTestClock: @unchecked Sendable {
     private let lock = NSLock()
     private var value = Date(timeIntervalSince1970: 2_000_000_000)
-    func read() -> Date { lock.withLock { value } }
-    func advance(_ seconds: TimeInterval) { lock.withLock { value = value.addingTimeInterval(seconds) } }
+    private var uptime: TimeInterval = 0
+    private var readStep: TimeInterval = 0
+    func read() -> Date {
+        lock.withLock { let result = value; value = value.addingTimeInterval(readStep); return result }
+    }
+    func setReadStep(_ value: TimeInterval) { lock.withLock { readStep = value } }
+    func elapsed() -> TimeInterval { lock.withLock { uptime } }
+    func advance(_ seconds: TimeInterval) {
+        lock.withLock { value = value.addingTimeInterval(seconds); uptime += max(0, seconds) }
+    }
+    func moveWallClock(_ seconds: TimeInterval) { lock.withLock { value = value.addingTimeInterval(seconds) } }
 }
 
 @MainActor

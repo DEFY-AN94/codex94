@@ -495,12 +495,12 @@ final class Codex94UITests: XCTestCase {
         let cacheBeforeFailure = try fixture.cacheFingerprint()
         let claudeBeforeFailure = try fixture.claudeUsageRequestCount()
         try fixture.setClaudeMode("error")
-        try uniqueIdentified("claude-refresh", in: popover).click()
-        // 4.1.0: a rejected CLI login drops the CLI report. The months-old local
-        // cache from the fixture stays visible as cached data, and the card names
-        // the sign-in failure as the reason ("Cached data · Sign in to ...").
-        try waitUntil("The synthetic Claude login failure did not reach its own card", timeout: 30) {
-            let issue = self.identified("claude-issue", in: popover)
+        try clickClaudeReadOnce(in: popover)
+        // 4.3.0: explicit reads bypass the recent-report skip. Their independent
+        // result remains beside the action; an authentication rejection retires
+        // its CLI report without hiding the older local windows.
+        try waitUntil("The synthetic Claude login failure did not reach its explicit action", timeout: 30) {
+            let issue = self.identified("claude-cli-read-once-issue", in: popover)
             return issue.exists && [issue.label, issue.title, issue.value as? String ?? ""]
                 .contains { $0.contains("Sign in to Claude Code, then refresh here.") }
         }
@@ -517,7 +517,7 @@ final class Codex94UITests: XCTestCase {
         try captureProviderPopover(popover, marker: "provider-quota-sections", named: "providers-claude-error-en.png")
         try fixture.setClaudeMode("normal")
         let claudeBeforeRecovery = try fixture.claudeUsageRequestCount()
-        try uniqueIdentified("claude-refresh", in: popover).click()
+        try clickClaudeReadOnce(in: popover)
         try waitForProviderCards(in: popover, codex: true)
         XCTAssertEqual(try fixture.claudeUsageRequestCount(), claudeBeforeRecovery + 1)
         XCTAssertEqual(try fixture.requestCount(), codexBeforeFailure)
@@ -585,6 +585,9 @@ final class Codex94UITests: XCTestCase {
         try setProviderMenuMode("both", in: dashboard)
         try setClaudeCLIUsageEnabled(true, in: dashboard)
         popover = try openProviderPopover(service: "claude", marker: "provider-quota-sections")
+        // Re-enabling does not bypass the minimum automatic interval. This
+        // presentation check explicitly requests the new CLI report it needs.
+        try clickClaudeReadOnce(in: popover)
         try waitForProviderCards(in: popover, codex: true)
 
         dashboard = try openDashboard(from: popover)
@@ -723,11 +726,7 @@ final class Codex94UITests: XCTestCase {
         try exerciseSourceHealth(in: dashboard)
         let beforeRegularCLI = try fixture.claudeUsageRequestCount()
         try setClaudeCLIUsageEnabled(true, in: dashboard)
-        try waitUntil("Re-enabling the CLI option must perform one read", timeout: 30) {
-            try self.fixture.claudeUsageRequestCount() == beforeRegularCLI + 1
-                && self.identified("claude-cli-read-once", in: dashboard).isEnabled
-                && self.identified("claude-cli-last-read", in: dashboard).exists
-        }
+        try assertRecentReportSkipsAutomaticCLI(in: dashboard, expectedReads: beforeRegularCLI)
         try assertPassiveHealthReadDoesNotLaunchCLI(in: dashboard, automaticCLIEnabled: true)
         let beforeAllOff = try providerRequestCounts()
         try setProviderEnabled("claude", enabled: false, in: dashboard)
@@ -756,6 +755,7 @@ final class Codex94UITests: XCTestCase {
                     "The neutral state must keep Services settings reachable")
         XCTAssertEqual(try providerRequestCounts(), beforeAllOff,
                        "Opening Services while both monitors are off must not request either provider")
+        dashboard = try exerciseApplicationSettingsShortcut(in: dashboard)
         let beforeReenable = try fixture.requestCount()
         let claudeBeforeReenable = try fixture.claudeUsageRequestCount()
         try setProviderEnabled("codex", enabled: true, in: dashboard)
@@ -804,8 +804,14 @@ final class Codex94UITests: XCTestCase {
             "sourceHealthSetupCLIAndPopoverNavigationVerified": true,
             "sourceHealthBrowsingPreservesRequestsAndCaches": true,
             "sourceHealthEnglishDarkAndChineseLightCaptured": true,
+            "recentLocalReportSkipsAutomaticAndRegularCLI": true,
+            "explicitCLIReadWithRecentLocalReportVerified": true,
+            "applicationSettingsShortcutClosedOpenAndMinimizedVerified": true,
+            "applicationSettingsShortcutReusesWindowAndPreservesPage": true,
+            "applicationSettingsShortcutPreservesProviderRequestCounts": true,
             "authenticationUIOperated": false, "realAccountDataUsed": false,
-            "keyboardAcceptance": "not-tested", "spacesAndFullscreenAcceptance": "not-tested",
+            "keyboardAcceptance": "application-settings-shortcut-only",
+            "generalKeyboardNavigationAcceptance": "not-tested", "spacesAndFullscreenAcceptance": "not-tested",
             "rawTestResultsUploaded": false
         ])
     }
@@ -862,6 +868,123 @@ final class Codex94UITests: XCTestCase {
         [try fixture.requestCount(), try fixture.claudeUsageRequestCount()]
     }
 
+    /// Exercise the application-level command on the unmodified App. Both
+    /// providers are deliberately disabled so window activation cannot be
+    /// confused with a provider freshness-triggered request.
+    private func exerciseApplicationSettingsShortcut(in dashboard: XCUIElement) throws -> XCUIElement {
+        try require(fixture.scenario == "providers"
+                    && !fixture.readOnlyFocusProbeEnabled
+                    && (try fixture.preference("codexMonitoringEnabled.v1") as? Bool) == false
+                    && (try fixture.preference("claudeMonitoringEnabled.v1") as? Bool) == false,
+                    "Settings shortcut evidence requires the unmodified, both-disabled App")
+        let counts = try providerRequestCounts()
+        let tokenReads = try fixture.tokenUsageRequestCount()
+        let cache = try fixture.cacheFingerprint()
+        let originalFrame = dashboard.frame
+        let originalWindow = try ownedWindowNumber(dashboard)
+        try require(identified("provider-settings-page", in: dashboard).exists,
+                    "The existing Services page must be retained by Settings navigation")
+
+        func assertDashboard() throws -> XCUIElement {
+            let shown = try dashboardWindow()
+            try require(identified("provider-settings-page", in: shown).waitForExistence(timeout: 5),
+                        "The Settings command must preserve the selected Services page")
+            try require(application.windows.matching(NSPredicate(
+                format: "label CONTAINS 'Settings' OR title CONTAINS 'Settings'"
+            )).count == 0, "Settings navigation must not create an empty Settings window")
+            XCTAssertEqual(shown.frame, originalFrame, "The command must preserve Dashboard placement and size")
+            XCTAssertEqual(try providerRequestCounts(), counts)
+            XCTAssertEqual(try fixture.tokenUsageRequestCount(), tokenReads)
+            XCTAssertEqual(try fixture.cacheFingerprint(), cache)
+            return shown
+        }
+
+        application.activate()
+        for _ in 0..<3 {
+            application.typeKey(",", modifierFlags: .command)
+            XCTAssertEqual(try ownedWindowNumber(assertDashboard()), originalWindow,
+                           "Repeated Settings commands must reuse the existing native window")
+        }
+        _ = try openProviderPopover(service: "codex", marker: "providers-disabled", neutral: true)
+        application.typeKey(",", modifierFlags: .command)
+        try waitUntil("The application Settings command must also dismiss an open popover") {
+            !self.identified("providers-disabled", in: self.application).exists
+        }
+        XCTAssertEqual(try ownedWindowNumber(assertDashboard()), originalWindow)
+
+        // Minimize using the actual native Window command, then reopen using
+        // the application Settings command rather than a mouse workaround.
+        application.typeKey("m", modifierFlags: .command)
+        try waitUntil("Dashboard must be minimized before testing its Settings recovery") {
+            try !self.isOwnedWindowOnScreen(originalWindow)
+        }
+        application.typeKey(",", modifierFlags: .command)
+        let restored = try assertDashboard()
+        XCTAssertEqual(try ownedWindowNumber(restored), originalWindow,
+                       "Settings must restore the same minimized window")
+
+        application.typeKey("w", modifierFlags: .command)
+        try waitUntil("Dashboard must be closed before testing the application-level shortcut") {
+            try !self.isOwnedWindowOnScreen(originalWindow)
+                && self.application.windows.matching(NSPredicate(
+                    format: "label == 'Codex94' OR title == 'Codex94'"
+                )).count == 0
+        }
+        try require(!identified("providers-disabled", in: application).exists
+                    && !identified("floating-quota-content", in: application).exists,
+                    "The closed-window command must not depend on a popover or floating window")
+        application.activate()
+        application.typeKey(",", modifierFlags: .command)
+        return try assertDashboard()
+    }
+
+    private func isOwnedWindowOnScreen(_ number: Int) throws -> Bool {
+        let pid = try ownedApplicationPID()
+        guard let values = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else {
+            throw UITestFailure("The Settings check requires an observable native window list")
+        }
+        return values.contains {
+            ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid
+                && ($0[kCGWindowNumber as String] as? NSNumber)?.intValue == number
+        }
+    }
+
+    private func clickClaudeReadOnce(in surface: XCUIElement) throws {
+        let button = try uniqueIdentified("claude-cli-read-once", in: surface)
+        try reveal(button, in: surface)
+        try waitUntil("The explicit Claude action must wait for any existing read or cleanup", timeout: 30) {
+            button.isEnabled && button.isHittable
+        }
+        button.click()
+    }
+
+    private func assertRecentReportSkipsAutomaticCLI(in dashboard: XCUIElement, expectedReads: Int) throws {
+        try require((try fixture.preference("claude.cliUsageEnabled.v1") as? Bool) == true,
+                    "The recent-report skip must be exercised with automatic CLI enabled")
+        try require(elementText(identified("claude-health-data-state", in: dashboard)).contains("Recent report")
+                    && elementText(identified("claude-sources-current", in: dashboard)).contains("Claude Code local cache"),
+                    "This check requires the freshly reported local source")
+        let before = try providerRequestCounts()
+        XCTAssertEqual(before[1], expectedReads, "Enabling automatic CLI must not read over a recent local report")
+        let popover = try openProviderPopover(service: "claude", marker: "claude-quota-section")
+        try uniqueIdentified("claude-refresh", in: popover).click()
+        let deadline = Date().addingTimeInterval(1)
+        repeat {
+            XCTAssertEqual(try providerRequestCounts(), before,
+                           "Opening and normally refreshing recent Claude data must skip CLI")
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        } while Date() < deadline
+        try clickClaudeReadOnce(in: popover)
+        try waitUntil("An explicit CLI read must run once even with a recent local report", timeout: 30) {
+            try self.fixture.claudeUsageRequestCount() == expectedReads + 1
+                && self.identified("claude-cli-read-once", in: popover).isEnabled
+                && self.identified("claude-cli-last-read", in: popover).exists
+        }
+        XCTAssertEqual(try fixture.requestCount(), before[0])
+        XCTAssertEqual(try fixture.preference("claude.cliUsageEnabled.v1") as? Bool, true)
+        _ = try openDashboard(from: popover)
+    }
+
     private func setProviderEnabled(_ service: String, enabled: Bool, in dashboard: XCUIElement) throws {
         try require(fixture.scenario == "providers" && ["codex", "claude"].contains(service), "Unknown provider toggle")
         let key = service + "MonitoringEnabled.v1"
@@ -911,7 +1034,7 @@ final class Codex94UITests: XCTestCase {
             let state = self.identified("claude-health-data-state", in: dashboard)
             let source = self.identified("claude-sources-current", in: dashboard)
             return state.exists && source.exists
-                && self.elementText(state).contains("Current report")
+                && self.elementText(state).contains("Recent report")
                 && self.elementText(source).contains("Claude Code local cache")
         }
 
@@ -930,7 +1053,7 @@ final class Codex94UITests: XCTestCase {
                 && self.identified("claude-health-cli-issue", in: dashboard).exists
                 && self.identified("claude-health-diagnostic-phase", in: dashboard).exists
         }
-        try require(elementText(identified("claude-health-data-state", in: dashboard)).contains("Current report")
+        try require(elementText(identified("claude-health-data-state", in: dashboard)).contains("Recent report")
                     && elementText(identified("claude-sources-current", in: dashboard)).contains("Claude Code local cache"),
                     "A failed CLI attempt must not replace a current accepted local report with an error state")
         XCTAssertEqual(try providerRequestCounts(), [beforeFailure[0], beforeFailure[1] + 1])
@@ -1414,8 +1537,13 @@ final class Codex94UITests: XCTestCase {
     private func refreshProviders(in popover: XCUIElement) throws {
         try waitForProviderCards(in: popover, codex: true)
         let before = try providerRequestCounts()
+        try clickClaudeReadOnce(in: popover)
+        try waitUntil("The explicit Claude action must establish a new report", timeout: 30) {
+            try self.fixture.claudeUsageRequestCount() == before[1] + 1
+                && self.identified("claude-cli-read-once", in: popover).isEnabled
+        }
         try commandButton("Refresh all services", in: popover).click()
-        try waitUntil("An explicit Refresh all must issue one read per enabled service", timeout: 30) {
+        try waitUntil("Refresh all must refresh Codex while reusing Claude's recent explicit report", timeout: 30) {
             try self.fixture.requestCount() == before[0] + 1
                 && self.fixture.claudeUsageRequestCount() == before[1] + 1
                 && self.fixture.requestsHaveExited()
