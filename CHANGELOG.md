@@ -6,11 +6,12 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
-## 4.3.0 - Unreleased
+## 4.3.0 - 2026-11-15
 
-Development candidate `4.3.0 (34)`. The published stable release remains
-`4.2.0 (33)`; no release date, tag, replacement asset or local App acceptance
-is implied by this entry.
+Version `4.3.0 (34)`. The planned release date uses Australia/Melbourne.
+Until publication is confirmed, the published stable release remains
+`4.2.0 (33)`. Publication and final-asset verification remain separate from
+candidate acceptance and are recorded in [docs/RELEASING.md](docs/RELEASING.md#430-candidate-scope-and-authorization--unreleased).
 
 ### Fixed
 
@@ -43,12 +44,19 @@ is implied by this entry.
 
 ### Validation and acceptance
 
-Cloud/static checks, macOS CI, UI evidence and local acceptance must be recorded
-against the actual candidate in [the release record](docs/RELEASING.md#430-candidate-scope-and-authorization--unreleased).
-The maintainer explicitly requested Ready after all cloud gates, with local
-acceptance deferred to the maintainer and no merge. The [acceptance checklist](docs/4.3.0-ACCEPTANCE.md)
-tracks that remaining work. OAuth/HTTP research is separate and absent from
-the candidate's production scope.
+The candidate's cloud gates passed on PR #75 head
+`7ee63a8df97d6211e69aa3330615c9c2d1390bc8`: the macOS release gate, all five UI
+scenarios with reviewed synthetic captures, and CodeQL. Maintainer-local
+acceptance was reported complete on 2026-11-14 with documented limits. Every
+executed scenario passed; the items that were partial or not executed are listed
+in the [acceptance checklist](docs/4.3.0-ACCEPTANCE.md) and are not claimed as
+passes. The candidate was then merged as
+`ccdbeb2bd0634736a40405cb408e387a313aedba`.
+
+Final-main CI and provenance for this dated revision, final DMG installation
+with first-launch acceptance, and publication are separate steps recorded in
+[the release record](docs/RELEASING.md#430-candidate-scope-and-authorization--unreleased).
+OAuth/HTTP research is separate and absent from the production scope.
 
 ## 4.2.0 - 2026-11-14
 

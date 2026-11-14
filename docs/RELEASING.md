@@ -33,7 +33,9 @@ acceptance visible in the PR. Never mark Ready merely because CI is green unless
 the maintainer explicitly authorizes a different order, as recorded for the
 4.2.0 candidate below.
 
-## 4.3.0 candidate scope and authorization — Unreleased
+<a id="430-candidate-scope-and-authorization--unreleased"></a>
+
+## 4.3.0 candidate acceptance and release scope — 2026-11-15
 
 Candidate `4.3.0 (34)` starts from main
 `70f9d413438d0f7a19141b19f34dddfda3164532`, after the published 4.2.0 source
@@ -66,9 +68,29 @@ pending for this new candidate. Previous 4.2.0 results do not validate 4.3.0.
 Local original-App keyboard, real-provider behavior, bridge coexistence and
 maintainer installation acceptance remain separate and pending.
 
-Keep the candidate date Unreleased until a later release-date decision. Stable
-download links, the v4.2.0 tag and its public assets remain unchanged. A Ready PR
-does not publish a new stable version or authorize any later gate.
+The paragraphs above record the authorization as it stood while PR #75 was open.
+Maintainer-local acceptance was reported complete on 2026-11-14
+(Australia/Melbourne) with documented limits. Every executed scenario passed;
+the partial and unexecuted items are listed in the
+[4.3.0 acceptance checklist](4.3.0-ACCEPTANCE.md) and in
+[PR #75's local acceptance record](https://github.com/DEFY-AN94/codex94/pull/75#issuecomment-6877150745),
+and are not represented as passes. The maintainer then separately authorized
+gate 3. PR #75 was squash-merged as
+`ccdbeb2bd0634736a40405cb408e387a313aedba`; its tree
+`47a66c5ee4b33fa6fd649fade41986cc821d57e7` equals the tested PR tree.
+
+The maintainer confirmed a planned release date of 2026-11-15
+(Australia/Melbourne). The dated revision changes documentation only: App
+sources, resources, project settings, tests, scripts and CI are unchanged, so
+the candidate App acceptance still applies. The revised commit still needs its
+own PR checks, final-main CI, two-file DMG artifact and attestation. Verify the
+actual Melbourne date before tagging and correct it through the same gates if it
+changes.
+
+The date change does not authorize gates 4–7: the annotated tag, the Draft
+Release, final DMG installation with first-launch acceptance, or publication.
+Stable download links, the v4.2.0 tag and its public assets remain unchanged
+until publication is confirmed.
 
 <a id="unreleased-candidate-420-33"></a>
 
