@@ -8,10 +8,9 @@ below applies only to its recorded version and does not validate later releases.
 
 ## 4.3.0 - 2026-11-15
 
-Version `4.3.0 (34)`. The planned release date uses Australia/Melbourne.
-Until publication is confirmed, the published stable release remains
-`4.2.0 (33)`. Publication and final-asset verification remain separate from
-candidate acceptance and are recorded in [docs/RELEASING.md](docs/RELEASING.md#430-candidate-scope-and-authorization--unreleased).
+Version `4.3.0 (34)` was published on the date above, following the published
+`4.2.0 (33)` release. Release dates use Australia/Melbourne. Exact source,
+CI, package and acceptance evidence is recorded in [docs/RELEASING.md](docs/RELEASING.md#430-release-verification--2026-11-15).
 
 ### Fixed
 
@@ -53,9 +52,10 @@ in the [acceptance checklist](docs/4.3.0-ACCEPTANCE.md) and are not claimed as
 passes. The candidate was then merged as
 `ccdbeb2bd0634736a40405cb408e387a313aedba`.
 
-Final-main CI and provenance for this dated revision, final DMG installation
-with first-launch acceptance, and publication are separate steps recorded in
-[the release record](docs/RELEASING.md#430-candidate-scope-and-authorization--unreleased).
+Final-main CI, provenance, final DMG installation and publication are recorded
+in [the release verification record](docs/RELEASING.md#430-release-verification--2026-11-15). First-launch Gatekeeper acceptance
+is not established. Stable download links identify 4.3.0; later documentation
+commits do not move its tag or replace its published assets.
 OAuth/HTTP research is separate and absent from the production scope.
 
 ## 4.2.0 - 2026-11-14

@@ -1,11 +1,11 @@
 # Security
 
-## 4.3.0 candidate: local activity and automatic-read admission
+## 4.3.0: local activity and automatic-read admission
 
-The unpublished `4.3.0 (34)` candidate retains the existing official-client
+Version `4.3.0 (34)` retains the existing official-client
 authentication boundary. No OAuth, token, cookie, Keychain, direct Claude HTTP
 client, entitlement or new external service is added. Separate HTTP research
-does not enter the candidate's production build.
+does not enter the production build.
 
 One new application-owned `statusline-health.json` sidecar records only schema,
 installation identifier, observation time and a fixed outcome. It is capped at
@@ -26,7 +26,7 @@ cancellation or process cleanup. No raw input, quota value, account/session data
 filesystem path or free-form error is persisted in the new record; its installation
 identifier is not included in redacted diagnostic copies.
 
-The candidate separates cached display from strict recent-report eligibility
+Version 4.3.0 separates cached display from strict recent-report eligibility
 (less than ten minutes for all Claude sources). Only eligible accepted reports
 may drive quota alerts or defer an automatic CLI attempt. Pending producers and
 configuration/installation mismatches retain the existing isolation. Missing
@@ -41,9 +41,9 @@ prompts. The explicitly requested one-time action remains distinct from automati
 admission and the passive-only reread action. Late results remain bound to their
 original read/context. Codex's own refresh behavior is unchanged.
 
-Published-version boundaries and historical changes follow below. Candidate
-validation and pending local acceptance are recorded separately in
-[the release workflow](docs/RELEASING.md#430-candidate-scope-and-authorization--unreleased).
+Earlier boundaries and historical changes follow below. Validation, the limits
+of local acceptance and final release evidence are recorded in
+[the release workflow](docs/RELEASING.md#430-release-verification--2026-11-15).
 
 ## Boundary
 
@@ -222,15 +222,15 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-4.2.0-SHA256SUMS.txt` before opening the DMG. The optional
+Verify `Codex94-4.3.0-SHA256SUMS.txt` before opening the DMG. The optional
 GitHub command can verify repository/workflow/commit provenance for the exact DMG:
 
 ```bash
-gh attestation verify Codex94-4.2.0-macos-universal-unnotarized.dmg \
+gh attestation verify Codex94-4.3.0-macos-universal-unnotarized.dmg \
   -R DEFY-AN94/codex94 \
   --signer-workflow DEFY-AN94/codex94/.github/workflows/ci.yml \
   --source-ref refs/heads/main \
-  --source-digest c13f886151b5932518352a3b92caafb71dbbf44f \
+  --source-digest fd991dff95a9595e96d0d2d615847b4fd4f40487 \
   --deny-self-hosted-runners
 ```
 
@@ -372,8 +372,8 @@ Version `4.0.1 (22)` uses passive Claude reports by default with explicit
 report-stream adoption and a separate default-off CLI reader. The retained
 `v4.0.0` tag identifies an unpublished candidate, not a supported stable release.
 
-The supported published stable version is [`v4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0),
-released on 2026-11-14 (Australia/Melbourne).
+The supported published stable version is [`v4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0),
+released on 2026-11-15 (Australia/Melbourne).
 Feature branches and `main` may contain development work that has not passed
 release acceptance. Current stable-version links identify the published release.
 Version `3.1.4` adjusts bounded quota deadlines and permits three extra
@@ -399,8 +399,8 @@ visually and privacy reviewed. Contributor validation guidance is documented in
 security or release evidence. Every release candidate needs its own checks,
 candidate App acceptance (before Ready unless the maintainer explicitly
 authorizes another order), and final CI artifact/tag/Release verification and
-maintainer acceptance before publication. The 4.2.0 authorization and acceptance
-are recorded in [the release workflow](docs/RELEASING.md#420-release-verification--2026-11-14).
+maintainer acceptance before publication. The 4.3.0 authorization and acceptance
+are recorded in [the release workflow](docs/RELEASING.md#430-release-verification--2026-11-15).
 
 ## Reporting
 
