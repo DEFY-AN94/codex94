@@ -24,7 +24,7 @@ gates are recorded in [docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope-
   installing or removing the statusline connection. Keys are still sorted and
   the file is still rewritten as a whole. The canonical form kept in the
   installation manifest and backup is unchanged, so connections created by
-  earlier versions stay recognised and removable; a settings file written by
+  earlier versions stay recognized and removable; a settings file written by
   an earlier version keeps its escapes until the next install or removal.
 - Stop reading a JSON Boolean, a non-finite value, or a number a native
   integer cannot represent (including a floating-point 2^63), as a valid Codex
@@ -57,14 +57,15 @@ gates are recorded in [docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope-
 
 ### Validation and acceptance
 
-`script/release_check.sh` passed locally with Xcode 27.2 on the uncommitted
-candidate sources: its hosted unit suite executed 739 tests with 1 existing
-skip and 0 failures, and it verified the Universal App and an unsigned DMG
-candidate for `4.3.1 (35)` (SHA-256
-`1a717f9a268bd8111dd841c5a7d6ef35e2805f65ac844ab5b2ae05b1d8220e6c`; a local
-artifact, not a release asset). That run predates this paragraph, which changed
-no App source. Nothing has run on CI. UI scenarios, CodeQL and every candidate
-and acceptance gate are pending and are not claimed here.
+`script/release_check.sh` passed locally with Xcode 27.2 on candidate commit
+`70a878ac45e965d2d6913b3ceaddc2958c2e5061` with a clean working tree: its
+hosted unit suite executed 739 tests with 1 existing skip and 0 failures, and
+it verified the Universal App and an unsigned DMG candidate for `4.3.1 (35)`
+(SHA-256 `f6e60a9d30afa044856f7b2109f581781ce0af363b9d21f3cba674de0fe00295`;
+a local artifact, not a release asset). A later documentation-only commit
+records this result and changed no App source, test, script or project
+setting. Nothing has run on CI. UI scenarios, CodeQL and every candidate and
+acceptance gate are pending and are not claimed here.
 
 One risk is known and unverified: the Providers UI scenario runs the App
 outside Applications, where the install preview button is now disabled, and

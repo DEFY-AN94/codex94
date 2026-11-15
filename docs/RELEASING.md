@@ -36,6 +36,7 @@ the maintainer explicitly authorizes a different order, as recorded for the
 ## 4.3.1 candidate scope — Unreleased
 
 Development candidate `4.3.1 (35)` starts from main
+`3c0df72d22bdad68c7879ed21eeb55bff30bf6b1`, after the published 4.3.0 source
 `fd991dff95a9595e96d0d2d615847b4fd4f40487`. Its scope is five hardening changes
 and nothing else: an upper bound on control-sequence parameters in the Claude
 CLI screen replay; a stable-install requirement for new statusline connections;
@@ -45,20 +46,23 @@ bounded local-file reader. They are listed in
 [CHANGELOG.md](../CHANGELOG.md#431---unreleased).
 
 On 2026-11-15 (Australia/Melbourne) the maintainer decided to keep these
-changes out of 4.3.0 and to carry them as 4.3.1. That is the only decision
-recorded here. It authorizes no commit, push, PR, tag, release, installation
-or publication, and none of the seven gates in section 1 has been requested or
-granted for 4.3.1.
+changes out of 4.3.0 and to carry them as 4.3.1, and later that day explicitly
+authorized gate 1 in section 1: committing and pushing the development branch
+and creating a Draft PR. This authorization does not extend to marking the PR
+Ready, merge, tag, Draft Release assets, installation/replacement of the
+maintainer's App, or public publication; gates 2 to 7 have not been requested
+or granted for 4.3.1.
 
 Evidence so far: `script/release_check.sh` passed locally with Xcode 27.2 on
-the uncommitted candidate sources. Its hosted unit suite executed 739 tests
-with 1 existing skip and 0 failures, and it verified the Universal App and an
-unsigned DMG candidate for `4.3.1 (35)` (SHA-256
-`1a717f9a268bd8111dd841c5a7d6ef35e2805f65ac844ab5b2ae05b1d8220e6c`; a local
-artifact, not a release asset). That run predates this paragraph, which changed
-no App source. Nothing has run on CI. The UI scenarios, CodeQL and every
-candidate and acceptance gate are pending. Results recorded for other versions
-do not validate 4.3.1.
+candidate commit `70a878ac45e965d2d6913b3ceaddc2958c2e5061` with a clean
+working tree. Its hosted unit suite executed 739 tests with 1 existing skip
+and 0 failures, and it verified the Universal App and an unsigned DMG candidate
+for `4.3.1 (35)` (SHA-256
+`f6e60a9d30afa044856f7b2109f581781ce0af363b9d21f3cba674de0fe00295`; a local
+artifact, not a release asset). A later documentation-only commit records this
+result and changed no App source, test, script or project setting. Nothing has
+run on CI. The UI scenarios, CodeQL and every candidate and acceptance gate are
+pending. Results recorded for other versions do not validate 4.3.1.
 
 Two notes for whoever accepts this candidate:
 

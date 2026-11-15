@@ -21,7 +21,7 @@ requirement that the App run from the same path that created the connection.
 Installing or removing a connection writes the settings file without escaped
 slashes. The canonical bytes used for the manifest, backup and conflict
 comparison are unchanged, so connections created by earlier versions are still
-recognised and removable.
+recognized and removable.
 
 The CLI screen replay caps every control-sequence parameter at an upper bound
 when parsing, so extreme values in terminal output cannot overflow cursor
