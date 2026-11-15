@@ -2,13 +2,13 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0),
-released on 2026-11-14 (Australia/Melbourne). It includes the user-triggered
+stable version is [`v4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0),
+released on 2026-11-15 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
-## 4.3.0 candidate: local bridge health and on-demand CLI
+## 4.3.0: local bridge health and on-demand CLI
 
-The unpublished `4.3.0 (34)` candidate adds one application-owned file:
+Version `4.3.0 (34)` adds one application-owned file:
 `~/Library/Application Support/Codex94/Claude/statusline-health.json`.
 It keeps only the latest recorded bridge activity, with a schema version,
 installation identifier, observation time and a fixed result. The record is at
@@ -53,9 +53,9 @@ passive even while automatic CLI is enabled.
 The application Settings/Command-comma route reuses the existing Dashboard;
 it adds no global keyboard listener, quota request or persistent UI state.
 There is no new OAuth, HTTP quota client, credential access, telemetry upload or
-real-account experiment. Separate HTTP research is outside this candidate.
+real-account experiment. Separate HTTP research is outside this release.
 See the [acceptance checklist](docs/4.3.0-ACCEPTANCE.md) for the distinction between
-cloud verification and pending maintainer-local acceptance.
+cloud verification and maintainer-local acceptance with its documented limits.
 
 Version `4.1.7 (31)` evaluates Claude CLI usage output
 even while the terminal continues redrawing. It retains the probe's 20-second

@@ -10,7 +10,7 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 自动调用 Claude CLI 是独立且默认关闭的选项。项目采用 MIT 许可，以 SwiftUI/AppKit 构建，
 不捆绑第三方运行时框架。
 
-**最新稳定版：**[`4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0)
+**最新稳定版：**[`4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0)
 · macOS 14+ · Apple Silicon 与 Intel · English 与简体中文
 
 [功能详情](#功能详情) · [界面截图](#界面截图) · [安装](#安装)
@@ -27,7 +27,7 @@ Codex94 是独立、非官方的 macOS 菜单栏工具，用于 **Codex 与 Clau
 账号信息或用量数值；
 详见[4.1.7 更新记录](CHANGELOG.md#417---2026-10-18)。
 
-### 当前版本：4.2.0 (33)
+### 上一版本：4.2.0 (33)
 
 4.2.0 在 **Dashboard → 服务**中新增 Claude 来源健康卡、独立的本地报告
 重读操作，并在现有诊断流程中展示最近一次已结束的 CLI 读取诊断。健康卡说明已接受的
@@ -57,13 +57,12 @@ Token 统计重试期间的旧数据提示。详见[继承的 4.1.8 变更](CHAN
 本版本已于 **2026-11-14**（Australia/Melbourne）发布，详见
 [发布核验记录](docs/RELEASING.md#420-release-verification--2026-11-14)。
 
-已知问题：弹出面板关闭时，Command-comma 可能打开空白 Settings 窗口
-（[#73](https://github.com/DEFY-AN94/codex94/issues/73)）。请使用菜单栏的 Dashboard
-操作或悬浮窗中的 Dashboard 按钮。
+4.2.0 的已知问题：弹出面板关闭时，Command-comma 可能打开空白 Settings 窗口
+（[#73](https://github.com/DEFY-AN94/codex94/issues/73)）。4.3.0 已修复。
 
-### 开发候选：4.3.0 (34)，Unreleased
+### 当前版本：4.3.0 (34)
 
-当前开发分支实现以下变更；**已发布稳定版仍是 4.2.0**，下方安装链接继续指向稳定版。
+4.3.0 已于 **2026-11-15**（Australia/Melbourne）发布，下方安装链接指向该版本。
 
 - 应用级设置命令及 **⌘,** 打开或恢复已有 Dashboard，弹窗关闭时也可使用，对应
   [#73](https://github.com/DEFY-AN94/codex94/issues/73)。它仍是应用内快捷键，不注册全局热键。
@@ -77,11 +76,12 @@ Token 统计重试期间的旧数据提示。详见[继承的 4.1.8 变更](CHAN
   上限 15 分钟。打开弹窗或唤醒 Mac 不绕过冷却。**重新读取本地报告**仍不启动 CLI；
   **用 CLI 刷新一次**仍是一次明确读取，不开启自动检查，连续点击也不排队。
 
-候选版增加一份有大小上限、按安装隔离的本地桥接健康记录，不含账号身份或额度数值。
+4.3.0 增加一份有大小上限、按安装隔离的本地桥接健康记录，不含账号身份或额度数值。
 CLI 失败与冷却状态只保存在内存中。没有新增 OAuth、凭据访问或 Claude HTTP 客户端，
-也不保证 App／网页用量实时同步。详见[隐私说明](PRIVACY.md#430-candidate-local-bridge-health-and-on-demand-cli)
-和[候选验收清单](docs/4.3.0-ACCEPTANCE.md)。云端检查与维护者本地验收分别记录；
-PR 标记为 Ready 不等于已经发布或已经完成本地验收。
+也不保证 App／网页用量实时同步。详见 [4.3.0 更新记录](CHANGELOG.md#430---2026-11-15)、
+[隐私说明](PRIVACY.md#430-local-bridge-health-and-on-demand-cli)、
+[验收清单](docs/4.3.0-ACCEPTANCE.md)和[发布核验记录](docs/RELEASING.md#430-release-verification--2026-11-15)。
+本地验收有已记录的范围限制，首次启动 Gatekeeper 验收未建立。
 
 ## 功能详情
 
@@ -217,7 +217,7 @@ Claude 监控每次只显示**一份已接受的报告**：
 
 ## 界面截图
 
-所有截图均采用隔离的合成数据，不包含真实账号或实时用量。以下为历史截图，不代表当前 4.2.0 的界面。
+所有截图均采用隔离的合成数据，不包含真实账号或实时用量。以下为历史截图，不代表当前 4.3.0 的界面。
 以下**柱状图**与**折线图**采集于 `0.3.0 (14)` 候选测试阶段，使用相同的七天日记录。
 原始合成截图保持不变，
 这些英文界面截图来自
@@ -260,8 +260,8 @@ Claude 监控每次只显示**一份已接受的报告**：
 
 ## 安装
 
-已发布稳定版为 [`v4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0)，
-于 **2026-11-14**（Australia/Melbourne）发布，提供 Universal 2 DMG 与同一个 annotated 标签
+已发布稳定版为 [`v4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0)，
+于 **2026-11-15**（Australia/Melbourne）发布，提供 Universal 2 DMG 与同一个 annotated 标签
 的源码。下方下载和 clone 指令指向该版本；后续文档提交不会移动标签或替换已发布资产。
 
 DMG **未签名，也未经过 Apple 公证**。内部 App 只有 ad-hoc Hardened Runtime 签名，
@@ -288,27 +288,27 @@ Codex94 可以使用 `/Applications/ChatGPT.app` 或 `/Applications/Codex.app`
 
 ### 安装 Universal DMG
 
-请从 [`v4.2.0` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0)
+请从 [`v4.3.0` Release 页面](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0)
 下载以下两个正式资产：
 
-- `Codex94-4.2.0-macos-universal-unnotarized.dmg`
-- `Codex94-4.2.0-SHA256SUMS.txt`
+- `Codex94-4.3.0-macos-universal-unnotarized.dmg`
+- `Codex94-4.3.0-SHA256SUMS.txt`
 
 DMG 支持 Apple Silicon（`arm64`）与 Intel（`x86_64`），最低系统为 macOS 14。
 打开前先验证 checksum：
 
 ```bash
-shasum -a 256 -c Codex94-4.2.0-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.3.0-SHA256SUMS.txt
 ```
 
 如已安装 GitHub CLI，还可验证该 DMG 来自本仓库的 GitHub workflow 与提交：
 
 ```bash
-gh attestation verify Codex94-4.2.0-macos-universal-unnotarized.dmg \
+gh attestation verify Codex94-4.3.0-macos-universal-unnotarized.dmg \
   -R DEFY-AN94/codex94 \
   --signer-workflow DEFY-AN94/codex94/.github/workflows/ci.yml \
   --source-ref refs/heads/main \
-  --source-digest c13f886151b5932518352a3b92caafb71dbbf44f \
+  --source-digest fd991dff95a9595e96d0d2d615847b4fd4f40487 \
   --deny-self-hosted-runners
 ```
 
@@ -329,7 +329,7 @@ Attestation 只证明构建来源，不代表 Apple 签名、公证、恶意软�
 仓库公开，无需 GitHub 认证。Clone 当前已发布的稳定源码标签：
 
 ```bash
-git clone --branch v4.2.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.3.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 然后构建所选标签：

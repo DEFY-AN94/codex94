@@ -3,13 +3,12 @@
 Issues and focused pull requests are welcome. Codex94 targets macOS 14+, Swift 6,
 and a zero third-party runtime dependency model.
 
-## 4.3.0 candidate behavior
+## 4.3.0 behavior
 
-The `4.3.0 (34)` candidate changes A/C/D/E only: application Settings routing,
+The published `4.3.0 (34)` release changes A/C/D/E only: application Settings routing,
 local bridge activity, Claude report eligibility and automatic CLI admission.
-These candidate rules supersede the historical 4.1.0 freshness/no-new-cache
-statements below only for those changes. The published stable release remains
-4.2.0. OAuth/HTTP research is separate; do not add it to the App target, settings,
+These rules supersede the historical 4.1.0 freshness/no-new-cache
+statements below only for those changes. OAuth/HTTP research is separate; do not add it to the App target, settings,
 credential access, network paths or scanner exceptions.
 
 - AppKit keeps the single Dashboard controller and existing AppStore. Application
@@ -42,11 +41,11 @@ credential access, network paths or scanner exceptions.
   A skipped check must advance its due time. Reset attempt, fresh corresponding
   window and passive deferral are different evidence; no missing-window loop.
 
-The maintainer explicitly authorized this candidate's commit/push/Draft PR and
-Ready transition after all cloud gates, leaving local acceptance for later and
-forbidding merge. Record that exception and pending local acceptance as described
+For the 4.3.0 candidate the maintainer explicitly authorized commit/push/Draft PR
+and the Ready transition after all cloud gates, leaving local acceptance for later
+and forbidding merge at that stage. That exception and the later gates are recorded
 in [RELEASING.md](docs/RELEASING.md#430-candidate-scope-and-authorization--unreleased).
-It does not authorize a tag, release, installation or publication.
+It is not a standing authorization for any later candidate.
 
 ## Before opening a pull request
 

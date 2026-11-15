@@ -1,18 +1,18 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints for the published
-[`4.2.0 (33)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0),
-published on 2026-11-14 (Australia/Melbourne). It includes the changes
+[`4.3.0 (34)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0),
+published on 2026-11-15 (Australia/Melbourne). It includes the changes
 developed for the unpublished `4.1.8 (32)` candidate and retains the
 unpublished `4.0.2 (23)` work carried into 4.1.0.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.3.0 candidate: window routing, bridge activity and CLI admission
+## 4.3.0 release: window routing, bridge activity and CLI admission
 
-The unpublished `4.3.0 (34)` candidate extends those responsibilities as follows.
-Its rules supersede the historical freshness policy below; the stable release
-remains 4.2.0. OAuth/HTTP research is not part of the production dependency graph.
+Version `4.3.0 (34)` extends those responsibilities as follows.
+Its rules supersede the historical freshness policy below.
+OAuth/HTTP research is not part of the production dependency graph.
 
 ### Application Settings
 
@@ -96,8 +96,8 @@ a newer weekly report does not prove a five-hour reset succeeded. Missing
 windows stay unknown and do not create immediate retry loops. Generation/read
 guards reject old completions and diagnostics after context changes or shutdown.
 
-See [the candidate acceptance checklist](4.3.0-ACCEPTANCE.md) for the required
-combination tests and pending native acceptance.
+See [the acceptance checklist](4.3.0-ACCEPTANCE.md) for the required
+combination tests and the native acceptance that was not established.
 
 ## 4.2.0 release: source-health projection and per-read diagnostics
 

@@ -1,7 +1,7 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0),
-released on 2026-11-14 (Australia/Melbourne). Later docs-only commits do not
+The published stable version is [`v4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0),
+released on 2026-11-15 (Australia/Melbourne). Later docs-only commits do not
 move its tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -87,10 +87,12 @@ own PR checks, final-main CI, two-file DMG artifact and attestation. Verify the
 actual Melbourne date before tagging and correct it through the same gates if it
 changes.
 
-The date change does not authorize gates 4–7: the annotated tag, the Draft
-Release, final DMG installation with first-launch acceptance, or publication.
-Stable download links, the v4.2.0 tag and its public assets remain unchanged
-until publication is confirmed.
+The date change did not authorize gates 4–7. On 2026-11-15 the maintainer
+authorized gates 4–7 in one explicit instruction after reviewing the final-main
+evidence. Version 4.3.0 was published that day; public stable downloads now
+identify it. Final source and distribution evidence is recorded
+[below](#430-release-verification--2026-11-15). The v4.2.0 tag and its public
+assets are unchanged.
 
 <a id="unreleased-candidate-420-33"></a>
 
@@ -796,7 +798,7 @@ test -z "$(git ls-remote --tags origin "refs/tags/$release_tag" "refs/tags/$rele
 git tag -a "$release_tag" "$RELEASE_SHA" -m "Codex94 $release_tag"
 test "$(git cat-file -t "$release_tag")" = tag
 test "$(git rev-parse "${release_tag}^{}")" = "$RELEASE_SHA"
-git push origin "refs/tags/$release_tag:refs/tags/$release_tag"
+git push origin "refs/tags/${release_tag}:refs/tags/${release_tag}"
 ```
 
 Recheck the remote tag object and peeled commit, and a shallow clone's commit
@@ -1839,3 +1841,98 @@ Later documentation commits do not move the tag or replace release assets.
   existing Command-comma empty-Settings route. Use the menu-bar Dashboard
   action or the floating window's Dashboard button. No 4.1.8 Release is
   implied by its inherited changelog or retained preparation record.
+
+
+### 4.3.0 release verification — 2026-11-15
+
+- [PR #75](https://github.com/DEFY-AN94/codex94/pull/75) repaired application
+  Settings/Command-comma routing ([#73](https://github.com/DEFY-AN94/codex94/issues/73)),
+  added the bounded local bridge-activity record, unified the strict
+  ten-minute Claude recent-report boundary and made automatic CLI reads
+  conditional with shared spacing and cooldown.
+  [PR #76](https://github.com/DEFY-AN94/codex94/pull/76) then set the release
+  date and recorded local acceptance; it changed documentation only.
+- PR #75 head: `7ee63a8df97d6211e69aa3330615c9c2d1390bc8`; tested merge:
+  `1725f0174cf1202a07ff653553d7d4c77d886a04`; merged as
+  `ccdbeb2bd0634736a40405cb408e387a313aedba` with tree
+  `47a66c5ee4b33fa6fd649fade41986cc821d57e7`, equal to the tested tree.
+  Frozen release commit: `fd991dff95a9595e96d0d2d615847b4fd4f40487`; tree:
+  `98b99b76c2f1af4022487361876b7f7152807d72`. The annotated `v4.3.0` tag and both
+  manual assets remain bound to that frozen commit. Documentation-only commits
+  may advance main without moving the tag or regenerating the release assets.
+- Final-main [CI run](https://github.com/DEFY-AN94/codex94/actions/runs/43607889126)
+  succeeded on attempt 1: the release gate, all five UI scenarios and the
+  attestation job. It executed 719 XCTest cases with one existing
+  hosted-key-window skip and zero failures. The
+  [CodeQL run](https://github.com/DEFY-AN94/codex94/actions/runs/43607889681)
+  completed its Actions, Python and Swift analyses successfully. PR #76's own
+  [CI run](https://github.com/DEFY-AN94/codex94/actions/runs/43600657495) and
+  CodeQL run 43600656139 passed on its tested merge
+  `c645203a0b94438528eb7e0997b5571380be7efd`; that PR run's UI captures were
+  not separately reviewed.
+- Final-main UI evidence: 53 PNGs and 45 JSON reports, the same file set as the
+  reviewed PR #75 run. Every report's source revision equals the release commit.
+  46 captures were viewed, six keyboard-focus captures are byte-identical to a
+  viewed one, and one is an exact-hash reuse; no blocking layout or privacy
+  finding. Eleven popover captures are 17 px taller than in the PR set because
+  the synthetic far-future countdown reached two-digit hours and wrapped.
+- Maintainer-local acceptance of the PR #75 candidate was reported complete on
+  2026-11-14 with documented limits; see the
+  [acceptance checklist](4.3.0-ACCEPTANCE.md) and
+  [PR #75's record](https://github.com/DEFY-AN94/codex94/pull/75#issuecomment-6877150745).
+  Partial and unexecuted items are not passes. Recovery's synthetic UI
+  acceptance remains click-functional; keyboard activation, AX Press and
+  localized tooltip acceptance are not promoted by this publication.
+- [Release v4.3.0](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0)
+  has two manual assets from the final-main distribution:
+  [Universal DMG](https://github.com/DEFY-AN94/codex94/releases/download/v4.3.0/Codex94-4.3.0-macos-universal-unnotarized.dmg),
+  SHA-256 `f8618b4b67ca38c199ee564e1e2295c7754e506c34f9156e33020080c9f21d50`, and
+  [checksum file](https://github.com/DEFY-AN94/codex94/releases/download/v4.3.0/Codex94-4.3.0-SHA256SUMS.txt),
+  file SHA-256 `e4bdc80ebc07c3d84eeae0f8b668d219a49df0d57cdd69220198ead1229533b2`.
+  The checksum text records the DMG digest; its own file digest is separate.
+  The DMG remains unsigned and unnotarized; the Universal App uses only ad-hoc
+  signing with Hardened Runtime.
+- [Artifact attestation](https://github.com/DEFY-AN94/codex94/attestations/67561716)
+  binds the final DMG to this repository's `.github/workflows/ci.yml`,
+  `refs/heads/main` and the frozen source commit. Verification denies
+  self-hosted runners. Provenance is not Apple signing, notarization, malware
+  review or Gatekeeper approval; the checksum file is not a separately attested
+  subject.
+- Final CI App executable SHA-256:
+  `089eb33e7385355ecaba77324283dd431b5684234e247d0616bf62a580e90871`.
+  Final package, installation, tag and publication verification:
+  The final CI DMG passed the strict two-entry payload, 4.3.0 (34),
+  arm64/x86_64, signature, Hardened Runtime and no-entitlement checks. Its App
+  is identical file for file to the PR #75 candidate used for local acceptance.
+
+  With the maintainer's gate 6 authorization, the agent quit the running App,
+  moved the installed 4.2.0 (33) bundle aside as a recoverable rollback copy and
+  copied the App from the re-downloaded Draft DMG to `/Applications`. The
+  installed bundle matched the DMG payload file for file and passed strict
+  signature verification. It was opened from the installed path and observed
+  for 60 seconds: one instance, no crash report and no error or fault log
+  entries. The agent could not view the interface, and Login Items were not
+  inspected. No password, quarantine, Gatekeeper or system setting was touched.
+  Quarantine was absent on the download and the installed App, so first-launch
+  Gatekeeper acceptance remains unestablished. No provider CLI read was
+  triggered by the agent.
+
+  Annotated tag object `23c88bee9aefb9c0b2b6b84b0639c8678d706c48` was narrowly
+  pushed and its remote peeled commit verified as
+  `fd991dff95a9595e96d0d2d615847b4fd4f40487`. A first push attempt failed
+  locally without sending anything, because the documented refspec expanded
+  incorrectly under zsh; section 4 now braces the variable. A shallow tag clone
+  verified only source identity and version metadata, not a full-history scan.
+  The automatic source ZIP and TAR each report the frozen commit ID; their
+  file contents were not compared entry by entry.
+
+  Release ID `445445950` was published at `2026-11-14T16:58:57Z`, or
+  `2026-11-15 03:58:57` Australia/Melbourne, and verified public, Latest and
+  not a prerelease. It has exactly two manual assets: DMG `748140458`
+  (3,991,698 bytes) and checksum `748140456` (112 bytes). Draft and
+  unauthenticated public downloads matched both GitHub API digests and the
+  final-main hashes recorded above. Both downloaded DMGs passed package and
+  provenance verification against the repository, workflow, main ref, frozen
+  source digest and hosted-runner policy.
+- Subsequent publication documentation updates stable links and records only.
+  It does not move `v4.3.0`, change App/build inputs or regenerate assets.

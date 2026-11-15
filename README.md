@@ -12,7 +12,7 @@ existing local usage reports by default; automatic Claude CLI reads are a
 separate, default-off choice. The app is MIT-licensed, built with SwiftUI/AppKit,
 and bundles no third-party runtime frameworks.
 
-**Latest stable:** [`4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0)
+**Latest stable:** [`4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0)
 · macOS 14+ · Apple Silicon and Intel · English and Simplified Chinese
 
 [Features](#features) · [Screenshots](#screenshots) · [Install](#installation)
@@ -32,7 +32,7 @@ only fixed-enum `phase`, `result` and `issue` values, `usage_sent` and
 account details or quota values. See
 [4.1.7 changes](CHANGELOG.md#417---2026-10-18).
 
-### Current release: 4.2.0 (33)
+### Previous release: 4.2.0 (33)
 
 Version 4.2.0 adds a Claude source-health card in **Dashboard →
 Services**, a separate local-report reread action that never starts the CLI,
@@ -73,14 +73,14 @@ Token statistics retries. See [inherited 4.1.8 changes](CHANGELOG.md#inherited-4
 Published on **2026-11-14** (Australia/Melbourne); see the
 [release verification record](docs/RELEASING.md#420-release-verification--2026-11-14).
 
-Known issue: Command-comma can open an empty Settings window when the
+Known issue in 4.2.0: Command-comma can open an empty Settings window when the
 popover is closed ([#73](https://github.com/DEFY-AN94/codex94/issues/73)).
-Use the menu-bar Dashboard action or the floating window's Dashboard button.
+Version 4.3.0 fixes it.
 
-### Development candidate: 4.3.0 (34), Unreleased
+### Current release: 4.3.0 (34)
 
-The current development branch implements these changes; **4.2.0 remains the
-published stable release** and the installation links below still select it.
+Version 4.3.0 was published on **2026-11-15** (Australia/Melbourne); the
+installation links below select it.
 
 - Application Settings and **⌘,** open or restore the existing Dashboard,
   including when the popover is closed, addressing
@@ -102,13 +102,14 @@ published stable release** and the installation links below still select it.
   still never starts the CLI; **Read once with the CLI** remains one explicit
   read without enabling automatic checks or queueing repeated clicks.
 
-The candidate adds one bounded, local installation-scoped bridge-health record;
+Version 4.3.0 adds one bounded, local installation-scoped bridge-health record;
 it contains no account identity or quota values. CLI failure/cooldown state stays
 in memory. It adds no OAuth, credential access, direct Claude HTTP client or
-guarantee of live App/web usage. See [privacy details](PRIVACY.md#430-candidate-local-bridge-health-and-on-demand-cli)
-and the [candidate acceptance checklist](docs/4.3.0-ACCEPTANCE.md).
-Cloud checks and local maintainer acceptance are recorded separately; a Ready PR
-is not a published release or evidence of local acceptance.
+guarantee of live App/web usage. See [4.3.0 changes](CHANGELOG.md#430---2026-11-15),
+[privacy details](PRIVACY.md#430-local-bridge-health-and-on-demand-cli),
+the [acceptance checklist](docs/4.3.0-ACCEPTANCE.md) and the
+[release verification record](docs/RELEASING.md#430-release-verification--2026-11-15). Local acceptance had documented limits, and
+first-launch Gatekeeper acceptance is not established.
 
 ## Features
 
@@ -298,7 +299,7 @@ can start; repeated one-time clicks do not queue extra reads.
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.
-These are historical captures, not screenshots of the current 4.2.0 interface.
+These are historical captures, not screenshots of the current 4.3.0 interface.
 The chart previews were captured during `0.3.0 (14)` candidate testing and
 show **Bar chart** and **Line chart** over the same seven reported days. These
 original synthetic captures remain unchanged, from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
@@ -343,8 +344,8 @@ statistics and update UI.
 ## Installation
 
 The published stable release is
-[`v4.2.0 (33)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0),
-released on **2026-11-14** (Australia/Melbourne), with a Universal 2 DMG and source
+[`v4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0),
+released on **2026-11-15** (Australia/Melbourne), with a Universal 2 DMG and source
 from the same annotated tag. The download and clone instructions below use
 that release; later documentation commits do not move its tag or replace assets.
 
@@ -378,27 +379,27 @@ precedence; an invalid manual choice is not silently bypassed.
 ### Install the Universal DMG
 
 Download both stable assets from the
-[`v4.2.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.2.0):
+[`v4.3.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0):
 
-- `Codex94-4.2.0-macos-universal-unnotarized.dmg`
-- `Codex94-4.2.0-SHA256SUMS.txt`
+- `Codex94-4.3.0-macos-universal-unnotarized.dmg`
+- `Codex94-4.3.0-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-4.2.0-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.3.0-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-4.2.0-macos-universal-unnotarized.dmg \
+gh attestation verify Codex94-4.3.0-macos-universal-unnotarized.dmg \
   -R DEFY-AN94/codex94 \
   --signer-workflow DEFY-AN94/codex94/.github/workflows/ci.yml \
   --source-ref refs/heads/main \
-  --source-digest c13f886151b5932518352a3b92caafb71dbbf44f \
+  --source-digest fd991dff95a9595e96d0d2d615847b4fd4f40487 \
   --deny-self-hosted-runners
 ```
 
@@ -422,7 +423,7 @@ This public repository needs no GitHub authentication. Clone the published
 stable source tag:
 
 ```bash
-git clone --branch v4.2.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.3.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:
