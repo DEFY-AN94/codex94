@@ -135,7 +135,9 @@ published release.
   folders remain allowed). The read leaves an unreadable cache untouched, and
   quota appears after the next successful quota refresh.
 
-CI, UI scenarios and App acceptance for this candidate are pending. See
+App acceptance is pending, and the CI run recorded so far predates the latest
+UI test change. The evidence and what is still pending are recorded in
+[the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased). See
 [4.3.1 changes](CHANGELOG.md#431---unreleased).
 
 ## Features

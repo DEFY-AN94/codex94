@@ -46,8 +46,9 @@ so a relocated home or Library folder keeps working. A cache that fails the
 check is unreadable; the read never deletes or rewrites it, and cache writing
 is unchanged.
 
-CI evidence and acceptance for this candidate are pending; the evidence so far
-is recorded in [the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased).
+Acceptance of this candidate is pending, and so is a CI run that covers its
+latest UI test change; the CI evidence obtained so far is recorded in
+[the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased).
 
 ## 4.3.0: local activity and automatic-read admission
 

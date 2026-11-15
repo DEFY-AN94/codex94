@@ -51,28 +51,75 @@ authorized gate 1 in section 1: committing and pushing the development branch
 and creating a Draft PR. This authorization does not extend to marking the PR
 Ready, merge, tag, Draft Release assets, installation/replacement of the
 maintainer's App, or public publication; gates 2 to 7 have not been requested
-or granted for 4.3.1.
+or granted for 4.3.1. After the first CI run the maintainer instructed that a
+further UI capture be added and this record be updated. The commits that do so
+go to the same Draft PR under gate 1; that instruction authorizes no later
+gate.
 
-Evidence so far: `script/release_check.sh` passed locally with Xcode 27.2 on
-candidate commit `70a878ac45e965d2d6913b3ceaddc2958c2e5061` with a clean
-working tree. Its hosted unit suite executed 739 tests with 1 existing skip
-and 0 failures, and it verified the Universal App and an unsigned DMG candidate
-for `4.3.1 (35)` (SHA-256
-`f6e60a9d30afa044856f7b2109f581781ce0af363b9d21f3cba674de0fe00295`; a local
-artifact, not a release asset). A later documentation-only commit records this
-result and changed no App source, test, script or project setting. Nothing has
-run on CI. The UI scenarios, CodeQL and every candidate and acceptance gate are
-pending. Results recorded for other versions do not validate 4.3.1.
+Evidence so far, in the order it was obtained:
+
+- **Local gate on the source commit.** `script/release_check.sh` passed with
+  Xcode 27.2 (27B52) on commit `70a878ac45e965d2d6913b3ceaddc2958c2e5061`,
+  which carries every App source, resource and project change of this
+  candidate, with a clean working tree. Its hosted unit suite executed 739
+  tests with 1 existing skip and 0 failures, and it verified the Universal App
+  and an unsigned DMG for `4.3.1 (35)` (SHA-256
+  `f6e60a9d30afa044856f7b2109f581781ce0af363b9d21f3cba674de0fe00295`; a local
+  artifact, not a release asset).
+- **First CI run.** [CI run 43701836254](https://github.com/DEFY-AN94/codex94/actions/runs/43701836254)
+  tested merge `bb9b661a69315f88ab963593fdf1147a2fa078bd` of PR head
+  `615d89e74bd3375bd4a72f851c97fc76a28b572e` (shared tree
+  `598b6c95213f5bb67a44f7a5cd81622539374d11`) with Xcode 16.4. Its release
+  gate executed 739 tests with the same skip and 0 failures, and all five
+  synthetic UI smokes passed on their first attempt.
+  [CodeQL run 43701833517](https://github.com/DEFY-AN94/codex94/actions/runs/43701833517)
+  passed Actions, Python and Swift analysis. Main-only DMG attestation was
+  skipped on the PR, which is not a successful attestation.
+- **First PR candidate.** The two-file artifact of that run holds a DMG with
+  SHA-256 `ff13db61c181bcffff47ec7bde4f9638b69447918672a97cab80cc0d4fbd1c09`
+  and a checksum file that matches it; the App executable inside that DMG has
+  SHA-256 `09c132501f626165f841e8993bde490da6316e83b270d5a0e8545315db0db1c2`.
+  `script/package_dmg.sh verify` passed on the downloaded files. A later head
+  supersedes this candidate.
+- **Synthetic UI review of that run.** An AI assistant read all 53 PNGs and
+  45 JSON reports in two independent passes per scenario; the maintainer has
+  not reviewed them. It found no privacy problem and no layout regression
+  attributable to 4.3.1, and noted one cosmetic truncation in a Recovery
+  popover that predates this candidate. All 43 reports that carry a source
+  revision name the tested merge. No image showed the new Services state in
+  full: the disabled preview and its requirement appeared only as fragments
+  behind a popover in two Providers images, and never in Simplified Chinese.
+- **Test-only follow-up.** Commit `9897b746ea3134a7664d5b09e97d3f903242022e`
+  changes only `Codex94UITests/Codex94UITests.swift`. The Providers smoke now
+  requires the preview button to be disabled and the requirement to carry the
+  exact English and Simplified Chinese text, writes a cropped image of both in
+  each language, and requires a click on the disabled button to open nothing.
+  It changes no App source, resource, script or project setting.
+  `script/release_check.sh` passed again on that commit with a clean working
+  tree (739 tests, 1 existing skip, 0 failures; local DMG SHA-256
+  `68d0675844ca40e8305c5047a673584392f8cf8b0c8b122364acb1783f78c305`). That
+  script does not build or run the UI test target, which was only compiled
+  locally.
+
+A later documentation-only commit records these results. The first CI run does
+not cover the test-only follow-up: the new assertions and images are unverified
+until CI runs on a head that contains them, and that run, its candidate DMG
+and the review of its images are pending. Maintainer acceptance of the
+candidate App and every later gate are also pending. Results recorded for
+other versions do not validate 4.3.1.
 
 Two notes for whoever accepts this candidate:
 
 1. Installing a new statusline connection can be exercised only from a stable
    install, `/Applications/Codex94.app` or `~/Applications/Codex94.app`, not
    from a mounted disk image.
-2. The Providers UI scenario is expected to be affected. It runs the App
-   outside Applications, where the install preview button is now disabled, and
-   one of its steps waits for that button to be hittable. Whether it still
-   passes is unverified; do not rely on earlier UI results.
+2. The Providers UI scenario runs the App outside Applications, where the
+   install preview button is disabled. It passed in the first CI run, whose
+   steps neither require the disabled state nor capture it. When this record
+   was written the assertions and the two images added afterwards had not run
+   on CI, and no CI scenario
+   shows the enabled preview of a stable install. Do not rely on UI results
+   recorded for earlier versions.
 
 <a id="430-candidate-scope-and-authorization--unreleased"></a>
 

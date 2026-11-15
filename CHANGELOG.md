@@ -57,20 +57,36 @@ gates are recorded in [docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope-
 
 ### Validation and acceptance
 
-`script/release_check.sh` passed locally with Xcode 27.2 on candidate commit
-`70a878ac45e965d2d6913b3ceaddc2958c2e5061` with a clean working tree: its
-hosted unit suite executed 739 tests with 1 existing skip and 0 failures, and
-it verified the Universal App and an unsigned DMG candidate for `4.3.1 (35)`
-(SHA-256 `f6e60a9d30afa044856f7b2109f581781ce0af363b9d21f3cba674de0fe00295`;
-a local artifact, not a release asset). A later documentation-only commit
-records this result and changed no App source, test, script or project
-setting. Nothing has run on CI. UI scenarios, CodeQL and every candidate and
-acceptance gate are pending and are not claimed here.
+`script/release_check.sh` passed locally with Xcode 27.2 on commit
+`70a878ac45e965d2d6913b3ceaddc2958c2e5061`, which carries every App source,
+resource and project change, with a clean working tree: its hosted unit suite
+executed 739 tests with 1 existing skip and 0 failures, and it verified the
+Universal App and an unsigned DMG for `4.3.1 (35)` (SHA-256
+`f6e60a9d30afa044856f7b2109f581781ce0af363b9d21f3cba674de0fe00295`; a local
+artifact, not a release asset).
 
-One risk is known and unverified: the Providers UI scenario runs the App
-outside Applications, where the install preview button is now disabled, and
-one of its steps waits for that button to be hittable. Earlier results,
-including those recorded for 4.3.0 below, do not validate this candidate.
+[CI run 43701836254](https://github.com/DEFY-AN94/codex94/actions/runs/43701836254)
+then tested merge `bb9b661a69315f88ab963593fdf1147a2fa078bd` of PR head
+`615d89e74bd3375bd4a72f851c97fc76a28b572e` with Xcode 16.4: the release gate
+executed 739 tests with the same skip and 0 failures, and all five synthetic
+UI smokes passed.
+[CodeQL run 43701833517](https://github.com/DEFY-AN94/codex94/actions/runs/43701833517)
+passed Actions, Python and Swift analysis. Main-only DMG attestation was
+skipped, which is not a successful attestation. An AI assistant reviewed the
+run's 53 synthetic images and 45 reports and found no privacy problem and no
+layout regression, but the disabled install preview and its requirement
+appeared only as fragments behind a popover, never in Simplified Chinese.
+
+Commit `9897b746ea3134a7664d5b09e97d3f903242022e` therefore extends the
+Providers UI smoke, and nothing else, to require the disabled preview and the
+exact English and Simplified Chinese requirement text and to capture both. The
+local gate passed again on that commit (739 tests, 1 existing skip, 0
+failures); it does not run UI smokes. When this entry was written these
+additions had not run on CI, so their result, the candidate from that run and the review of its images are
+pending and are not claimed here, as are maintainer acceptance of the
+candidate App and every later gate. Earlier results, including those recorded
+for 4.3.0 below, do not validate this candidate. The full record is in
+[docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
 
 ## 4.3.0 - 2026-11-15
 

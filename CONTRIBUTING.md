@@ -316,7 +316,10 @@ ownership, permissions and SHA-256, then sets a fixture-first `PATH` for the AUT
 The synthetic terminal accepts only version checks and the fixed `/usage`
 invocation; its log contains only the fixed usage-event/mode schema. The scenario
 does not run a real Claude CLI, install a statusline connection, or operate
-authentication UI. Check exact request counts, independent provider errors,
+authentication UI. Because its App runs from a build folder, it requires the
+statusline install preview to be disabled and the stable-install requirement to
+be shown in English and Simplified Chinese, captures both, and never opens the
+preview. Check exact request counts, independent provider errors,
 `single`/`compactBoth`/`both` native status items, shared popover content, disabled Codex Token
 reads and the all-disabled settings entry. Keep these synthetic results separate
 from real CLI compatibility, account acceptance and unattended monitoring.

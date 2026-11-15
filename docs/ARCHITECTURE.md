@@ -12,8 +12,9 @@ defines component responsibilities, not a substitute for those records.
 
 The unreleased `4.3.1 (35)` development candidate adds the following ownership
 rules on top of `4.3.0 (34)`. It introduces no new source file, stored file or
-dependency. CI evidence and acceptance for this candidate are pending; the
-evidence so far is recorded in [the release workflow](RELEASING.md#431-candidate-scope--unreleased).
+dependency. Acceptance of this candidate is pending, and so is a CI run that
+covers its latest UI test change; the CI evidence obtained so far is recorded
+in [the release workflow](RELEASING.md#431-candidate-scope--unreleased).
 
 ### Stable-install rule
 

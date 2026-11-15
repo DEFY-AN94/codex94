@@ -34,8 +34,9 @@ it is treated as unreadable, the read leaves it untouched, and quota appears
 after the next successful quota refresh. The cache's contents and the way it is
 written are unchanged.
 
-CI evidence and acceptance for this candidate are pending; the evidence so far
-is recorded in [the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased).
+Acceptance of this candidate is pending, and so is a CI run that covers its
+latest UI test change; the CI evidence obtained so far is recorded in
+[the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased).
 
 ## 4.3.0: local bridge health and on-demand CLI
 
