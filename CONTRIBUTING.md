@@ -96,6 +96,12 @@ rejected path. The settings section observes this controller directly; app
 activation refreshes its status. Registration failures use localized feedback,
 not raw system errors. Tests inject the narrow service adapter and must not
 read or change real Login Items.
+The Claude statusline installer reuses
+`LaunchAtLoginController.isCurrentBundleStableInstall()` for new installations
+only and must not add a second path rule. Installer tests inject
+`stableInstall:`; only the single test of the production default reads the
+running bundle, and it skips rather than fails when the host runs from an
+Applications folder.
 
 ### Version 0.2.2 behavior
 

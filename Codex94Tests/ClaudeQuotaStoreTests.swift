@@ -51,7 +51,8 @@ final class ClaudeQuotaStoreTests: XCTestCase {
     func testDifferentConfigurationCannotOverrideLocalDataOnAnyRefreshPath() async throws {
         let f = try fixture(cliEnabled: false, legacyInstallation: false, customConfiguration: true)
         let other = ClaudeStatuslineInstaller(cache: f.cache, executableURL: URL(fileURLWithPath: "/bin/echo"),
-            supportDirectory: f.directory.appendingPathComponent("support"), environment: [:], homeDirectory: f.directory)
+            supportDirectory: f.directory.appendingPathComponent("support"), environment: [:], homeDirectory: f.directory,
+            stableInstall: true)
         try seedLegacyInstallation(other)
         let began = f.clock.read()
         try writeLocalCache(f, fiveHourUsed: 10, fetchedAt: began, resetAt: began.addingTimeInterval(20_000))
@@ -757,7 +758,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
             installer: ClaudeStatuslineInstaller(settingsURL: fixture.directory.appendingPathComponent(".claude/settings.json"),
                 cache: fixture.cache, executableURL: URL(fileURLWithPath: "/bin/echo"),
                 supportDirectory: fixture.directory.appendingPathComponent("support"), environment: [:],
-                homeDirectory: fixture.directory),
+                homeDirectory: fixture.directory, stableInstall: true),
             localCache: ClaudeLocalUsageCacheReader(fileURL: fixture.localCacheURL),
             fetcherFactory: { counter.increment(); return fetcher },
             notificationController: NotificationController(service: ClaudeStoreTestNotifications()),
@@ -2370,7 +2371,7 @@ final class ClaudeQuotaStoreTests: XCTestCase {
         let environment = customConfiguration ? ["CLAUDE_CONFIG_DIR": root.appendingPathComponent("custom-profile").path] : [:]
         let installer = ClaudeStatuslineInstaller(cache: cache,
             executableURL: URL(fileURLWithPath: "/bin/echo"), supportDirectory: root.appendingPathComponent("support"),
-            environment: environment, homeDirectory: root)
+            environment: environment, homeDirectory: root, stableInstall: true)
         if legacyInstallation { try seedLegacyInstallation(installer) }
         let fetcher = ClaudeStoreTestFetcher()
         let sleeper = ClaudeStoreTestSleeper()

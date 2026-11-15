@@ -40,13 +40,18 @@ struct ClaudeStatuslineInstaller: Sendable {
     let cache: ClaudeStatuslineCache
     let executableURL: URL
     let supportDirectory: URL
+    /// Gates NEW installations only: the bridge command persists this App's
+    /// path in the user's settings, so it must not point at a disk image,
+    /// translocated or build location. Removal and recovery never consult it.
+    let isStableInstall: Bool
     private let directories: ClaudeConfigurationDirectories
     var manifestURL: URL { supportDirectory.appendingPathComponent("statusline-installation.json") }
 
     init(settingsURL: URL? = nil, cache: ClaudeStatuslineCache = ClaudeStatuslineCache(),
          executableURL: URL? = nil, supportDirectory: URL? = nil,
          environment: [String: String] = ProcessInfo.processInfo.environment,
-         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
+         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+         stableInstall: Bool? = nil) {
         let directories = ClaudeConfigurationDirectories(environment: environment, homeDirectory: homeDirectory)
         self.directories = directories
         self.settingsURL = settingsURL ?? directories.settingsURL
@@ -54,6 +59,8 @@ struct ClaudeStatuslineInstaller: Sendable {
         self.executableURL = executableURL ?? Bundle.main.executableURL
             ?? URL(fileURLWithPath: "/Applications/Codex94.app/Contents/MacOS/Codex94")
         self.supportDirectory = supportDirectory ?? cache.fileURL.deletingLastPathComponent()
+        // Tests inject the decision; production always asks the owner of the rule.
+        self.isStableInstall = stableInstall ?? LaunchAtLoginController.isCurrentBundleStableInstall()
     }
 
     var setupState: ClaudeStatuslineSetupState {
@@ -109,6 +116,7 @@ struct ClaudeStatuslineInstaller: Sendable {
     }
 
     func previewInstall() throws -> ClaudeStatuslineInstallPreview {
+        guard isStableInstall else { throw ClaudeQuotaIssue.stableInstallRequired }
         guard !FileManager.default.fileExists(atPath: manifestURL.path) else {
             throw ClaudeQuotaIssue.configurationConflict
         }
@@ -142,6 +150,9 @@ struct ClaudeStatuslineInstaller: Sendable {
     }
 
     private func installLocked(_ preview: ClaudeStatuslineInstallPreview) throws {
+        // The decision taken at launch is enforced again inside the locked install,
+        // so a preview minted by another installer instance cannot bypass it.
+        guard isStableInstall else { throw ClaudeQuotaIssue.stableInstallRequired }
         guard preview.settingsURL == settingsURL,
               preview.expectedDigest == ClaudeLocalFile.digest(try readSettings()),
               !FileManager.default.fileExists(atPath: manifestURL.path),
@@ -171,7 +182,7 @@ struct ClaudeStatuslineInstaller: Sendable {
             }
             var settings = try Self.object(preview.originalSettings)
             settings["statusLine"] = try JSONSerialization.jsonObject(with: preview.installedStatusline)
-            try ClaudeLocalFile.write(try Self.encode(settings), to: settingsURL)
+            try ClaudeLocalFile.write(try Self.encodeSettingsFile(settings), to: settingsURL)
         } catch {
             // Remove only the manifest this invocation created; preserve the backup.
             if (try? ClaudeLocalFile.read(manifestURL, maximumBytes: 1_048_576)) == manifestData {
@@ -197,7 +208,7 @@ struct ClaudeStatuslineInstaller: Sendable {
             settings["statusLine"] = try JSONSerialization.jsonObject(with: previous)
         } else { settings.removeValue(forKey: "statusLine") }
         guard try readSettings() == originalData else { throw ClaudeQuotaIssue.configurationConflict }
-        try ClaudeLocalFile.write(try Self.encode(settings), to: settingsURL)
+        try ClaudeLocalFile.write(try Self.encodeSettingsFile(settings), to: settingsURL)
         try FileManager.default.removeItem(at: manifestURL)
         ClaudeBridgeHealthStore(cache: cache).removeLocked(installationID: manifest.installationID)
         // Backups and quota evidence remain user-owned recovery material.
@@ -300,8 +311,18 @@ struct ClaudeStatuslineInstaller: Sendable {
         return value
     }
 
+    /// Canonical comparison form, persisted in every existing manifest and
+    /// backup. Its bytes (escaped slashes included) must never change, or
+    /// installed connections would be reported as conflicts.
     private static func encode(_ object: Any) throws -> Data {
         try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .prettyPrinted])
+    }
+
+    /// The user's own settings file only: the same value without "\/" noise.
+    /// Never compare or persist these bytes as the canonical form.
+    private static func encodeSettingsFile(_ settings: [String: Any]) throws -> Data {
+        try JSONSerialization.data(withJSONObject: settings,
+                                   options: [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes])
     }
 
     private static func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'" }

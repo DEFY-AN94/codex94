@@ -347,7 +347,8 @@ final class ClaudeCLIDiagnosticTests: XCTestCase {
         let notifications = HealthDiagnosticNotifications()
         let cache = ClaudeStatuslineCache(fileURL: root.appendingPathComponent("support/statusline-quota.json"))
         let installer = ClaudeStatuslineInstaller(cache: cache, executableURL: URL(fileURLWithPath: "/bin/echo"),
-            supportDirectory: root.appendingPathComponent("support"), environment: [:], homeDirectory: root)
+            supportDirectory: root.appendingPathComponent("support"), environment: [:], homeDirectory: root,
+            stableInstall: true)
         let localURL = ClaudeLocalUsageCacheReader.defaultFileURL(environment: [:], homeDirectory: root)
         let store = ClaudeQuotaStore(preferences: preferences, cache: cache, installer: installer,
             localCache: ClaudeLocalUsageCacheReader(fileURL: localURL), fetcherFactory: { fetcher },

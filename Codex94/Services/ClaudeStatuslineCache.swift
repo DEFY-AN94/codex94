@@ -231,10 +231,7 @@ enum ClaudeLocalFile {
         // Foundation deliberately folds /private/var and /private/tmp back to
         // /var and /tmp, even in resolvingSymlinksInPath(). Handle only those
         // root-owned system aliases; never resolve arbitrary user symlinks.
-        var parts = url.path.split(separator: "/").map(String.init)
-        guard url.isFileURL, url.path.hasPrefix("/"), !parts.contains(".."), !parts.contains(".") else {
-            throw ClaudeQuotaIssue.configurationConflict
-        }
+        var parts = try absolutePathComponents(of: url)
         if let first = parts.first, first == "var" || first == "tmp" {
             let alias = "/" + first
             var value = stat()
@@ -256,6 +253,16 @@ enum ClaudeLocalFile {
                 throw ClaudeQuotaIssue.unavailable
             }
         }
+    }
+
+    /// Shape only: an absolute file path without dot segments. Every local
+    /// read requires it, including one that allows symlinked parent folders.
+    private static func absolutePathComponents(of url: URL) throws -> [String] {
+        let parts = url.path.split(separator: "/").map(String.init)
+        guard url.isFileURL, url.path.hasPrefix("/"), !parts.contains(".."), !parts.contains(".") else {
+            throw ClaudeQuotaIssue.configurationConflict
+        }
+        return parts
     }
 
     static func createPrivateDirectory(_ url: URL) throws {
@@ -280,13 +287,18 @@ enum ClaudeLocalFile {
     /// The owner requirement is opt-in: local Claude Code state requires the
     /// current uid; existing bridge/configuration reads retain their prior policy.
     /// A changing file never supplies stable bytes/stamp, and is not retried here.
+    /// allowingSymlinkedAncestors skips ONLY the walk that refuses a symlinked
+    /// parent directory, for an App-owned file whose home or Library folder is
+    /// legitimately reached through one. The final component is still never
+    /// followed, and every descriptor check below applies unchanged.
     static func readStamped(
         _ url: URL, maximumBytes: Int, requireCurrentOwner: Bool = false,
+        allowingSymlinkedAncestors: Bool = false,
         unchangedSince previous: ReadStamp? = nil,
         readData: ((FileHandle, Int) throws -> Data)? = nil
     ) throws -> StampedRead {
         guard maximumBytes >= 0, maximumBytes < Int.max else { throw ReadFailure.invalidFile }
-        try requireNoSymlinks(url)
+        if allowingSymlinkedAncestors { _ = try absolutePathComponents(of: url) } else { try requireNoSymlinks(url) }
         // O_NOFOLLOW protects the last component; O_NONBLOCK lets fstat reject
         // a FIFO without waiting for a writer on the calling thread.
         let descriptor = Darwin.open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)

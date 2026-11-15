@@ -50,6 +50,8 @@ struct SnapshotCache: Sendable {
     }
 
     let fileURL: URL
+    /// Far above any real cache, which holds a few short fields per bucket.
+    static let maximumCacheBytes = 1_048_576
 
     init(fileURL: URL? = nil) {
         let applicationSupport = FileManager.default.urls(
@@ -61,7 +63,16 @@ struct SnapshotCache: Sendable {
     }
 
     func load() -> QuotaSnapshot? {
-        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        // Checked: the file itself is never a followed symlink, and is one singly
+        // linked regular file of the current user, bounded in size, unchanged
+        // while read, with no wait on a FIFO. Not checked: symlinked PARENT
+        // directories, because save() writes through a relocated home or
+        // Application Support folder and this App-owned cache must load back.
+        // Anything refused is an unreadable cache, left untouched.
+        guard case let .contents(data, _)? = try? ClaudeLocalFile.readStamped(
+            fileURL, maximumBytes: Self.maximumCacheBytes, requireCurrentOwner: true,
+            allowingSymlinkedAncestors: true
+        ) else { return nil }
         guard let versionProbe = try? JSONDecoder.codex94.decode(
             CacheVersionProbe.self,
             from: data

@@ -33,6 +33,43 @@ acceptance visible in the PR. Never mark Ready merely because CI is green unless
 the maintainer explicitly authorizes a different order, as recorded for the
 4.2.0 candidate below.
 
+## 4.3.1 candidate scope — Unreleased
+
+Development candidate `4.3.1 (35)` starts from main
+`fd991dff95a9595e96d0d2d615847b4fd4f40487`. Its scope is five hardening changes
+and nothing else: an upper bound on control-sequence parameters in the Claude
+CLI screen replay; a stable-install requirement for new statusline connections;
+writing the Claude Code settings file without escaped slashes; validation of
+Codex app-server numbers; and reading the Codex quota cache through the shared
+bounded local-file reader. They are listed in
+[CHANGELOG.md](../CHANGELOG.md#431---unreleased).
+
+On 2026-11-15 (Australia/Melbourne) the maintainer decided to keep these
+changes out of 4.3.0 and to carry them as 4.3.1. That is the only decision
+recorded here. It authorizes no commit, push, PR, tag, release, installation
+or publication, and none of the seven gates in section 1 has been requested or
+granted for 4.3.1.
+
+Evidence so far: `script/release_check.sh` passed locally with Xcode 27.2 on
+the uncommitted candidate sources. Its hosted unit suite executed 739 tests
+with 1 existing skip and 0 failures, and it verified the Universal App and an
+unsigned DMG candidate for `4.3.1 (35)` (SHA-256
+`1a717f9a268bd8111dd841c5a7d6ef35e2805f65ac844ab5b2ae05b1d8220e6c`; a local
+artifact, not a release asset). That run predates this paragraph, which changed
+no App source. Nothing has run on CI. The UI scenarios, CodeQL and every
+candidate and acceptance gate are pending. Results recorded for other versions
+do not validate 4.3.1.
+
+Two notes for whoever accepts this candidate:
+
+1. Installing a new statusline connection can be exercised only from a stable
+   install, `/Applications/Codex94.app` or `~/Applications/Codex94.app`, not
+   from a mounted disk image.
+2. The Providers UI scenario is expected to be affected. It runs the App
+   outside Applications, where the install preview button is now disabled, and
+   one of its steps waits for that button to be hittable. Whether it still
+   passes is unverified; do not rely on earlier UI results.
+
 <a id="430-candidate-scope-and-authorization--unreleased"></a>
 
 ## 4.3.0 candidate acceptance and release scope — 2026-11-15

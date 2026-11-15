@@ -6,6 +6,71 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
+## 4.3.1 - Unreleased
+
+Development candidate `4.3.1 (35)`. It carries hardening changes on top of
+`4.3.0 (34)` and is not part of that version; no release date, tag, release
+asset or local App acceptance is implied by this entry. Its scope and pending
+gates are recorded in [docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
+
+### Fixed
+
+- Stop the Claude CLI screen replay from crashing when terminal output carries
+  an extreme cursor-movement parameter. Every control-sequence parameter is
+  capped at an upper bound when it is parsed, so cursor arithmetic can no longer
+  overflow; a parameter too long to parse still counts as omitted, as before.
+  Input that did not crash produces the same screen as before.
+- Write Claude Code's settings file without escaped slashes (`\/`) when
+  installing or removing the statusline connection. Keys are still sorted and
+  the file is still rewritten as a whole. The canonical form kept in the
+  installation manifest and backup is unchanged, so connections created by
+  earlier versions stay recognised and removable; a settings file written by
+  an earlier version keeps its escapes until the next install or removal.
+- Stop reading a JSON Boolean, a non-finite value, or a number a native
+  integer cannot represent (including a floating-point 2^63), as a valid Codex
+  app-server response id, error code, percentage, window duration or reset
+  time. A quota window whose duration or percentage is rejected is skipped, and
+  a reset time that is rejected or outside the supported date range is treated
+  as absent while its window is kept. Ordinary integers, fractions (truncated
+  toward zero) and integer strings parse as before, including integer
+  percentages outside 0–100, which are still preserved and clamped on display.
+
+### Changed
+
+- Require a stable install for new statusline connections: exactly
+  `/Applications/Codex94.app` or `~/Applications/Codex94.app`, the rule Launch
+  at Login already uses, because the connection saves the App's location in
+  Claude Code settings. From a disk image, translocated or build location,
+  Services disables the install preview and explains the requirement; a refused
+  installation writes no manifest, backup or settings change. Showing and
+  removing an existing connection stay available from any location. Removing
+  an old record after a conflict still requires the App to run from the same
+  path that created the connection; that requirement is unchanged.
+- Read the Codex quota cache through the bounded local-file reader already used
+  for Claude files: an absolute path without dot segments, at most 1 MiB, one
+  singly linked regular file owned by the current user, never a symbolic link
+  itself, and opened without waiting on a FIFO. Symbolic links in its parent
+  folders stay allowed for this App-owned cache, so a relocated home or Library
+  folder keeps working. A cache that fails the check is treated as unreadable
+  and the read leaves it untouched; quota appears after the next successful
+  quota refresh. Writing the cache is unchanged.
+
+### Validation and acceptance
+
+`script/release_check.sh` passed locally with Xcode 27.2 on the uncommitted
+candidate sources: its hosted unit suite executed 739 tests with 1 existing
+skip and 0 failures, and it verified the Universal App and an unsigned DMG
+candidate for `4.3.1 (35)` (SHA-256
+`1a717f9a268bd8111dd841c5a7d6ef35e2805f65ac844ab5b2ae05b1d8220e6c`; a local
+artifact, not a release asset). That run predates this paragraph, which changed
+no App source. Nothing has run on CI. UI scenarios, CodeQL and every candidate
+and acceptance gate are pending and are not claimed here.
+
+One risk is known and unverified: the Providers UI scenario runs the App
+outside Applications, where the install preview button is now disabled, and
+one of its steps waits for that button to be hittable. Earlier results,
+including those recorded for 4.3.0 below, do not validate this candidate.
+
 ## 4.3.0 - 2026-11-15
 
 Version `4.3.0 (34)` was published on the date above, following the published

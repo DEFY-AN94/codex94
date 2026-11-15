@@ -111,6 +111,33 @@ the [acceptance checklist](docs/4.3.0-ACCEPTANCE.md) and the
 [release verification record](docs/RELEASING.md#430-release-verification--2026-11-15). Local acceptance had documented limits, and
 first-launch Gatekeeper acceptance is not established.
 
+### Development candidate: 4.3.1 (35), Unreleased
+
+This candidate contains hardening changes on top of 4.3.0 and is not a
+published release.
+
+- A **new statusline connection** can be installed only while Codex94 runs from
+  exactly `/Applications/Codex94.app` or `~/Applications/Codex94.app`, the
+  locations Launch at login already accepts, because the connection saves the
+  App's location in Claude Code settings. Anywhere else, such as a disk image,
+  Services disables the install preview and explains why. An existing
+  connection is still shown and can still be removed from any location.
+  Removing an old record after a conflict still requires Codex94 to run from
+  the same path that created the connection, as before.
+- Installing or removing a connection no longer writes escaped slashes (`\/`)
+  into the Claude Code settings file. Existing connections are unaffected.
+- The Claude CLI screen replay no longer crashes on extreme cursor-movement
+  parameters. Codex app-server response ids, error codes and quota-window
+  fields that are Booleans, non-finite or not representable as a native
+  integer are treated as absent instead of misread. The Codex quota cache is
+  read only as a regular, singly linked file of at most 1 MiB owned by the
+  current user that is not itself a symbolic link (symbolic links in its parent
+  folders remain allowed). The read leaves an unreadable cache untouched, and
+  quota appears after the next successful quota refresh.
+
+CI, UI scenarios and App acceptance for this candidate are pending. See
+[4.3.1 changes](CHANGELOG.md#431---unreleased).
+
 ## Features
 
 The following describes the published release. Release-by-release changes live

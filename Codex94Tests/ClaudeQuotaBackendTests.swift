@@ -544,6 +544,72 @@ final class ClaudeQuotaBackendTests: XCTestCase {
                        "A later open update cannot reuse an earlier frame's completion")
     }
 
+    func testScreenSnapshotBoundsEveryCursorAndEraseParameter() {
+        // A trap in the replay takes down the whole App, so hostile parameters
+        // must still return a full grid. Filling every cell first keeps lines
+        // untrimmed, which makes cursor positions and erased ranges countable.
+        let rows = 50, columns = 180, escape = "\u{1b}["
+        let fill = (1...rows).map { "\(escape)\($0);1H" + String(repeating: ".", count: columns) }.joined()
+        let huge = String(Int.max), overflow = String(repeating: "9", count: 30)
+        func replay(_ home: String, _ sequence: String, tail: String = "#") -> [String] {
+            let bytes = Data((fill + escape + home + "H" + escape + sequence + tail).utf8)
+            let screen = ClaudeUsageScreen.snapshot(from: bytes)
+            let lines = screen.text.components(separatedBy: "\n")
+            XCTAssertTrue(screen.isComplete, "\(home)H \(sequence)")
+            XCTAssertEqual(lines.count, rows, "\(home)H \(sequence)")
+            XCTAssertTrue(lines.allSatisfy { $0.count <= columns }, "\(home)H \(sequence)")
+            return lines
+        }
+
+        // Cursor at row 10, column 5 (zero-based); the marker shows where it ended.
+        for (sequence, row, column) in [
+            ("A", 9, 5), ("3B", 13, 5), ("4C", 10, 9), ("2D", 10, 3), ("7G", 10, 6), ("4;9H", 3, 8),
+            ("\(huge)A", 0, 5), ("\(huge)B", 49, 5), ("\(huge)C", 10, 179), ("\(huge)D", 10, 0),
+            ("\(huge)G", 10, 179), ("\(huge);\(huge)H", 49, 179), ("\(huge);\(huge)f", 49, 179),
+            ("\(huge)H", 49, 0), ("\(huge);H", 49, 0), (";\(huge)H", 0, 179)
+        ] {
+            let lines = replay("11;6", sequence)
+            let marked = lines.indices.filter { lines[$0].contains("#") }
+            XCTAssertEqual(marked, [row], sequence)
+            guard let line = marked.first.map({ lines[$0] }), let marker = line.firstIndex(of: "#") else { continue }
+            XCTAssertEqual(line.distance(from: line.startIndex, to: marker), column, sequence)
+            XCTAssertEqual(lines.joined().filter { $0 == "." }.count, rows * columns - 1, sequence)
+        }
+
+        let cursor = 10 * columns + 5, all = rows * columns
+        for (sequence, remaining) in [
+            ("J", cursor), ("0J", cursor), ("1J", all - cursor - 1), ("2J", 0), ("\(huge)J", 0),
+            ("K", all - (columns - 5)), ("0K", all - (columns - 5)), ("1K", all - 6),
+            ("2K", all - columns), ("\(huge)K", all - columns),
+            // A malformed negative mode is neither 0 nor 1: it erased the whole
+            // screen or line before the bound existed, and it still does.
+            ("-1J", 0), ("-5J", 0), ("-\(huge)J", 0), ("\(Int.min)J", 0),
+            ("-1K", all - columns), ("-5K", all - columns), ("-\(huge)K", all - columns),
+            ("\(Int.min)K", all - columns)
+        ] {
+            let lines = replay("11;6", sequence)
+            XCTAssertEqual(lines.joined().filter { $0 == "." }.count, remaining, sequence)
+            XCTAssertEqual(lines[10].filter { $0 == "#" }.count, 1, sequence)
+        }
+
+        // Every command with every hostile parameter shape, from mid-screen and
+        // from both corners, followed by a scroll, backspaces and a long write.
+        let parameters = [
+            huge, overflow, "-\(huge)", String(Int.min), "-\(overflow)", "", ";", "0", "1", "2", "3", ";;;;",
+            "\(huge);\(overflow)", "\(overflow);\(huge)", "\(overflow);\(overflow)",
+            Array(repeating: huge, count: 64).joined(separator: ";")
+        ]
+        let tail = "\n\n\u{8}\u{8}" + String(repeating: "#", count: columns + 20)
+        for home in ["11;6", "1;1", "\(rows);\(columns)", "\(huge);\(huge)", "\(overflow);\(overflow)"] {
+            for parameter in parameters {
+                for command in "ABCDGHfJK" {
+                    let lines = replay(home, "\(parameter)\(command)", tail: tail)
+                    XCTAssertTrue(lines.contains { $0.contains("#") }, "\(home)H \(parameter)\(command)")
+                }
+            }
+        }
+    }
+
     func testFakeCLIUsesOnlyUsageAndCleansItsProcessGroup() async throws {
         let root = try fixtureDirectory()
         let executable = root.appendingPathComponent("claude")
@@ -1533,7 +1599,7 @@ final class ClaudeQuotaBackendTests: XCTestCase {
         let support = root.appendingPathComponent("support")
         let cache = ClaudeStatuslineCache(fileURL: support.appendingPathComponent("statusline-quota.json"))
         let installer = ClaudeStatuslineInstaller(settingsURL: root.appendingPathComponent("settings.json"), cache: cache,
-            executableURL: executable, supportDirectory: support)
+            executableURL: executable, supportDirectory: support, stableInstall: true)
         return (installer, support, cache)
     }
 

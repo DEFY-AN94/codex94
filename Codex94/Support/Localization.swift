@@ -753,6 +753,7 @@ extension ClaudeQuotaIssue {
         case .configurationConflict: "claude.issue.configurationConflict"
         case .unavailable: "claude.issue.unavailable"
         case .localCacheUnreadable: "claude.issue.localCacheUnreadable"
+        case .stableInstallRequired: "claude.setup.installRequired"
         }
     }
 }

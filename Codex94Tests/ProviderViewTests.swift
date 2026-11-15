@@ -1323,7 +1323,7 @@ final class ProviderViewTests: XCTestCase {
             settingsURL: settings,
             cache: ClaudeStatuslineCache(fileURL: support.appendingPathComponent("quota.json")),
             executableURL: directory.appendingPathComponent("SyntheticCodex94"),
-            supportDirectory: support
+            supportDirectory: support, stableInstall: true
         )
         let preview = try installer.previewInstall()
         XCTAssertTrue(preview.preservesExistingStatusline)
@@ -1419,6 +1419,100 @@ final class ProviderViewTests: XCTestCase {
         }
     }
 
+    func testUnstableAppLocationExplainsTheRequirementAndKeepsRemovalAvailable() throws {
+        for state in [ClaudeStatuslineSetupState.notInstalled, .installed, .conflict, .differentConfiguration] {
+            XCTAssertEqual(ClaudeStatuslineSetupView.canPreviewInstall(state: state, stableInstall: true),
+                           state == .notInstalled)
+            XCTAssertFalse(ClaudeStatuslineSetupView.canPreviewInstall(state: state, stableInstall: false))
+            XCTAssertEqual(ClaudeStatuslineSetupView.showsInstallRequirement(state: state, stableInstall: false),
+                           state == .notInstalled)
+            XCTAssertFalse(ClaudeStatuslineSetupView.showsInstallRequirement(state: state, stableInstall: true))
+        }
+        XCTAssertEqual(ClaudeQuotaIssue.stableInstallRequired.localizationKey, "claude.setup.installRequired")
+        let directory = try temporaryDirectory()
+        let fixture = try makeFixture(directory: directory, stableInstall: false)
+        defer { fixture.cleanUp() }
+        // The same synthetic state seen by a stably installed App: every rendered
+        // difference between the two stores is the stable-install decision.
+        let stableDirectory = try temporaryDirectory()
+        let stable = try makeFixture(directory: stableDirectory, stableInstall: true)
+        defer { stable.cleanUp() }
+        let settings = directory.appendingPathComponent("settings.json")
+        let bytes = Data(#"{"statusLine":{"type":"command","command":"printf original"}}"#.utf8)
+        try bytes.write(to: settings)
+        try bytes.write(to: stableDirectory.appendingPathComponent("settings.json"))
+        let manifest = directory.appendingPathComponent("bridge/statusline-installation.json")
+        fixture.claude.refreshSetupState()
+        stable.claude.refreshSetupState()
+        XCTAssertFalse(fixture.claude.canInstallStatusline)
+        XCTAssertTrue(stable.claude.canInstallStatusline)
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .notInstalled)
+        XCTAssertEqual(stable.claude.statuslineSetupState, .notInstalled)
+        XCTAssertTrue(ClaudeStatuslineSetupView.showsInstallRequirement(
+            state: fixture.claude.statuslineSetupState, stableInstall: fixture.claude.canInstallStatusline
+        ))
+        XCTAssertThrowsError(try fixture.claude.previewStatuslineInstall()) {
+            XCTAssertEqual($0 as? ClaudeQuotaIssue, .stableInstallRequired)
+        }
+        // The caption exists only when unstable, so the rendered view must grow
+        // by at least its one line. Height cannot show the disabled button: that
+        // wiring is covered by canPreviewInstall above, not by this rendering.
+        let captionLine = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .caption1))
+        XCTAssertGreaterThan(captionLine, 8)
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let text = StatusAccessibilityString.localized(
+                "claude.setup.installRequired", language: language, bundle: .main
+            )
+            XCTAssertNotEqual(text, "claude.setup.installRequired")
+            XCTAssertTrue(text.contains("/Applications/Codex94.app"))
+            XCTAssertTrue(text.contains("~/Applications/Codex94.app"))
+            let size = try render(ClaudeStatuslineSetupView(store: fixture.claude), width: 360, dark: false,
+                language: language, name: "setup-install-required-\(language.rawValue)", output: directory)
+            XCTAssertLessThan(size.height, 420)
+            let stableSize = try render(ClaudeStatuslineSetupView(store: stable.claude), width: 360, dark: false,
+                language: language, name: "setup-install-allowed-\(language.rawValue)", output: stableDirectory)
+            XCTAssertGreaterThanOrEqual(size.height - stableSize.height, captionLine - 0.5,
+                                        "The requirement caption must be laid out when unstable: \(language.rawValue)")
+        }
+        XCTAssertEqual(try Data(contentsOf: settings), bytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manifest.path))
+
+        // A connection made while the App was installed stays removable from anywhere.
+        for root in [directory, stableDirectory] {
+            let executable = root.appendingPathComponent("SyntheticCodex94")
+            try Data("#!/bin/sh\nexit 0\n".utf8).write(to: executable)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+            let installed = ClaudeStatuslineInstaller(
+                settingsURL: root.appendingPathComponent("settings.json"),
+                cache: ClaudeStatuslineCache(fileURL: root.appendingPathComponent("claude-quota.json")),
+                executableURL: executable, supportDirectory: root.appendingPathComponent("bridge"),
+                stableInstall: true
+            )
+            try installed.install(installed.previewInstall())
+        }
+        fixture.claude.refreshSetupState()
+        stable.claude.refreshSetupState()
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .installed)
+        XCTAssertEqual(stable.claude.statuslineSetupState, .installed)
+        XCTAssertFalse(ClaudeStatuslineSetupView.showsInstallRequirement(
+            state: fixture.claude.statuslineSetupState, stableInstall: fixture.claude.canInstallStatusline
+        ), "An existing connection is not asked to move the App before it can be removed")
+        // No caption once installed: the App location changes nothing on screen.
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let size = try render(ClaudeStatuslineSetupView(store: fixture.claude), width: 360, dark: false,
+                language: language, name: "setup-installed-outside-applications-\(language.rawValue)",
+                output: directory)
+            let stableSize = try render(ClaudeStatuslineSetupView(store: stable.claude), width: 360, dark: false,
+                language: language, name: "setup-installed-\(language.rawValue)", output: stableDirectory)
+            XCTAssertEqual(size.height, stableSize.height, accuracy: 0.5, language.rawValue)
+        }
+        try fixture.claude.removeStatusline()
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .notInstalled)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manifest.path))
+        let restored = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as? [String: Any])
+        XCTAssertEqual((restored["statusLine"] as? [String: Any])?["command"] as? String, "printf original")
+    }
+
     private func card(snapshot: QuotaSnapshot?, source: ClaudeQuotaSource?, now: Date,
                       issue: ClaudeQuotaIssue? = nil) -> ClaudeQuotaCardContent {
         ClaudeQuotaCardContent(
@@ -1444,7 +1538,8 @@ final class ProviderViewTests: XCTestCase {
 
     private func makeFixture(directory: URL, bothWindows: Bool = false,
                              claudeReportAge: TimeInterval = 10,
-                             allowsCodexSetupFetch: Bool = false) throws -> ProviderFixture {
+                             allowsCodexSetupFetch: Bool = false,
+                             stableInstall: Bool = true) throws -> ProviderFixture {
         let domain = "Codex94ProviderViewTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
         let preferences = PreferencesStore(defaults: defaults)
@@ -1466,7 +1561,8 @@ final class ProviderViewTests: XCTestCase {
             preferences: preferences, cache: cache,
             installer: ClaudeStatuslineInstaller(settingsURL: directory.appendingPathComponent("settings.json"),
                                                  cache: cache, executableURL: directory.appendingPathComponent("SyntheticCodex94"),
-                                                 supportDirectory: directory.appendingPathComponent("bridge")),
+                                                 supportDirectory: directory.appendingPathComponent("bridge"),
+                                                 stableInstall: stableInstall),
             localCache: ClaudeLocalUsageCacheReader(fileURL: directory.appendingPathComponent("claude-state/.claude.json")),
             fetcherFactory: { claudeFetcher },
             notificationController: NotificationController(service: notifications),

@@ -494,7 +494,12 @@ enum ClaudeUsageScreen {
                         if command == "h" { synchronizedUpdate = true }
                         if command == "l" { synchronizedUpdate = false }
                     }
-                    let values = parameters.split(separator: ";", omittingEmptySubsequences: false).map { Int($0) ?? 0 }
+                    // Upper bound only, once at parse time: beyond the 50x180 grid every
+                    // Int moves and erases alike, and no addition below can overflow.
+                    // Negatives need no bound (only max(1, _) and ==0/==1 read them); a
+                    // parameter too long for Int still parses as omitted, as before.
+                    let values = parameters.split(separator: ";", omittingEmptySubsequences: false)
+                        .map { min(9_999, Int($0) ?? 0) }
                     let value = values.first ?? 0, amount = max(1, value)
                     switch command {
                     case "H", "f": row = min(rows - 1, amount - 1); column = min(columns - 1, max(1, values.dropFirst().first ?? 1) - 1)
