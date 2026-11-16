@@ -11,7 +11,10 @@ enum ClaudeStatuslineReportEligibility: Equatable, Sendable {
     case allowed, confirmationRequired, blocked
 }
 
-struct ClaudeStatuslineInstallPreview: Sendable {
+struct ClaudeStatuslineInstallPreview: Sendable, Identifiable {
+    /// Every preview mints its own installation ID, so it identifies one
+    /// presentation of the preview sheet.
+    var id: String { installationID }
     let settingsURL: URL
     let originalCommand: String?
     let bridgeCommand: String

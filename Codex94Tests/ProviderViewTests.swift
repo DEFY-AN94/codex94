@@ -1342,6 +1342,89 @@ final class ProviderViewTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: support.path))
     }
 
+    /// Regression for the preview sheet that opened empty and could not be
+    /// closed. Its content used to be read from view state inside a
+    /// `sheet(isPresented:)` closure, which a first press could present while
+    /// that state still looked nil. Drives the real view in a real window.
+    func testFirstPreviewPressPresentsTheFilledSheetThenCancelAndInstallCloseIt() throws {
+        let directory = try temporaryDirectory()
+        let fixture = try makeFixture(directory: directory, stableInstall: true)
+        defer { fixture.cleanUp() }
+        let executable = directory.appendingPathComponent("SyntheticCodex94")
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let settings = directory.appendingPathComponent("settings.json")
+        let manifest = directory.appendingPathComponent("bridge/statusline-installation.json")
+        fixture.claude.refreshSetupState()
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .notInstalled)
+        XCTAssertTrue(fixture.claude.canInstallStatusline)
+
+        let host = FirstMouseHostingView(rootView: ClaudeStatuslineSetupView(store: fixture.claude)
+            .frame(width: 520, alignment: .leading).padding(20)
+            .environment(\.locale, LanguagePreference.english.locale))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 420),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        // The content, not the window, fixes the geometry: the button's leading
+        // edge sits at the 20-point padding on every system.
+        window.setContentSize(host.fittingSize)
+        window.orderFront(nil)
+        defer {
+            if let sheet = window.attachedSheet { window.endSheet(sheet) }
+            window.orderOut(nil)
+        }
+        settle()
+
+        // The first press after the view appears is the case that failed: nothing
+        // has re-evaluated the view body since it was created. The hosted suite
+        // has no accessibility client, so SwiftUI publishes no element tree to
+        // look the button up in. Probe the leading edge of the content with real
+        // mouse events instead: the preview button is the only control in this
+        // state, and a probe that lands on text changes nothing.
+        var buttonY = CGFloat(20) // The padding above the content holds no control.
+        while window.attachedSheet == nil, buttonY < host.bounds.height {
+            try click(at: NSPoint(x: 44, y: buttonY), in: host)
+            // A press that landed attaches the sheet a few run-loop turns later.
+            // Wait with a bound, so a slow machine is not mistaken for a miss
+            // and pressed a second time.
+            let landed = Date().addingTimeInterval(0.25)
+            while window.attachedSheet == nil, Date() < landed { settle(for: 0.02) }
+            if window.attachedSheet == nil { buttonY += 6 }
+        }
+        let first = try XCTUnwrap(window.attachedSheet, "A press on the preview button must present the sheet")
+        // The filled preview is 520 points wide; an empty sheet collapses to a stub.
+        waitForWidth(of: first)
+        XCTAssertGreaterThanOrEqual(first.frame.width, 500, "The first press must not present an empty sheet")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: settings.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manifest.path))
+
+        // Cancel is the sheet's Escape action. It closes the sheet and writes nothing.
+        try press(keyCode: 53, characters: "\u{1B}", in: first)
+        try waitForSheet(on: window, presented: false)
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .notInstalled)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: settings.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manifest.path))
+
+        // A second press builds a fresh preview; Return is the install action.
+        try click(at: NSPoint(x: 44, y: buttonY), in: host)
+        try waitForSheet(on: window, presented: true)
+        let second = try XCTUnwrap(window.attachedSheet)
+        waitForWidth(of: second)
+        XCTAssertGreaterThanOrEqual(second.frame.width, 500)
+        try press(keyCode: 36, characters: "\r", in: second)
+        try waitForSheet(on: window, presented: false)
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .installed)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: manifest.path))
+        let written = try Data(contentsOf: settings)
+        XCTAssertNil(written.range(of: Data(#"\/"#.utf8)), "The settings file must not escape slashes")
+        let line = try XCTUnwrap((JSONSerialization.jsonObject(with: written) as? [String: Any])?["statusLine"]
+            as? [String: Any])
+        let command = try XCTUnwrap(line["command"] as? String)
+        XCTAssertTrue(command.contains(executable.path))
+        XCTAssertTrue(command.contains(ClaudeStatuslineBridge.argument))
+    }
+
     func testConflictSetupRenderingKeepsCurrentCommandAndRecoveryFiles() throws {
         let directory = try temporaryDirectory()
         print("CODEX94_PROVIDER_RENDER_DIR=\(directory.path)")
@@ -1643,6 +1726,57 @@ final class ProviderViewTests: XCTestCase {
         return url
     }
 
+    private func settle(for interval: TimeInterval = 0.05) {
+        RunLoop.main.run(until: Date().addingTimeInterval(interval))
+    }
+
+    private func click(at point: NSPoint, in view: NSView) throws {
+        let window = try XCTUnwrap(view.window)
+        let location = view.convert(point, to: nil)
+        let pressedAt = ProcessInfo.processInfo.systemUptime
+        func event(_ type: NSEvent.EventType) throws -> NSEvent {
+            try XCTUnwrap(NSEvent.mouseEvent(
+                with: type, location: location, modifierFlags: [],
+                timestamp: type == .leftMouseDown ? pressedAt : pressedAt + 0.05,
+                windowNumber: window.windowNumber,
+                context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0
+            ))
+        }
+        // Queue the release first, so a control that tracks the mouse in its own
+        // event loop finds it; otherwise deliver it directly.
+        NSApp.postEvent(try event(.leftMouseUp), atStart: false)
+        window.sendEvent(try event(.leftMouseDown))
+        while let release = NSApp.nextEvent(matching: .leftMouseUp, until: nil, inMode: .default, dequeue: true) {
+            window.sendEvent(release)
+        }
+    }
+
+    private func press(keyCode: UInt16, characters: String, in window: NSWindow) throws {
+        let event = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+            context: nil, characters: characters, charactersIgnoringModifiers: characters,
+            isARepeat: false, keyCode: keyCode
+        ))
+        if !window.performKeyEquivalent(with: event) { window.sendEvent(event) }
+    }
+
+    /// A sheet may take a moment to reach its content size. An empty one never does.
+    private func waitForWidth(of sheet: NSWindow) {
+        let sized = Date().addingTimeInterval(2)
+        while sheet.frame.width < 500, Date() < sized { settle() }
+    }
+
+    private struct SheetStateTimeout: Error { let expectedPresented: Bool }
+
+    private func waitForSheet(on window: NSWindow, presented: Bool) throws {
+        let deadline = Date().addingTimeInterval(3)
+        while (window.attachedSheet != nil) != presented, Date() < deadline { settle() }
+        guard (window.attachedSheet != nil) == presented else {
+            throw SheetStateTimeout(expectedPresented: presented)
+        }
+    }
+
     @discardableResult
     private func render<Content: View>(_ content: Content, width: CGFloat, dark: Bool,
                                        language: LanguagePreference, name: String, output: URL) throws -> NSSize {
@@ -1681,6 +1815,14 @@ final class ProviderViewTests: XCTestCase {
         add(attachment)
         return size
     }
+}
+
+/// The hosted test process owns no key window, and AppKit asks the hit view
+/// whether a press may pass through a window that is not key. Do not depend on
+/// the system's own answer for a hosting view.
+@MainActor
+private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 /// Measure laid-out content in an independent, fixed viewport. A dry

@@ -2,8 +2,9 @@ import SwiftUI
 
 struct ClaudeStatuslineSetupView: View {
     @ObservedObject var store: ClaudeQuotaStore
+    /// The single source of truth for the preview sheet. The sheet is presented
+    /// from this value and receives it as its content, so it cannot open empty.
     @State private var preview: ClaudeStatuslineInstallPreview?
-    @State private var showingPreview = false
     @State private var confirmation: SetupConfirmation?
     @State private var operationIssue: ClaudeQuotaIssue?
     @State private var forgetFailed = false
@@ -48,7 +49,6 @@ struct ClaudeStatuslineSetupView: View {
                     clearFeedback()
                     do {
                         preview = try store.previewStatuslineInstall()
-                        showingPreview = true
                     } catch {
                         operationIssue = error as? ClaudeQuotaIssue ?? .unavailable
                         store.refreshSetupState()
@@ -99,20 +99,18 @@ struct ClaudeStatuslineSetupView: View {
                 confirmation = nil
             }
         }
-        .sheet(isPresented: $showingPreview) {
-            if let preview {
-                ClaudeStatuslinePreviewView(preview: preview) {
-                    clearFeedback()
-                    defer { showingPreview = false; store.refreshSetupState() }
-                    do {
-                        try store.installStatusline(preview)
-                        successMessage = "claude.setup.saved"
-                    } catch {
-                        operationIssue = error as? ClaudeQuotaIssue ?? .unavailable
-                    }
-                } cancel: {
-                    showingPreview = false
+        .sheet(item: $preview) { presented in
+            ClaudeStatuslinePreviewView(preview: presented) {
+                clearFeedback()
+                defer { preview = nil; store.refreshSetupState() }
+                do {
+                    try store.installStatusline(presented)
+                    successMessage = "claude.setup.saved"
+                } catch {
+                    operationIssue = error as? ClaudeQuotaIssue ?? .unavailable
                 }
+            } cancel: {
+                preview = nil
             }
         }
         .confirmationDialog(
