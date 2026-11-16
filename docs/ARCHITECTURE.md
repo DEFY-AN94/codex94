@@ -12,9 +12,11 @@ defines component responsibilities, not a substitute for those records.
 
 The unreleased `4.3.1 (35)` development candidate adds the following ownership
 rules on top of `4.3.0 (34)`. It introduces no new source file, stored file or
-dependency. An earlier build of this candidate did not pass acceptance.
-Acceptance of the fixed candidate is pending, and so is a CI run that covers
-the fix; the evidence obtained so far is recorded in
+dependency. An earlier build of this candidate did not pass acceptance. The
+fixed candidate passed CI, and on 2026-11-17 the maintainer accepted it after
+exercising the statusline connection, with one known issue in the install
+preview (see below). The candidate is still unreleased. The evidence and what
+that acceptance did not exercise are recorded in
 [the release workflow](RELEASING.md#431-candidate-scope--unreleased).
 
 ### Stable-install rule
@@ -40,6 +42,14 @@ the installation ID that every preview mints. The sheet receives that value as
 its content. Do not add a separate presentation flag, and do not build sheet
 content from view state that `body` does not read: such a sheet can be
 presented empty, with no action to close it.
+
+Known issue: the sheet's content does not follow the language chosen in
+Codex94. During acceptance it appeared in English, the first system language,
+while Simplified Chinese was chosen. The windows get the chosen language from
+`codex94Environment` on their root views, and this is the only `sheet`
+modifier in the App. The suspected cause, not confirmed by a test, is that
+the sheet's content does not receive that locale; see
+[#79](https://github.com/DEFY-AN94/codex94/issues/79).
 
 ### Canonical and settings-file encodings
 

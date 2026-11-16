@@ -39,8 +39,15 @@ sheet that could not be closed. The fix changes how the sheet is presented,
 not what is read, written or sent.
 
 An earlier build of this candidate did not pass acceptance because of that
-defect. Acceptance of the fixed candidate is pending, and so is a CI run that
-covers the fix; the evidence obtained so far is recorded in
+defect. The fixed candidate passed CI, and on 2026-11-17 the maintainer
+accepted it after exercising the statusline connection from a disk image and
+from a temporary copy in a stable location. Removal from a stable location,
+the English App language, a real CLI read and any Gatekeeper flow were not
+exercised. The candidate is still unreleased. In that acceptance the preview
+sheet appeared in English, the first macOS language, instead of the
+Simplified Chinese chosen in Codex94
+([#79](https://github.com/DEFY-AN94/codex94/issues/79)), which changes
+nothing that is read, written or sent. The evidence is recorded in
 [the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased).
 
 ## 4.3.0: local bridge health and on-demand CLI

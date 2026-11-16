@@ -144,9 +144,18 @@ and is not a published release.
   folders remain allowed). The read leaves an unreadable cache untouched, and
   quota appears after the next successful quota refresh.
 
+Known issue in this candidate: the install preview sheet does not follow the
+language chosen in Codex94. During acceptance it appeared in English, the
+first macOS language, while the rest of the App was in Simplified Chinese; it
+appears to use the macOS language. Its buttons work and what it writes is
+correct ([#79](https://github.com/DEFY-AN94/codex94/issues/79)).
+
 An earlier build of this candidate did not pass App acceptance because of the
-empty preview sheet. CI and App acceptance of the fixed candidate are pending.
-The evidence and what is still pending are recorded in
+empty preview sheet. The fixed candidate passed CI, and the maintainer
+accepted it on 2026-11-17 with the known issue above. That acceptance did not
+exercise removing a connection from a stable location, the English App
+language, a real CLI read or any Gatekeeper flow. The candidate is still
+unreleased. The evidence and the release steps that remain are recorded in
 [the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased). See
 [4.3.1 changes](CHANGELOG.md#431---unreleased).
 

@@ -10,8 +10,8 @@ below applies only to its recorded version and does not validate later releases.
 
 Development candidate `4.3.1 (35)`. It carries hardening changes and one defect
 fix on top of `4.3.0 (34)` and is not part of that version; no release date,
-tag, release asset or passed App acceptance is implied by this entry. Its scope
-and pending gates are recorded in
+tag or release asset is implied by this entry. Its scope, its acceptance and
+the gates that remain are recorded in
 [docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
 
 ### Fixed
@@ -118,12 +118,42 @@ failures; local DMG SHA-256
 release asset).
 
 That commit changes App source, so the earlier candidates no longer stand, and
-neither does anything observed during that acceptance. When this entry was
-written no CI run covered it: CI, the candidate from that run, the review of
-its images, maintainer acceptance and every later gate are pending and are not
-claimed here. Earlier results, including those recorded for 4.3.0 below, do not
-validate this candidate. The full record is in
+neither does anything observed during that acceptance.
+[CI run 43867728225](https://github.com/DEFY-AN94/codex94/actions/runs/43867728225)
+tested merge `528c553e78c8900699ae6752ae5e9eee75320e6c` of PR head
+`941260b01ce27e1e391054399d3e594d90787e0e`: 740 tests with the same skip and 0
+failures, among them the new test, and all five UI smokes passed.
+[CodeQL run 43867725050](https://github.com/DEFY-AN94/codex94/actions/runs/43867725050)
+passed, and attestation was skipped again. An AI assistant reviewed that run's
+55 synthetic images and 45 reports and found no privacy problem and no
+blocking layout problem. No image shows the preview sheet, because no UI
+scenario opens it.
+
+The maintainer accepted that run's candidate on 2026-11-17. From a read-only
+disk image the candidate left the settings file and the manifest of the
+existing connection unchanged until the maintainer removed it, and the
+removal wrote no escaped slashes. From a temporary copy in a stable location
+the install preview presented the filled sheet and never the empty one, a
+discarded preview wrote nothing, and Install wrote a settings file without
+escaped slashes and a manifest with the matching installation ID. The
+acceptance found the known issue below. It did not exercise removing a
+connection from a stable location, the English App language, a real CLI read
+or any Gatekeeper flow. Marking the PR Ready and every later gate have not
+been authorized and are not claimed here. Earlier results, including those
+recorded for 4.3.0 below, do not validate this candidate. The full record is
+in
 [docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
+
+### Known issue
+
+- The statusline install preview sheet does not follow the language chosen in
+  Codex94. During acceptance it appeared in English, the first macOS
+  language, while the rest of the App was in Simplified Chinese; it appears
+  to use the macOS language, and no other combination was tried. Its buttons
+  work and what it writes is correct. Whether earlier versions behave the
+  same was not checked. Tracked as
+  [#79](https://github.com/DEFY-AN94/codex94/issues/79) and not fixed in
+  4.3.1.
 
 ## 4.3.0 - 2026-11-15
 
