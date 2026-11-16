@@ -38,31 +38,37 @@ the maintainer explicitly authorizes a different order, as recorded for the
 Development candidate `4.3.1 (35)` starts from main
 `3c0df72d22bdad68c7879ed21eeb55bff30bf6b1`, after the published 4.3.0 source
 `fd991dff95a9595e96d0d2d615847b4fd4f40487`. Its scope is five hardening changes
-and nothing else: an upper bound on control-sequence parameters in the Claude
-CLI screen replay; a stable-install requirement for new statusline connections;
-writing the Claude Code settings file without escaped slashes; validation of
-Codex app-server numbers; and reading the Codex quota cache through the shared
-bounded local-file reader. They are listed in
+and one defect fix, and nothing else. The hardening changes are an upper bound
+on control-sequence parameters in the Claude CLI screen replay; a
+stable-install requirement for new statusline connections; writing the Claude
+Code settings file without escaped slashes; validation of Codex app-server
+numbers; and reading the Codex quota cache through the shared bounded
+local-file reader. The defect fix, found during candidate acceptance, is for
+the statusline install preview, which could open as an empty sheet that could
+not be closed. All six are listed in
 [CHANGELOG.md](../CHANGELOG.md#431---unreleased).
 
-On 2026-11-15 (Australia/Melbourne) the maintainer decided to keep these
-changes out of 4.3.0 and to carry them as 4.3.1, and later that day explicitly
-authorized gate 1 in section 1: committing and pushing the development branch
-and creating a Draft PR. This authorization does not extend to marking the PR
-Ready, merge, tag, Draft Release assets, installation/replacement of the
-maintainer's App, or public publication; gates 2 to 7 have not been requested
-or granted for 4.3.1. After the first CI run the maintainer instructed that a
-further UI capture be added and this record be updated. The commits that do so
-go to the same Draft PR under gate 1; that instruction authorizes no later
-gate.
+On 2026-11-15 (Australia/Melbourne) the maintainer decided to keep the five
+hardening changes out of 4.3.0 and to carry them as 4.3.1, and later that day
+explicitly authorized gate 1 in section 1: committing and pushing the
+development branch and creating a Draft PR. This authorization does not extend
+to marking the PR Ready, merge, tag, Draft Release assets,
+installation/replacement of the maintainer's App, or public publication; gates
+2 to 7 have not been requested or granted for 4.3.1. After the first CI run the
+maintainer instructed that a further UI capture be added and this record be
+updated. On 2026-11-16, after candidate acceptance failed on the preview defect
+described below, the maintainer instructed that its fix be carried in 4.3.1.
+The commits that do these things go to the same Draft PR under gate 1; neither
+instruction authorizes a later gate.
 
 Evidence so far, in the order it was obtained:
 
 - **Local gate on the source commit.** `script/release_check.sh` passed with
   Xcode 27.2 (27B52) on commit `70a878ac45e965d2d6913b3ceaddc2958c2e5061`,
-  which carries every App source, resource and project change of this
-  candidate, with a clean working tree. Its hosted unit suite executed 739
-  tests with 1 existing skip and 0 failures, and it verified the Universal App
+  which carried every App source, resource and project change of the
+  candidate at that time, with a clean working tree. Its hosted unit suite
+  executed 739 tests with 1 existing skip and 0 failures, and it verified the
+  Universal App
   and an unsigned DMG for `4.3.1 (35)` (SHA-256
   `f6e60a9d30afa044856f7b2109f581781ce0af363b9d21f3cba674de0fe00295`; a local
   artifact, not a release asset).
@@ -100,26 +106,111 @@ Evidence so far, in the order it was obtained:
   `68d0675844ca40e8305c5047a673584392f8cf8b0c8b122364acb1783f78c305`). That
   script does not build or run the UI test target, which was only compiled
   locally.
+- **Second CI run.** [CI run 43716225216](https://github.com/DEFY-AN94/codex94/actions/runs/43716225216)
+  tested merge `d0d0b5c52ab6f56c4cfc4d28c8bb9df10d6f5852` of PR head
+  `008695abf1e90cfc748fcc980426d42b2392da3c` (shared tree
+  `1800fddbcc991f24e7bdd19d1f6d3b5907591d91`) with Xcode 16.4. Its release
+  gate executed 739 tests with the same skip and 0 failures, and all five
+  synthetic UI smokes passed on their first attempt, including the new
+  Providers assertions.
+  [CodeQL run 43716224407](https://github.com/DEFY-AN94/codex94/actions/runs/43716224407)
+  passed Actions, Python and Swift analysis. Main-only DMG attestation was
+  skipped again.
+- **Second PR candidate.** The two-file artifact of that run holds a DMG with
+  SHA-256 `c11581e454d2926f26eb4245d5c2eabd5b49de3bb1d95e51130c17d72665d11a`
+  and a checksum file that matches it. The App executable inside it has the
+  same SHA-256 as in the first candidate,
+  `09c132501f626165f841e8993bde490da6316e83b270d5a0e8545315db0db1c2`, because
+  the commits between the two changed no App input.
+  `script/package_dmg.sh verify` passed on the downloaded files. The fix
+  below supersedes this candidate.
+- **Synthetic UI review of the second run.** An AI assistant read all 55 PNGs
+  (49 distinct) and 45 JSON reports in two independent passes per scenario;
+  the maintainer has not reviewed them. It found no privacy problem and no
+  layout regression attributable to 4.3.1. The two new Providers images show
+  the disabled preview and the complete requirement in English and Simplified
+  Chinese, equal to the string catalog.
+- **Candidate acceptance, not passed.** On 2026-11-16 the maintainer exercised
+  the second candidate on macOS 27.2 (26B123), Apple silicon, dark appearance.
+  The maintainer operated the App and supplied screenshots. An AI assistant
+  ran the commands, watched the files read-only, compared them and restored
+  them. The installed 4.3.0 (34) was quit first and was never replaced.
+  - Identity: the DMG and executable hashes matched the candidate, and
+    `codesign --verify --deep --strict` passed on an ad-hoc signature with
+    Hardened Runtime and no entitlements, for arm64 and x86_64. The DMG
+    carried no quarantine attribute, so nothing here is a Gatekeeper check.
+  - From a read-only mount of the DMG, About showed 4.3.1 (35), and the
+    Launch at Login switch was dimmed and could not be changed, still showing
+    on, with its requirement. The existing connection, created
+    by an earlier version and without an installation ID, was shown as
+    installed, with the preview disabled and removal offered. The Claude Code
+    settings file and the installation manifest did not change until the
+    maintainer removed the connection.
+  - Removal from that location succeeded. The settings file lost its
+    statusline entry, held no escaped slash and kept its other keys, and the
+    manifest was removed. The disabled preview and the complete requirement
+    then appeared in Simplified Chinese and in English.
+  - From a temporary copy at `~/Applications/Codex94.app`, made with the
+    maintainer's explicit approval and moved to the Trash afterwards, the
+    preview button was enabled and the requirement was gone. The first press
+    presented an empty sheet with no control. It could not be closed, a quit
+    request was refused while it was up, and the process had to be terminated.
+    Nothing was written. This copy was not the gate 6 installation.
+  - The installed 4.3.0 (34) showed the same empty sheet in the same state,
+    so the defect is not new in 4.3.1.
+  - Not executed: cancelling, installing and removing from a stable location,
+    so the settings bytes of a real installation remain unobserved; a real
+    CLI read; any Gatekeeper flow.
+  - The settings file and the manifest were copied back from a backup taken
+    before the removal, and are byte-identical to their state before
+    acceptance.
+  - One cosmetic observation predates this candidate: with no connection
+    installed, source health shows "not installed" together with "Connection
+    activity diagnostics are unavailable for this installation".
+- **Cause and fix.** The sheet's content was read from view state inside a
+  `sheet(isPresented:)` closure, and the view body never read that state. A
+  press that no other view update followed presented the sheet while the
+  state still looked empty. The pattern dates from 4.0.0. Until 4.1.7 every
+  preview press also made the store publish, which refreshed the view; commit
+  `7adf5a079481e94e5bc4c1c9e5aa096d00c19ef9` (4.1.8, first tagged in
+  `v4.2.0`) made that publish conditional. Versions other than 4.3.0 and this
+  candidate were not retested. Commit
+  `a9af9303e36f0a7fec322cd39b34f37d74c1f6ee` presents the sheet from the
+  preview value itself and adds a hosted test that drives the real setup view
+  in a real window with synthesized mouse and key events. The test fails on
+  the previous sources, where the sheet is 100 points wide and Escape cannot
+  close it, and passes with the fix. `script/release_check.sh` passed on
+  that commit with Xcode 27.2 (27B52) and a clean working tree: 740 tests, 1
+  existing skip, 0 failures; local DMG SHA-256
+  `ceac1186378b9aa17773f9d64aa1f598adfc77647b2688034d35b929cf21209d` (a local
+  artifact, not a release asset).
 
-A later documentation-only commit records these results. The first CI run does
-not cover the test-only follow-up: the new assertions and images are unverified
-until CI runs on a head that contains them, and that run, its candidate DMG
-and the review of its images are pending. Maintainer acceptance of the
-candidate App and every later gate are also pending. Results recorded for
-other versions do not validate 4.3.1.
+A later documentation-only commit records these results. Commit `a9af930`
+changes App source, so it invalidates the second candidate and everything
+observed on it. When this record was written no CI run covered that commit:
+CI and CodeQL on a head that contains it, the candidate from that run, the
+review of its images and maintainer acceptance of that candidate are pending,
+as is every later gate. Results recorded for other versions do not validate
+4.3.1.
 
-Two notes for whoever accepts this candidate:
+Three notes for whoever accepts this candidate:
 
 1. Installing a new statusline connection can be exercised only from a stable
    install, `/Applications/Codex94.app` or `~/Applications/Codex94.app`, not
    from a mounted disk image.
 2. The Providers UI scenario runs the App outside Applications, where the
-   install preview button is disabled. It passed in the first CI run, whose
-   steps neither require the disabled state nor capture it. When this record
-   was written the assertions and the two images added afterwards had not run
-   on CI, and no CI scenario
-   shows the enabled preview of a stable install. Do not rely on UI results
-   recorded for earlier versions.
+   install preview button is disabled. It asserts that state and never opens
+   the preview, so no UI scenario shows the enabled preview or the preview
+   sheet. The hosted test named above covers the sheet inside the test host
+   with synthesized events, which is not an observation of the candidate App.
+   Opening the preview, cancelling it and installing from a stable install
+   still need a person. Do not rely on UI results recorded for earlier
+   versions.
+3. The acceptance above removed the maintainer's real connection after a
+   backup of the settings file and the manifest, and copied both back
+   afterwards. The maintainer approved that for this Mac; it is not the
+   default procedure. The manifest location is fixed, so an isolated setup
+   needs a separate macOS account.
 
 <a id="430-candidate-scope-and-authorization--unreleased"></a>
 

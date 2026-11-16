@@ -12,9 +12,10 @@ defines component responsibilities, not a substitute for those records.
 
 The unreleased `4.3.1 (35)` development candidate adds the following ownership
 rules on top of `4.3.0 (34)`. It introduces no new source file, stored file or
-dependency. Acceptance of this candidate is pending, and so is a CI run that
-covers its latest UI test change; the CI evidence obtained so far is recorded
-in [the release workflow](RELEASING.md#431-candidate-scope--unreleased).
+dependency. An earlier build of this candidate did not pass acceptance.
+Acceptance of the fixed candidate is pending, and so is a CI run that covers
+the fix; the evidence obtained so far is recorded in
+[the release workflow](RELEASING.md#431-candidate-scope--unreleased).
 
 ### Stable-install rule
 
@@ -30,6 +31,15 @@ manifest's command equal the command for the current executable path, so it
 succeeds only from the path that created the connection. `ClaudeQuotaStore`
 exposes the decision and the setup view projects it through pure helpers; do
 not add a second path rule.
+
+### Install preview presentation
+
+`ClaudeStatuslineSetupView` presents the install preview with `sheet(item:)`
+from one optional `ClaudeStatuslineInstallPreview`, which is `Identifiable` by
+the installation ID that every preview mints. The sheet receives that value as
+its content. Do not add a separate presentation flag, and do not build sheet
+content from view state that `body` does not read: such a sheet can be
+presented empty, with no action to close it.
 
 ### Canonical and settings-file encodings
 

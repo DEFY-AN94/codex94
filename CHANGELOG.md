@@ -8,13 +8,25 @@ below applies only to its recorded version and does not validate later releases.
 
 ## 4.3.1 - Unreleased
 
-Development candidate `4.3.1 (35)`. It carries hardening changes on top of
-`4.3.0 (34)` and is not part of that version; no release date, tag, release
-asset or local App acceptance is implied by this entry. Its scope and pending
-gates are recorded in [docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
+Development candidate `4.3.1 (35)`. It carries hardening changes and one defect
+fix on top of `4.3.0 (34)` and is not part of that version; no release date,
+tag, release asset or passed App acceptance is implied by this entry. Its scope
+and pending gates are recorded in
+[docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
 
 ### Fixed
 
+- Stop the statusline install preview from opening as an empty sheet that
+  could not be closed. The sheet read its content from view state, and a press
+  could present the sheet before the view had refreshed. An empty sheet has no
+  Cancel action and also blocked quitting the App, so a new connection could
+  not be installed. The sheet is now presented from the preview value itself.
+  The pattern dates from 4.0.0. Judging from the source, it stayed hidden
+  until 4.1.8, first released in 4.2.0, stopped the store from publishing on
+  every preview press. The maintainer observed the empty sheet on the
+  published `4.3.0 (34)` and on a `4.3.1 (35)` candidate, both on macOS 27.2;
+  other versions were not retested. Removing an existing connection was not
+  affected.
 - Stop the Claude CLI screen replay from crashing when terminal output carries
   an extreme cursor-movement parameter. Every control-sequence parameter is
   capped at an upper bound when it is parsed, so cursor arithmetic can no longer
@@ -58,10 +70,10 @@ gates are recorded in [docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope-
 ### Validation and acceptance
 
 `script/release_check.sh` passed locally with Xcode 27.2 on commit
-`70a878ac45e965d2d6913b3ceaddc2958c2e5061`, which carries every App source,
-resource and project change, with a clean working tree: its hosted unit suite
-executed 739 tests with 1 existing skip and 0 failures, and it verified the
-Universal App and an unsigned DMG for `4.3.1 (35)` (SHA-256
+`70a878ac45e965d2d6913b3ceaddc2958c2e5061`, which then carried every App
+source, resource and project change, with a clean working tree: its hosted
+unit suite executed 739 tests with 1 existing skip and 0 failures, and it
+verified the Universal App and an unsigned DMG for `4.3.1 (35)` (SHA-256
 `f6e60a9d30afa044856f7b2109f581781ce0af363b9d21f3cba674de0fe00295`; a local
 artifact, not a release asset).
 
@@ -79,13 +91,38 @@ appeared only as fragments behind a popover, never in Simplified Chinese.
 
 Commit `9897b746ea3134a7664d5b09e97d3f903242022e` therefore extends the
 Providers UI smoke, and nothing else, to require the disabled preview and the
-exact English and Simplified Chinese requirement text and to capture both. The
-local gate passed again on that commit (739 tests, 1 existing skip, 0
-failures); it does not run UI smokes. When this entry was written these
-additions had not run on CI, so their result, the candidate from that run and the review of its images are
-pending and are not claimed here, as are maintainer acceptance of the
-candidate App and every later gate. Earlier results, including those recorded
-for 4.3.0 below, do not validate this candidate. The full record is in
+exact English and Simplified Chinese requirement text and to capture both.
+[CI run 43716225216](https://github.com/DEFY-AN94/codex94/actions/runs/43716225216)
+tested merge `d0d0b5c52ab6f56c4cfc4d28c8bb9df10d6f5852` of PR head
+`008695abf1e90cfc748fcc980426d42b2392da3c`: 739 tests with the same skip and 0
+failures, and all five UI smokes passed, including the new Providers
+assertions.
+[CodeQL run 43716224407](https://github.com/DEFY-AN94/codex94/actions/runs/43716224407)
+passed, and attestation was skipped again. An AI assistant reviewed that run's
+55 synthetic images and 45 reports: no privacy problem, no layout regression,
+and the two new images show the disabled preview and the complete requirement
+in both languages.
+
+Acceptance of that run's candidate on 2026-11-16 did not pass. From a
+read-only disk image the candidate recognized an existing connection, removed
+it without writing escaped slashes and showed the requirement in both
+languages. From a temporary copy in a stable location its first press on the
+install preview presented the empty sheet described under Fixed, and
+installing was never reached. Commit
+`a9af9303e36f0a7fec322cd39b34f37d74c1f6ee` fixes it and adds a hosted test
+that drives the real view in a real window; the test fails on the previous
+sources and passes with the fix. `script/release_check.sh` passed on that
+commit with Xcode 27.2 and a clean working tree (740 tests, 1 existing skip, 0
+failures; local DMG SHA-256
+`ceac1186378b9aa17773f9d64aa1f598adfc77647b2688034d35b929cf21209d`, not a
+release asset).
+
+That commit changes App source, so the earlier candidates no longer stand, and
+neither does anything observed during that acceptance. When this entry was
+written no CI run covered it: CI, the candidate from that run, the review of
+its images, maintainer acceptance and every later gate are pending and are not
+claimed here. Earlier results, including those recorded for 4.3.0 below, do not
+validate this candidate. The full record is in
 [docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
 
 ## 4.3.0 - 2026-11-15

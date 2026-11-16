@@ -111,10 +111,17 @@ the [acceptance checklist](docs/4.3.0-ACCEPTANCE.md) and the
 [release verification record](docs/RELEASING.md#430-release-verification--2026-11-15). Local acceptance had documented limits, and
 first-launch Gatekeeper acceptance is not established.
 
+Known issue in 4.2.0 and 4.3.0: with no statusline connection installed,
+**Preview setup…** in Services can open an empty sheet that cannot be closed
+and that blocks quitting. Force quit Codex94 from Activity Monitor if it
+appears. Existing connections and their removal are not affected. The
+unreleased 4.3.1 candidate below carries the fix. The empty sheet was observed
+on 4.3.0; 4.2.0 shares the code but was not retested.
+
 ### Development candidate: 4.3.1 (35), Unreleased
 
-This candidate contains hardening changes on top of 4.3.0 and is not a
-published release.
+This candidate contains hardening changes and one defect fix on top of 4.3.0
+and is not a published release.
 
 - A **new statusline connection** can be installed only while Codex94 runs from
   exactly `/Applications/Codex94.app` or `~/Applications/Codex94.app`, the
@@ -124,6 +131,8 @@ published release.
   connection is still shown and can still be removed from any location.
   Removing an old record after a conflict still requires Codex94 to run from
   the same path that created the connection, as before.
+- The install preview no longer opens as an empty sheet that cannot be closed,
+  the known issue described above.
 - Installing or removing a connection no longer writes escaped slashes (`\/`)
   into the Claude Code settings file. Existing connections are unaffected.
 - The Claude CLI screen replay no longer crashes on extreme cursor-movement
@@ -135,8 +144,9 @@ published release.
   folders remain allowed). The read leaves an unreadable cache untouched, and
   quota appears after the next successful quota refresh.
 
-App acceptance is pending, and the CI run recorded so far predates the latest
-UI test change. The evidence and what is still pending are recorded in
+An earlier build of this candidate did not pass App acceptance because of the
+empty preview sheet. CI and App acceptance of the fixed candidate are pending.
+The evidence and what is still pending are recorded in
 [the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased). See
 [4.3.1 changes](CHANGELOG.md#431---unreleased).
 

@@ -46,8 +46,14 @@ so a relocated home or Library folder keeps working. A cache that fails the
 check is unreadable; the read never deletes or rewrites it, and cache writing
 is unchanged.
 
-Acceptance of this candidate is pending, and so is a CI run that covers its
-latest UI test change; the CI evidence obtained so far is recorded in
+The candidate also fixes the install preview, which could open as an empty
+sheet that could not be closed. The fix changes how the sheet is presented and
+nothing else: the same preview is shown, and no file access, command or stored
+format changes.
+
+An earlier build of this candidate did not pass acceptance because of that
+defect. Acceptance of the fixed candidate is pending, and so is a CI run that
+covers the fix; the evidence obtained so far is recorded in
 [the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased).
 
 ## 4.3.0: local activity and automatic-read admission

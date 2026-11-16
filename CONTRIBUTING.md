@@ -102,6 +102,10 @@ only and must not add a second path rule. Installer tests whose outcome
 depends on that decision inject `stableInstall:`; only the single test of the
 production default asserts on the running bundle's answer, and it skips rather
 than fails when the host runs from an Applications folder.
+Present the install preview from its own optional value with `sheet(item:)`;
+a sheet must never have an empty branch. No UI scenario opens that sheet, so
+a hosted test drives the real setup view in a real window with synthesized
+mouse and key events. Keep it passing when the view changes.
 
 ### Version 0.2.2 behavior
 
