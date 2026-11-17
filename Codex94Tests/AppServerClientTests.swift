@@ -845,6 +845,224 @@ final class AppServerClientTests: XCTestCase {
         }
     }
 
+    func testPreviouslyAcceptedQuotaFieldShapesParseIdentically() throws {
+        let reset = Date(timeIntervalSince1970: 2_000_000_000)
+        // Integers outside 0...100 stay preserved for the clamping projection
+        // (the 0.2.1 contract); a fraction keeps its truncation toward zero and
+        // never fills the precise field reserved for fractional providers.
+        let usedShapes: [(raw: String, used: Int, remaining: Int)] = [
+            ("0", 0, 100), ("27", 27, 73), ("100", 100, 0), ("-1", -1, 100), ("101", 101, 0),
+            ("27.0", 27, 73), ("27.9", 27, 73), ("99.5", 99, 1), ("-0.5", 0, 100), ("1e2", 100, 0),
+            (#""21""#, 21, 79), ("9223372036854775807", Int.max, 0), ("-9223372036854775808", Int.min, 100)
+        ]
+        for shape in usedShapes {
+            let weekly = try XCTUnwrap(parsedLimits(#"""
+            {"rateLimits":{"secondary":{"usedPercent":\#(shape.raw),"windowDurationMins":10080,"resetsAt":2000000000}}}
+            """#).defaultBucket?.window(.weekly), "Accepted value: \(shape.raw)")
+            XCTAssertEqual(weekly, QuotaWindowSnapshot(
+                kind: .weekly, usedPercent: shape.used, windowMinutes: 10_080, resetsAt: reset
+            ), "Accepted value: \(shape.raw)")
+            XCTAssertNil(weekly.preciseUsedPercent)
+            XCTAssertEqual(weekly.remainingPercent, shape.remaining, "Accepted value: \(shape.raw)")
+        }
+
+        let durationShapes: [(raw: String, kind: QuotaWindowKind, minutes: Int)] = [
+            ("300", .fiveHour, 300), ("240", .fiveHour, 240), ("360.9", .fiveHour, 360),
+            ("10080", .weekly, 10_080), ("1.008e4", .weekly, 10_080), (#""10080""#, .weekly, 10_080)
+        ]
+        for shape in durationShapes {
+            XCTAssertEqual(try parsedLimits(#"""
+            {"rateLimits":{"primary":{"usedPercent":40,"windowDurationMins":\#(shape.raw)}}}
+            """#).defaultBucket?.windows, [QuotaWindowSnapshot(
+                kind: shape.kind, usedPercent: 40, windowMinutes: shape.minutes, resetsAt: nil
+            )], "Accepted value: \(shape.raw)")
+        }
+
+        let resetShapes: [(raw: String, seconds: TimeInterval?)] = [
+            ("0", 0), ("2000000000", 2_000_000_000), ("2000000000.9", 2_000_000_000),
+            (#""2000000000""#, 2_000_000_000), ("253402300799", 253_402_300_799), ("null", nil)
+        ]
+        for shape in resetShapes {
+            XCTAssertEqual(try parsedLimits(#"""
+            {"rateLimits":{"secondary":{"usedPercent":27,"windowDurationMins":10080,"resetsAt":\#(shape.raw)}}}
+            """#).defaultBucket?.windows, [QuotaWindowSnapshot(
+                kind: .weekly, usedPercent: 27, windowMinutes: 10_080,
+                resetsAt: shape.seconds.map(Date.init(timeIntervalSince1970:))
+            )], "Accepted value: \(shape.raw)")
+        }
+    }
+
+    func testBooleanAndUnrepresentableQuotaFieldsSkipOnlyTheirWindow() throws {
+        let fiveHour = QuotaWindowSnapshot(
+            kind: .fiveHour, usedPercent: 40, windowMinutes: 300,
+            resetsAt: Date(timeIntervalSince1970: 1_999_990_000)
+        )
+        // The integers above Int.max formerly wrapped into -1%, 1% or a classified
+        // five-hour duration, and the Double 2^63 converted "exactly" to Int.max.
+        // Every literal here is finite: whether JSONSerialization accepts an
+        // overflowing exponent differs by sign and OS, so non-finite values are
+        // passed directly below instead of being decoded.
+        let invalidUsed = [
+            "true", "false", "1e300", "9.223372036854776e18", "9223372036854775808", "-9223372036854775809",
+            "18446744073709551615", "18446744073709551617", "123456789012345678901234567890",
+            #""27.5""#, #""true""#, "null", "[27]"
+        ]
+        let invalidDurations = [
+            "true", "false", "0", "-300", "-10080", "1e300", "9.223372036854776e18", "18446744073709551615",
+            "18446744073709551916", "18446744073709561696", #""ten""#, "null"
+        ]
+        for (field, values) in [("usedPercent", invalidUsed), ("windowDurationMins", invalidDurations)] {
+            for raw in values {
+                let window = field == "usedPercent"
+                    ? #"{"usedPercent":\#(raw),"windowDurationMins":10080,"resetsAt":2000000000}"#
+                    : #"{"usedPercent":27,"windowDurationMins":\#(raw),"resetsAt":2000000000}"#
+                let snapshot = try parsedLimits(#"""
+                {"rateLimits":{"primary":{"usedPercent":40,"windowDurationMins":300,"resetsAt":1999990000},"secondary":\#(window)}}
+                """#)
+                XCTAssertEqual(snapshot.buckets.map(\.limitID), ["codex"])
+                XCTAssertEqual(snapshot.defaultBucket?.windows, [fiveHour], "Rejected \(field): \(raw)")
+
+                XCTAssertThrowsError(
+                    try parsedLimits(#"{"rateLimits":{"secondary":\#(window)}}"#), "Rejected \(field): \(raw)"
+                ) { XCTAssertEqual($0 as? ConnectionIssue, .quotaUnavailable) }
+            }
+        }
+
+        // The same values, and the non-finite ones no JSON text is relied on to
+        // produce, reach the parser without a JSON decode in between.
+        let unbridged: [Any] = [
+            true, false, Double.nan, Double.infinity, -Double.infinity, UInt64.max, 0x1p63, Float(0x1p63),
+            NSNumber(value: Double.nan), NSNumber(value: Double.infinity), NSNumber(value: -Double.infinity),
+            NSNumber(value: 0x1p63)
+        ]
+        for invalid in unbridged {
+            XCTAssertEqual(RateLimitsParser.classifiedWindows(in: [
+                "primary": ["usedPercent": invalid, "windowDurationMins": 300],
+                "secondary": ["usedPercent": 27, "windowDurationMins": invalid]
+            ]), [], "Rejected value: \(invalid)")
+        }
+    }
+
+    func testOutOfRangeResetIsAbsentWithoutDroppingItsWindow() throws {
+        // Booleans formerly became 1970 dates and huge values arbitrary ones.
+        for raw in [
+            "true", "false", "-1", "-0.5e1", "253402300800", "9223372036854775807", "-9223372036854775808",
+            "1e300", "9.223372036854776e18", "18446744073709551615", "36893488149419103232",
+            #""-1""#, #""soon""#
+        ] {
+            XCTAssertEqual(try parsedLimits(#"""
+            {"rateLimits":{"secondary":{"usedPercent":27,"windowDurationMins":10080,"resetsAt":\#(raw)}}}
+            """#).defaultBucket?.windows, [QuotaWindowSnapshot(
+                kind: .weekly, usedPercent: 27, windowMinutes: 10_080, resetsAt: nil
+            )], "Rejected reset: \(raw)")
+        }
+
+        // Non-finite resets are passed directly, never through a JSON literal.
+        let unbridged: [Any] = [
+            Double.nan, Double.infinity, -Double.infinity, 0x1p63, true, UInt64.max,
+            NSNumber(value: Double.nan), NSNumber(value: Double.infinity), NSNumber(value: -Double.infinity)
+        ]
+        for invalid in unbridged {
+            XCTAssertEqual(RateLimitsParser.classifiedWindows(in: [
+                "secondary": ["usedPercent": 27, "windowDurationMins": 10_080, "resetsAt": invalid]
+            ]), [QuotaWindowSnapshot(
+                kind: .weekly, usedPercent: 27, windowMinutes: 10_080, resetsAt: nil
+            )], "Rejected reset: \(invalid)")
+        }
+    }
+
+    func testMalformedQuotaFieldsFailTheFetchBeforeTheOptionalAccountRead() async throws {
+        for window in [
+            #"{"usedPercent":true,"windowDurationMins":10080}"#,
+            #"{"usedPercent":18446744073709551615,"windowDurationMins":10080}"#,
+            #"{"usedPercent":27,"windowDurationMins":18446744073709561696}"#
+        ] {
+            let fixture = try makeFixture(script: quotaFirstScript(
+                accountScript: "exit 80",
+                limitsResponse: #"{"id":2,"result":{"rateLimits":{"secondary":\#(window)}}}"#
+            ))
+            await assertIssue(.quotaUnavailable) {
+                try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaAndAccount)
+            }
+            XCTAssertEqual(try recordedRequests(fixture).compactMap { $0["method"] as? String }, [
+                "initialize", "initialized", "account/rateLimits/read"
+            ])
+            try assertProcessIsGone(at: fixture.pidFile)
+        }
+    }
+
+    func testBooleanAndOverflowingEnvelopeIDsNeverAnswerARequest() async throws {
+        // true formerly matched request 1 and 2^65 + 2 wrapped into request 2.
+        let fixture = try makeFixture(script: #"""
+        IFS= read -r initialize
+        printf '%s\n' '{"id":true,"error":{"code":-32000,"message":"failed"}}'
+        printf '%s\n' '{"id":18446744073709551617,"error":{"code":-32000,"message":"failed"}}'
+        printf '%s\n' '{"id":1,"result":{}}'
+        IFS= read -r initialized
+        IFS= read -r limits
+        printf '%s\n' '{"id":36893488147419103234,"result":{"rateLimits":{"secondary":{"usedPercent":99,"windowDurationMins":10080}}}}'
+        printf '%s\n' '{"id":2.0,"result":{"rateLimits":{"secondary":{"usedPercent":27,"windowDurationMins":10080}}}}'
+        """#)
+
+        let snapshot = try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaOnly)
+        XCTAssertEqual(snapshot.defaultBucket?.windows, [QuotaWindowSnapshot(
+            kind: .weekly, usedPercent: 27, windowMinutes: 10_080, resetsAt: nil
+        )])
+    }
+
+    func testStringEnvelopeIDStillAnswersItsRequest() async throws {
+        let fixture = try makeFixture(script: #"""
+        IFS= read -r initialize
+        printf '%s\n' '{"id":"1","result":{}}'
+        IFS= read -r initialized
+        IFS= read -r limits
+        printf '%s\n' '{"id":"2","result":{"rateLimits":{"secondary":{"usedPercent":27,"windowDurationMins":10080}}}}'
+        """#)
+
+        let snapshot = try await fixture.client.fetch(executable: fixture.executable, identityMode: .quotaOnly)
+        XCTAssertEqual(snapshot.defaultBucket?.window(.weekly)?.remainingPercent, 73)
+    }
+
+    func testWrappedOrBooleanErrorCodeIsNotAnUnsupportedUsageMethod() async throws {
+        // 2^64 - 32601 formerly wrapped into the method-not-found code.
+        let responses: [(String, TokenUsageIssue?)] = [
+            (#"{"id":2,"error":{"code":18446744073709519015,"message":"failed"}}"#, nil),
+            (#"{"id":2,"error":{"code":true,"message":"failed"}}"#, nil),
+            (#"{"id":2,"error":{"code":"-32601","message":"Method not found"}}"#, .unsupported),
+            (#"{"id":2,"error":{"code":-32601.0,"message":"Method not found"}}"#, .unsupported)
+        ]
+        for (response, expected) in responses {
+            let fixture = try makeFixture(script: """
+            IFS= read -r initialize
+            printf '%s\\n' '{"id":1,"result":{}}'
+            IFS= read -r initialized
+            IFS= read -r usage
+            printf '%s\\n' '\(response)'
+            """)
+            do {
+                _ = try await fixture.client.fetchUsage(executable: fixture.executable)
+                XCTFail("Expected a failed usage read")
+            } catch {
+                XCTAssertEqual(error as? TokenUsageIssue, expected, "Response: \(response)")
+                if expected == nil { XCTAssertEqual(error as? ConnectionIssue, .serverError) }
+            }
+        }
+    }
+
+    /// Decoded the way the line channel decodes a response, so numbers and
+    /// Booleans carry their real bridged types.
+    private func parsedLimits(_ json: String) throws -> QuotaSnapshot {
+        try RateLimitsParser.parse(
+            limitsResult: try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]),
+            accountResult: nil,
+            executable: LocatedCodex(
+                executableURL: URL(fileURLWithPath: "/Applications/ChatGPT.app/Contents/Resources/codex"),
+                version: "codex-cli test", source: .chatGPTApp
+            ),
+            fetchedAt: Date(timeIntervalSince1970: 1_900_000_000)
+        )
+    }
+
     private func assertIssue<Value: Sendable>(
         _ expected: ConnectionIssue,
         operation: () async throws -> Value

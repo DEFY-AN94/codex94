@@ -3250,6 +3250,22 @@
         }
       }
     },
+    "claude.setup.installRequired": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install Codex94 as /Applications/Codex94.app or ~/Applications/Codex94.app first. The connection saves this app's location in your Claude Code settings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先将 Codex94 安装为 /Applications/Codex94.app 或 ~/Applications/Codex94.app。连接会把 Codex94 的位置写入 Claude Code 设置。"
+          }
+        }
+      }
+    },
     "connection.nextAutomaticAttempt %@" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Next automatic attempt: %@" } },

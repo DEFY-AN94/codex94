@@ -1,5 +1,68 @@
 # Security
 
+## 4.3.1 candidate: installation location and input hardening
+
+The unreleased `4.3.1 (35)` development candidate narrows existing inputs on
+top of `4.3.0 (34)`. It adds no data source, file, permission, entitlement or
+network path.
+
+A new statusline installation is refused unless the App runs from exactly
+`/Applications/Codex94.app` or `~/Applications/Codex94.app`, the rule Launch at
+Login already applies, because the generated command persists the App's
+executable path in the user's Claude Code settings. The decision is taken once,
+when the App creates its installer at launch, and is not evaluated again:
+preview refuses on it first and the locked installation enforces the same
+decision a second time. A refusal writes no manifest, backup or settings
+change. Setup state, removal and conflict recovery never consult the rule, so
+an existing connection is still shown and can be removed from any App location.
+Removing an old record after a conflict keeps its earlier, unchanged
+requirement that the App run from the same path that created the connection.
+
+Installing or removing a connection writes the settings file without escaped
+slashes. The canonical bytes used for the manifest, backup and conflict
+comparison are unchanged, so connections created by earlier versions are still
+recognized and removable.
+
+The CLI screen replay caps every control-sequence parameter at an upper bound
+when parsing, so extreme values in terminal output cannot overflow cursor
+arithmetic and stop the App. A parameter too long to parse still counts as
+omitted, and input that did not crash produces the same screen as before.
+
+Codex app-server response ids, error codes and quota-window fields no longer
+accept a JSON Boolean, a non-finite value or a number the native integer type
+cannot represent, including a floating-point 2^63. Such a value is absent
+instead of being wrapped into a plausible one: a quota window whose duration or
+percentage is rejected is skipped, and a reset time that is rejected or outside
+the supported date range is absent while its window is kept. Ordinary integers,
+fractions (truncated toward zero) and integer strings parse as before, and
+integer percentages outside 0–100 are still preserved and clamped at projection.
+
+The Codex quota cache is read with the shared safe local-file reader. Its path
+must be absolute without dot segments; the cache file itself is never followed
+as a symbolic link and must be one singly linked regular file owned by the
+current user, at most 1 MiB, opened with no wait on a FIFO. Symbolic links in
+its parent directories are deliberately still allowed for this App-owned cache,
+so a relocated home or Library folder keeps working. A cache that fails the
+check is unreadable; the read never deletes or rewrites it, and cache writing
+is unchanged.
+
+The candidate also fixes the install preview, which could open as an empty
+sheet that could not be closed. The fix changes how the sheet is presented and
+nothing else: the same preview is shown, and no file access, command or stored
+format changes.
+
+An earlier build of this candidate did not pass acceptance because of that
+defect. The fixed candidate passed CI, and on 2026-11-17 the maintainer
+accepted it after exercising the statusline connection from a disk image and
+from a temporary copy in a stable location. Removal from a stable location,
+the English App language, a real CLI read and any Gatekeeper flow were not
+exercised. The candidate is still unreleased. In that acceptance the preview
+sheet appeared in English, the first macOS language, instead of the
+Simplified Chinese chosen in Codex94
+([#79](https://github.com/DEFY-AN94/codex94/issues/79)), which changes
+no file access, command or stored format. The evidence is recorded in
+[the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased).
+
 ## 4.3.0: local activity and automatic-read admission
 
 Version `4.3.0 (34)` retains the existing official-client

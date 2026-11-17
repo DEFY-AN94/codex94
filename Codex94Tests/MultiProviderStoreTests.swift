@@ -586,7 +586,8 @@ final class MultiProviderStoreTests: XCTestCase {
         let claudeCache = ClaudeStatuslineCache(fileURL: directory.appendingPathComponent("claude-quota.json"))
         let installer = ClaudeStatuslineInstaller(
             settingsURL: directory.appendingPathComponent("synthetic-settings.json"), cache: claudeCache,
-            executableURL: executable, supportDirectory: directory.appendingPathComponent("synthetic-support")
+            executableURL: executable, supportDirectory: directory.appendingPathComponent("synthetic-support"),
+            stableInstall: true
         )
         let now = referenceDate
         let claudeStore = ClaudeQuotaStore(

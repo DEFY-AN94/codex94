@@ -234,7 +234,7 @@ final class ClaudeBridgeHealthTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.health.fileURL.path))
         try capture(payload(), fixture: fixture)
         let other = ClaudeStatuslineInstaller(cache: fixture.cache, executableURL: fixture.installer.executableURL,
-            environment: otherEnvironment, homeDirectory: fixture.root)
+            environment: otherEnvironment, homeDirectory: fixture.root, stableInstall: true)
         XCTAssertEqual(other.bridgeHealth(at: first), .unavailable)
     }
 
@@ -281,7 +281,7 @@ final class ClaudeBridgeHealthTests: XCTestCase {
         let environment = ["CLAUDE_CONFIG_DIR": root.appendingPathComponent("profile").path]
         let cache = ClaudeStatuslineCache(fileURL: root.appendingPathComponent("support/statusline-quota.json"))
         let installer = ClaudeStatuslineInstaller(cache: cache, executableURL: executable,
-            environment: environment, homeDirectory: root)
+            environment: environment, homeDirectory: root, stableInstall: true)
         let preview = try installer.previewInstall()
         try installer.install(preview)
         return Fixture(root: root, environment: environment, installer: installer, installationID: preview.installationID)

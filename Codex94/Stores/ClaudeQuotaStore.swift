@@ -540,6 +540,11 @@ final class ClaudeQuotaStore: ObservableObject {
         if isEnabled { projectReport(at: now()) }
     }
 
+    /// False outside a stable App location. Only new installations depend on
+    /// it; an existing connection stays removable from any location, and
+    /// forgetting a conflicting record keeps its own same-path requirement.
+    var canInstallStatusline: Bool { installer.isStableInstall }
+
     func previewStatuslineInstall() throws -> ClaudeStatuslineInstallPreview {
         defer { refreshSetupState() }
         return try installer.previewInstall()

@@ -353,14 +353,14 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
                 throw ConnectionIssue.malformedResponse
             }
 
-            guard let responseID = Self.integer(dictionary["id"]) else {
+            guard let responseID = AppServerInteger.value(dictionary["id"]) else {
                 continue
             }
             guard responseID == id else {
                 continue
             }
             if let error = dictionary["error"] as? [String: Any] {
-                if tokenUsageRequest, Self.integer(error["code"]) == -32601 {
+                if tokenUsageRequest, AppServerInteger.value(error["code"]) == -32601 {
                     throw TokenUsageIssue.unsupported
                 }
                 let message = (error["message"] as? String)?.lowercased() ?? ""
@@ -385,12 +385,27 @@ final class CodexAppServerClient: QuotaFetching, TokenUsageFetching, @unchecked 
     private func requestDeadline(seconds: TimeInterval, totalDeadline: Date) -> Date {
         min(Date().addingTimeInterval(seconds), totalDeadline)
     }
+}
 
-    private static func integer(_ value: Any?) -> Int? {
-        if let value = value as? Int { return value }
-        if let value = value as? NSNumber { return value.intValue }
-        if let value = value as? String { return Int(value) }
-        return nil
+/// Envelope ids, error codes and quota fields keep the wire shapes existing
+/// replays rely on: JSON numbers, fractions truncated toward zero and decimal
+/// strings. StrictJSONInteger refuses all but the first, so it cannot be used.
+/// A JSON Boolean is never 0/1, and a number Int cannot hold is absent rather
+/// than wrapped into a plausible id, percentage, duration or date.
+private enum AppServerInteger {
+    static func value(_ value: Any?) -> Int? {
+        if let string = value as? String { return Int(string) }
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
+        // A Double of 2^63 converts "exactly" to Int.max although Int cannot hold
+        // it; only a number that prints as Int.max really is that integer.
+        if let exact = Int(exactly: number),
+           exact != .max || number.stringValue == String(Int.max) { return exact }
+        // Only a real fraction is truncated. From 2^53 a Double has none, so
+        // whatever the exact conversion refused does not fit; NaN fails too.
+        let double = number.doubleValue
+        guard double.magnitude < 0x1p53 else { return nil }
+        return Int(double.rounded(.towardZero))
     }
 }
 
@@ -552,14 +567,17 @@ enum RateLimitsParser {
         var windowsByKind: [QuotaWindowKind: QuotaWindowSnapshot] = [:]
 
         for case let rawWindow as [String: Any] in candidates {
-            guard let windowMinutes = integer(rawWindow["windowDurationMins"]),
+            // Non-positive durations classify as no window. An integer percentage
+            // outside 0...100 stays preserved for the clamping projection.
+            guard let windowMinutes = AppServerInteger.value(rawWindow["windowDurationMins"]),
                   let kind = kind(for: windowMinutes),
-                  let usedPercent = integer(rawWindow["usedPercent"]) else {
+                  let usedPercent = AppServerInteger.value(rawWindow["usedPercent"]) else {
                 continue
             }
 
-            let resetsAt = integer(rawWindow["resetsAt"]).map {
-                Date(timeIntervalSince1970: TimeInterval($0))
+            // The Claude readers' timestamp range; outside it the reset is absent.
+            let resetsAt = AppServerInteger.value(rawWindow["resetsAt"]).flatMap {
+                (0...253_402_300_799).contains($0) ? Date(timeIntervalSince1970: TimeInterval($0)) : nil
             }
             let candidate = QuotaWindowSnapshot(
                 kind: kind,
@@ -637,12 +655,5 @@ enum RateLimitsParser {
             return nil
         }
         return string
-    }
-
-    private static func integer(_ value: Any?) -> Int? {
-        if let value = value as? Int { return value }
-        if let value = value as? NSNumber { return value.intValue }
-        if let value = value as? String { return Int(value) }
-        return nil
     }
 }

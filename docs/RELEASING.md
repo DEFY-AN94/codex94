@@ -33,6 +33,271 @@ acceptance visible in the PR. Never mark Ready merely because CI is green unless
 the maintainer explicitly authorizes a different order, as recorded for the
 4.2.0 candidate below.
 
+## 4.3.1 candidate scope — Unreleased
+
+Development candidate `4.3.1 (35)` starts from main
+`3c0df72d22bdad68c7879ed21eeb55bff30bf6b1`, after the published 4.3.0 source
+`fd991dff95a9595e96d0d2d615847b4fd4f40487`. Its scope is five hardening changes
+and one defect fix, and nothing else. The hardening changes are an upper bound
+on control-sequence parameters in the Claude CLI screen replay; a
+stable-install requirement for new statusline connections; writing the Claude
+Code settings file without escaped slashes; validation of Codex app-server
+numbers; and reading the Codex quota cache through the shared bounded
+local-file reader. The defect fix, found during candidate acceptance, is for
+the statusline install preview, which could open as an empty sheet that could
+not be closed. All six are listed in
+[CHANGELOG.md](../CHANGELOG.md#431---unreleased).
+
+On 2026-11-15 (Australia/Melbourne) the maintainer decided to keep the five
+hardening changes out of 4.3.0 and to carry them as 4.3.1, and later that day
+explicitly authorized gate 1 in section 1: committing and pushing the
+development branch and creating a Draft PR. This authorization does not extend
+to marking the PR Ready, merge, tag, Draft Release assets,
+installation/replacement of the maintainer's App, or public publication; gates
+2 to 7 have not been requested or granted for 4.3.1. After the first CI run the
+maintainer instructed that a further UI capture be added and this record be
+updated. On 2026-11-16, after candidate acceptance failed on the preview defect
+described below, the maintainer instructed that its fix be carried in 4.3.1.
+The commits that do these things go to the same Draft PR under gate 1; neither
+instruction authorizes a later gate. On 2026-11-17 the maintainer instructed
+that the acceptance of the third candidate be recorded as passed, as
+described below, and that the language defect found in it be tracked as
+[issue #79](https://github.com/DEFY-AN94/codex94/issues/79) instead of being
+fixed in 4.3.1. That is not gate 2: marking the PR Ready was not requested.
+
+Evidence so far, in the order it was obtained:
+
+- **Local gate on the source commit.** `script/release_check.sh` passed with
+  Xcode 27.2 (27B52) on commit `70a878ac45e965d2d6913b3ceaddc2958c2e5061`,
+  which carried every App source, resource and project change of the
+  candidate at that time, with a clean working tree. Its hosted unit suite
+  executed 739 tests with 1 existing skip and 0 failures, and it verified the
+  Universal App
+  and an unsigned DMG for `4.3.1 (35)` (SHA-256
+  `f6e60a9d30afa044856f7b2109f581781ce0af363b9d21f3cba674de0fe00295`; a local
+  artifact, not a release asset).
+- **First CI run.** [CI run 43701836254](https://github.com/DEFY-AN94/codex94/actions/runs/43701836254)
+  tested merge `bb9b661a69315f88ab963593fdf1147a2fa078bd` of PR head
+  `615d89e74bd3375bd4a72f851c97fc76a28b572e` (shared tree
+  `598b6c95213f5bb67a44f7a5cd81622539374d11`) with Xcode 16.4. Its release
+  gate executed 739 tests with the same skip and 0 failures, and all five
+  synthetic UI smokes passed on their first attempt.
+  [CodeQL run 43701833517](https://github.com/DEFY-AN94/codex94/actions/runs/43701833517)
+  passed Actions, Python and Swift analysis. Main-only DMG attestation was
+  skipped on the PR, which is not a successful attestation.
+- **First PR candidate.** The two-file artifact of that run holds a DMG with
+  SHA-256 `ff13db61c181bcffff47ec7bde4f9638b69447918672a97cab80cc0d4fbd1c09`
+  and a checksum file that matches it; the App executable inside that DMG has
+  SHA-256 `09c132501f626165f841e8993bde490da6316e83b270d5a0e8545315db0db1c2`.
+  `script/package_dmg.sh verify` passed on the downloaded files. A later head
+  supersedes this candidate.
+- **Synthetic UI review of that run.** An AI assistant read all 53 PNGs and
+  45 JSON reports in two independent passes per scenario; the maintainer has
+  not reviewed them. It found no privacy problem and no layout regression
+  attributable to 4.3.1, and noted one cosmetic truncation in a Recovery
+  popover that predates this candidate. All 43 reports that carry a source
+  revision name the tested merge. No image showed the new Services state in
+  full: the disabled preview and its requirement appeared only as fragments
+  behind a popover in two Providers images, and never in Simplified Chinese.
+- **Test-only follow-up.** Commit `9897b746ea3134a7664d5b09e97d3f903242022e`
+  changes only `Codex94UITests/Codex94UITests.swift`. The Providers smoke now
+  requires the preview button to be disabled and the requirement to carry the
+  exact English and Simplified Chinese text, writes a cropped image of both in
+  each language, and requires a click on the disabled button to open nothing.
+  It changes no App source, resource, script or project setting.
+  `script/release_check.sh` passed again on that commit with a clean working
+  tree (739 tests, 1 existing skip, 0 failures; local DMG SHA-256
+  `68d0675844ca40e8305c5047a673584392f8cf8b0c8b122364acb1783f78c305`). That
+  script does not build or run the UI test target, which was only compiled
+  locally.
+- **Second CI run.** [CI run 43716225216](https://github.com/DEFY-AN94/codex94/actions/runs/43716225216)
+  tested merge `d0d0b5c52ab6f56c4cfc4d28c8bb9df10d6f5852` of PR head
+  `008695abf1e90cfc748fcc980426d42b2392da3c` (shared tree
+  `1800fddbcc991f24e7bdd19d1f6d3b5907591d91`) with Xcode 16.4. Its release
+  gate executed 739 tests with the same skip and 0 failures, and all five
+  synthetic UI smokes passed on their first attempt, including the new
+  Providers assertions.
+  [CodeQL run 43716224407](https://github.com/DEFY-AN94/codex94/actions/runs/43716224407)
+  passed Actions, Python and Swift analysis. Main-only DMG attestation was
+  skipped again.
+- **Second PR candidate.** The two-file artifact of that run holds a DMG with
+  SHA-256 `c11581e454d2926f26eb4245d5c2eabd5b49de3bb1d95e51130c17d72665d11a`
+  and a checksum file that matches it. The App executable inside it has the
+  same SHA-256 as in the first candidate,
+  `09c132501f626165f841e8993bde490da6316e83b270d5a0e8545315db0db1c2`, because
+  the commits between the two changed no App input.
+  `script/package_dmg.sh verify` passed on the downloaded files. The fix
+  below supersedes this candidate.
+- **Synthetic UI review of the second run.** An AI assistant read all 55 PNGs
+  (49 distinct) and 45 JSON reports in two independent passes per scenario;
+  the maintainer has not reviewed them. It found no privacy problem and no
+  layout regression attributable to 4.3.1. The two new Providers images show
+  the disabled preview and the complete requirement in English and Simplified
+  Chinese, equal to the string catalog.
+- **Candidate acceptance, not passed.** On 2026-11-16 the maintainer exercised
+  the second candidate on macOS 27.2 (26B123), Apple silicon, dark appearance.
+  The maintainer operated the App and supplied screenshots. An AI assistant
+  ran the commands, watched the files read-only, compared them and restored
+  them. The installed 4.3.0 (34) was quit first and was never replaced.
+  - Identity: the DMG and executable hashes matched the candidate, and
+    `codesign --verify --deep --strict` passed on an ad-hoc signature with
+    Hardened Runtime and no entitlements, for arm64 and x86_64. The DMG
+    carried no quarantine attribute, so nothing here is a Gatekeeper check.
+  - From a read-only mount of the DMG, About showed 4.3.1 (35), and the
+    Launch at Login switch was dimmed and could not be changed, still showing
+    on, with its requirement. The existing connection, created
+    by an earlier version and without an installation ID, was shown as
+    installed, with the preview disabled and removal offered. The Claude Code
+    settings file and the installation manifest did not change until the
+    maintainer removed the connection.
+  - Removal from that location succeeded. The settings file lost its
+    statusline entry, held no escaped slash and kept its other keys, and the
+    manifest was removed. The disabled preview and the complete requirement
+    then appeared in Simplified Chinese and in English.
+  - From a temporary copy at `~/Applications/Codex94.app`, made with the
+    maintainer's explicit approval and moved to the Trash afterwards, the
+    preview button was enabled and the requirement was gone. The first press
+    presented an empty sheet with no control. It could not be closed, a quit
+    request was refused while it was up, and the process had to be terminated.
+    Nothing was written. This copy was not the gate 6 installation.
+  - The installed 4.3.0 (34) showed the same empty sheet in the same state,
+    so the defect is not new in 4.3.1.
+  - Not executed: cancelling, installing and removing from a stable location,
+    so the settings bytes of a real installation were not observed in that
+    round; a real CLI read; any Gatekeeper flow.
+  - The settings file and the manifest were copied back from a backup taken
+    before the removal, and are byte-identical to their state before
+    acceptance.
+  - One cosmetic observation predates this candidate: with no connection
+    installed, source health shows "not installed" together with "Connection
+    activity diagnostics are unavailable for this installation".
+- **Cause and fix.** The sheet's content was read from view state inside a
+  `sheet(isPresented:)` closure, and the view body never read that state. A
+  press that no other view update followed presented the sheet while the
+  state still looked empty. The pattern dates from 4.0.0. Until 4.1.7 every
+  preview press also made the store publish, which refreshed the view; commit
+  `7adf5a079481e94e5bc4c1c9e5aa096d00c19ef9` (4.1.8, first tagged in
+  `v4.2.0`) made that publish conditional. Versions other than 4.3.0 and this
+  candidate were not retested. Commit
+  `a9af9303e36f0a7fec322cd39b34f37d74c1f6ee` presents the sheet from the
+  preview value itself and adds a hosted test that drives the real setup view
+  in a real window with synthesized mouse and key events. The test fails on
+  the previous sources, where the sheet is 100 points wide and Escape cannot
+  close it, and passes with the fix. `script/release_check.sh` passed on
+  that commit with Xcode 27.2 (27B52) and a clean working tree: 740 tests, 1
+  existing skip, 0 failures; local DMG SHA-256
+  `ceac1186378b9aa17773f9d64aa1f598adfc77647b2688034d35b929cf21209d` (a local
+  artifact, not a release asset). That commit changes App source, so it
+  invalidated the second candidate and everything observed on it.
+- **Third CI run.** [CI run 43867728225](https://github.com/DEFY-AN94/codex94/actions/runs/43867728225)
+  tested merge `528c553e78c8900699ae6752ae5e9eee75320e6c` of PR head
+  `941260b01ce27e1e391054399d3e594d90787e0e`, which is the fix commit plus one
+  documentation-only commit (shared tree
+  `eca529a79095c23fb748e2efd6b4f552a2fc931b`), with Xcode 16.4. Its release
+  gate executed 740 tests with the same skip and 0 failures, among them the
+  new preview sheet test, and all five synthetic UI smokes passed on their
+  first attempt.
+  [CodeQL run 43867725050](https://github.com/DEFY-AN94/codex94/actions/runs/43867725050)
+  passed Actions, Python and Swift analysis. Main-only DMG attestation was
+  skipped again.
+- **Third PR candidate.** The two-file artifact of that run holds a DMG with
+  SHA-256 `0ae1b4d5ce4af38bbc5801ac239293073ca105e9cb6a4e2aa072eb439d28555b`
+  and a checksum file that matches it. The App executable inside it has
+  SHA-256 `b49e4f12c620b1541b41b21ad0f7428ba7edcd1620032745ce0d2448b441db1f`,
+  new because the fix changes App source. `script/package_dmg.sh verify`
+  passed on the downloaded files.
+- **Synthetic UI review of the third run.** An AI assistant read all 55 PNGs
+  (49 distinct) and 45 JSON reports in two independent passes per scenario;
+  the maintainer has not reviewed them. It found no privacy problem and no
+  blocking layout problem, only cosmetic observations, none of them in the
+  statusline setup section, the one view this candidate changes. All 43
+  reports that carry a source revision name the tested merge. No image shows
+  the preview sheet, because no scenario opens it.
+- **Candidate acceptance, passed.** On 2026-11-17 the maintainer exercised
+  the third candidate on macOS 27.2 (26B123), Apple silicon, dark appearance,
+  with Simplified Chinese chosen in the App and English first among the
+  system languages. As the day before, the maintainer operated the App and
+  supplied screenshots, and an AI assistant ran the commands, watched the
+  files read-only, compared them and restored them. The installed 4.3.0 (34)
+  was quit first and was never replaced. At the maintainer's instruction this
+  round is recorded as passed. The AI assistant wrote this record; the known
+  issue and the items not executed are listed in it.
+  - Identity: the DMG and executable hashes matched the candidate, and
+    `codesign --verify --deep --strict` passed on an ad-hoc signature with
+    Hardened Runtime and no entitlements, for arm64 and x86_64. The DMG
+    carried no quarantine attribute, so nothing here is a Gatekeeper check.
+  - From a read-only mount of the DMG, About showed 4.3.1 (35), and the
+    Launch at Login switch was dimmed, with its requirement. The settings
+    file and the manifest of the existing connection, which has no
+    installation ID, did not change until the maintainer removed it. No
+    screenshot was taken of the Services page before that removal.
+  - Removal from that location succeeded. The settings file lost its
+    statusline entry, held no escaped slash and kept its other keys, and the
+    manifest was removed. Services then showed the disabled preview and the
+    complete requirement in Simplified Chinese.
+  - From a temporary copy at `~/Applications/Codex94.app`, made with the
+    maintainer's explicit approval and moved to the Trash afterwards, the
+    preview button was enabled and the requirement was gone. A press on it
+    presented the filled sheet: the settings file, the connection command,
+    Cancel and Install. The process started for this stage ran without a
+    restart until the end of the round, so no press presented the empty
+    sheet, which could be left only by terminating the process. Nothing was
+    written before Install, and the connection installed afterwards carries
+    a different installation ID from the preview in the screenshot, so that
+    preview was discarded. This copy was not the gate 6 installation.
+  - A later press followed by Install wrote the settings file and the
+    manifest. The settings file held no escaped slash, its bytes equaled a
+    re-encoding of its content with sorted keys and plain slashes, its other
+    keys were unchanged and its mode was 0600, as before. The command named
+    the copy and the bridge argument, and the manifest carried the
+    installation ID of that command. Services then showed the connection as
+    installed.
+  - Known issue: the sheet appeared in English, the first system language,
+    while the page behind it was in Simplified Chinese. The Simplified
+    Chinese strings exist, so this is not a missing translation. The
+    suspected cause, not yet confirmed by a test, is that the sheet's
+    content does not receive the language that the windows set on their root
+    views; no other language combination was tried. Whether 4.3.0 or an
+    earlier version behaves the same was not observed; the sheet's content
+    view is unchanged since 4.0.0. The maintainer decided to track this as
+    [issue #79](https://github.com/DEFY-AN94/codex94/issues/79) and not to
+    fix it in 4.3.1.
+  - Not executed: removing a connection from a stable location; the English
+    App language, which this round covers only through the CI images of the
+    disabled preview; a real CLI read; any Gatekeeper flow.
+  - The settings file and the manifest were copied back from a backup taken
+    before the removal, and are byte-identical to their state before
+    acceptance. The record file that the installer wrote for this round's
+    connection was moved to the Trash.
+
+The acceptance covers the App of run 43867728225, whose executable has the
+SHA-256 given above. The commit that records the third run and this
+acceptance changes documentation only and moves the PR head past `941260b`.
+Its own CI run is not recorded here. That run's candidate should hold the
+same executable, as the first two candidates did, and that is to be confirmed
+before gate 2. Gates 2 to 7 have not been requested or granted, including
+marking the PR Ready. Results recorded for other versions do not validate
+4.3.1.
+
+Three notes for whoever exercises this candidate again:
+
+1. Installing a new statusline connection can be exercised only from a stable
+   install, `/Applications/Codex94.app` or `~/Applications/Codex94.app`, not
+   from a mounted disk image.
+2. The Providers UI scenario runs the App outside Applications, where the
+   install preview button is disabled. It asserts that state and never opens
+   the preview, so no UI scenario shows the enabled preview or the preview
+   sheet. The hosted test named above covers the sheet inside the test host
+   with synthesized events, which is not an observation of the candidate App.
+   Opening the preview, cancelling it and installing from a stable install
+   still need a person. Do not rely on UI results recorded for earlier
+   versions.
+3. Both acceptances above removed the maintainer's real connection after a
+   backup of the settings file and the manifest, and copied both back
+   afterwards. The maintainer approved that for this Mac; it is not the
+   default procedure. The manifest location is fixed, so an isolated setup
+   needs a separate macOS account.
+
 <a id="430-candidate-scope-and-authorization--unreleased"></a>
 
 ## 4.3.0 candidate acceptance and release scope — 2026-11-15

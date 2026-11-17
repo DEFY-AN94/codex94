@@ -44,17 +44,21 @@ final class LaunchAtLoginController: ObservableObject {
         return expectedBundleURLs.contains(resolvedBundleURL)
     }
 
+    /// The production decision, shared with every feature that persists this
+    /// App's path outside the bundle (Login Items, the Claude statusline command).
+    nonisolated static func isCurrentBundleStableInstall() -> Bool {
+        isStableInstall(
+            bundleURL: Bundle.main.bundleURL,
+            homeDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
+            systemApplicationsDirectoryURL: URL(fileURLWithPath: "/Applications", isDirectory: true)
+        )
+    }
+
     init(
         readStatus: @escaping () -> SMAppService.Status = { SMAppService.mainApp.status },
         register: @escaping () throws -> Void = { try SMAppService.mainApp.register() },
         unregister: @escaping () throws -> Void = { try SMAppService.mainApp.unregister() },
-        stableInstall: @escaping () -> Bool = {
-            LaunchAtLoginController.isStableInstall(
-                bundleURL: Bundle.main.bundleURL,
-                homeDirectoryURL: FileManager.default.homeDirectoryForCurrentUser,
-                systemApplicationsDirectoryURL: URL(fileURLWithPath: "/Applications", isDirectory: true)
-            )
-        }
+        stableInstall: @escaping () -> Bool = { LaunchAtLoginController.isCurrentBundleStableInstall() }
     ) {
         self.readStatus = readStatus
         self.register = register

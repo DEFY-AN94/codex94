@@ -6,6 +6,155 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
+## 4.3.1 - Unreleased
+
+Development candidate `4.3.1 (35)`. It carries hardening changes and one defect
+fix on top of `4.3.0 (34)` and is not part of that version; no release date,
+tag or release asset is implied by this entry. Its scope, its acceptance and
+the gates that remain are recorded in
+[docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
+
+### Fixed
+
+- Stop the statusline install preview from opening as an empty sheet that
+  could not be closed. The sheet read its content from view state, and a press
+  could present the sheet before the view had refreshed. An empty sheet has no
+  Cancel action and also blocked quitting the App, so a new connection could
+  not be installed. The sheet is now presented from the preview value itself.
+  The pattern dates from 4.0.0. Judging from the source, it stayed hidden
+  until 4.1.8, first released in 4.2.0, stopped the store from publishing on
+  every preview press. The maintainer observed the empty sheet on the
+  published `4.3.0 (34)` and on a `4.3.1 (35)` candidate, both on macOS 27.2;
+  other versions were not retested. Removing an existing connection was not
+  affected.
+- Stop the Claude CLI screen replay from crashing when terminal output carries
+  an extreme cursor-movement parameter. Every control-sequence parameter is
+  capped at an upper bound when it is parsed, so cursor arithmetic can no longer
+  overflow; a parameter too long to parse still counts as omitted, as before.
+  Input that did not crash produces the same screen as before.
+- Write Claude Code's settings file without escaped slashes (`\/`) when
+  installing or removing the statusline connection. Keys are still sorted and
+  the file is still rewritten as a whole. The canonical form kept in the
+  installation manifest and backup is unchanged, so connections created by
+  earlier versions stay recognized and removable; a settings file written by
+  an earlier version keeps its escapes until the next install or removal.
+- Stop reading a JSON Boolean, a non-finite value, or a number a native
+  integer cannot represent (including a floating-point 2^63), as a valid Codex
+  app-server response id, error code, percentage, window duration or reset
+  time. A quota window whose duration or percentage is rejected is skipped, and
+  a reset time that is rejected or outside the supported date range is treated
+  as absent while its window is kept. Ordinary integers, fractions (truncated
+  toward zero) and integer strings parse as before, including integer
+  percentages outside 0–100, which are still preserved and clamped on display.
+
+### Changed
+
+- Require a stable install for new statusline connections: exactly
+  `/Applications/Codex94.app` or `~/Applications/Codex94.app`, the rule Launch
+  at Login already uses, because the connection saves the App's location in
+  Claude Code settings. From a disk image, translocated or build location,
+  Services disables the install preview and explains the requirement; a refused
+  installation writes no manifest, backup or settings change. Showing and
+  removing an existing connection stay available from any location. Removing
+  an old record after a conflict still requires the App to run from the same
+  path that created the connection; that requirement is unchanged.
+- Read the Codex quota cache through the bounded local-file reader already used
+  for Claude files: an absolute path without dot segments, at most 1 MiB, one
+  singly linked regular file owned by the current user, never a symbolic link
+  itself, and opened without waiting on a FIFO. Symbolic links in its parent
+  folders stay allowed for this App-owned cache, so a relocated home or Library
+  folder keeps working. A cache that fails the check is treated as unreadable
+  and the read leaves it untouched; quota appears after the next successful
+  quota refresh. Writing the cache is unchanged.
+
+### Validation and acceptance
+
+`script/release_check.sh` passed locally with Xcode 27.2 on commit
+`70a878ac45e965d2d6913b3ceaddc2958c2e5061`, which then carried every App
+source, resource and project change, with a clean working tree: its hosted
+unit suite executed 739 tests with 1 existing skip and 0 failures, and it
+verified the Universal App and an unsigned DMG for `4.3.1 (35)` (SHA-256
+`f6e60a9d30afa044856f7b2109f581781ce0af363b9d21f3cba674de0fe00295`; a local
+artifact, not a release asset).
+
+[CI run 43701836254](https://github.com/DEFY-AN94/codex94/actions/runs/43701836254)
+then tested merge `bb9b661a69315f88ab963593fdf1147a2fa078bd` of PR head
+`615d89e74bd3375bd4a72f851c97fc76a28b572e` with Xcode 16.4: the release gate
+executed 739 tests with the same skip and 0 failures, and all five synthetic
+UI smokes passed.
+[CodeQL run 43701833517](https://github.com/DEFY-AN94/codex94/actions/runs/43701833517)
+passed Actions, Python and Swift analysis. Main-only DMG attestation was
+skipped, which is not a successful attestation. An AI assistant reviewed the
+run's 53 synthetic images and 45 reports and found no privacy problem and no
+layout regression, but the disabled install preview and its requirement
+appeared only as fragments behind a popover, never in Simplified Chinese.
+
+Commit `9897b746ea3134a7664d5b09e97d3f903242022e` therefore extends the
+Providers UI smoke, and nothing else, to require the disabled preview and the
+exact English and Simplified Chinese requirement text and to capture both.
+[CI run 43716225216](https://github.com/DEFY-AN94/codex94/actions/runs/43716225216)
+tested merge `d0d0b5c52ab6f56c4cfc4d28c8bb9df10d6f5852` of PR head
+`008695abf1e90cfc748fcc980426d42b2392da3c`: 739 tests with the same skip and 0
+failures, and all five UI smokes passed, including the new Providers
+assertions.
+[CodeQL run 43716224407](https://github.com/DEFY-AN94/codex94/actions/runs/43716224407)
+passed, and attestation was skipped again. An AI assistant reviewed that run's
+55 synthetic images and 45 reports: no privacy problem, no layout regression,
+and the two new images show the disabled preview and the complete requirement
+in both languages.
+
+Acceptance of that run's candidate on 2026-11-16 did not pass. From a
+read-only disk image the candidate recognized an existing connection, removed
+it without writing escaped slashes and showed the requirement in both
+languages. From a temporary copy in a stable location its first press on the
+install preview presented the empty sheet described under Fixed, and
+installing was never reached. Commit
+`a9af9303e36f0a7fec322cd39b34f37d74c1f6ee` fixes it and adds a hosted test
+that drives the real view in a real window; the test fails on the previous
+sources and passes with the fix. `script/release_check.sh` passed on that
+commit with Xcode 27.2 and a clean working tree (740 tests, 1 existing skip, 0
+failures; local DMG SHA-256
+`ceac1186378b9aa17773f9d64aa1f598adfc77647b2688034d35b929cf21209d`, not a
+release asset).
+
+That commit changes App source, so the earlier candidates no longer stand, and
+neither does anything observed during that acceptance.
+[CI run 43867728225](https://github.com/DEFY-AN94/codex94/actions/runs/43867728225)
+tested merge `528c553e78c8900699ae6752ae5e9eee75320e6c` of PR head
+`941260b01ce27e1e391054399d3e594d90787e0e`: 740 tests with the same skip and 0
+failures, among them the new test, and all five UI smokes passed.
+[CodeQL run 43867725050](https://github.com/DEFY-AN94/codex94/actions/runs/43867725050)
+passed, and attestation was skipped again. An AI assistant reviewed that run's
+55 synthetic images and 45 reports and found no privacy problem and no
+blocking layout problem. No image shows the preview sheet, because no UI
+scenario opens it.
+
+The maintainer accepted that run's candidate on 2026-11-17. From a read-only
+disk image the candidate left the settings file and the manifest of the
+existing connection unchanged until the maintainer removed it, and the
+removal wrote no escaped slashes. From a temporary copy in a stable location
+the install preview presented the filled sheet and never the empty one, a
+discarded preview wrote nothing, and Install wrote a settings file without
+escaped slashes and a manifest with the matching installation ID. The
+acceptance found the known issue below. It did not exercise removing a
+connection from a stable location, the English App language, a real CLI read
+or any Gatekeeper flow. Marking the PR Ready and every later gate have not
+been authorized and are not claimed here. Earlier results, including those
+recorded for 4.3.0 below, do not validate this candidate. The full record is
+in
+[docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
+
+### Known issue
+
+- The statusline install preview sheet does not follow the language chosen in
+  Codex94. During acceptance it appeared in English, the first macOS
+  language, while the rest of the App was in Simplified Chinese; it appears
+  to use the macOS language, and no other combination was tried. Its buttons
+  work and what it writes is correct. Whether earlier versions behave the
+  same was not checked. Tracked as
+  [#79](https://github.com/DEFY-AN94/codex94/issues/79) and not fixed in
+  4.3.1.
+
 ## 4.3.0 - 2026-11-15
 
 Version `4.3.0 (34)` was published on the date above, following the published

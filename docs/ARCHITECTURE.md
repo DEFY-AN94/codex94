@@ -8,6 +8,83 @@ unpublished `4.0.2 (23)` work carried into 4.1.0.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
+## 4.3.1 candidate: installation location and input hardening
+
+The unreleased `4.3.1 (35)` development candidate adds the following ownership
+rules on top of `4.3.0 (34)`. It introduces no new source file, stored file or
+dependency. An earlier build of this candidate did not pass acceptance. The
+fixed candidate passed CI, and on 2026-11-17 the maintainer accepted it after
+exercising the statusline connection, with one known issue in the install
+preview (see below). The candidate is still unreleased. The evidence and what
+that acceptance did not exercise are recorded in
+[the release workflow](RELEASING.md#431-candidate-scope--unreleased).
+
+### Stable-install rule
+
+`LaunchAtLoginController` still owns the stable-install rule.
+`LaunchAtLoginController.isCurrentBundleStableInstall()` is the single
+production answer for every feature that persists the App's path outside the
+bundle: Login Items and the statusline command. `ClaudeStatuslineInstaller`
+takes that answer once at construction (tests inject `stableInstall:`) and
+applies it to preview and to the locked install only. Setup state, bridge
+health, report eligibility, removal and forget-record recovery do not depend on
+it. Forget-record recovery keeps its own, unchanged requirement that the
+manifest's command equal the command for the current executable path, so it
+succeeds only from the path that created the connection. `ClaudeQuotaStore`
+exposes the decision and the setup view projects it through pure helpers; do
+not add a second path rule.
+
+### Install preview presentation
+
+`ClaudeStatuslineSetupView` presents the install preview with `sheet(item:)`
+from one optional `ClaudeStatuslineInstallPreview`, which is `Identifiable` by
+the installation ID that every preview mints. The sheet receives that value as
+its content. Do not add a separate presentation flag, and do not build sheet
+content from view state that `body` does not read: such a sheet can be
+presented empty, with no action to close it.
+
+Known issue: the sheet's content does not follow the language chosen in
+Codex94. During acceptance it appeared in English, the first system language,
+while Simplified Chinese was chosen. The windows get the chosen language from
+`codex94Environment` on their root views, and this is the only `sheet`
+modifier in the App. The suspected cause, not confirmed by a test, is that
+the sheet's content does not receive that locale; see
+[#79](https://github.com/DEFY-AN94/codex94/issues/79).
+
+### Canonical and settings-file encodings
+
+The installer keeps one canonical encoding, `encode()`, for manifest, backup
+and comparison bytes. Changing it would report installed connections as
+conflicts. Only the two writes of the user's settings file, on install and on
+removal, use `encodeSettingsFile()`, the same value without escaped slashes.
+Those bytes are never compared or persisted as the canonical form.
+
+### Codex quota cache read
+
+`SnapshotCache.load()` reads through `ClaudeLocalFile.readStamped` with the
+current-owner requirement and a 1 MiB bound, and returns no snapshot on any
+refusal without deleting or rewriting the file; `save()` is unchanged. It
+passes `allowingSymlinkedAncestors`, which skips only the walk that refuses a
+symlinked parent directory: `save()` writes through a relocated home or
+Application Support folder and the cache must load back. The path shape is
+still required (absolute, no dot segments), the file itself is still opened
+with `O_NOFOLLOW`, and every descriptor check applies as for other callers.
+
+### App-server integers and replay parameters
+
+`CodexAppServerClient` and `RateLimitsParser` share one file-private helper,
+`AppServerInteger`. It keeps the accepted wire shapes (JSON numbers, fractions
+truncated toward zero, integer strings) and refuses Booleans, non-finite values
+and numbers `Int` cannot hold, including a floating-point 2^63.
+`RateLimitsParser` additionally treats a reset time outside the supported date
+range as absent and keeps the window. `StrictJSONInteger` and
+`StrictJSONPercentage` remain the stricter rules for the fields that already
+use them.
+
+`ClaudeUsageScreen.snapshot(from:)` caps control-sequence parameters from above
+once at parse time instead of guarding each cursor expression. Negatives need
+no bound, and a parameter too long for `Int` still parses as omitted.
+
 ## 4.3.0 release: window routing, bridge activity and CLI admission
 
 Version `4.3.0 (34)` extends those responsibilities as follows.

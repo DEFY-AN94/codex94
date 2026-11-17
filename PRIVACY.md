@@ -6,6 +6,50 @@ stable version is [`v4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/
 released on 2026-11-15 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
+## 4.3.1 candidate: installation location and local-file reads
+
+The unreleased `4.3.1 (35)` development candidate stores no new data and sends
+none. It adds no file, preference, network request or permission on top of
+`4.3.0 (34)`.
+
+A new statusline connection can be installed only while Codex94 runs from
+`/Applications/Codex94.app` or `~/Applications/Codex94.app`. The requirement
+exists because the connection saves the App's location in the user's Claude
+Code settings, as part of the statusline command, so that location should not
+be a disk image, translocated or build location. A refused installation writes
+no manifest, backup or settings change. An existing connection is still shown
+and stays removable from any location; removing an old record after a conflict
+still requires, as before, that the App run from the path that created the
+connection.
+
+Installing or removing a connection now writes the Claude Code settings file
+without escaped slashes (`\/`). The JSON value written is the same, with sorted
+keys and the file rewritten as a whole; the stored manifest and backup keep
+their existing format.
+
+The Codex quota cache, `quota-snapshot.json`, is read only as a regular, singly
+linked file of at most 1 MiB owned by the current user that is not itself a
+symbolic link; symbolic links in its parent folders remain allowed. Otherwise
+it is treated as unreadable, the read leaves it untouched, and quota appears
+after the next successful quota refresh. The cache's contents and the way it is
+written are unchanged.
+
+The candidate also fixes the install preview, which could open as an empty
+sheet that could not be closed. The fix changes how the sheet is presented,
+not what is read, written or sent.
+
+An earlier build of this candidate did not pass acceptance because of that
+defect. The fixed candidate passed CI, and on 2026-11-17 the maintainer
+accepted it after exercising the statusline connection from a disk image and
+from a temporary copy in a stable location. Removal from a stable location,
+the English App language, a real CLI read and any Gatekeeper flow were not
+exercised. The candidate is still unreleased. In that acceptance the preview
+sheet appeared in English, the first macOS language, instead of the
+Simplified Chinese chosen in Codex94
+([#79](https://github.com/DEFY-AN94/codex94/issues/79)), which changes
+nothing that is read, written or sent. The evidence is recorded in
+[the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased).
+
 ## 4.3.0: local bridge health and on-demand CLI
 
 Version `4.3.0 (34)` adds one application-owned file:

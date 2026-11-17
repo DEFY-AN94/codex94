@@ -12,7 +12,7 @@ enum ClaudeQuotaSource: String, Codable, Sendable {
 enum ClaudeQuotaIssue: String, Error, Equatable, Sendable {
     case cliUnavailable, loginRequired, setupRequired, timedOut, invalidData
     case noData, staleData, sourceChanged, configurationConflict, unavailable
-    case localCacheUnreadable
+    case localCacheUnreadable, stableInstallRequired
 }
 
 /// An opaque report-stream selection, never proof of account identity.

@@ -2,8 +2,9 @@ import SwiftUI
 
 struct ClaudeStatuslineSetupView: View {
     @ObservedObject var store: ClaudeQuotaStore
+    /// The single source of truth for the preview sheet. The sheet is presented
+    /// from this value and receives it as its content, so it cannot open empty.
     @State private var preview: ClaudeStatuslineInstallPreview?
-    @State private var showingPreview = false
     @State private var confirmation: SetupConfirmation?
     @State private var operationIssue: ClaudeQuotaIssue?
     @State private var forgetFailed = false
@@ -48,13 +49,13 @@ struct ClaudeStatuslineSetupView: View {
                     clearFeedback()
                     do {
                         preview = try store.previewStatuslineInstall()
-                        showingPreview = true
                     } catch {
                         operationIssue = error as? ClaudeQuotaIssue ?? .unavailable
                         store.refreshSetupState()
                     }
                 }
-                .disabled(store.statuslineSetupState != .notInstalled)
+                .disabled(!Self.canPreviewInstall(state: store.statuslineSetupState,
+                                                  stableInstall: store.canInstallStatusline))
                 .accessibilityIdentifier("claude-setup-preview")
                 if store.statuslineSetupState == .installed {
                     Button("claude.setup.remove", role: .destructive) { confirmation = .remove }
@@ -63,6 +64,13 @@ struct ClaudeStatuslineSetupView: View {
                     Button("claude.setup.forgetRecord", role: .destructive) { confirmation = .forgetRecord }
                         .accessibilityIdentifier("claude-setup-forget-record")
                 }
+            }
+            if Self.showsInstallRequirement(state: store.statuslineSetupState,
+                                            stableInstall: store.canInstallStatusline) {
+                Text("claude.setup.installRequired")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("claude-setup-install-required")
             }
             if store.statuslineSetupState == .installed {
                 Text("claude.setup.installed")
@@ -91,20 +99,18 @@ struct ClaudeStatuslineSetupView: View {
                 confirmation = nil
             }
         }
-        .sheet(isPresented: $showingPreview) {
-            if let preview {
-                ClaudeStatuslinePreviewView(preview: preview) {
-                    clearFeedback()
-                    defer { showingPreview = false; store.refreshSetupState() }
-                    do {
-                        try store.installStatusline(preview)
-                        successMessage = "claude.setup.saved"
-                    } catch {
-                        operationIssue = error as? ClaudeQuotaIssue ?? .unavailable
-                    }
-                } cancel: {
-                    showingPreview = false
+        .sheet(item: $preview) { presented in
+            ClaudeStatuslinePreviewView(preview: presented) {
+                clearFeedback()
+                defer { preview = nil; store.refreshSetupState() }
+                do {
+                    try store.installStatusline(presented)
+                    successMessage = "claude.setup.saved"
+                } catch {
+                    operationIssue = error as? ClaudeQuotaIssue ?? .unavailable
                 }
+            } cancel: {
+                preview = nil
             }
         }
         .confirmationDialog(
@@ -120,6 +126,16 @@ struct ClaudeStatuslineSetupView: View {
         } message: {
             Text(confirmation?.messageKey ?? "claude.setup.removeHelp")
         }
+    }
+
+    /// The bridge command saves this App's path in the user's settings, so only
+    /// a stable install may start one. Removal and recovery are never gated on it.
+    static func canPreviewInstall(state: ClaudeStatuslineSetupState, stableInstall: Bool) -> Bool {
+        state == .notInstalled && stableInstall
+    }
+
+    static func showsInstallRequirement(state: ClaudeStatuslineSetupState, stableInstall: Bool) -> Bool {
+        state == .notInstalled && !stableInstall
     }
 
     private func clearFeedback() {

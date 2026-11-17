@@ -804,6 +804,8 @@ final class Codex94UITests: XCTestCase {
             "sourceHealthSetupCLIAndPopoverNavigationVerified": true,
             "sourceHealthBrowsingPreservesRequestsAndCaches": true,
             "sourceHealthEnglishDarkAndChineseLightCaptured": true,
+            "statuslinePreviewDisabledOutsideApplicationsVerified": true,
+            "statuslineInstallRequirementEnglishDarkAndChineseLightCaptured": true,
             "recentLocalReportSkipsAutomaticAndRegularCLI": true,
             "explicitCLIReadWithRecentLocalReportVerified": true,
             "applicationSettingsShortcutClosedOpenAndMinimizedVerified": true,
@@ -1067,6 +1069,8 @@ final class Codex94UITests: XCTestCase {
         try setTheme(.terminalDark, in: dashboard)
         try selectPage(.providers, in: dashboard)
         try captureSourceHealth(in: dashboard, named: "providers-health-current-error-en-dark.png")
+        try captureStatuslineInstallRequirement(
+            in: dashboard, named: "providers-statusline-install-required-en-dark.png")
 
         let diagnostics = try uniqueIdentified("claude-health-open-diagnostics", in: dashboard)
         try reveal(diagnostics, in: dashboard)
@@ -1097,6 +1101,8 @@ final class Codex94UITests: XCTestCase {
         try setTheme(.terminalLight, in: dashboard)
         try selectPage(.providers, in: dashboard)
         try captureSourceHealth(in: dashboard, named: "providers-health-current-error-zh-Hans-light.png")
+        try captureStatuslineInstallRequirement(
+            in: dashboard, named: "providers-statusline-install-required-zh-Hans-light.png")
         try selectPage(.display, in: dashboard)
         try setLanguage(.english, in: dashboard)
         try setTheme(originalTheme, in: dashboard)
@@ -1216,6 +1222,98 @@ final class Codex94UITests: XCTestCase {
                     && identified("claude-health-diagnostic-phase", in: health).exists,
                     "Health screenshots must contain both the accepted data state and failed-operation details")
         try fixture.writeArtifact(health.screenshot().pngRepresentation, named: name)
+    }
+
+    /// The smoke App runs from a build folder, never from an Applications
+    /// folder, so a new statusline connection must be unavailable: the preview
+    /// button is disabled and the localized requirement is shown below it.
+    /// The only click lands on that button after it is proven disabled, to show
+    /// that it is inert; no preview opens and no installation is attempted.
+    private func captureStatuslineInstallRequirement(in dashboard: XCUIElement, named name: String) throws {
+        let expected: [UILanguage: (name: String, text: String)] = [
+            .english: (
+                "providers-statusline-install-required-en-dark.png",
+                "Install Codex94 as /Applications/Codex94.app or ~/Applications/Codex94.app first. "
+                    + "The connection saves this app's location in your Claude Code settings."
+            ),
+            .simplifiedChinese: (
+                "providers-statusline-install-required-zh-Hans-light.png",
+                "请先将 Codex94 安装为 /Applications/Codex94.app 或 ~/Applications/Codex94.app。"
+                    + "连接会把 Codex94 的位置写入 Claude Code 设置。"
+            )
+        ]
+        let current = try XCTUnwrap(expected[language])
+        let theme: UITheme = language == .english ? .terminalDark : .terminalLight
+        try require(fixture.scenario == "providers" && current.name == name
+                    && (try fixture.preference("theme") as? String) == theme.rawValue
+                    && identified("provider-settings-page", in: dashboard).exists
+                    && !identified("copy-diagnostics", in: dashboard).exists
+                    && !identified("connection-menu-bar-reset", in: dashboard).exists,
+                    "Statusline requirement images may contain only the registered Providers surface")
+        let preview = try uniqueIdentified("claude-setup-preview", in: dashboard)
+        let requirement = try uniqueIdentified("claude-setup-install-required", in: dashboard)
+        try require(!preview.isEnabled,
+                    "Outside an Applications folder the statusline install preview must be disabled")
+        try require(elementText(requirement).contains(current.text),
+                    "The statusline requirement must be shown in the selected application language")
+        try require(!identified("claude-setup-installed", in: dashboard).exists
+                    && !identified("claude-setup-remove", in: dashboard).exists
+                    && !identified("claude-setup-issue", in: dashboard).exists
+                    && !identified("claude-setup-preview-sheet", in: dashboard).exists,
+                    "The synthetic Providers fixture must not present an installed, failed or previewed statusline connection")
+
+        // The button is above its requirement. Reveal it first, then the text:
+        // the second step can only scroll the pair further into the viewport.
+        try revealProviderElement(preview, in: dashboard)
+        try revealProviderElement(requirement, in: dashboard)
+        let buttonFrame = preview.frame
+        let textFrame = requirement.frame
+        let windowFrame = dashboard.frame
+        let viewport = identified("provider-settings-page", in: dashboard).frame.intersection(windowFrame)
+        try require(buttonFrame.width > 0 && buttonFrame.height > 0 && textFrame.width > 0
+                    && viewport.contains(buttonFrame) && viewport.contains(textFrame),
+                    "The disabled preview and its requirement must be fully visible together")
+        try require(textFrame.minY >= buttonFrame.maxY && textFrame.height >= 10,
+                    "The statusline requirement must be laid out below the preview button without overlap")
+
+        let region = buttonFrame.union(textFrame).insetBy(dx: -8, dy: -8).intersection(viewport)
+        try require([region.minX, region.minY, region.width, region.height].allSatisfy(\.isFinite)
+                    && region.width >= textFrame.width && region.height >= buttonFrame.union(textFrame).height
+                    && windowFrame.width > 0 && windowFrame.height > 0,
+                    "The statusline requirement region must lie inside the Services viewport")
+        guard let source = CGImageSourceCreateWithData(dashboard.screenshot().pngRepresentation as CFData, nil),
+              let window = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw UITestFailure("Could not decode the synthetic Dashboard screenshot")
+        }
+        // Screenshots use pixels and accessibility frames use points; both have a top-left origin.
+        let scaleX = CGFloat(window.width) / windowFrame.width
+        let scaleY = CGFloat(window.height) / windowFrame.height
+        try require(scaleX >= 1 && scaleY >= 1 && abs(scaleX - scaleY) < 0.05,
+                    "The Dashboard screenshot must use one uniform display scale")
+        let pixels = CGRect(
+            x: (region.minX - windowFrame.minX) * scaleX, y: (region.minY - windowFrame.minY) * scaleY,
+            width: region.width * scaleX, height: region.height * scaleY
+        ).integral.intersection(CGRect(x: 0, y: 0, width: window.width, height: window.height))
+        let encoded = NSMutableData()
+        guard pixels.width >= 1, pixels.height >= 1,
+              let cropped = window.cropping(to: pixels),
+              let destination = CGImageDestinationCreateWithData(encoded, "public.png" as CFString, 1, nil) else {
+            throw UITestFailure("Could not crop the synthetic statusline requirement image")
+        }
+        CGImageDestinationAddImage(destination, cropped, nil)
+        try require(CGImageDestinationFinalize(destination) && encoded.length > 0,
+                    "Could not encode the synthetic statusline requirement image")
+        try fixture.writeArtifact(encoded as Data, named: name)
+
+        // After the evidence is written, a click on the disabled control must
+        // neither open the preview nor report an operation result.
+        preview.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        try require(!identified("claude-setup-preview-sheet", in: dashboard).exists
+                    && !identified("claude-setup-issue", in: dashboard).exists
+                    && !identified("claude-setup-saved", in: dashboard).exists
+                    && !preview.isEnabled && requirement.exists,
+                    "A disabled statusline preview must not start an installation preview")
     }
 
     private func providerElementIsFullyVisible(_ element: XCUIElement, in dashboard: XCUIElement) -> Bool {
@@ -5015,6 +5113,8 @@ private struct SyntheticFixture {
             "providers-mixed-fable-en.png", "providers-mixed-history-fable-en.png",
             "providers-history-fable-en.png", "providers-local-cache-fable-off-en.png",
             "providers-health-current-error-en-dark.png", "providers-health-current-error-zh-Hans-light.png",
+            "providers-statusline-install-required-en-dark.png",
+            "providers-statusline-install-required-zh-Hans-light.png",
             "providers-result.json", "providers-viewport-three.json", "providers-viewport-four.json",
             "providers-reopen-codex-left.json", "providers-reopen-codex-right.json",
             "providers-reopen-claude-left.json", "providers-reopen-claude-right.json",

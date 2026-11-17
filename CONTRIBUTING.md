@@ -96,6 +96,16 @@ rejected path. The settings section observes this controller directly; app
 activation refreshes its status. Registration failures use localized feedback,
 not raw system errors. Tests inject the narrow service adapter and must not
 read or change real Login Items.
+The Claude statusline installer reuses
+`LaunchAtLoginController.isCurrentBundleStableInstall()` for new installations
+only and must not add a second path rule. Installer tests whose outcome
+depends on that decision inject `stableInstall:`; only the single test of the
+production default asserts on the running bundle's answer, and it skips rather
+than fails when the host runs from an Applications folder.
+Present the install preview from its own optional value with `sheet(item:)`;
+a sheet must never have an empty branch. No UI scenario opens that sheet, so
+a hosted test drives the real setup view in a real window with synthesized
+mouse and key events. Keep it passing when the view changes.
 
 ### Version 0.2.2 behavior
 
@@ -310,7 +320,10 @@ ownership, permissions and SHA-256, then sets a fixture-first `PATH` for the AUT
 The synthetic terminal accepts only version checks and the fixed `/usage`
 invocation; its log contains only the fixed usage-event/mode schema. The scenario
 does not run a real Claude CLI, install a statusline connection, or operate
-authentication UI. Check exact request counts, independent provider errors,
+authentication UI. Because its App runs from a build folder, it requires the
+statusline install preview to be disabled and the stable-install requirement to
+be shown in English and Simplified Chinese, captures both, and never opens the
+preview. Check exact request counts, independent provider errors,
 `single`/`compactBoth`/`both` native status items, shared popover content, disabled Codex Token
 reads and the all-disabled settings entry. Keep these synthetic results separate
 from real CLI compatibility, account acceptance and unattended monitoring.

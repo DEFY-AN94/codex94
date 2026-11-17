@@ -1323,7 +1323,7 @@ final class ProviderViewTests: XCTestCase {
             settingsURL: settings,
             cache: ClaudeStatuslineCache(fileURL: support.appendingPathComponent("quota.json")),
             executableURL: directory.appendingPathComponent("SyntheticCodex94"),
-            supportDirectory: support
+            supportDirectory: support, stableInstall: true
         )
         let preview = try installer.previewInstall()
         XCTAssertTrue(preview.preservesExistingStatusline)
@@ -1340,6 +1340,89 @@ final class ProviderViewTests: XCTestCase {
         }
         XCTAssertEqual(try Data(contentsOf: settings), bytes)
         XCTAssertFalse(FileManager.default.fileExists(atPath: support.path))
+    }
+
+    /// Regression for the preview sheet that opened empty and could not be
+    /// closed. Its content used to be read from view state inside a
+    /// `sheet(isPresented:)` closure, which a first press could present while
+    /// that state still looked nil. Drives the real view in a real window.
+    func testFirstPreviewPressPresentsTheFilledSheetThenCancelAndInstallCloseIt() throws {
+        let directory = try temporaryDirectory()
+        let fixture = try makeFixture(directory: directory, stableInstall: true)
+        defer { fixture.cleanUp() }
+        let executable = directory.appendingPathComponent("SyntheticCodex94")
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+        let settings = directory.appendingPathComponent("settings.json")
+        let manifest = directory.appendingPathComponent("bridge/statusline-installation.json")
+        fixture.claude.refreshSetupState()
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .notInstalled)
+        XCTAssertTrue(fixture.claude.canInstallStatusline)
+
+        let host = FirstMouseHostingView(rootView: ClaudeStatuslineSetupView(store: fixture.claude)
+            .frame(width: 520, alignment: .leading).padding(20)
+            .environment(\.locale, LanguagePreference.english.locale))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 420),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        // The content, not the window, fixes the geometry: the button's leading
+        // edge sits at the 20-point padding on every system.
+        window.setContentSize(host.fittingSize)
+        window.orderFront(nil)
+        defer {
+            if let sheet = window.attachedSheet { window.endSheet(sheet) }
+            window.orderOut(nil)
+        }
+        settle()
+
+        // The first press after the view appears is the case that failed: nothing
+        // has re-evaluated the view body since it was created. The hosted suite
+        // has no accessibility client, so SwiftUI publishes no element tree to
+        // look the button up in. Probe the leading edge of the content with real
+        // mouse events instead: the preview button is the only control in this
+        // state, and a probe that lands on text changes nothing.
+        var buttonY = CGFloat(20) // The padding above the content holds no control.
+        while window.attachedSheet == nil, buttonY < host.bounds.height {
+            try click(at: NSPoint(x: 44, y: buttonY), in: host)
+            // A press that landed attaches the sheet a few run-loop turns later.
+            // Wait with a bound, so a slow machine is not mistaken for a miss
+            // and pressed a second time.
+            let landed = Date().addingTimeInterval(0.25)
+            while window.attachedSheet == nil, Date() < landed { settle(for: 0.02) }
+            if window.attachedSheet == nil { buttonY += 6 }
+        }
+        let first = try XCTUnwrap(window.attachedSheet, "A press on the preview button must present the sheet")
+        // The filled preview is 520 points wide; an empty sheet collapses to a stub.
+        waitForWidth(of: first)
+        XCTAssertGreaterThanOrEqual(first.frame.width, 500, "The first press must not present an empty sheet")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: settings.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manifest.path))
+
+        // Cancel is the sheet's Escape action. It closes the sheet and writes nothing.
+        try press(keyCode: 53, characters: "\u{1B}", in: first)
+        try waitForSheet(on: window, presented: false)
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .notInstalled)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: settings.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manifest.path))
+
+        // A second press builds a fresh preview; Return is the install action.
+        try click(at: NSPoint(x: 44, y: buttonY), in: host)
+        try waitForSheet(on: window, presented: true)
+        let second = try XCTUnwrap(window.attachedSheet)
+        waitForWidth(of: second)
+        XCTAssertGreaterThanOrEqual(second.frame.width, 500)
+        try press(keyCode: 36, characters: "\r", in: second)
+        try waitForSheet(on: window, presented: false)
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .installed)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: manifest.path))
+        let written = try Data(contentsOf: settings)
+        XCTAssertNil(written.range(of: Data(#"\/"#.utf8)), "The settings file must not escape slashes")
+        let line = try XCTUnwrap((JSONSerialization.jsonObject(with: written) as? [String: Any])?["statusLine"]
+            as? [String: Any])
+        let command = try XCTUnwrap(line["command"] as? String)
+        XCTAssertTrue(command.contains(executable.path))
+        XCTAssertTrue(command.contains(ClaudeStatuslineBridge.argument))
     }
 
     func testConflictSetupRenderingKeepsCurrentCommandAndRecoveryFiles() throws {
@@ -1419,6 +1502,100 @@ final class ProviderViewTests: XCTestCase {
         }
     }
 
+    func testUnstableAppLocationExplainsTheRequirementAndKeepsRemovalAvailable() throws {
+        for state in [ClaudeStatuslineSetupState.notInstalled, .installed, .conflict, .differentConfiguration] {
+            XCTAssertEqual(ClaudeStatuslineSetupView.canPreviewInstall(state: state, stableInstall: true),
+                           state == .notInstalled)
+            XCTAssertFalse(ClaudeStatuslineSetupView.canPreviewInstall(state: state, stableInstall: false))
+            XCTAssertEqual(ClaudeStatuslineSetupView.showsInstallRequirement(state: state, stableInstall: false),
+                           state == .notInstalled)
+            XCTAssertFalse(ClaudeStatuslineSetupView.showsInstallRequirement(state: state, stableInstall: true))
+        }
+        XCTAssertEqual(ClaudeQuotaIssue.stableInstallRequired.localizationKey, "claude.setup.installRequired")
+        let directory = try temporaryDirectory()
+        let fixture = try makeFixture(directory: directory, stableInstall: false)
+        defer { fixture.cleanUp() }
+        // The same synthetic state seen by a stably installed App: every rendered
+        // difference between the two stores is the stable-install decision.
+        let stableDirectory = try temporaryDirectory()
+        let stable = try makeFixture(directory: stableDirectory, stableInstall: true)
+        defer { stable.cleanUp() }
+        let settings = directory.appendingPathComponent("settings.json")
+        let bytes = Data(#"{"statusLine":{"type":"command","command":"printf original"}}"#.utf8)
+        try bytes.write(to: settings)
+        try bytes.write(to: stableDirectory.appendingPathComponent("settings.json"))
+        let manifest = directory.appendingPathComponent("bridge/statusline-installation.json")
+        fixture.claude.refreshSetupState()
+        stable.claude.refreshSetupState()
+        XCTAssertFalse(fixture.claude.canInstallStatusline)
+        XCTAssertTrue(stable.claude.canInstallStatusline)
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .notInstalled)
+        XCTAssertEqual(stable.claude.statuslineSetupState, .notInstalled)
+        XCTAssertTrue(ClaudeStatuslineSetupView.showsInstallRequirement(
+            state: fixture.claude.statuslineSetupState, stableInstall: fixture.claude.canInstallStatusline
+        ))
+        XCTAssertThrowsError(try fixture.claude.previewStatuslineInstall()) {
+            XCTAssertEqual($0 as? ClaudeQuotaIssue, .stableInstallRequired)
+        }
+        // The caption exists only when unstable, so the rendered view must grow
+        // by at least its one line. Height cannot show the disabled button: that
+        // wiring is covered by canPreviewInstall above, not by this rendering.
+        let captionLine = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .caption1))
+        XCTAssertGreaterThan(captionLine, 8)
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let text = StatusAccessibilityString.localized(
+                "claude.setup.installRequired", language: language, bundle: .main
+            )
+            XCTAssertNotEqual(text, "claude.setup.installRequired")
+            XCTAssertTrue(text.contains("/Applications/Codex94.app"))
+            XCTAssertTrue(text.contains("~/Applications/Codex94.app"))
+            let size = try render(ClaudeStatuslineSetupView(store: fixture.claude), width: 360, dark: false,
+                language: language, name: "setup-install-required-\(language.rawValue)", output: directory)
+            XCTAssertLessThan(size.height, 420)
+            let stableSize = try render(ClaudeStatuslineSetupView(store: stable.claude), width: 360, dark: false,
+                language: language, name: "setup-install-allowed-\(language.rawValue)", output: stableDirectory)
+            XCTAssertGreaterThanOrEqual(size.height - stableSize.height, captionLine - 0.5,
+                                        "The requirement caption must be laid out when unstable: \(language.rawValue)")
+        }
+        XCTAssertEqual(try Data(contentsOf: settings), bytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manifest.path))
+
+        // A connection made while the App was installed stays removable from anywhere.
+        for root in [directory, stableDirectory] {
+            let executable = root.appendingPathComponent("SyntheticCodex94")
+            try Data("#!/bin/sh\nexit 0\n".utf8).write(to: executable)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+            let installed = ClaudeStatuslineInstaller(
+                settingsURL: root.appendingPathComponent("settings.json"),
+                cache: ClaudeStatuslineCache(fileURL: root.appendingPathComponent("claude-quota.json")),
+                executableURL: executable, supportDirectory: root.appendingPathComponent("bridge"),
+                stableInstall: true
+            )
+            try installed.install(installed.previewInstall())
+        }
+        fixture.claude.refreshSetupState()
+        stable.claude.refreshSetupState()
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .installed)
+        XCTAssertEqual(stable.claude.statuslineSetupState, .installed)
+        XCTAssertFalse(ClaudeStatuslineSetupView.showsInstallRequirement(
+            state: fixture.claude.statuslineSetupState, stableInstall: fixture.claude.canInstallStatusline
+        ), "An existing connection is not asked to move the App before it can be removed")
+        // No caption once installed: the App location changes nothing on screen.
+        for language in [LanguagePreference.english, .simplifiedChinese] {
+            let size = try render(ClaudeStatuslineSetupView(store: fixture.claude), width: 360, dark: false,
+                language: language, name: "setup-installed-outside-applications-\(language.rawValue)",
+                output: directory)
+            let stableSize = try render(ClaudeStatuslineSetupView(store: stable.claude), width: 360, dark: false,
+                language: language, name: "setup-installed-\(language.rawValue)", output: stableDirectory)
+            XCTAssertEqual(size.height, stableSize.height, accuracy: 0.5, language.rawValue)
+        }
+        try fixture.claude.removeStatusline()
+        XCTAssertEqual(fixture.claude.statuslineSetupState, .notInstalled)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manifest.path))
+        let restored = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as? [String: Any])
+        XCTAssertEqual((restored["statusLine"] as? [String: Any])?["command"] as? String, "printf original")
+    }
+
     private func card(snapshot: QuotaSnapshot?, source: ClaudeQuotaSource?, now: Date,
                       issue: ClaudeQuotaIssue? = nil) -> ClaudeQuotaCardContent {
         ClaudeQuotaCardContent(
@@ -1444,7 +1621,8 @@ final class ProviderViewTests: XCTestCase {
 
     private func makeFixture(directory: URL, bothWindows: Bool = false,
                              claudeReportAge: TimeInterval = 10,
-                             allowsCodexSetupFetch: Bool = false) throws -> ProviderFixture {
+                             allowsCodexSetupFetch: Bool = false,
+                             stableInstall: Bool = true) throws -> ProviderFixture {
         let domain = "Codex94ProviderViewTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
         let preferences = PreferencesStore(defaults: defaults)
@@ -1466,7 +1644,8 @@ final class ProviderViewTests: XCTestCase {
             preferences: preferences, cache: cache,
             installer: ClaudeStatuslineInstaller(settingsURL: directory.appendingPathComponent("settings.json"),
                                                  cache: cache, executableURL: directory.appendingPathComponent("SyntheticCodex94"),
-                                                 supportDirectory: directory.appendingPathComponent("bridge")),
+                                                 supportDirectory: directory.appendingPathComponent("bridge"),
+                                                 stableInstall: stableInstall),
             localCache: ClaudeLocalUsageCacheReader(fileURL: directory.appendingPathComponent("claude-state/.claude.json")),
             fetcherFactory: { claudeFetcher },
             notificationController: NotificationController(service: notifications),
@@ -1547,6 +1726,57 @@ final class ProviderViewTests: XCTestCase {
         return url
     }
 
+    private func settle(for interval: TimeInterval = 0.05) {
+        RunLoop.main.run(until: Date().addingTimeInterval(interval))
+    }
+
+    private func click(at point: NSPoint, in view: NSView) throws {
+        let window = try XCTUnwrap(view.window)
+        let location = view.convert(point, to: nil)
+        let pressedAt = ProcessInfo.processInfo.systemUptime
+        func event(_ type: NSEvent.EventType) throws -> NSEvent {
+            try XCTUnwrap(NSEvent.mouseEvent(
+                with: type, location: location, modifierFlags: [],
+                timestamp: type == .leftMouseDown ? pressedAt : pressedAt + 0.05,
+                windowNumber: window.windowNumber,
+                context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0
+            ))
+        }
+        // Queue the release first, so a control that tracks the mouse in its own
+        // event loop finds it; otherwise deliver it directly.
+        NSApp.postEvent(try event(.leftMouseUp), atStart: false)
+        window.sendEvent(try event(.leftMouseDown))
+        while let release = NSApp.nextEvent(matching: .leftMouseUp, until: nil, inMode: .default, dequeue: true) {
+            window.sendEvent(release)
+        }
+    }
+
+    private func press(keyCode: UInt16, characters: String, in window: NSWindow) throws {
+        let event = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+            context: nil, characters: characters, charactersIgnoringModifiers: characters,
+            isARepeat: false, keyCode: keyCode
+        ))
+        if !window.performKeyEquivalent(with: event) { window.sendEvent(event) }
+    }
+
+    /// A sheet may take a moment to reach its content size. An empty one never does.
+    private func waitForWidth(of sheet: NSWindow) {
+        let sized = Date().addingTimeInterval(2)
+        while sheet.frame.width < 500, Date() < sized { settle() }
+    }
+
+    private struct SheetStateTimeout: Error { let expectedPresented: Bool }
+
+    private func waitForSheet(on window: NSWindow, presented: Bool) throws {
+        let deadline = Date().addingTimeInterval(3)
+        while (window.attachedSheet != nil) != presented, Date() < deadline { settle() }
+        guard (window.attachedSheet != nil) == presented else {
+            throw SheetStateTimeout(expectedPresented: presented)
+        }
+    }
+
     @discardableResult
     private func render<Content: View>(_ content: Content, width: CGFloat, dark: Bool,
                                        language: LanguagePreference, name: String, output: URL) throws -> NSSize {
@@ -1585,6 +1815,14 @@ final class ProviderViewTests: XCTestCase {
         add(attachment)
         return size
     }
+}
+
+/// The hosted test process owns no key window, and AppKit asks the hit view
+/// whether a press may pass through a window that is not key. Do not depend on
+/// the system's own answer for a hosting view.
+@MainActor
+private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 /// Measure laid-out content in an independent, fixed viewport. A dry
