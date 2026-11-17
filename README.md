@@ -157,7 +157,7 @@ exercise removing a connection from a stable location, the English App
 language, a real CLI read or any Gatekeeper flow. The candidate is still
 unreleased. The evidence and the release steps that remain are recorded in
 [the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased). See
-[4.3.1 changes](CHANGELOG.md#431---unreleased).
+[4.3.1 changes](CHANGELOG.md#431---2026-11-18).
 
 ## Features
 

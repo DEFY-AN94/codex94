@@ -33,7 +33,9 @@ acceptance visible in the PR. Never mark Ready merely because CI is green unless
 the maintainer explicitly authorizes a different order, as recorded for the
 4.2.0 candidate below.
 
-## 4.3.1 candidate scope — Unreleased
+<a id="431-candidate-scope--unreleased"></a>
+
+## 4.3.1 candidate acceptance and release scope — 2026-11-18
 
 Development candidate `4.3.1 (35)` starts from main
 `3c0df72d22bdad68c7879ed21eeb55bff30bf6b1`, after the published 4.3.0 source
@@ -46,7 +48,7 @@ numbers; and reading the Codex quota cache through the shared bounded
 local-file reader. The defect fix, found during candidate acceptance, is for
 the statusline install preview, which could open as an empty sheet that could
 not be closed. All six are listed in
-[CHANGELOG.md](../CHANGELOG.md#431---unreleased).
+[CHANGELOG.md](../CHANGELOG.md#431---2026-11-18).
 
 On 2026-11-15 (Australia/Melbourne) the maintainer decided to keep the five
 hardening changes out of 4.3.0 and to carry them as 4.3.1, and later that day
@@ -54,9 +56,10 @@ explicitly authorized gate 1 in section 1: committing and pushing the
 development branch and creating a Draft PR. This authorization does not extend
 to marking the PR Ready, merge, tag, Draft Release assets,
 installation/replacement of the maintainer's App, or public publication; gates
-2 to 7 have not been requested or granted for 4.3.1. After the first CI run the
-maintainer instructed that a further UI capture be added and this record be
-updated. On 2026-11-16, after candidate acceptance failed on the preview defect
+2 to 7 had not been requested or granted for 4.3.1 at that point. Later
+authorizations are recorded after the evidence list below. After the first
+CI run the maintainer instructed that a further UI capture be added and this
+record be updated. On 2026-11-16, after candidate acceptance failed on the preview defect
 described below, the maintainer instructed that its fix be carried in 4.3.1.
 The commits that do these things go to the same Draft PR under gate 1; neither
 instruction authorizes a later gate. On 2026-11-17 the maintainer instructed
@@ -269,15 +272,64 @@ Evidence so far, in the order it was obtained:
     before the removal, and are byte-identical to their state before
     acceptance. The record file that the installer wrote for this round's
     connection was moved to the Trash.
+- **Fourth CI run.** Commit `6f7f6135fbbe95247b063ca4d0ad0159404aab54`
+  recorded the third run and the acceptance and changed documentation only.
+  [CI run 43923606098](https://github.com/DEFY-AN94/codex94/actions/runs/43923606098)
+  tested its merge `35d869cb9c7527d126dceea52155875711a785e9` (shared tree
+  `164fb99c5cbf5e7685d8ba90da60d812a1861e76`) with Xcode 16.4. The release
+  gate executed 740 tests with the same skip and 0 failures, and the
+  Providers, Token usage and Floating smokes passed, all in attempt 1. The
+  Display and Recovery smokes did not start in that attempt: GitHub canceled
+  both because no hosted macOS runner picked them up, and the attempt ended
+  as failed without either job executing a step. Both passed in attempt 2, a
+  re-run of only those two jobs.
+  [CodeQL run 43923598099](https://github.com/DEFY-AN94/codex94/actions/runs/43923598099)
+  passed Actions, Python and Swift analysis. Main-only DMG attestation was
+  skipped again.
+- **Fourth PR candidate.** The two-file artifact of that run holds a DMG with
+  SHA-256 `ddd0a1174f0f4dbbf29ed1b3fc20ec6fbd1634d2c78ea4896b7c233d981b6026`
+  and a checksum file that matches it, and `script/package_dmg.sh verify`
+  passed on the downloaded files. All eight files of its App have the same
+  SHA-256 as in the accepted third candidate, the executable included; only
+  the outer disk image differs.
+- **Synthetic UI review of the fourth run.** An AI assistant read all 55 PNGs
+  (49 distinct) and 45 JSON reports in two independent passes per scenario;
+  the maintainer has not reviewed them. It found no privacy problem and no
+  blocking layout problem, only cosmetic observations. All 43 reports that
+  carry a source revision name the tested merge. This review was finished
+  before PR #78 was marked Ready.
 
 The acceptance covers the App of run 43867728225, whose executable has the
-SHA-256 given above. The commit that records the third run and this
-acceptance changes documentation only and moves the PR head past `941260b`.
-Its own CI run is not recorded here. That run's candidate should hold the
-same executable, as the first two candidates did, and that is to be confirmed
-before gate 2. Gates 2 to 7 have not been requested or granted, including
-marking the PR Ready. Results recorded for other versions do not validate
-4.3.1.
+SHA-256 given above, and the fourth candidate holds that same App. Results
+recorded for other versions do not validate 4.3.1.
+
+The paragraphs above record the authorization as it stood while PR #78 was a
+Draft. On 2026-11-17 (Australia/Melbourne), after the fourth run was green
+and its candidate had been compared, the maintainer authorized gate 2, and
+[PR #78](https://github.com/DEFY-AN94/codex94/pull/78) was marked Ready. The
+maintainer then authorized gates 3 to 7 in one explicit instruction. PR #78
+was squash-merged as `8e1ffefb9cef10f335f8968ee6709da7b18e92a6`; its tree
+`164fb99c5cbf5e7685d8ba90da60d812a1861e76` equals the tested PR tree.
+
+The maintainer confirmed a planned release date of 2026-11-18
+(Australia/Melbourne). The dated revision changes documentation only: App
+sources, resources, project settings, tests, scripts and CI are unchanged, so
+the candidate App acceptance still applies. The revised commit still needs
+its own PR checks, final-main CI, two-file DMG artifact and attestation.
+Verify the actual Melbourne date before tagging and correct it through the
+same gates if it changes.
+
+The date change is a prerequisite of gate 4 and goes through its own Draft
+PR. The maintainer's instruction named gates 3 to 7 and said to continue, and
+the maintainer chose the date when asked about this PR; no separate
+instruction named gates 1 and 2 for this documentation-only PR.
+
+Gates 4 to 7 are authorized by that instruction, and none has been
+performed: the annotated tag, the Draft Release, final DMG installation with
+first-launch acceptance, and publication. Each still waits for what sections
+4 to 6 require first. Only the maintainer operates Privacy & Security, Open
+Anyway or Login Items. Stable download links, the v4.3.0 tag and its public
+assets remain unchanged until publication is confirmed.
 
 Three notes for whoever exercises this candidate again:
 

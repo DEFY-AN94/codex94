@@ -115,7 +115,7 @@ CLI 失败与冷却状态只保存在内存中。没有新增 OAuth、凭据访�
 英文 App 语言、真实的 CLI 读取以及任何 Gatekeeper 流程。该候选版仍未发布。已取得的
 证据和尚未进行的发布步骤记录在
 [发布流程](docs/RELEASING.md#431-candidate-scope--unreleased)中。详见
-[4.3.1 更新记录](CHANGELOG.md#431---unreleased)。
+[4.3.1 更新记录](CHANGELOG.md#431---2026-11-18)。
 
 ## 功能详情
 

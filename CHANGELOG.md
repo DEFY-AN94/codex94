@@ -6,12 +6,13 @@ set and installation instructions, see [README.md](README.md) or
 evidence lives in [docs/RELEASING.md](docs/RELEASING.md). Historical validation
 below applies only to its recorded version and does not validate later releases.
 
-## 4.3.1 - Unreleased
+## 4.3.1 - 2026-11-18
 
-Development candidate `4.3.1 (35)`. It carries hardening changes and one defect
-fix on top of `4.3.0 (34)` and is not part of that version; no release date,
-tag or release asset is implied by this entry. Its scope, its acceptance and
-the gates that remain are recorded in
+Version `4.3.1 (35)`. It carries hardening changes and one defect fix on top
+of `4.3.0 (34)`. The planned release date uses Australia/Melbourne. Until
+publication is confirmed, the published stable release remains `4.3.0 (34)`.
+Publication and final-asset verification remain separate from candidate
+acceptance and are recorded in
 [docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
 
 ### Fixed
@@ -138,11 +139,26 @@ discarded preview wrote nothing, and Install wrote a settings file without
 escaped slashes and a manifest with the matching installation ID. The
 acceptance found the known issue below. It did not exercise removing a
 connection from a stable location, the English App language, a real CLI read
-or any Gatekeeper flow. Marking the PR Ready and every later gate have not
-been authorized and are not claimed here. Earlier results, including those
-recorded for 4.3.0 below, do not validate this candidate. The full record is
-in
-[docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
+or any Gatekeeper flow.
+
+The commit that recorded that acceptance changed documentation only.
+[CI run 43923606098](https://github.com/DEFY-AN94/codex94/actions/runs/43923606098)
+tested merge `35d869cb9c7527d126dceea52155875711a785e9` of PR head
+`6f7f6135fbbe95247b063ca4d0ad0159404aab54`: 740 tests with the same skip and 0
+failures. Its Display and Recovery UI smokes were canceled unstarted in
+attempt 1, because no hosted runner picked them up, and passed in attempt 2;
+the other three passed in attempt 1.
+[CodeQL run 43923598099](https://github.com/DEFY-AN94/codex94/actions/runs/43923598099)
+passed. That run's App is identical file for file to the accepted
+candidate's, and an AI assistant's review of its 55 synthetic images and 45
+reports found no privacy problem and no blocking layout problem. The
+candidate was then merged as `8e1ffefb9cef10f335f8968ee6709da7b18e92a6`.
+
+Final-main CI and provenance for this dated revision, final DMG installation
+with first-launch acceptance, and publication are separate steps recorded in
+[the release record](docs/RELEASING.md#431-candidate-scope--unreleased).
+Earlier results, including those recorded for 4.3.0 below, do not validate
+this version.
 
 ### Known issue
 
