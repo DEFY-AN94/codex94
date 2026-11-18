@@ -1,7 +1,7 @@
 # Release workflow: source + technical-user DMG
 
-The published stable version is [`v4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0),
-released on 2026-11-15 (Australia/Melbourne). Later docs-only commits do not
+The published stable version is [`v4.3.1 (35)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.1),
+released on 2026-11-18 (Australia/Melbourne). Later docs-only commits do not
 move its tag or regenerate its assets. Keep public download and source-clone
 instructions on the published release until a later publication is confirmed.
 
@@ -312,24 +312,30 @@ was squash-merged as `8e1ffefb9cef10f335f8968ee6709da7b18e92a6`; its tree
 `164fb99c5cbf5e7685d8ba90da60d812a1861e76` equals the tested PR tree.
 
 The maintainer confirmed a planned release date of 2026-11-18
-(Australia/Melbourne). The dated revision changes documentation only: App
-sources, resources, project settings, tests, scripts and CI are unchanged, so
-the candidate App acceptance still applies. The revised commit still needs
-its own PR checks, final-main CI, two-file DMG artifact and attestation.
-Verify the actual Melbourne date before tagging and correct it through the
-same gates if it changes.
+(Australia/Melbourne). The dated revision changed documentation only: App
+sources, resources, project settings, tests, scripts and CI were unchanged,
+so the candidate App acceptance still applied. The revised commit needed its
+own PR checks, final-main CI, two-file DMG artifact and attestation, and the
+Melbourne date was to be verified again before tagging.
 
-The date change is a prerequisite of gate 4 and goes through its own Draft
-PR. The maintainer's instruction named gates 3 to 7 and said to continue, and
-the maintainer chose the date when asked about this PR; no separate
-instruction named gates 1 and 2 for this documentation-only PR.
+The date change was a prerequisite of gate 4 and went through its own Draft
+PR, [PR #80](https://github.com/DEFY-AN94/codex94/pull/80). The maintainer's
+instruction named gates 3 to 7 and said to continue, and the maintainer chose
+the date when asked about that PR; no separate instruction named gates 1 and
+2 for it.
 
-Gates 4 to 7 are authorized by that instruction, and none has been
-performed: the annotated tag, the Draft Release, final DMG installation with
-first-launch acceptance, and publication. Each still waits for what sections
-4 to 6 require first. Only the maintainer operates Privacy & Security, Open
-Anyway or Login Items. Stable download links, the v4.3.0 tag and its public
-assets remain unchanged until publication is confirmed.
+Gates 4 to 7 were authorized by that instruction, given on 2026-11-17 before
+the final-main evidence existed. The agent carried them out on 2026-11-18
+(Australia/Melbourne), after the dated revision had been merged and its
+final-main evidence was complete. Gate 6 was an agent-run installation and
+launch check: nobody viewed the interface, the maintainer did not inspect the
+installed App before publication, and first-launch Gatekeeper acceptance was
+not established. Version 4.3.1 was published that day; public stable
+downloads now identify it. Final source and distribution evidence is recorded
+[below](#431-release-verification--2026-11-18). The v4.3.0 tag and its public
+assets are unchanged. After publication the maintainer asked for the
+documentation follow-up that records it; that request did not name marking
+its PR Ready or merging it.
 
 Three notes for whoever exercises this candidate again:
 
@@ -406,8 +412,9 @@ changes.
 
 The date change did not authorize gates 4–7. On 2026-11-15 the maintainer
 authorized gates 4–7 in one explicit instruction after reviewing the final-main
-evidence. Version 4.3.0 was published that day; public stable downloads now
-identify it. Final source and distribution evidence is recorded
+evidence. Version 4.3.0 was published that day, and public stable downloads
+identified it until 4.3.1 was published. Final source and distribution
+evidence is recorded
 [below](#430-release-verification--2026-11-15). The v4.2.0 tag and its public
 assets are unchanged.
 
@@ -424,8 +431,8 @@ duplicate 4.1.8 history. The App, tests and build inputs are preserved; document
 conflicts retain main's 4.1.8 date, acceptance record and known Issue #73.
 The synchronized candidate was revalidated as recorded below. PR #72 targeted
 `main` so the default-branch security checks applied. Version 4.2.0 was
-published on 2026-11-14 (Australia/Melbourne); public stable downloads now
-identify it. Final source and distribution evidence is recorded [below](#420-release-verification--2026-11-14).
+published on 2026-11-14 (Australia/Melbourne); public stable downloads
+identified it until 4.3.0 was published. Final source and distribution evidence is recorded [below](#420-release-verification--2026-11-14).
 
 Scope: Claude source-health presentation and recovery guidance, an explicit
 passive-only local reread, per-read completed diagnostics in the existing
@@ -823,7 +830,7 @@ The maintainer chose to retain `v4.0.0` unchanged and removed its Draft Release;
 do not move or reuse that tag. The 4.0.0 candidate's test and native-observation
 records do not establish validation of these source boundaries. Final checks,
 artifacts and installation need separate records. Its release records remain
-historical; current stable links point to 4.2.0.
+historical; stable links pointed to 4.2.0 when this was written.
 
 During the earlier 4.0 release work, the maintainer approved a ten-minute
 live-observation scope.
@@ -2253,3 +2260,106 @@ Later documentation commits do not move the tag or replace release assets.
   source digest and hosted-runner policy.
 - Subsequent publication documentation updates stable links and records only.
   It does not move `v4.3.0`, change App/build inputs or regenerate assets.
+
+
+### 4.3.1 release verification — 2026-11-18
+
+- [PR #78](https://github.com/DEFY-AN94/codex94/pull/78) made new statusline
+  connections require a stable install, fixed the install preview that could
+  open as an empty sheet, stopped writing escaped slashes into the Claude
+  Code settings file, bounded control-sequence parameters in the CLI screen
+  replay, validated Codex app-server integers and moved the Codex quota cache
+  read to the bounded local-file reader.
+  [PR #80](https://github.com/DEFY-AN94/codex94/pull/80) then set the release
+  date and recorded the merge; it changed documentation only.
+- PR #78 head: `6f7f6135fbbe95247b063ca4d0ad0159404aab54`; tested merge:
+  `35d869cb9c7527d126dceea52155875711a785e9`; merged as
+  `8e1ffefb9cef10f335f8968ee6709da7b18e92a6` with tree
+  `164fb99c5cbf5e7685d8ba90da60d812a1861e76`, equal to the tested tree.
+  Frozen release commit: `bc17435e0492f6bc9ead8286dab7323236430a53`; tree:
+  `aa6171d0bdb23c6f2958a6f715c0dd1922c8315f`. The annotated `v4.3.1` tag and both
+  manual assets remain bound to that frozen commit. Documentation-only commits
+  may advance main without moving the tag or regenerating the release assets.
+- Final-main [CI run](https://github.com/DEFY-AN94/codex94/actions/runs/44089987074)
+  succeeded on attempt 1: the release gate, all five UI scenarios and the
+  attestation job. It executed 740 XCTest cases with one existing
+  hosted-key-window skip and zero failures. The
+  [CodeQL run](https://github.com/DEFY-AN94/codex94/actions/runs/44089986631)
+  completed its Actions, Python and Swift analyses successfully. PR #80's own
+  [CI run](https://github.com/DEFY-AN94/codex94/actions/runs/44048727500)
+  passed on its tested merge `d08c190b28bccf845d736f9e932b3d4189f49511`, and
+  CodeQL run 44048722192 passed on the PR head
+  `9f8296ae30a9896d7d6c350ba2c95a32db15423b`, which has the same tree. That PR
+  run's UI captures were not reviewed and its DMG artifact was not downloaded.
+- Final-main UI evidence: 55 PNGs, 49 of them distinct, and 45 JSON reports,
+  with the same file names as the second, third and fourth PR #78 runs. All
+  43 reports that carry a source revision name the release commit; the two
+  focus-observation reports carry none. An AI assistant read every file in
+  two independent passes per scenario and found no privacy problem and no
+  blocking layout problem, only cosmetic observations. The maintainer has not
+  reviewed these captures.
+- Maintainer-local acceptance of the PR #78 candidate was recorded as passed
+  on 2026-11-17, at the maintainer's instruction, with documented limits; see
+  the [candidate record](#431-candidate-scope--unreleased). It found one known
+  issue, the language of the install preview sheet
+  ([#79](https://github.com/DEFY-AN94/codex94/issues/79)), which 4.3.1 does not
+  fix. Removing a connection from a stable location, the English App
+  language, a real CLI read and any Gatekeeper flow were not exercised and
+  are not promoted by this publication.
+- [Release v4.3.1](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.1)
+  has two manual assets from the final-main distribution:
+  [Universal DMG](https://github.com/DEFY-AN94/codex94/releases/download/v4.3.1/Codex94-4.3.1-macos-universal-unnotarized.dmg),
+  SHA-256 `add26983d44117b1d7ad77f2babc00a07033cb996f5abd61c8bc771d735fc318`, and
+  [checksum file](https://github.com/DEFY-AN94/codex94/releases/download/v4.3.1/Codex94-4.3.1-SHA256SUMS.txt),
+  file SHA-256 `645757afdde3a64d25329210733c30b4e4ee09d8e793949c24895f8fa5f178d5`.
+  The checksum text records the DMG digest; its own file digest is separate.
+  The DMG remains unsigned and unnotarized; the Universal App uses only ad-hoc
+  signing with Hardened Runtime.
+- [Artifact attestation](https://github.com/DEFY-AN94/codex94/attestations/68630981)
+  binds the final DMG to this repository's `.github/workflows/ci.yml`,
+  `refs/heads/main` and the frozen source commit. Verification denies
+  self-hosted runners, and it fails when another source commit is named.
+  Provenance is not Apple signing, notarization, malware review or Gatekeeper
+  approval; the checksum file is not a separately attested subject.
+- Final CI App executable SHA-256:
+  `b49e4f12c620b1541b41b21ad0f7428ba7edcd1620032745ce0d2448b441db1f`.
+  Final package, installation, tag and publication verification:
+  The final CI DMG passed the strict two-entry payload, 4.3.1 (35),
+  arm64/x86_64, signature, Hardened Runtime and no-entitlement checks. Its App
+  is identical file for file to the PR #78 candidate used for local acceptance.
+
+  With the maintainer's gate 6 authorization, the agent moved the installed
+  4.3.0 (34) bundle to the Trash under a rollback name, where it stays
+  recoverable until the Trash is emptied, and copied the App from the
+  re-downloaded Draft DMG to `/Applications`. No Codex94 process was
+  running at that time. The installed bundle matched the DMG payload file for
+  file and passed strict signature verification. It was opened from the
+  installed path on macOS 27.3 (26C5035r) and observed for about 65 seconds:
+  one instance, no crash report and no child process. The unified log held
+  nine error-level entries for the process in that time, all from the
+  system's App Intents registration (subsystems `com.apple.appintents` and
+  `com.apple.AppKit`), and no fault entry. The Claude Code settings file and
+  the installation manifest did not change. The agent could not view the
+  interface, and Login Items were not inspected. No password, quarantine,
+  Gatekeeper or system setting was touched. Quarantine was absent on the
+  download and the installed App, so first-launch Gatekeeper acceptance
+  remains unestablished. No provider CLI read was triggered by the agent.
+
+  Annotated tag object `c69aacfc5686f79b28c0b6e80b0ad2410844c758` was narrowly
+  pushed and its remote peeled commit verified as
+  `bc17435e0492f6bc9ead8286dab7323236430a53`. The Melbourne date was checked as
+  2026-11-18 before tagging. A shallow tag clone verified only source identity
+  and version metadata, not a full-history scan. The automatic source ZIP and
+  TAR each report the frozen commit ID; their file contents were not compared
+  entry by entry.
+
+  Release ID `449338092` was published at `2026-11-17T23:49:48Z`, or
+  `2026-11-18 10:49:48` Australia/Melbourne, and verified public, Latest and
+  not a prerelease. It has exactly two manual assets: DMG `761105120`
+  (3,993,200 bytes) and checksum `761105117` (112 bytes). Draft and
+  unauthenticated public downloads matched both GitHub API digests and the
+  final-main hashes recorded above. Both downloaded DMGs passed package and
+  provenance verification against the repository, workflow, main ref, frozen
+  source digest and hosted-runner policy.
+- Subsequent publication documentation updates stable links and records only.
+  It does not move `v4.3.1`, change App/build inputs or regenerate assets.

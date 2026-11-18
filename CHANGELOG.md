@@ -8,12 +8,11 @@ below applies only to its recorded version and does not validate later releases.
 
 ## 4.3.1 - 2026-11-18
 
-Version `4.3.1 (35)`. It carries hardening changes and one defect fix on top
-of `4.3.0 (34)`. The planned release date uses Australia/Melbourne. Until
-publication is confirmed, the published stable release remains `4.3.0 (34)`.
-Publication and final-asset verification remain separate from candidate
-acceptance and are recorded in
-[docs/RELEASING.md](docs/RELEASING.md#431-candidate-scope--unreleased).
+Version `4.3.1 (35)` was published on the date above, following the published
+`4.3.0 (34)` release. It carries hardening changes and one defect fix. Release
+dates use Australia/Melbourne. Exact source, CI, package and acceptance
+evidence is recorded in
+[docs/RELEASING.md](docs/RELEASING.md#431-release-verification--2026-11-18).
 
 ### Fixed
 
@@ -154,11 +153,13 @@ candidate's, and an AI assistant's review of its 55 synthetic images and 45
 reports found no privacy problem and no blocking layout problem. The
 candidate was then merged as `8e1ffefb9cef10f335f8968ee6709da7b18e92a6`.
 
-Final-main CI and provenance for this dated revision, final DMG installation
-with first-launch acceptance, and publication are separate steps recorded in
-[the release record](docs/RELEASING.md#431-candidate-scope--unreleased).
-Earlier results, including those recorded for 4.3.0 below, do not validate
-this version.
+Final-main CI, provenance, final DMG installation and publication are recorded
+in
+[the release verification record](docs/RELEASING.md#431-release-verification--2026-11-18).
+First-launch Gatekeeper acceptance is not established. Stable download links
+identify 4.3.1; later documentation commits do not move its tag or replace its
+published assets. Earlier results, including those recorded for 4.3.0 below,
+do not validate this version.
 
 ### Known issue
 
@@ -219,8 +220,9 @@ passes. The candidate was then merged as
 
 Final-main CI, provenance, final DMG installation and publication are recorded
 in [the release verification record](docs/RELEASING.md#430-release-verification--2026-11-15). First-launch Gatekeeper acceptance
-is not established. Stable download links identify 4.3.0; later documentation
-commits do not move its tag or replace its published assets.
+is not established. Stable download links identified 4.3.0 until 4.3.1 was
+published; later documentation commits do not move its tag or replace its
+published assets.
 OAuth/HTTP research is separate and absent from the production scope.
 
 ## 4.2.0 - 2026-11-14
@@ -293,8 +295,8 @@ and earlier candidate acceptance remain in [docs/RELEASING.md](docs/RELEASING.md
   and is not fixed by this release. Use the menu-bar Dashboard action or the
   floating window's Dashboard button.
 
-Stable download links identify 4.2.0. Later documentation commits do not
-move its tag or replace its published assets.
+Stable download links identified 4.2.0 until 4.3.0 was published. Later
+documentation commits do not move its tag or replace its published assets.
 
 ## 4.1.7 - 2026-10-18
 

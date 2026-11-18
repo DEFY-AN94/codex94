@@ -1,10 +1,9 @@
 # Security
 
-## 4.3.1 candidate: installation location and input hardening
+## 4.3.1: installation location and input hardening
 
-The unreleased `4.3.1 (35)` development candidate narrows existing inputs on
-top of `4.3.0 (34)`. It adds no data source, file, permission, entitlement or
-network path.
+Version `4.3.1 (35)` narrows existing inputs on top of `4.3.0 (34)`. It adds
+no data source, file, permission, entitlement or network path.
 
 A new statusline installation is refused unless the App runs from exactly
 `/Applications/Codex94.app` or `~/Applications/Codex94.app`, the rule Launch at
@@ -46,22 +45,22 @@ so a relocated home or Library folder keeps working. A cache that fails the
 check is unreadable; the read never deletes or rewrites it, and cache writing
 is unchanged.
 
-The candidate also fixes the install preview, which could open as an empty
+Version 4.3.1 also fixes the install preview, which could open as an empty
 sheet that could not be closed. The fix changes how the sheet is presented and
 nothing else: the same preview is shown, and no file access, command or stored
 format changes.
 
-An earlier build of this candidate did not pass acceptance because of that
-defect. The fixed candidate passed CI, and on 2026-11-17 the maintainer
-accepted it after exercising the statusline connection from a disk image and
-from a temporary copy in a stable location. Removal from a stable location,
-the English App language, a real CLI read and any Gatekeeper flow were not
-exercised. The candidate is still unreleased. In that acceptance the preview
-sheet appeared in English, the first macOS language, instead of the
-Simplified Chinese chosen in Codex94
-([#79](https://github.com/DEFY-AN94/codex94/issues/79)), which changes
-no file access, command or stored format. The evidence is recorded in
-[the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased).
+An earlier build did not pass acceptance because of that defect. The fixed
+build passed CI, and on 2026-11-17 the maintainer accepted it after exercising
+the statusline connection from a disk image and from a temporary copy in a
+stable location. Removal from a stable location, the English App language, a
+real CLI read and any Gatekeeper flow were not exercised. In that acceptance
+the preview sheet appeared in English, the first macOS language, instead of
+the Simplified Chinese chosen in Codex94
+([#79](https://github.com/DEFY-AN94/codex94/issues/79)), which changes no file
+access, command or stored format. Validation, the limits of that acceptance
+and the final release evidence are recorded in
+[the release workflow](docs/RELEASING.md#431-release-verification--2026-11-18).
 
 ## 4.3.0: local activity and automatic-read admission
 
@@ -285,15 +284,15 @@ checked for integrity, runtime, no Team ID, and no entitlement keys. This does
 not establish publisher identity or Apple trust, and macOS may block the first
 launch.
 
-Verify `Codex94-4.3.0-SHA256SUMS.txt` before opening the DMG. The optional
+Verify `Codex94-4.3.1-SHA256SUMS.txt` before opening the DMG. The optional
 GitHub command can verify repository/workflow/commit provenance for the exact DMG:
 
 ```bash
-gh attestation verify Codex94-4.3.0-macos-universal-unnotarized.dmg \
+gh attestation verify Codex94-4.3.1-macos-universal-unnotarized.dmg \
   -R DEFY-AN94/codex94 \
   --signer-workflow DEFY-AN94/codex94/.github/workflows/ci.yml \
   --source-ref refs/heads/main \
-  --source-digest fd991dff95a9595e96d0d2d615847b4fd4f40487 \
+  --source-digest bc17435e0492f6bc9ead8286dab7323236430a53 \
   --deny-self-hosted-runners
 ```
 
@@ -435,8 +434,8 @@ Version `4.0.1 (22)` uses passive Claude reports by default with explicit
 report-stream adoption and a separate default-off CLI reader. The retained
 `v4.0.0` tag identifies an unpublished candidate, not a supported stable release.
 
-The supported published stable version is [`v4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0),
-released on 2026-11-15 (Australia/Melbourne).
+The supported published stable version is [`v4.3.1 (35)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.1),
+released on 2026-11-18 (Australia/Melbourne).
 Feature branches and `main` may contain development work that has not passed
 release acceptance. Current stable-version links identify the published release.
 Version `3.1.4` adjusts bounded quota deadlines and permits three extra
@@ -462,8 +461,12 @@ visually and privacy reviewed. Contributor validation guidance is documented in
 security or release evidence. Every release candidate needs its own checks,
 candidate App acceptance (before Ready unless the maintainer explicitly
 authorizes another order), and final CI artifact/tag/Release verification and
-maintainer acceptance before publication. The 4.3.0 authorization and acceptance
-are recorded in [the release workflow](docs/RELEASING.md#430-release-verification--2026-11-15).
+maintainer acceptance before publication. For 4.3.1 the authorizations and the
+candidate acceptance with its limits are recorded in
+[the candidate record](docs/RELEASING.md#431-candidate-scope--unreleased). The
+final install was checked by an agent without a view of the interface, as
+recorded in
+[the release verification](docs/RELEASING.md#431-release-verification--2026-11-18).
 
 ## Reporting
 

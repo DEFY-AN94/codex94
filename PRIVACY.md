@@ -2,15 +2,14 @@
 
 Codex94 is a macOS utility. It has no analytics, advertising, telemetry upload,
 crash-reporting SDK, system profiling, or Codex94-operated server. The published
-stable version is [`v4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0),
-released on 2026-11-15 (Australia/Melbourne). It includes the user-triggered
+stable version is [`v4.3.1 (35)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.1),
+released on 2026-11-18 (Australia/Melbourne). It includes the user-triggered
 public GitHub release check described below, without automatic installation.
 
-## 4.3.1 candidate: installation location and local-file reads
+## 4.3.1: installation location and local-file reads
 
-The unreleased `4.3.1 (35)` development candidate stores no new data and sends
-none. It adds no file, preference, network request or permission on top of
-`4.3.0 (34)`.
+Version `4.3.1 (35)` stores no new data and sends none. It adds no file,
+preference, network request or permission on top of `4.3.0 (34)`.
 
 A new statusline connection can be installed only while Codex94 runs from
 `/Applications/Codex94.app` or `~/Applications/Codex94.app`. The requirement
@@ -34,21 +33,21 @@ it is treated as unreadable, the read leaves it untouched, and quota appears
 after the next successful quota refresh. The cache's contents and the way it is
 written are unchanged.
 
-The candidate also fixes the install preview, which could open as an empty
+Version 4.3.1 also fixes the install preview, which could open as an empty
 sheet that could not be closed. The fix changes how the sheet is presented,
 not what is read, written or sent.
 
-An earlier build of this candidate did not pass acceptance because of that
-defect. The fixed candidate passed CI, and on 2026-11-17 the maintainer
-accepted it after exercising the statusline connection from a disk image and
-from a temporary copy in a stable location. Removal from a stable location,
-the English App language, a real CLI read and any Gatekeeper flow were not
-exercised. The candidate is still unreleased. In that acceptance the preview
-sheet appeared in English, the first macOS language, instead of the
-Simplified Chinese chosen in Codex94
-([#79](https://github.com/DEFY-AN94/codex94/issues/79)), which changes
-nothing that is read, written or sent. The evidence is recorded in
-[the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased).
+An earlier build did not pass acceptance because of that defect. The fixed
+build passed CI, and on 2026-11-17 the maintainer accepted it after exercising
+the statusline connection from a disk image and from a temporary copy in a
+stable location. Removal from a stable location, the English App language, a
+real CLI read and any Gatekeeper flow were not exercised. In that acceptance
+the preview sheet appeared in English, the first macOS language, instead of
+the Simplified Chinese chosen in Codex94
+([#79](https://github.com/DEFY-AN94/codex94/issues/79)), which changes nothing
+that is read, written or sent. Validation, the limits of that acceptance and
+the final release evidence are recorded in
+[the release workflow](docs/RELEASING.md#431-release-verification--2026-11-18).
 
 ## 4.3.0: local bridge health and on-demand CLI
 
