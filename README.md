@@ -12,7 +12,7 @@ existing local usage reports by default; automatic Claude CLI reads are a
 separate, default-off choice. The app is MIT-licensed, built with SwiftUI/AppKit,
 and bundles no third-party runtime frameworks.
 
-**Latest stable:** [`4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0)
+**Latest stable:** [`4.3.1 (35)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.1)
 · macOS 14+ · Apple Silicon and Intel · English and Simplified Chinese
 
 [Features](#features) · [Screenshots](#screenshots) · [Install](#installation)
@@ -32,7 +32,7 @@ only fixed-enum `phase`, `result` and `issue` values, `usage_sent` and
 account details or quota values. See
 [4.1.7 changes](CHANGELOG.md#417---2026-10-18).
 
-### Previous release: 4.2.0 (33)
+### Earlier release: 4.2.0 (33)
 
 Version 4.2.0 adds a Claude source-health card in **Dashboard →
 Services**, a separate local-report reread action that never starts the CLI,
@@ -77,10 +77,9 @@ Known issue in 4.2.0: Command-comma can open an empty Settings window when the
 popover is closed ([#73](https://github.com/DEFY-AN94/codex94/issues/73)).
 Version 4.3.0 fixes it.
 
-### Current release: 4.3.0 (34)
+### Previous release: 4.3.0 (34)
 
-Version 4.3.0 was published on **2026-11-15** (Australia/Melbourne); the
-installation links below select it.
+Version 4.3.0 was published on **2026-11-15** (Australia/Melbourne).
 
 - Application Settings and **⌘,** open or restore the existing Dashboard,
   including when the popover is closed, addressing
@@ -114,14 +113,15 @@ first-launch Gatekeeper acceptance is not established.
 Known issue in 4.2.0 and 4.3.0: with no statusline connection installed,
 **Preview setup…** in Services can open an empty sheet that cannot be closed
 and that blocks quitting. Force quit Codex94 from Activity Monitor if it
-appears. Existing connections and their removal are not affected. The
-unreleased 4.3.1 candidate below carries the fix. The empty sheet was observed
-on 4.3.0; 4.2.0 shares the code but was not retested.
+appears. Existing connections and their removal are not affected. Version
+4.3.1 fixes it. The empty sheet was observed on 4.3.0; 4.2.0 shares the code
+but was not retested.
 
-### Development candidate: 4.3.1 (35), Unreleased
+### Current release: 4.3.1 (35)
 
-This candidate contains hardening changes and one defect fix on top of 4.3.0
-and is not a published release.
+Version 4.3.1 was published on **2026-11-18** (Australia/Melbourne); the
+installation links below select it. It contains hardening changes and one
+defect fix on top of 4.3.0.
 
 - A **new statusline connection** can be installed only while Codex94 runs from
   exactly `/Applications/Codex94.app` or `~/Applications/Codex94.app`, the
@@ -144,20 +144,19 @@ and is not a published release.
   folders remain allowed). The read leaves an unreadable cache untouched, and
   quota appears after the next successful quota refresh.
 
-Known issue in this candidate: the install preview sheet does not follow the
-language chosen in Codex94. During acceptance it appeared in English, the
-first macOS language, while the rest of the App was in Simplified Chinese; it
-appears to use the macOS language. Its buttons work and what it writes is
-correct ([#79](https://github.com/DEFY-AN94/codex94/issues/79)).
+Known issue in 4.3.1: the install preview sheet does not follow the language
+chosen in Codex94. During acceptance it appeared in English, the first macOS
+language, while the rest of the App was in Simplified Chinese; it appears to
+use the macOS language. Its buttons work and what it writes is correct
+([#79](https://github.com/DEFY-AN94/codex94/issues/79)).
 
-An earlier build of this candidate did not pass App acceptance because of the
-empty preview sheet. The fixed candidate passed CI, and the maintainer
-accepted it on 2026-11-17 with the known issue above. That acceptance did not
-exercise removing a connection from a stable location, the English App
-language, a real CLI read or any Gatekeeper flow. The candidate is still
-unreleased. The evidence and the release steps that remain are recorded in
-[the release workflow](docs/RELEASING.md#431-candidate-scope--unreleased). See
-[4.3.1 changes](CHANGELOG.md#431---2026-11-18).
+An earlier build did not pass App acceptance because of the empty preview
+sheet. The maintainer accepted the fixed build on 2026-11-17 with the known
+issue above. That acceptance did not exercise removing a connection from a
+stable location, the English App language, a real CLI read or any Gatekeeper
+flow, and first-launch Gatekeeper acceptance is not established. See
+[4.3.1 changes](CHANGELOG.md#431---2026-11-18) and the
+[release verification record](docs/RELEASING.md#431-release-verification--2026-11-18).
 
 ## Features
 
@@ -347,7 +346,7 @@ can start; repeated one-time clicks do not queue extra reads.
 ## Screenshots
 
 All screenshots use isolated synthetic data, not a real account or live usage.
-These are historical captures, not screenshots of the current 4.3.0 interface.
+These are historical captures, not screenshots of the current 4.3.1 interface.
 The chart previews were captured during `0.3.0 (14)` candidate testing and
 show **Bar chart** and **Line chart** over the same seven reported days. These
 original synthetic captures remain unchanged, from [CI run 35521556558](https://github.com/DEFY-AN94/codex94/actions/runs/35521556558).
@@ -392,8 +391,8 @@ statistics and update UI.
 ## Installation
 
 The published stable release is
-[`v4.3.0 (34)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0),
-released on **2026-11-15** (Australia/Melbourne), with a Universal 2 DMG and source
+[`v4.3.1 (35)`](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.1),
+released on **2026-11-18** (Australia/Melbourne), with a Universal 2 DMG and source
 from the same annotated tag. The download and clone instructions below use
 that release; later documentation commits do not move its tag or replace assets.
 
@@ -427,27 +426,27 @@ precedence; an invalid manual choice is not silently bypassed.
 ### Install the Universal DMG
 
 Download both stable assets from the
-[`v4.3.0` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0):
+[`v4.3.1` release page](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.1):
 
-- `Codex94-4.3.0-macos-universal-unnotarized.dmg`
-- `Codex94-4.3.0-SHA256SUMS.txt`
+- `Codex94-4.3.1-macos-universal-unnotarized.dmg`
+- `Codex94-4.3.1-SHA256SUMS.txt`
 
 The DMG supports Apple Silicon (`arm64`) and Intel (`x86_64`) on macOS
 14 or later. Verify the checksum before opening it:
 
 ```bash
-shasum -a 256 -c Codex94-4.3.0-SHA256SUMS.txt
+shasum -a 256 -c Codex94-4.3.1-SHA256SUMS.txt
 ```
 
 If you have the GitHub CLI, verify that the exact DMG came from this
 repository's GitHub workflow and commit:
 
 ```bash
-gh attestation verify Codex94-4.3.0-macos-universal-unnotarized.dmg \
+gh attestation verify Codex94-4.3.1-macos-universal-unnotarized.dmg \
   -R DEFY-AN94/codex94 \
   --signer-workflow DEFY-AN94/codex94/.github/workflows/ci.yml \
   --source-ref refs/heads/main \
-  --source-digest fd991dff95a9595e96d0d2d615847b4fd4f40487 \
+  --source-digest bc17435e0492f6bc9ead8286dab7323236430a53 \
   --deny-self-hosted-runners
 ```
 
@@ -471,7 +470,7 @@ This public repository needs no GitHub authentication. Clone the published
 stable source tag:
 
 ```bash
-git clone --branch v4.3.0 --depth 1 https://github.com/DEFY-AN94/codex94.git
+git clone --branch v4.3.1 --depth 1 https://github.com/DEFY-AN94/codex94.git
 ```
 
 Then build the selected tag:

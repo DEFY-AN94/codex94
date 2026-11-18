@@ -1,23 +1,22 @@
 # Component ownership and reuse
 
 This describes ownership and reuse constraints for the published
-[`4.3.0 (34)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.0),
-published on 2026-11-15 (Australia/Melbourne). It includes the changes
+[`4.3.1 (35)` release](https://github.com/DEFY-AN94/codex94/releases/tag/v4.3.1),
+published on 2026-11-18 (Australia/Melbourne). It includes the changes
 developed for the unpublished `4.1.8 (32)` candidate and retains the
 unpublished `4.0.2 (23)` work carried into 4.1.0.
 Test results and final package acceptance are separate evidence; this document
 defines component responsibilities, not a substitute for those records.
 
-## 4.3.1 candidate: installation location and input hardening
+## 4.3.1 release: installation location and input hardening
 
-The unreleased `4.3.1 (35)` development candidate adds the following ownership
-rules on top of `4.3.0 (34)`. It introduces no new source file, stored file or
-dependency. An earlier build of this candidate did not pass acceptance. The
-fixed candidate passed CI, and on 2026-11-17 the maintainer accepted it after
-exercising the statusline connection, with one known issue in the install
-preview (see below). The candidate is still unreleased. The evidence and what
-that acceptance did not exercise are recorded in
-[the release workflow](RELEASING.md#431-candidate-scope--unreleased).
+Version `4.3.1 (35)` adds the following ownership rules on top of
+`4.3.0 (34)`. It introduces no new source file, stored file or dependency. An
+earlier build did not pass acceptance. The fixed build passed CI, and on
+2026-11-17 the maintainer accepted it after exercising the statusline
+connection, with one known issue in the install preview (see below). The
+evidence and what that acceptance did not exercise are recorded in
+[the release workflow](RELEASING.md#431-release-verification--2026-11-18).
 
 ### Stable-install rule
 
